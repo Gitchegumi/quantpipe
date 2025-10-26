@@ -34,6 +34,12 @@ All strategies MUST undergo comprehensive backtesting on historical data before 
 Backtesting MUST include realistic transaction costs, slippage, and market impact modeling.
 Out-of-sample validation required using walk-forward analysis or cross-validation techniques.
 
+#### Model Evaluation Standards
+
+- Performance metrics MUST include accuracy, precision/recall, Sharpe ratio, and maximum drawdown.
+- Statistical significance of results MUST be verified (p-value < 0.05).
+- Backtest equity curves MUST be reviewed for non-stationarity and overfitting indicators.
+
 **Rationale**: Historical performance validation helps identify strategy robustness and prevents overfitting while providing confidence estimates for live trading.
 
 ### IV. Real-Time Performance Monitoring
@@ -52,6 +58,43 @@ Trading logs MUST maintain audit trails for regulatory compliance and performanc
 
 **Rationale**: Trading decisions depend on accurate data; security breaches or data corruption can result in significant financial losses.
 
+### VI. Data Version Control and Provenance
+
+All historical and live market data used in research, backtesting, and production MUST be traceable, reproducible, and verifiable without requiring storage of raw data in the version control system.
+
+*Requirements:*
+
+**Data Manifest**:
+Each dataset MUST have a manifest file stored in version control (e.g., data_manifest.yaml or .json) containing:
+
+- Source URL or provider name
+- Instrument or symbol (e.g., EURUSD, US500)
+- Timeframe (e.g., 1m, 15m, 1h)
+- Date range covered
+- Download date
+- File checksum (e.g., SHA256)
+- Preprocessing summary (timezone normalization, deduplication, etc.)
+
+**Storage Policy**:
+Raw data files SHOULD be stored locally or in designated external storage (e.g., /data/raw/ or cloud bucket) and excluded from Git via .gitignore.
+
+**Integrity Verification**:
+Before use in backtesting or live models, datasets MUST pass checksum verification against the manifest entry to confirm authenticity and completeness.
+
+**Reproducibility**:
+Any backtest or analysis MUST specify the data manifest version and hash used to ensure results can be independently replicated.
+
+**Rationale**:
+Maintaining lightweight metadata rather than raw data in version control ensures full reproducibility and traceability while avoiding repository bloat or performance degradation.
+
+### VII. Model Parsimony and Interpretability
+
+All predictive models MUST prioritize simplicity, interpretability, and statistical soundness over raw complexity.
+Feature sets MUST be justified by empirical evidence or economic rationale.
+Over-parameterized models or redundant indicators are prohibited unless explicitly validated by out-of-sample performance gains.
+
+**Rationale**: Parsimonious models generalize better, reduce computational overhead, and align with disciplined quantitative methodology.
+
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -67,6 +110,8 @@ All trading strategies MUST comply with the following risk management requiremen
 Strategy development follows a structured pipeline:
 
 1. **Research Phase**: Market analysis, signal identification, and preliminary testing
+   - Research deliverables MUST include hypothesis documentation, parameter rationale, and expected risk/return profile.
+   - Artifacts MUST be stored in /research/ and linked to GitHub Spec Kit issues for traceability.
 2. **Implementation Phase**: Code development following strategy-first architecture principles
 3. **Validation Phase**: Comprehensive backtesting and risk assessment
 4. **Staging Phase**: Paper trading and real-time validation without capital risk
@@ -80,10 +125,16 @@ This constitution supersedes all other development practices and trading procedu
 All code reviews MUST verify compliance with risk management and architectural principles.
 Strategy performance MUST be regularly reviewed against constitutional requirements.
 
+Versioning Policy:
+
+- Patch (x.y.z): minor text or clarity updates
+- Minor (x.y.0): procedural or workflow changes
+- Major (x.0.0): structural or principle revisions
+
 Amendments require:
 
 - Technical impact assessment and migration plan
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version**: 1.0.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-25
+**Version**: 1.1.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-25
