@@ -95,6 +95,7 @@ User wants to run a historical backtest and obtain standardized performance metr
 - **FR-003**: System MUST detect pullback state when price closes within PULLBACK_DISTANCE_RATIO of fast EMA and momentum oscillator in opposing extreme (RSI < OVERSOLD or RSI > OVERBOUGHT depending on trend).
 - **FR-004**: System MUST validate reversal trigger via candle pattern set {bullish_engulfing, bearish_engulfing, pin_bar, strong_close} combined with momentum turn (RSI slope sign change) before signal emission.
 - **FR-005**: System MUST output structured trade signal object with fields: id, timestamp_utc, pair, direction, entry_price, initial_stop_price, risk_per_trade_pct, calc_position_size, tags[], version.
+- **FR-005**: System MUST output structured trade signal object with fields: id, timestamp_utc, pair, direction, entry_price, initial_stop_price, risk_per_trade_pct, calc_position_size, tags[], version. The id MUST be a deterministic lowercase hex hash of the concatenated string (timestamp_utc|pair|direction|entry_price|strategy_version) using SHA-256 truncated to first 16 characters to ensure reproducibility across identical reruns.
 - **FR-006**: System MUST compute initial stop using max(ATR * ATR_STOP_MULT, MIN_STOP_DISTANCE) relative to recent swing point consistent with signal direction.
 - **FR-007**: System MUST derive position size from account_equity * risk_per_trade_pct / (entry_price - stop_price adjusted for pip value & lot sizing).
 - **FR-008**: System MUST enforce portfolio-level exposure constraints (no more than MAX_OPEN_TRADES or MAX_PAIR_EXPOSURE per pair).
@@ -118,6 +119,8 @@ User wants to run a historical backtest and obtain standardized performance metr
 - **FR-026**: When both TARGET_R_MULT and ATR_TRAIL_MULT enabled, system MUST prioritize fixed R exit; if TARGET_R_MULT not reached within EXIT_TARGET_MAX_CANDLES from entry, trailing stop activation supersedes fixed target.
 - **FR-027**: System MUST classify volatility regimes using rolling ATR_REGIME_WINDOW candle percentiles: ATR < LOW_PCTL (e.g.,10) => LOW; ATR > HIGH_PCTL (e.g.,90) => HIGH.
 - **FR-028**: If ENABLE_HTF_FILTER=true, system MUST require HTF_EMA_FAST > HTF_EMA_SLOW for long signals and HTF_EMA_FAST < HTF_EMA_SLOW for short; otherwise suppress signal.
+- **FR-029**: System MUST capture and expose observability metrics each backtest run: candle_processing_latency_ms_p95, avg_entry_slippage_pips, avg_exit_slippage_pips, drawdown_curve (array of timestamp,drawwdown_R), trade_outcome_distribution (win_count, loss_count, avg_win_R, avg_loss_R), and persist them in the run summary. Metrics MUST be derivable deterministically from trade log and timing samples.
+- **FR-030**: System MUST ingest historical candle data via streaming chunked processing (chunk size CHUNK_SIZE_CANDLES configurable; default 10_000) maintaining rolling indicator states (EMA, ATR, RSI) without reprocessing earlier candles. Memory footprint for data buffers MUST remain ≤ MEMORY_MAX_BYTES (planning default: 150MB) for 1 year of 1m data on one pair. Strategy MUST flush processed chunks except minimal rolling state to enable multi-year backtests.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -146,6 +149,10 @@ User wants to run a historical backtest and obtain standardized performance metr
 - **SC-006**: At least 30 trades generated in core validation dataset (sufficient sample for initial evaluation) OR system flags insufficiency.
 - **SC-007**: No strategy crash on malformed/missing candle test dataset; graceful degradation recorded.
 - **SC-008**: Performance expectancy (avg_R * win_rate - (1 - win_rate)) remains ≥ -0.2 in baseline sample (avoid obviously unviable configuration).
+- **SC-009**: p95 candle_processing_latency_ms ≤ 5ms on reference machine for 1m aggregated to 15m timeframe.
+- **SC-010**: avg_entry_slippage_pips within configured SLIPPAGE_TOLERANCE_PIPS (default ≤ 1.5 pips) in ≥ 95% of trades.
+- **SC-011**: Peak resident memory during backtest of 1 year 1m data (single pair) ≤ 150MB.
+- **SC-012**: Backtest throughput ≥ 50k candles/second on reference machine configuration.
 
 ## Assumptions
 
@@ -183,6 +190,14 @@ All previous clarification markers resolved:
 - FR-028 higher timeframe filter requires dual EMA alignment.
 
 Remaining parameterization will be finalized in planning phase.
+
+## Clarifications
+
+### Session 2025-10-25
+
+- Q: What uniqueness & reproducibility scheme should TradeSignal id use? → A: Deterministic composite SHA-256 hash of (timestamp_utc|pair|direction|entry_price|strategy_version) truncated to 16 hex chars.
+- Q: What observability metrics set should be logged? → A: Trade outcomes + latency per candle + slippage stats + drawdown curve snapshot (FR-029, SC-009, SC-010 added).
+- Q: What scalability/data ingestion approach should be used? → A: Streaming chunked ingestion with rolling indicators (FR-030, SC-011, SC-012 added).
 
 ## NEXT STEPS
 
