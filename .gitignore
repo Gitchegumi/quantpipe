@@ -211,3 +211,6 @@ __marimo__/
 
 # VScode Workspace Settings
 *.code-workspace
+
+#Historical Price Data
+price_data/
