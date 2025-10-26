@@ -208,3 +208,6 @@ __marimo__/
 
 # Spec Kit Files
 .github/prompts
+
+# VScode Workspace Settings
+*.code-workspace
