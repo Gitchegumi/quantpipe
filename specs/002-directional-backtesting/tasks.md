@@ -295,23 +295,23 @@ Run `poetry run python -m src.cli.run_backtest --direction BOTH --data price_dat
 
 **Tasks**:
 
-### JSON Implementation
+### JSON Implementation (Renumbered to resolve T056 duplication)
 
-- [ ] T056 [P] [US4] Create format_json_output function in src/io/formatters.py
-- [ ] T057 [P] [US4] Implement JSON serialization for BacktestResult (handle NaN/Infinity as null) in src/io/formatters.py
-- [ ] T058 [P] [US4] Implement datetime serialization (ISO 8601 UTC) in src/io/formatters.py
-- [ ] T059 [P] [US4] Add JSON schema validation against contracts/json-output-schema.json in src/io/formatters.py
-- [ ] T060 [P] [US4] Update CLI argument parser to accept --output-format {text,json} in src/cli/run_backtest.py
-- [ ] T061 [P] [US4] Wire format_json_output call for JSON mode in CLI main function in src/cli/run_backtest.py
-- [ ] T062 [P] [US4] Update filename generation for .json extension in src/io/formatters.py
+- [ ] T116 [P] [US4] Create format_json_output function in src/io/formatters.py
+- [ ] T117 [P] [US4] Implement JSON serialization for BacktestResult (handle NaN/Infinity as null) in src/io/formatters.py
+- [ ] T118 [P] [US4] Implement datetime serialization (ISO 8601 UTC) in src/io/formatters.py
+- [ ] T119 [P] [US4] Add JSON schema validation against contracts/json-output-schema.json in src/io/formatters.py
+- [ ] T120 [P] [US4] Update CLI argument parser to accept --output-format {text,json} in src/cli/run_backtest.py
+- [ ] T121 [P] [US4] Wire format_json_output call for JSON mode in CLI main function in src/cli/run_backtest.py
+- [ ] T122 [P] [US4] Update filename generation for .json extension in src/io/formatters.py
 
-### JSON Testing
+### JSON Testing (Renumbered)
 
-- [ ] T063 [P] [US4] Add JSON output test (verify valid JSON structure) in tests/unit/test_output_formatters.py
-- [ ] T064 [P] [US4] Add JSON schema validation test (validate against contracts/json-output-schema.json) in tests/unit/test_output_formatters.py
-- [ ] T065 [P] [US4] Add datetime serialization test (verify ISO 8601 UTC format per FR-023) in tests/unit/test_output_formatters.py
-- [ ] T066 [P] [US4] Add NaN/Infinity handling test (verify null serialization per FR-024) in tests/unit/test_output_formatters.py
-- [ ] T067 [P] [US4] Add integration test for JSON output with all direction modes in tests/integration/test_directional_backtesting.py
+- [ ] T123 [P] [US4] Add JSON output test (verify valid JSON structure) in tests/unit/test_output_formatters.py
+- [ ] T124 [P] [US4] Add JSON schema validation test (validate against contracts/json-output-schema.json) in tests/unit/test_output_formatters.py
+- [ ] T125 [P] [US4] Add datetime serialization test (verify ISO 8601 UTC format per FR-023) in tests/unit/test_output_formatters.py
+- [ ] T126 [P] [US4] Add NaN/Infinity handling test (verify null serialization per FR-024) in tests/unit/test_output_formatters.py
+- [ ] T127 [P] [US4] Add integration test for JSON output with all direction modes in tests/integration/test_directional_backtesting.py
 
 **Independent Test**:
 Run `poetry run python -m src.cli.run_backtest --direction LONG --data price_data/eurusd/DAT_MT_EURUSD_M1_2020.csv --output-format json` → outputs valid JSON file. Parse JSON with external tool (e.g., `jq`), validate against schema, verify all fields conform to spec (ISO 8601 timestamps, null for NaN).
@@ -428,8 +428,8 @@ All tests pass, code quality checks pass, performance targets met, manual smoke 
 - Phase 2 (Foundational): 17 tasks (BLOCKS all user stories)
 - Phase 3 (US1 - LONG): 11 tasks
 - Phase 4 (US2 - SHORT): 9 tasks
-- Phase 5 (US3 - BOTH): 12 tasks (includes new T056 for timestamp-first-wins test)
-- Phase 6 (US4 - JSON): 12 tasks
+- Phase 5 (US3 - BOTH): 12 tasks (includes T056 timestamp-first-wins test)
+- Phase 6 (US4 - JSON): 12 tasks (renumbered to T116–T127)
 - Phase 7 (US5 - Dry-Run): 10 tasks
 - Phase 8 (Polish): 23 tasks
 
@@ -459,3 +459,41 @@ All tests pass, code quality checks pass, performance targets met, manual smoke 
 **Ready for execution** ✓
 
 **Note on SC-006 (95% success rate)**: This success criterion requires post-deployment monitoring and cannot be validated in pre-release testing. Recommend tracking via production metrics dashboard after initial deployment.
+
+---
+
+## Remediation Addendum (2025-10-29)
+
+Coverage analysis identified gaps for certain functional requirements (FR-008 data ingestion invocation, FR-009 execution loop for BOTH mode, FR-015 run metadata + reproducibility hash, FR-018 logging completeness for SHORT/BOTH, FR-019 log-level argument support, FR-020 output writing for all modes) and success criteria (SC-007 deterministic reproducibility test, SC-008 explicit readability verification). The following additional tasks close these gaps. These are appended rather than renumbering existing entries to preserve historical traceability.
+
+### Additional Tasks (Remediation)
+
+- [ ] T102 [Remediation] Integrate data ingestion step in BacktestOrchestrator.run_backtest (load candles via existing io/data module) before signal generation (FR-008) in src/backtest/orchestrator.py
+- [ ] T103 [Remediation] Implement BOTH mode execution loop (iterate merged non-conflicting signals and call simulate_execution) (FR-009) in src/backtest/orchestrator.py
+- [ ] T104 [Remediation] Implement run metadata assembly (run_id, parameters_hash placeholder, manifest_ref, start/end timestamps, total_candles_processed) (FR-015) in src/backtest/orchestrator.py
+- [ ] T105 [Remediation] Implement reproducibility_hash generation (stable hash of direction + data file name + candle count) and add unit test (SC-007, FR-015) in src/backtest/orchestrator.py & tests/unit/test_backtest_orchestrator.py
+- [ ] T106 [Remediation] Add logging progress for SHORT mode (signal count, execution progress) (FR-018) in src/cli/run_backtest.py
+- [ ] T107 [Remediation] Add logging progress for BOTH mode (pre/post merge counts, conflicts count, execution progress) (FR-018) in src/cli/run_backtest.py
+- [ ] T108 [Remediation] Add --log-level argument parser support and propagation to logging setup (FR-019) in src/cli/run_backtest.py
+- [ ] T109 [Remediation] Add unit test for --log-level argument (verify DEBUG enables verbose messages) (FR-019) in tests/unit/test_cli_arguments.py
+- [ ] T110 [Remediation] Add file writing logic for SHORT mode text output (FR-020) in src/cli/run_backtest.py
+- [ ] T111 [Remediation] Add file writing logic for BOTH mode text output (FR-020) in src/cli/run_backtest.py
+- [ ] T112 [Remediation] Add file writing logic for JSON output (all modes) (FR-020) in src/cli/run_backtest.py
+- [ ] T113 [Remediation] Add test verifying output files created for SHORT, BOTH, JSON modes (FR-020) in tests/integration/test_directional_backtesting.py
+- [ ] T114 [Remediation] Add readability test for text output (assert presence of labeled sections: "Run Metadata", "Metrics Summary") (SC-008) in tests/unit/test_output_formatters.py
+- [ ] T115 [Remediation] Add deterministic reproducibility test (run twice same inputs, compare reproducibility_hash) (SC-007) in tests/integration/test_directional_backtesting.py
+
+### Updated Coverage Summary
+
+After completion of T102–T115:
+
+- FR-008, FR-009 (BOTH execution), FR-015, FR-018 (SHORT/BOTH logging), FR-019, FR-020 fully covered by explicit implementation + tests.
+- SC-007 determinism gains explicit integration + test (T105, T115).
+- SC-008 readability gains explicit test (T114).
+
+Total Tasks: 127 (original 101 + 15 remediation + 11 renumbered JSON tasks added to new range preserving count)
+Remediation Tasks: 15 (12 implementation, 3 tests only)
+
+No further uncovered functional requirements remain; edge cases all mapped.
+
+---
