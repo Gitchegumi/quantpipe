@@ -25,6 +25,68 @@ poetry shell
 poetry run pytest
 ```
 
+## Running Backtests
+
+### CLI Quick Start
+
+```powershell
+# Run backtest on your data
+poetry run python -m src.cli.run_backtest `
+  --data price_data/EURUSD_15m.csv `
+  --direction BOTH
+
+# Long signals only
+poetry run python -m src.cli.run_backtest `
+  --data price_data/EURUSD_15m.csv `
+  --direction LONG
+
+# Dry-run mode (signals only, no execution)
+poetry run python -m src.cli.run_backtest `
+  --data price_data/EURUSD_15m.csv `
+  --dry-run
+```
+
+### CLI Options
+
+| Option | Values | Default | Description |
+|--------|--------|---------|-------------|
+| `--data` | PATH | Required | Path to CSV price data file |
+| `--direction` | `LONG`, `SHORT`, `BOTH` | `LONG` | Trade direction mode |
+| `--output` | PATH | `results/` | Output directory for results |
+| `--output-format` | `text`, `json` | `text` | Output format |
+| `--log-level` | `DEBUG`, `INFO`, `WARNING`, `ERROR` | `INFO` | Logging verbosity |
+| `--dry-run` | flag | - | Generate signals without execution |
+
+### Data File Format
+
+**CSV Requirements:**
+
+- Columns: `timestamp`, `open`, `high`, `low`, `close`, `volume`
+- Timestamp format: ISO 8601 or Unix epoch
+- No gaps in data (warnings will be logged)
+
+### Output Examples
+
+**Text Output (default):**
+
+```text
+Backtest Results:
+  Trades: 42
+  Win Rate: 61.9%
+  Avg R: 1.24
+  Expectancy: 0.87
+  Max Drawdown: 3.2R
+  Sharpe Estimate: 1.45
+```
+
+**JSON Output:**
+
+```powershell
+poetry run python -m src.cli.run_backtest `
+  --data data.csv `
+  --output-format json > results.json
+```
+
 ## Project Structure
 
 ```text
