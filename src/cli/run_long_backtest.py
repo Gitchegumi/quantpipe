@@ -170,10 +170,12 @@ def run_simple_backtest(
 
     return {
         "signals_generated": signals_generated,
-        "total_trades": summary.total_trades,
-        "win_rate_pct": summary.win_rate_pct,
+        "trade_count": summary.trade_count,
+        "win_rate": summary.win_rate,
         "expectancy": summary.expectancy,
-        "total_pnl_r": summary.total_pnl_r,
+        "avg_r": summary.avg_r,
+        "sharpe_estimate": summary.sharpe_estimate,
+        "profit_factor": summary.profit_factor,
     }
 
 

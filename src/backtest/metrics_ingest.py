@@ -151,22 +151,30 @@ class MetricsIngestor:
         else:
             sharpe_estimate = 0.0
 
+        # Calculate avg win/loss
+        avg_win_r = sum(e.pnl_r for e in self.executions if e.pnl_r > 0) / self.winning_trades if self.winning_trades > 0 else 0.0
+        avg_loss_r = abs(sum(e.pnl_r for e in self.executions if e.pnl_r < 0)) / self.losing_trades if self.losing_trades > 0 else 0.0
+        avg_r = self.total_pnl_r / self.total_trades if self.total_trades > 0 else 0.0
+
         summary = MetricsSummary(
-            total_trades=self.total_trades,
-            winning_trades=self.winning_trades,
-            losing_trades=self.losing_trades,
-            breakeven_trades=self.breakeven_trades,
-            win_rate_pct=win_rate_pct,
+            trade_count=self.total_trades,
+            win_count=self.winning_trades,
+            loss_count=self.losing_trades,
+            win_rate=win_rate_pct / 100.0,  # Convert to 0.0-1.0
+            avg_win_r=avg_win_r,
+            avg_loss_r=avg_loss_r,
+            avg_r=avg_r,
             expectancy=expectancy,
-            total_pnl_r=self.total_pnl_r,
-            max_drawdown_r=self.max_drawdown_r,
             sharpe_estimate=sharpe_estimate,
             profit_factor=profit_factor,
+            max_drawdown_r=self.max_drawdown_r,
+            latency_p95_ms=0.0,  # TODO: implement latency tracking
+            latency_mean_ms=0.0,
         )
 
         logger.info(
-            f"Metrics summary: total_trades={summary.total_trades}, "
-            f"win_rate={summary.win_rate_pct:.1f}%, "
+            f"Metrics summary: trade_count={summary.trade_count}, "
+            f"win_rate={summary.win_rate:.1%}, "
             f"expectancy={summary.expectancy:.2f}R"
         )
 

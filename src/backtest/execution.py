@@ -97,7 +97,14 @@ def simulate_execution(
     # Track trade through subsequent candles
     candles_in_trade = 0
     trailing_stop_active = False
-    trailing_stop_price = signal.stop_loss_price
+    trailing_stop_price = signal.initial_stop_price
+
+    # Calculate take-profit from initial stop (2R default)
+    risk_distance = abs(entry_fill_price - signal.initial_stop_price)
+    if signal.direction == "LONG":
+        take_profit_price = entry_fill_price + (risk_distance * 2.0)
+    else:  # SHORT
+        take_profit_price = entry_fill_price - (risk_distance * 2.0)
 
     for i in range(entry_candle_idx + 1, len(candles)):
         candle = candles[i]
@@ -107,7 +114,7 @@ def simulate_execution(
         if candles_in_trade >= trailing_stop_timeout_candles:
             if not trailing_stop_active:
                 trailing_stop_active = True
-                trailing_stop_price = signal.stop_loss_price
+                trailing_stop_price = signal.initial_stop_price
                 logger.debug(
                     f"Trailing stop activated after {trailing_stop_timeout_candles} candles"
                 )
@@ -116,12 +123,12 @@ def simulate_execution(
         if trailing_stop_active:
             if signal.direction == "LONG":
                 # Trail stop up as price rises
-                potential_stop = candle.close - abs(signal.entry_price - signal.stop_loss_price)
+                potential_stop = candle.close - abs(signal.entry_price - signal.initial_stop_price)
                 if potential_stop > trailing_stop_price:
                     trailing_stop_price = potential_stop
             else:  # SHORT
                 # Trail stop down as price falls
-                potential_stop = candle.close + abs(signal.entry_price - signal.stop_loss_price)
+                potential_stop = candle.close + abs(signal.entry_price - signal.initial_stop_price)
                 if potential_stop < trailing_stop_price:
                     trailing_stop_price = potential_stop
 
@@ -130,7 +137,8 @@ def simulate_execution(
             candle,
             signal,
             entry_fill_price,
-            trailing_stop_price if trailing_stop_active else signal.stop_loss_price,
+            trailing_stop_price if trailing_stop_active else signal.initial_stop_price,
+            take_profit_price,
             slippage_pips,
         )
 
@@ -138,7 +146,7 @@ def simulate_execution(
             exit_fill_price, exit_reason = exit_result
 
             # Calculate PnL in R-multiples
-            risk_distance = abs(entry_fill_price - signal.stop_loss_price)
+            risk_distance = abs(entry_fill_price - signal.initial_stop_price)
             if signal.direction == "LONG":
                 pnl_distance = exit_fill_price - entry_fill_price
             else:  # SHORT
@@ -180,6 +188,7 @@ def _check_exit_conditions(
     signal: TradeSignal,
     entry_fill_price: float,
     current_stop_price: float,
+    take_profit_price: float,
     slippage_pips: float,
 ) -> tuple[float, str] | None:
     """
@@ -195,6 +204,7 @@ def _check_exit_conditions(
         signal: Original trade signal.
         entry_fill_price: Actual entry fill price.
         current_stop_price: Current stop price (may be trailing).
+        take_profit_price: Target profit price (calculated from risk distance).
         slippage_pips: Exit slippage in pips.
 
     Returns:
@@ -215,8 +225,8 @@ def _check_exit_conditions(
             return (exit_fill, "STOP_LOSS")
 
         # Check take-profit
-        if candle.high >= signal.take_profit_price:
-            exit_fill = signal.take_profit_price - (slippage_pips / 10000)
+        if candle.high >= take_profit_price:
+            exit_fill = take_profit_price - (slippage_pips / 10000)
             return (exit_fill, "TARGET")
 
     else:  # SHORT
@@ -226,8 +236,8 @@ def _check_exit_conditions(
             return (exit_fill, "STOP_LOSS")
 
         # Check take-profit
-        if candle.low <= signal.take_profit_price:
-            exit_fill = signal.take_profit_price + (slippage_pips / 10000)
+        if candle.low <= take_profit_price:
+            exit_fill = take_profit_price + (slippage_pips / 10000)
             return (exit_fill, "TARGET")
 
     return None

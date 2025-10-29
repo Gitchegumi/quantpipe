@@ -149,11 +149,10 @@ def generate_long_signals(
     # Create signal
     signal = TradeSignal(
         id=signal_id,
-        pair=parameters.get("pair", "UNKNOWN"),
+        pair=parameters.get("pair", "EURUSD"),
         direction="LONG",
         entry_price=entry_price,
-        stop_loss_price=stop_price,
-        take_profit_price=entry_price + (stop_distance * parameters.get("target_r", 2.0)),
+        initial_stop_price=stop_price,
         risk_per_trade_pct=parameters.get("position_risk_pct", 0.25),
         calc_position_size=position_size,
         tags=["pullback", "reversal", "long"],

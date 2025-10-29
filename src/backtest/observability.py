@@ -125,13 +125,14 @@ class ObservabilityReporter:
         table.add_column("Metric", style="cyan", width=25)
         table.add_column("Value", style="green", justify="right")
 
-        table.add_row("Total Trades", str(summary.total_trades))
-        table.add_row("Winning Trades", str(summary.winning_trades))
-        table.add_row("Losing Trades", str(summary.losing_trades))
-        table.add_row("Breakeven Trades", str(summary.breakeven_trades))
-        table.add_row("Win Rate", f"{summary.win_rate_pct:.2f}%")
+        table.add_row("Total Trades", str(summary.trade_count))
+        table.add_row("Winning Trades", str(summary.win_count))
+        table.add_row("Losing Trades", str(summary.loss_count))
+        table.add_row("Win Rate", f"{summary.win_rate:.2%}")
+        table.add_row("Avg Win", f"{summary.avg_win_r:.3f}R")
+        table.add_row("Avg Loss", f"{summary.avg_loss_r:.3f}R")
+        table.add_row("Avg R", f"{summary.avg_r:.3f}R")
         table.add_row("Expectancy", f"{summary.expectancy:.3f}R")
-        table.add_row("Total PnL", f"{summary.total_pnl_r:.2f}R")
         table.add_row("Max Drawdown", f"{summary.max_drawdown_r:.2f}R")
         table.add_row("Sharpe Estimate", f"{summary.sharpe_estimate:.3f}")
         table.add_row("Profit Factor", f"{summary.profit_factor:.2f}")
@@ -144,8 +145,8 @@ class ObservabilityReporter:
             console.print(f"\n[dim]Duration: {duration.total_seconds():.1f}s[/dim]")
 
         logger.info(
-            f"Backtest metrics: total_trades={summary.total_trades}, "
-            f"win_rate={summary.win_rate_pct:.2f}%, expectancy={summary.expectancy:.3f}R"
+            f"Backtest metrics: trade_count={summary.trade_count}, "
+            f"win_rate={summary.win_rate:.2%}, expectancy={summary.expectancy:.3f}R"
         )
 
     def report_signal_generated(self, signal_id: str, timestamp: datetime) -> None:
