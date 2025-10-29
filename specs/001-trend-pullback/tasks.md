@@ -55,16 +55,16 @@ Low-level modules (indicators, ingestion, manifest, reproducibility, metrics).
 
 Implements long-side logic; independently testable.
 
-- [ ] T026 [US1] Implement trend classifier in `src/strategy/trend_pullback/trend_classifier.py`
-- [ ] T027 [P] [US1] Implement pullback detector in `src/strategy/trend_pullback/pullback_detector.py`
-- [ ] T028 [P] [US1] Implement reversal pattern & momentum turn logic in `src/strategy/trend_pullback/reversal.py` including pullback expiry handling (FR-021: PULLBACK_MAX_AGE timeout)
-- [ ] T029 [US1] Implement long signal generator in `src/strategy/trend_pullback/signal_generator.py`
-- [ ] T030 [P] [US1] Implement risk manager (ATR stop calc + position sizing) in `src/risk/manager.py`
-- [ ] T031 [US1] Implement execution simulator with entry/exit logic including exit mode precedence rule (FR-026: fixed R target with trailing stop timeout fallback) in `src/backtest/execution.py`
-- [ ] T032 [P] [US1] Wire metrics ingestion for executions in `src/backtest/metrics_ingest.py`
-- [ ] T033 [US1] Implement observability reporter in `src/backtest/observability.py`
-- [ ] T034 [US1] Create CLI command `src/cli/run_long_backtest.py` for running long-signal-only backtest
-- [ ] T035 [US1] Add integration test for acceptance scenarios in `tests/integration/test_us1_long_signal.py`
+- [x] T026 [US1] Implement trend classifier in `src/strategy/trend_pullback/trend_classifier.py`
+- [x] T027 [P] [US1] Implement pullback detector in `src/strategy/trend_pullback/pullback_detector.py`
+- [x] T028 [P] [US1] Implement reversal pattern & momentum turn logic in `src/strategy/trend_pullback/reversal.py` including pullback expiry handling (FR-021: PULLBACK_MAX_AGE timeout)
+- [x] T029 [US1] Implement long signal generator in `src/strategy/trend_pullback/signal_generator.py`
+- [x] T030 [P] [US1] Implement risk manager (ATR stop calc + position sizing) in `src/risk/manager.py`
+- [x] T031 [US1] Implement execution simulator with entry/exit logic including exit mode precedence rule (FR-026: fixed R target with trailing stop timeout fallback) in `src/backtest/execution.py`
+- [x] T032 [P] [US1] Wire metrics ingestion for executions in `src/backtest/metrics_ingest.py`
+- [x] T033 [US1] Implement observability reporter in `src/backtest/observability.py`
+- [x] T034 [US1] Create CLI command `src/cli/run_long_backtest.py` for running long-signal-only backtest
+- [x] T035 [US1] Add integration test for acceptance scenarios in `tests/integration/test_us1_long_signal.py`
 - [ ] T036 [P] [US1] Add unit tests for reversal patterns in `tests/unit/test_reversal_patterns.py`
 - [ ] T037 [US1] Add unit tests for risk sizing rounding in `tests/unit/test_risk_manager_rounding.py`
 - [ ] T038 [US1] Add performance test harness stub in `tests/performance/test_long_signal_perf.py`
