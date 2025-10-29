@@ -206,9 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Spec Kit Files
-.github/prompts
-
 # VScode Workspace Settings
 *.code-workspace
 .vscode/
