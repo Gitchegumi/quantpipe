@@ -1,11 +1,15 @@
 <!--
 Sync Impact Report:
-- Version change: 0.0.0 → 1.0.0
-- Modified principles: Initial creation - all principles new
-- Added sections: Risk Management, Development Workflow
+- Version change: 1.3.0 → 1.4.0
+- Modified principles: Principle VIII - Code Quality & Documentation Standards (enhanced with automated quality tooling requirements)
+- Added sections: Principle X - Code Quality Automation & Linting, Development Workflow - Milestone Commit Messages
 - Removed sections: None
-- Templates requiring updates: ✅ All existing templates compatible
-- Follow-up TODOs: None - all placeholders filled
+- Templates requiring updates:
+  ✅ plan-template.md - Compatible (already references code quality)
+  ✅ tasks-template.md - Should include quality validation tasks
+  ✅ spec-template.md - Compatible (no changes needed)
+  ✅ agent-file-template.md - Already updated in v1.2.0
+- Follow-up TODOs: Ensure all new Python modules pass black, ruff, and pylint validation
 -->
 
 # Trading Strategies Constitution
@@ -62,7 +66,7 @@ Trading logs MUST maintain audit trails for regulatory compliance and performanc
 
 All historical and live market data used in research, backtesting, and production MUST be traceable, reproducible, and verifiable without requiring storage of raw data in the version control system.
 
-*Requirements:*
+_Requirements:_
 
 **Data Manifest**:
 Each dataset MUST have a manifest file stored in version control (e.g., data_manifest.yaml or .json) containing:
@@ -95,6 +99,104 @@ Over-parameterized models or redundant indicators are prohibited unless explicit
 
 **Rationale**: Parsimonious models generalize better, reduce computational overhead, and align with disciplined quantitative methodology.
 
+### Principle VIII: Code Quality & Documentation Standards
+
+Code MUST be self-documenting. Every module, class, method, and function SHALL include complete docstrings (PEP 257). Type hints MUST be used for all function signatures. Code comments MUST explain "why", not "what". Line length MUST NOT exceed 88 characters (Black standard). Variable and function names MUST be descriptive and unambiguous.
+
+**Python 3.11 Requirements:**
+
+- MUST follow PEP 8 style guidelines
+- MUST include complete docstrings (PEP 257) for all modules, classes, methods, functions
+- MUST use type hints for all signatures
+- Line length ≤88 characters (Black standard)
+- Variable and function names MUST be descriptive and unambiguous
+- Code comments MUST explain "why", not "what"
+
+### Principle IX: Dependency Management & Reproducibility
+
+Python projects MUST use Poetry as the package manager. The use of `requirements.txt` is prohibited except for minimal production deployments when explicitly required. All dependencies MUST be declared in `pyproject.toml` with appropriate version constraints. Lock files (`poetry.lock`) MUST be committed to version control to ensure reproducible builds. Development dependencies MUST be separated from production dependencies.
+
+**Poetry Requirements:**
+
+- Package manager: Poetry (mandatory)
+- Configuration: `pyproject.toml` (all dependencies declared)
+- Lock file: `poetry.lock` (MUST be committed)
+- No `requirements.txt` except for minimal production deployments
+- Development dependencies separated from production dependencies
+
+### Principle X: Code Quality Automation & Linting
+
+All Python code MUST be validated using automated quality tools before merge. The codebase SHALL maintain high code quality standards through continuous linting and formatting. Quality checks MUST pass in CI/CD pipelines.
+
+**Required Quality Tools:**
+
+- **Black**: Code formatter (≥23.10.0)
+  - Line length: 88 characters
+  - MUST format all Python files
+  - Configuration in `pyproject.toml`
+- **Ruff**: Fast Python linter (≥0.1.0)
+  - MUST run on all Python files
+  - Configuration in `pyproject.toml`
+  - Zero errors required for merge
+- **Pylint**: Comprehensive Python linter (≥3.3.0)
+  - Minimum score: 8.0/10 for new code
+  - MUST fix all W1203 (logging-fstring-interpolation) warnings
+  - Score improvement encouraged but not blocking
+
+**Mandatory Logging Standards:**
+
+- Logging calls MUST use lazy % formatting
+- F-strings in logging calls are PROHIBITED
+- Example (correct): `logger.info("Processing %d items", count)`
+- Example (incorrect): `logger.info(f"Processing {count} items")`
+- Rationale: Lazy evaluation prevents unnecessary string formatting when log level filters the message
+
+**Quality Workflow:**
+
+```bash
+# Format code
+poetry run black src/ tests/
+
+# Lint with ruff
+poetry run ruff check src/ tests/
+
+# Lint with pylint
+poetry run pylint src/ --score=yes
+```
+
+All quality checks SHOULD be automated in pre-commit hooks and CI/CD pipelines.
+
+### IX. Dependency Management & Reproducibility
+
+All Python projects MUST use Poetry for dependency management and packaging.
+The use of requirements.txt files is prohibited for dependency specification.
+All dependencies MUST be declared in pyproject.toml with appropriate version constraints.
+
+_Requirements:_
+
+**Poetry Configuration**:
+Every Python project MUST contain a pyproject.toml file managed by Poetry, including:
+
+- Project metadata (name, version, description, authors)
+- Python version constraint
+- Runtime dependencies with semantic versioning constraints
+- Development dependencies (testing, linting, formatting tools)
+- Build system configuration
+
+**Dependency Lock File**:
+The poetry.lock file MUST be committed to version control to ensure deterministic builds and reproducible environments across all development and production systems.
+
+**Virtual Environment Management**:
+Poetry MUST be used to create and manage project-specific virtual environments. Manual venv creation or system-wide package installation is prohibited.
+
+**Dependency Updates**:
+Dependency version updates MUST be performed using `poetry update` with review of changes in poetry.lock before committing.
+
+**Installation Commands**:
+Development setup MUST use `poetry install` to create reproducible environments. Production deployment MUST use `poetry install --only main` to exclude development dependencies.
+
+**Rationale**: Poetry provides deterministic dependency resolution, lock file management, and integrated virtual environment handling, ensuring reproducible builds and eliminating dependency conflicts. This standardization simplifies onboarding, reduces environment-related issues, and aligns with modern Python packaging best practices.
+
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -119,6 +221,33 @@ Strategy development follows a structured pipeline:
 
 All phases MUST include peer review and compliance verification before progression.
 
+### Milestone Commit Messages
+
+After completing any development milestone (feature implementation, code quality improvements, constitution amendments, etc.), a concise commit message MUST be provided that summarizes all changes made during that milestone.
+
+**Commit Message Requirements:**
+
+- Use conventional commit format: `type(scope): brief description`
+- Include key metrics or file counts when relevant (e.g., "16 files", "score improved 8.78→9.68")
+- List major changes as bullet points in the commit body
+- Cover all significant modifications in a single coherent message
+- Keep descriptions concise but informative
+- Combine related changes into one commit when appropriate
+
+**Example:**
+
+```md
+feat(quality): enforce lazy logging and add constitution Principle X
+
+- Fix 62 logging calls: f-strings → lazy % formatting (16 files)
+- Eliminate W1203 warnings, improve pylint 8.78→9.68/10
+- Constitution v1.4.0: formalize Black/Ruff/Pylint requirements
+- Mandate lazy % logging, prohibit f-strings in logging calls
+- Update copilot-instructions.md with quality standards
+```
+
+**Rationale**: Structured commit messages provide clear change history, facilitate code review, and enable efficient navigation of project evolution. Milestone-based commits ensure related changes are grouped logically rather than scattered across multiple small commits.
+
 ## Governance
 
 This constitution supersedes all other development practices and trading procedures.
@@ -137,4 +266,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version**: 1.1.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-25
+**Version:** 1.4.0  
+**Ratified:** October 25, 2025  
+**Last Amended:** October 29, 2025
