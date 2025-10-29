@@ -109,7 +109,7 @@ User wants to run a historical backtest and obtain standardized performance metr
 - **FR-017**: System MUST log rationale tags (e.g., ["trend", "pullback", "reversal", "risk_ok"]) with each signal for audit.
 - **FR-018**: System MUST support time normalization to UTC; input timestamps converted if source differs.
 - **FR-019**: System MUST gracefully handle missing candle (skip, mark gap, no signal) without crashing.
-- **FR-020**: System MUST expose configuration via parameter dictionary loadable from JSON/YAML (no hard-coded magic numbers).
+- **FR-020**: System MUST expose configuration via parameter dictionary loadable from external configuration files (no hard-coded magic numbers).
 - **FR-021**: System MUST ensure that if no qualifying reversal forms within PULLBACK_MAX_AGE candles after pullback detection, the pullback state expires.
 - **FR-022**: System MUST apply cooldown of COOLDOWN_CANDLES after trade close before emitting new signal in same direction for same pair.
 - **FR-023**: System MUST tag backtest run with run_id and store aggregated metrics separately from per-trade logs.
@@ -140,7 +140,7 @@ User wants to run a historical backtest and obtain standardized performance metr
 
 ### Measurable Outcomes
 
-- **SC-001**: Backtest run produces full metrics report in ≤ 2 seconds per 100k candles processed on reference machine.
+- **SC-001**: Backtest run produces full metrics report in ≤ 2 seconds per 100k candles processed on standard development hardware.
 - **SC-002**: Strategy emits ≤ 1 false signal (violating defined criteria) per 10k candles in validation dataset.
 - **SC-003**: Reproducibility hash identical across two runs with same manifest & parameters (deterministic output).
 - **SC-004**: Drawdown protection halts new signals within one candle after threshold breach 100% of test scenarios.
@@ -148,23 +148,23 @@ User wants to run a historical backtest and obtain standardized performance metr
 - **SC-006**: At least 30 trades generated in core validation dataset (sufficient sample for initial evaluation) OR system flags insufficiency.
 - **SC-007**: No strategy crash on malformed/missing candle test dataset; graceful degradation recorded.
 - **SC-008**: Performance expectancy (avg_R * win_rate - (1 - win_rate)) remains ≥ -0.2 in baseline sample (avoid obviously unviable configuration).
-- **SC-009**: p95 candle_processing_latency_ms ≤ 5ms on reference machine for 1m aggregated to 15m timeframe.
-- **SC-010**: avg_entry_slippage_pips within configured SLIPPAGE_TOLERANCE_PIPS (default ≤ 1.5 pips) in ≥ 95% of trades.
-- **SC-011**: Peak resident memory during backtest of 1 year 1m data (single pair) ≤ 150MB.
-- **SC-012**: Backtest throughput ≥ 50k candles/second on reference machine configuration.
+- **SC-009**: Signal processing latency (95th percentile) ≤ 5ms on standard development hardware for typical timeframe aggregation.
+- **SC-010**: Average entry slippage within configured tolerance (default ≤ 1.5 pips) in ≥ 95% of trades.
+- **SC-011**: Peak memory usage during backtest of 1 year 1-minute data (single pair) ≤ 150MB.
+- **SC-012**: Backtest throughput ≥ 50k candles/second on standard development hardware.
 
 ## Assumptions
 
-- Baseline parameters: EMA_FAST=20, EMA_SLOW=50, RSI_LEN=14, ATR_LEN=14.
-- Oversold threshold RSI < 30; Overbought RSI > 70 (initial parsimonious defaults).
+- Baseline indicator parameters: Fast trend period=20, Slow trend period=50, Momentum oscillator length=14, Volatility period=14.
+- Oversold threshold < 30; Overbought threshold > 70 (initial parsimonious defaults).
 - Spread/slippage modeled as fixed baseline until dynamic model added.
-- Ranging detection: ≥ 3 crosses in last 40 candles (initial heuristic, see FR-002: RANGE_CROSS_THRESHOLD=3, RANGE_LOOKBACK=40).
+- Ranging detection: ≥ 3 trend indicator crosses in last 40 candles (initial heuristic).
 - Risk per trade default 0.25% of equity.
-- Volatility spike cooldown: VOLATILITY_SPIKE_COOLDOWN default = 10 candles (suspend new entries after extreme ATR).
-- Trade cooldown: COOLDOWN_CANDLES default = 5 candles after trade close (see FR-022).
+- Volatility spike cooldown: default = 10 candles (suspend new entries after extreme volatility).
+- Trade cooldown: default = 5 candles after trade close.
 - Data timezone assumed UTC; adjustment external to strategy module if source differs.
 - Manifest guarantees sorted chronological candles.
-- Higher timeframe filter disabled initially (ENABLE_HTF_FILTER=false).
+- Higher timeframe filter disabled initially.
 - Min trade sample size for viability = 30 trades.
 
 ## Out of Scope
