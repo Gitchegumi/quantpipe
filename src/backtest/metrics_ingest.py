@@ -118,16 +118,19 @@ class MetricsIngestor:
         if self.total_trades == 0:
             # Return zero metrics
             return MetricsSummary(
-                total_trades=0,
-                winning_trades=0,
-                losing_trades=0,
-                breakeven_trades=0,
-                win_rate_pct=0.0,
+                trade_count=0,
+                win_count=0,
+                loss_count=0,
+                win_rate=0.0,
+                avg_win_r=0.0,
+                avg_loss_r=0.0,
+                avg_r=0.0,
                 expectancy=0.0,
-                total_pnl_r=0.0,
-                max_drawdown_r=0.0,
                 sharpe_estimate=0.0,
                 profit_factor=0.0,
+                max_drawdown_r=0.0,
+                latency_p95_ms=0.0,
+                latency_mean_ms=0.0,
             )
 
         # Calculate win rate

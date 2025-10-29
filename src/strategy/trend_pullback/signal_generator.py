@@ -1,9 +1,9 @@
 """
-Long signal generator for the trend pullback strategy.
+Signal generator for the trend pullback strategy (long and short).
 
 This module orchestrates trend classification, pullback detection, and reversal
-confirmation to generate long trade signals. Only generates signals when all
-conditions align.
+confirmation to generate trade signals in both directions. Only generates signals
+when all conditions align.
 """
 
 import logging
@@ -162,6 +162,156 @@ def generate_long_signals(
 
     logger.info(
         f"Long signal generated: id={signal_id[:16]}..., "
+        f"entry={entry_price:.5f}, stop={stop_price:.5f}, "
+        f"timestamp={latest_candle.timestamp_utc.isoformat()}"
+    )
+
+    return [signal]
+
+
+def generate_short_signals(
+    candles: Sequence[Candle],
+    parameters: dict,
+    parameters_hash: str | None = None,
+) -> list[TradeSignal]:
+    """
+    Generate short trade signals from candle sequence.
+
+    Analyzes candles for:
+    1. Confirmed downtrend (fast EMA < slow EMA)
+    2. Active pullback (RSI/Stoch RSI overbought)
+    3. Reversal confirmation (momentum turn + bearish candlestick pattern)
+
+    Only generates signal when all three conditions are met.
+
+    Args:
+        candles: Sequence of Candle objects with computed indicators.
+        parameters: Strategy parameters dictionary.
+        parameters_hash: Pre-computed parameters hash (optional, will compute if None).
+
+    Returns:
+        List of TradeSignal objects (0 or 1 signal).
+
+    Raises:
+        ValueError: If candles is empty or missing required data.
+
+    Examples:
+        >>> from datetime import datetime, timezone
+        >>> from models.core import Candle
+        >>> candles = [...]  # Candles showing short setup
+        >>> params = {
+        ...     "ema_fast": 20,
+        ...     "ema_slow": 50,
+        ...     "rsi_period": 14,
+        ...     "position_risk_pct": 0.25
+        ... }
+        >>> signals = generate_short_signals(candles, params)
+        >>> len(signals)
+        1
+        >>> signals[0].direction
+        'SHORT'
+    """
+    if not candles:
+        raise ValueError("Candles sequence cannot be empty")
+
+    if len(candles) < 50:
+        logger.debug(f"Insufficient candles for signal generation: {len(candles)} < 50")
+        return []
+
+    # Compute parameters hash if not provided
+    if parameters_hash is None:
+        parameters_hash = compute_parameters_hash(parameters)
+
+    # Step 1: Classify trend
+    try:
+        trend_state = classify_trend(
+            candles,
+            cross_count_threshold=parameters.get("trend_cross_count_threshold", 3),
+        )
+    except ValueError as e:
+        logger.warning(f"Trend classification failed: {e}")
+        return []
+
+    # Only proceed if in downtrend
+    if trend_state.state != "DOWN":
+        logger.debug(f"Not in downtrend: {trend_state.state}")
+        return []
+
+    # Step 2: Detect pullback (overbought for shorts)
+    try:
+        pullback_state = detect_pullback(
+            candles,
+            trend_state,
+            rsi_oversold=parameters.get("rsi_oversold", 30.0),
+            rsi_overbought=parameters.get("rsi_overbought", 70.0),
+            stoch_rsi_low=parameters.get("stoch_rsi_low", 0.2),
+            stoch_rsi_high=parameters.get("stoch_rsi_high", 0.8),
+            pullback_max_age_candles=parameters.get("pullback_max_age", 20),
+        )
+    except ValueError as e:
+        logger.warning(f"Pullback detection failed: {e}")
+        return []
+
+    # Only proceed if pullback is active
+    if not pullback_state.active:
+        logger.debug("No active pullback")
+        return []
+
+    # Step 3: Detect reversal (bearish for shorts)
+    try:
+        has_reversal = detect_reversal(
+            candles,
+            pullback_state,
+            min_candles_for_reversal=parameters.get("min_candles_reversal", 3),
+        )
+    except ValueError as e:
+        logger.warning(f"Reversal detection failed: {e}")
+        return []
+
+    # Only generate signal if reversal confirmed
+    if not has_reversal:
+        logger.debug("No reversal detected")
+        return []
+
+    # All conditions met - generate signal
+    latest_candle = candles[-1]
+
+    # Calculate entry and stop prices (SHORT: stop above entry)
+    entry_price = latest_candle.close
+    atr_value = latest_candle.atr if latest_candle.atr is not None else 0.002
+    stop_distance = atr_value * parameters.get("stop_loss_atr_multiplier", 2.0)
+    stop_price = entry_price + stop_distance  # Stop above for shorts
+
+    # Calculate position size (placeholder - will be done by risk manager)
+    position_size = 0.01  # Temporary value
+
+    # Generate deterministic signal ID
+    signal_id = generate_signal_id(
+        pair=parameters.get("pair", "UNKNOWN"),
+        timestamp_utc=latest_candle.timestamp_utc,
+        direction="SHORT",
+        entry_price=entry_price,
+        stop_price=stop_price,
+        position_size=position_size,
+        parameters_hash=parameters_hash,
+    )
+
+    # Create signal
+    signal = TradeSignal(
+        id=signal_id,
+        pair=parameters.get("pair", "EURUSD"),
+        direction="SHORT",
+        entry_price=entry_price,
+        initial_stop_price=stop_price,
+        risk_per_trade_pct=parameters.get("position_risk_pct", 0.25),
+        calc_position_size=position_size,
+        tags=["pullback", "reversal", "short"],
+        version="0.1.0",
+        timestamp_utc=latest_candle.timestamp_utc,
+    )
+
+    logger.info(
+        f"Short signal generated: id={signal_id[:16]}..., "
         f"entry={entry_price:.5f}, stop={stop_price:.5f}, "
         f"timestamp={latest_candle.timestamp_utc.isoformat()}"
     )
