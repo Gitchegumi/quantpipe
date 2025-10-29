@@ -20,16 +20,16 @@ Essential repository and environment scaffolding.
 
 ### Total tasks: 10 | Parallelizable: 4 | First 40 tasks = MVP scope (includes US1 complete)
 
-- [ ] T001 Create base source directories per plan in `src/` (indicators/, strategy/trend_pullback/, risk/, backtest/, models/, io/, cli/)
-- [ ] T002 Create Python package initializer files in each new directory (`src/indicators/__init__.py`, etc.)
-- [ ] T003 Add `pyproject.toml` with project metadata, dependencies (numpy, pandas, pydantic, rich, pytest, hypothesis) using Poetry in repo root
-- [ ] T004 Add `.gitignore` entries for `.venv/`, data cache directory `/data/raw/`, backtest outputs `/runs/`
-- [ ] T005 Create `src/config/parameters.py` pydantic settings loader for strategy parameters
-- [ ] T006 Create `README.md` base referencing `specs/001-trend-pullback/quickstart.md`
-- [ ] T007 Create `tests/conftest.py` with global fixtures (temp manifest path, sample parameters)
-- [ ] T008 [P] Create `tests/fixtures/sample_candles_long.csv` synthetic dataset for US1 acceptance tests
-- [ ] T009 [P] Create `tests/fixtures/sample_candles_short.csv` synthetic dataset for US2 acceptance tests
-- [ ] T010 [P] Create `tests/fixtures/sample_candles_empty.csv` zero-trade dataset for US3 scenario 3
+- [x] T001 Create base source directories per plan in `src/` (indicators/, strategy/trend_pullback/, risk/, backtest/, models/, io/, cli/)
+- [x] T002 Create Python package initializer files in each new directory (`src/indicators/__init__.py`, etc.)
+- [x] T003 Add `pyproject.toml` with project metadata, dependencies (numpy, pandas, pydantic, rich, pytest, hypothesis) using Poetry in repo root
+- [x] T004 Add `.gitignore` entries for `.venv/`, data cache directory `/data/raw/`, backtest outputs `/runs/`
+- [x] T005 Create `src/config/parameters.py` pydantic settings loader for strategy parameters
+- [x] T006 Create `README.md` base referencing `specs/001-trend-pullback/quickstart.md`
+- [x] T007 Create `tests/conftest.py` with global fixtures (temp manifest path, sample parameters)
+- [x] T008 [P] Create `tests/fixtures/sample_candles_long.csv` synthetic dataset for US1 acceptance tests
+- [x] T009 [P] Create `tests/fixtures/sample_candles_short.csv` synthetic dataset for US2 acceptance tests
+- [x] T010 [P] Create `tests/fixtures/sample_candles_empty.csv` zero-trade dataset for US3 scenario 3
 
 ## Phase 2: Foundational (Cross-Story Prerequisites)
 
