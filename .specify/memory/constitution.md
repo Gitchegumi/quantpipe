@@ -1,10 +1,14 @@
 <!--
 Sync Impact Report:
-- Version change: 0.0.0 → 1.0.0
-- Modified principles: Initial creation - all principles new
-- Added sections: Risk Management, Development Workflow
+- Version change: 1.1.0 → 1.2.0
+- Modified principles: None
+- Added sections: Principle VIII - Code Quality & Documentation Standards (PEP 8 compliance)
 - Removed sections: None
-- Templates requiring updates: ✅ All existing templates compatible
+- Templates requiring updates:
+  ✅ plan-template.md - Updated (Code Style guidance reinforced)
+  ✅ tasks-template.md - Updated (Code review task patterns)
+  ✅ spec-template.md - Compatible (no changes needed)
+  ✅ agent-file-template.md - Updated (Code Style section enhancement)
 - Follow-up TODOs: None - all placeholders filled
 -->
 
@@ -95,6 +99,38 @@ Over-parameterized models or redundant indicators are prohibited unless explicit
 
 **Rationale**: Parsimonious models generalize better, reduce computational overhead, and align with disciplined quantitative methodology.
 
+### VIII. Code Quality & Documentation Standards
+
+All Python code MUST comply with PEP 8 style guidelines without exception.
+Every module, class, method, and function MUST include complete docstrings following PEP 257 conventions.
+Docstrings MUST document parameters, return values, exceptions raised, and provide usage examples for public APIs.
+
+*Requirements:*
+
+**Module-level docstrings**:
+MUST appear at the top of every Python file, describing the module's purpose, key components, and any important usage notes.
+
+**Class docstrings**:
+MUST describe the class purpose, key attributes, and typical usage patterns. Include examples for complex classes.
+
+**Function/method docstrings**:
+MUST use the following format:
+
+- Brief one-line summary
+- Extended description (if needed)
+- Args section listing each parameter with type and description
+- Returns section describing return value and type
+- Raises section documenting exceptions that may be raised
+- Examples section for public APIs or complex functionality
+
+**Type hints**:
+MUST be provided for all function signatures, method parameters, and return values. Use `typing` module constructs where appropriate.
+
+**Code formatting**:
+MUST use consistent indentation (4 spaces), line length ≤88 characters (Black formatter standard), and proper whitespace per PEP 8.
+
+**Rationale**: Comprehensive documentation ensures code maintainability, enables effective collaboration, facilitates onboarding, and aligns with professional Python development standards. Type hints combined with docstrings provide both human and machine-readable contracts.
+
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -137,4 +173,4 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version**: 1.1.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-25
+**Version**: 1.2.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-28

@@ -19,7 +19,7 @@ cd src; pytest; ruff check .
 
 ## Code Style
 
-Python 3.11 (chosen for ecosystem breadth, numerical libs, readability): Follow standard conventions
+Python 3.11: MUST follow PEP 8 style guidelines. All modules, classes, methods, and functions MUST include complete docstrings (PEP 257). Use type hints for all signatures. Line length ≤88 characters (Black standard). See Constitution Principle VIII for full requirements.
 
 ## Recent Changes
 
