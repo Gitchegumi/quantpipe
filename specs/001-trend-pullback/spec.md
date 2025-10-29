@@ -72,12 +72,12 @@ User wants to run a historical backtest and obtain standardized performance metr
 
 ### Edge Cases
 
-- EMA20 and EMA50 diverge then compress rapidly (potential fake ranging) → treat as ranging only if crossings count exceeds threshold X within last Y candles.
+- EMA20 and EMA50 diverge then compress rapidly (potential fake ranging) → treat as ranging only if crossings count exceeds RANGE_CROSS_THRESHOLD within last RANGE_LOOKBACK candles.
 - ATR extremely low (volatility compression) → minimum stop distance floor applied.
-- ATR extremely high (news spike) → strategy suspends new entries for Z candles.
+- ATR extremely high (news spike) → strategy suspends new entries for VOLATILITY_SPIKE_COOLDOWN candles.
 - Data gap (missing candles) → skip signal evaluation until continuity re-established.
 - Reversal candle forms but momentum oscillator not yet turned → defer until both criteria satisfied.
-- Multiple signals sequentially within narrow price band → enforce cooldown period C candles.
+- Multiple signals sequentially within narrow price band → enforce cooldown period COOLDOWN_CANDLES after trade close (see FR-022).
 - Price gaps through intended stop at exit evaluation → slippage applied; record adverse excursion.
 - Duplicate manifest entry for same pair/timeframe → validation error logged.
 
@@ -94,7 +94,6 @@ User wants to run a historical backtest and obtain standardized performance metr
 - **FR-002**: System MUST classify ranging state when EMA cross count ≥ RANGE_CROSS_THRESHOLD within last RANGE_LOOKBACK candles.
 - **FR-003**: System MUST detect pullback state when price closes within PULLBACK_DISTANCE_RATIO of fast EMA and momentum oscillator in opposing extreme (RSI < OVERSOLD or RSI > OVERBOUGHT depending on trend).
 - **FR-004**: System MUST validate reversal trigger via candle pattern set {bullish_engulfing, bearish_engulfing, pin_bar, strong_close} combined with momentum turn (RSI slope sign change) before signal emission.
-- **FR-005**: System MUST output structured trade signal object with fields: id, timestamp_utc, pair, direction, entry_price, initial_stop_price, risk_per_trade_pct, calc_position_size, tags[], version.
 - **FR-005**: System MUST output structured trade signal object with fields: id, timestamp_utc, pair, direction, entry_price, initial_stop_price, risk_per_trade_pct, calc_position_size, tags[], version. The id MUST be a deterministic lowercase hex hash of the concatenated string (timestamp_utc|pair|direction|entry_price|strategy_version) using SHA-256 truncated to first 16 characters to ensure reproducibility across identical reruns.
 - **FR-006**: System MUST compute initial stop using max(ATR * ATR_STOP_MULT, MIN_STOP_DISTANCE) relative to recent swing point consistent with signal direction.
 - **FR-007**: System MUST derive position size from account_equity * risk_per_trade_pct / (entry_price - stop_price adjusted for pip value & lot sizing).
@@ -159,8 +158,10 @@ User wants to run a historical backtest and obtain standardized performance metr
 - Baseline parameters: EMA_FAST=20, EMA_SLOW=50, RSI_LEN=14, ATR_LEN=14.
 - Oversold threshold RSI < 30; Overbought RSI > 70 (initial parsimonious defaults).
 - Spread/slippage modeled as fixed baseline until dynamic model added.
-- Ranging detection: ≥ 3 crosses in last 40 candles (initial heuristic).
+- Ranging detection: ≥ 3 crosses in last 40 candles (initial heuristic, see FR-002: RANGE_CROSS_THRESHOLD=3, RANGE_LOOKBACK=40).
 - Risk per trade default 0.25% of equity.
+- Volatility spike cooldown: VOLATILITY_SPIKE_COOLDOWN default = 10 candles (suspend new entries after extreme ATR).
+- Trade cooldown: COOLDOWN_CANDLES default = 5 candles after trade close (see FR-022).
 - Data timezone assumed UTC; adjustment external to strategy module if source differs.
 - Manifest guarantees sorted chronological candles.
 - Higher timeframe filter disabled initially (ENABLE_HTF_FILTER=false).

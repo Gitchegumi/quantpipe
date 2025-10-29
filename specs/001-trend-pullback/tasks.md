@@ -59,7 +59,7 @@ Implements long-side logic; independently testable.
 - [ ] T029 [P] [US1] Implement reversal pattern & momentum turn logic in `src/strategy/trend_pullback/reversal.py`
 - [ ] T030 [US1] Implement long signal generator in `src/strategy/trend_pullback/signal_generator.py`
 - [ ] T031 [P] [US1] Implement risk manager (ATR stop calc + position sizing) in `src/risk/manager.py`
-- [ ] T032 [US1] Implement execution simulator basic (entry/exit precedence) in `src/backtest/execution.py`
+- [ ] T032 [US1] Implement execution simulator with entry/exit logic including exit mode precedence rule (FR-026: fixed R target with trailing stop timeout fallback) in `src/backtest/execution.py`
 - [ ] T033 [P] [US1] Wire metrics ingestion for executions in `src/backtest/metrics_ingest.py`
 - [ ] T034 [US1] Implement observability reporter in `src/backtest/observability.py`
 - [ ] T035 [US1] Create CLI command `src/cli/run_long_backtest.py` for running long-signal-only backtest
