@@ -132,21 +132,23 @@ class TestUS2ShortSignalIntegration:
         GIVEN: Price data showing downtrend with pullback and bearish reversal
         WHEN: Running short signal generation
         THEN: Should generate valid short signal with correct stop placement
-        
+
         NOTE: This test validates the function can be called and returns proper structure.
         Full end-to-end validation with synthetic data requires precise RSI momentum turn
         coordination which is complex to generate. Real market data testing in Phase 5.
         """
         # Arrange: Ingest candles
-        candles = list(ingest_candles(
-            csv_path=sample_short_data,
-            ema_fast=20,
-            ema_slow=50,
-            atr_period=14,
-            rsi_period=14,
-            stoch_rsi_period=14,
-            expected_timeframe_minutes=60,
-        ))
+        candles = list(
+            ingest_candles(
+                csv_path=sample_short_data,
+                ema_fast=20,
+                ema_slow=50,
+                atr_period=14,
+                rsi_period=14,
+                stoch_rsi_period=14,
+                expected_timeframe_minutes=60,
+            )
+        )
 
         assert len(candles) == 200, "Should load 200 candles"
 
@@ -171,13 +173,15 @@ class TestUS2ShortSignalIntegration:
 
         # Assert: Function returns list (even if empty - conditions may not be met)
         assert isinstance(signals, list), "Should return list of signals"
-        
+
         # If signal generated, validate structure
         if len(signals) > 0:
             signal = signals[0]
             assert signal.direction == "SHORT", "Signal should be SHORT"
             assert signal.pair == "EURUSD"
-            assert signal.initial_stop_price > signal.entry_price, "Stop should be above entry for SHORT"
+            assert (
+                signal.initial_stop_price > signal.entry_price
+            ), "Stop should be above entry for SHORT"
             assert signal.risk_per_trade_pct == 0.25
             assert "short" in signal.tags
 
@@ -186,20 +190,22 @@ class TestUS2ShortSignalIntegration:
         GIVEN: Short signal from downtrend pullback
         WHEN: Simulating execution through continuation
         THEN: Should validate execution logic works for short positions
-        
-        NOTE: Test validates execution can handle short signals.  
+
+        NOTE: Test validates execution can handle short signals.
         Synthetic data may not generate signals due to precise momentum requirements.
         """
         # Arrange: Ingest all candles
-        candles = list(ingest_candles(
-            csv_path=sample_short_data,
-            ema_fast=20,
-            ema_slow=50,
-            atr_period=14,
-            rsi_period=14,
-            stoch_rsi_period=14,
-            expected_timeframe_minutes=60,
-        ))
+        candles = list(
+            ingest_candles(
+                csv_path=sample_short_data,
+                ema_fast=20,
+                ema_slow=50,
+                atr_period=14,
+                rsi_period=14,
+                stoch_rsi_period=14,
+                expected_timeframe_minutes=60,
+            )
+        )
 
         # Arrange: Generate signal
         parameters = {
@@ -218,7 +224,7 @@ class TestUS2ShortSignalIntegration:
         }
 
         signals = generate_short_signals(candles, parameters)
-        
+
         # Skip test if no signal generated (conditions not met in synthetic data)
         if len(signals) == 0:
             return
@@ -242,20 +248,22 @@ class TestUS2ShortSignalIntegration:
         GIVEN: Short trades (if generated)
         WHEN: Computing metrics summary
         THEN: Should handle empty or populated metrics correctly
-        
+
         NOTE: Test validates metrics calculation works. May have zero trades
         if synthetic data doesn't trigger signal conditions.
         """
         # Arrange: Ingest candles
-        candles = list(ingest_candles(
-            csv_path=sample_short_data,
-            ema_fast=20,
-            ema_slow=50,
-            atr_period=14,
-            rsi_period=14,
-            stoch_rsi_period=14,
-            expected_timeframe_minutes=60,
-        ))
+        candles = list(
+            ingest_candles(
+                csv_path=sample_short_data,
+                ema_fast=20,
+                ema_slow=50,
+                atr_period=14,
+                rsi_period=14,
+                stoch_rsi_period=14,
+                expected_timeframe_minutes=60,
+            )
+        )
 
         parameters = {
             "ema_fast": 20,
@@ -285,8 +293,8 @@ class TestUS2ShortSignalIntegration:
         summary = metrics.get_summary()
 
         # Assert: Metrics structure valid (may have 0 trades)
-        assert hasattr(summary, 'trade_count'), "Summary should have trade_count field"
-        assert hasattr(summary, 'win_rate'), "Summary should have win_rate field"
+        assert hasattr(summary, "trade_count"), "Summary should have trade_count field"
+        assert hasattr(summary, "win_rate"), "Summary should have win_rate field"
         assert summary.trade_count >= 0, "Trade count should be non-negative"
 
     def test_no_short_signal_in_uptrend(self, tmp_path: Path):
@@ -298,10 +306,10 @@ class TestUS2ShortSignalIntegration:
         # Arrange: Create uptrend data
         csv_path = tmp_path / "uptrend.csv"
         rows = ["timestamp_utc,open,high,low,close,volume"]
-        
+
         base_price = 1.10000
         timestamp = datetime(2024, 1, 1, 0, 0)
-        
+
         for i in range(100):
             open_price = base_price + (i * 0.00010)
             close_price = open_price + 0.00015
@@ -315,19 +323,21 @@ class TestUS2ShortSignalIntegration:
             timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
             if timestamp.hour == 0:
                 timestamp = timestamp.replace(day=timestamp.day + 1)
-        
+
         csv_path.write_text("\n".join(rows))
 
         # Arrange: Ingest uptrend candles
-        candles = list(ingest_candles(
-            csv_path=csv_path,
-            ema_fast=20,
-            ema_slow=50,
-            atr_period=14,
-            rsi_period=14,
-            stoch_rsi_period=14,
-            expected_timeframe_minutes=60,
-        ))
+        candles = list(
+            ingest_candles(
+                csv_path=csv_path,
+                ema_fast=20,
+                ema_slow=50,
+                atr_period=14,
+                rsi_period=14,
+                stoch_rsi_period=14,
+                expected_timeframe_minutes=60,
+            )
+        )
 
         parameters = {
             "ema_fast": 20,

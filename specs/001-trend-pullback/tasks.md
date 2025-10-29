@@ -84,16 +84,16 @@ Adds symmetry; reuses components where possible.
 
 Full metrics, error handling, zero-trade case.
 
-- [ ] T045 [US3] Implement full metrics calculations (expectancy, Sharpe estimate, profit factor) in `src/backtest/metrics.py`
-- [ ] T046 [P] [US3] Implement drawdown curve & max drawdown computation in `src/backtest/drawdown.py`
-- [ ] T047 [US3] Implement volatility regime classifier in `src/strategy/trend_pullback/volatility_regime.py`
-- [ ] T048 [P] [US3] Implement data gap handling in ingestion `src/io/ingestion.py`
-- [ ] T049 [US3] Implement reproducibility hash finalize & verify in `src/backtest/reproducibility.py`
-- [ ] T050 [P] [US3] Implement CLI backtest command output JSON `src/cli/run_backtest.py`
-- [ ] T051 [US3] Add integration test for manifest missing error path in `tests/integration/test_us3_manifest_error.py`
-- [ ] T052 [US3] Add integration test for zero-trade metrics in `tests/integration/test_us3_zero_trades.py`
-- [ ] T053 [P] [US3] Add performance throughput test `tests/performance/test_throughput.py`
-- [ ] T054 [US3] Add memory footprint measurement test `tests/performance/test_memory_usage.py`
+- [x] T045 [US3] Implement full metrics calculations (expectancy, Sharpe estimate, profit factor) in `src/backtest/metrics.py`
+- [x] T046 [P] [US3] Implement drawdown curve & max drawdown computation in `src/backtest/drawdown.py`
+- [x] T047 [US3] Implement volatility regime classifier in `src/strategy/trend_pullback/volatility_regime.py`
+- [x] T048 [P] [US3] Implement data gap handling in ingestion `src/io/ingestion.py`
+- [x] T049 [US3] Implement reproducibility hash finalize & verify in `src/backtest/reproducibility.py`
+- [x] T050 [P] [US3] Implement CLI backtest command output JSON `src/cli/run_backtest.py`
+- [x] T051 [US3] Add integration test for manifest missing error path in `tests/integration/test_us3_manifest_error.py`
+- [x] T052 [US3] Add integration test for zero-trade metrics in `tests/integration/test_us3_zero_trades.py`
+- [x] T053 [P] [US3] Add performance throughput test `tests/performance/test_throughput.py`
+- [x] T054 [US3] Add memory footprint measurement test `tests/performance/test_memory_usage.py`
 
 ## Phase 6: Polish & Cross-Cutting
 

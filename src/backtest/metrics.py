@@ -82,12 +82,12 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
             avg_win_r=np.nan,
             avg_loss_r=np.nan,
             avg_r=np.nan,
-            expectancy_r=np.nan,
-            sharpe_ratio=np.nan,
+            expectancy=np.nan,
+            sharpe_estimate=np.nan,
             profit_factor=np.nan,
             max_drawdown_r=np.nan,
-            avg_latency_ms=np.nan,
-            p95_latency_ms=np.nan,
+            latency_p95_ms=np.nan,
+            latency_mean_ms=np.nan,
         )
 
     # Extract PnL in R multiples
@@ -109,11 +109,11 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
     # Average R per trade
     avg_r = float(np.mean(pnl_r_values))
 
-    # Expectancy (R)
-    expectancy_r = avg_r
+    # Expectancy (R) - expected value per trade
+    expectancy = avg_r
 
     # Sharpe ratio estimate (assuming independent trades)
-    sharpe_ratio = (
+    sharpe_estimate = (
         float(np.mean(pnl_r_values) / np.std(pnl_r_values))
         if np.std(pnl_r_values) > 0
         else np.nan
@@ -133,8 +133,8 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
     max_drawdown_r = float(np.min(drawdown_r)) if len(drawdown_r) > 0 else 0.0
 
     # Latency metrics (placeholder - requires actual latency data)
-    avg_latency_ms = np.nan
-    p95_latency_ms = np.nan
+    latency_p95_ms = np.nan
+    latency_mean_ms = np.nan
 
     metrics = MetricsSummary(
         trade_count=trade_count,
@@ -144,18 +144,18 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
         avg_win_r=avg_win_r,
         avg_loss_r=avg_loss_r,
         avg_r=avg_r,
-        expectancy_r=expectancy_r,
-        sharpe_ratio=sharpe_ratio,
+        expectancy=expectancy,
+        sharpe_estimate=sharpe_estimate,
         profit_factor=profit_factor,
         max_drawdown_r=max_drawdown_r,
-        avg_latency_ms=avg_latency_ms,
-        p95_latency_ms=p95_latency_ms,
+        latency_p95_ms=latency_p95_ms,
+        latency_mean_ms=latency_mean_ms,
     )
 
     logger.info(
         f"Metrics computed: {trade_count} trades, "
         f"win_rate={win_rate:.2%}, "
-        f"expectancy={expectancy_r:.2f}R"
+        f"expectancy={expectancy:.2f}R"
     )
 
     return metrics

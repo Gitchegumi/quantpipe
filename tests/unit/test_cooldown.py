@@ -20,7 +20,7 @@ class TestSignalCooldown:
         """Create sample candle sequence for cooldown testing."""
         candles = []
         base_time = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
-        
+
         for i in range(10):
             candle = Candle(
                 timestamp_utc=base_time + timedelta(hours=i),
@@ -36,7 +36,7 @@ class TestSignalCooldown:
                 stoch_rsi=0.5,
             )
             candles.append(candle)
-        
+
         return candles
 
     def test_no_previous_signal_allows_generation(self, sample_candles):
@@ -47,9 +47,11 @@ class TestSignalCooldown:
         """
         # Act
         can_generate = can_generate_signal(sample_candles, last_signal_timestamp=None)
-        
+
         # Assert
-        assert can_generate is True, "Should allow signal when no previous signal exists"
+        assert (
+            can_generate is True
+        ), "Should allow signal when no previous signal exists"
 
     def test_cooldown_blocks_immediate_signal(self, sample_candles):
         """
@@ -59,16 +61,16 @@ class TestSignalCooldown:
         """
         # Arrange: Last signal was the most recent candle
         last_signal_time = sample_candles[-1].timestamp_utc
-        
+
         # Act
         can_generate = can_generate_signal(
-            sample_candles,
-            last_signal_timestamp=last_signal_time,
-            cooldown_candles=5
+            sample_candles, last_signal_timestamp=last_signal_time, cooldown_candles=5
         )
-        
+
         # Assert
-        assert can_generate is False, "Should block signal immediately after previous signal"
+        assert (
+            can_generate is False
+        ), "Should block signal immediately after previous signal"
 
     def test_cooldown_blocks_within_5_candles(self, sample_candles):
         """
@@ -78,14 +80,12 @@ class TestSignalCooldown:
         """
         # Arrange: Last signal was 4 candles ago (index 5, current is 9)
         last_signal_time = sample_candles[5].timestamp_utc
-        
+
         # Act
         can_generate = can_generate_signal(
-            sample_candles,
-            last_signal_timestamp=last_signal_time,
-            cooldown_candles=5
+            sample_candles, last_signal_timestamp=last_signal_time, cooldown_candles=5
         )
-        
+
         # Assert: Only 4 candles have passed (6, 7, 8, 9)
         assert can_generate is False, "Should block signal within 5-candle cooldown"
 
@@ -97,16 +97,16 @@ class TestSignalCooldown:
         """
         # Arrange: Last signal was 6 candles ago (index 3, current is 9)
         last_signal_time = sample_candles[3].timestamp_utc
-        
+
         # Act
         can_generate = can_generate_signal(
-            sample_candles,
-            last_signal_timestamp=last_signal_time,
-            cooldown_candles=5
+            sample_candles, last_signal_timestamp=last_signal_time, cooldown_candles=5
         )
-        
+
         # Assert: 6 candles have passed (4, 5, 6, 7, 8, 9) >= 5
-        assert can_generate is True, "Should allow signal after 5-candle cooldown expires"
+        assert (
+            can_generate is True
+        ), "Should allow signal after 5-candle cooldown expires"
 
     def test_cooldown_exact_boundary_5_candles(self, sample_candles):
         """
@@ -116,16 +116,16 @@ class TestSignalCooldown:
         """
         # Arrange: Last signal was exactly 5 candles ago (index 4, current is 9)
         last_signal_time = sample_candles[4].timestamp_utc
-        
+
         # Act
         can_generate = can_generate_signal(
-            sample_candles,
-            last_signal_timestamp=last_signal_time,
-            cooldown_candles=5
+            sample_candles, last_signal_timestamp=last_signal_time, cooldown_candles=5
         )
-        
+
         # Assert: Exactly 5 candles have passed (5, 6, 7, 8, 9)
-        assert can_generate is True, "Should allow signal when exactly 5 candles have passed"
+        assert (
+            can_generate is True
+        ), "Should allow signal when exactly 5 candles have passed"
 
     def test_custom_cooldown_period(self, sample_candles):
         """
@@ -135,14 +135,12 @@ class TestSignalCooldown:
         """
         # Arrange: Last signal was 3 candles ago
         last_signal_time = sample_candles[6].timestamp_utc
-        
+
         # Act: Use custom cooldown of 3 candles
         can_generate = can_generate_signal(
-            sample_candles,
-            last_signal_timestamp=last_signal_time,
-            cooldown_candles=3
+            sample_candles, last_signal_timestamp=last_signal_time, cooldown_candles=3
         )
-        
+
         # Assert: 3 candles have passed (7, 8, 9)
         assert can_generate is True, "Should respect custom cooldown period"
 
@@ -156,9 +154,9 @@ class TestSignalCooldown:
         can_generate = can_generate_signal(
             [],
             last_signal_timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            cooldown_candles=5
+            cooldown_candles=5,
         )
-        
+
         # Assert
         assert can_generate is False, "Should block signal with empty candle sequence"
 
@@ -170,13 +168,11 @@ class TestSignalCooldown:
         """
         # Arrange: Signal was before the first candle
         old_signal_time = sample_candles[0].timestamp_utc - timedelta(days=1)
-        
+
         # Act
         can_generate = can_generate_signal(
-            sample_candles,
-            last_signal_timestamp=old_signal_time,
-            cooldown_candles=5
+            sample_candles, last_signal_timestamp=old_signal_time, cooldown_candles=5
         )
-        
+
         # Assert
         assert can_generate is True, "Should allow signal when previous is very old"
