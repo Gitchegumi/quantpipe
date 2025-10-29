@@ -1,15 +1,15 @@
 <!--
 Sync Impact Report:
-- Version change: 1.1.0 → 1.2.0
+- Version change: 1.2.0 → 1.3.0
 - Modified principles: None
-- Added sections: Principle VIII - Code Quality & Documentation Standards (PEP 8 compliance)
+- Added sections: Principle IX - Dependency Management & Reproducibility
 - Removed sections: None
 - Templates requiring updates:
-  ✅ plan-template.md - Updated (Code Style guidance reinforced)
-  ✅ tasks-template.md - Updated (Code review task patterns)
+  ✅ plan-template.md - Compatible (references dependencies generically)
+  ✅ tasks-template.md - Will reference Poetry in setup tasks
   ✅ spec-template.md - Compatible (no changes needed)
-  ✅ agent-file-template.md - Updated (Code Style section enhancement)
-- Follow-up TODOs: None - all placeholders filled
+  ✅ agent-file-template.md - Already updated in v1.2.0
+- Follow-up TODOs: Update any existing pyproject.toml/requirements.txt references in task templates
 -->
 
 # Trading Strategies Constitution
@@ -131,6 +131,37 @@ MUST use consistent indentation (4 spaces), line length ≤88 characters (Black 
 
 **Rationale**: Comprehensive documentation ensures code maintainability, enables effective collaboration, facilitates onboarding, and aligns with professional Python development standards. Type hints combined with docstrings provide both human and machine-readable contracts.
 
+### IX. Dependency Management & Reproducibility
+
+All Python projects MUST use Poetry for dependency management and packaging.
+The use of requirements.txt files is prohibited for dependency specification.
+All dependencies MUST be declared in pyproject.toml with appropriate version constraints.
+
+*Requirements:*
+
+**Poetry Configuration**:
+Every Python project MUST contain a pyproject.toml file managed by Poetry, including:
+
+- Project metadata (name, version, description, authors)
+- Python version constraint
+- Runtime dependencies with semantic versioning constraints
+- Development dependencies (testing, linting, formatting tools)
+- Build system configuration
+
+**Dependency Lock File**:
+The poetry.lock file MUST be committed to version control to ensure deterministic builds and reproducible environments across all development and production systems.
+
+**Virtual Environment Management**:
+Poetry MUST be used to create and manage project-specific virtual environments. Manual venv creation or system-wide package installation is prohibited.
+
+**Dependency Updates**:
+Dependency version updates MUST be performed using `poetry update` with review of changes in poetry.lock before committing.
+
+**Installation Commands**:
+Development setup MUST use `poetry install` to create reproducible environments. Production deployment MUST use `poetry install --only main` to exclude development dependencies.
+
+**Rationale**: Poetry provides deterministic dependency resolution, lock file management, and integrated virtual environment handling, ensuring reproducible builds and eliminating dependency conflicts. This standardization simplifies onboarding, reduces environment-related issues, and aligns with modern Python packaging best practices.
+
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -173,4 +204,4 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version**: 1.2.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-28
+**Version**: 1.3.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-28
