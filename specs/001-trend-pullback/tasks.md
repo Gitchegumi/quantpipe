@@ -73,12 +73,12 @@ Implements long-side logic; independently testable.
 
 Adds symmetry; reuses components where possible.
 
-- [ ] T039 [US2] Extend signal generator to support short logic in `src/strategy/trend_pullback/signal_generator.py`
-- [ ] T040 [P] [US2] Extend reversal logic tests for bearish patterns in `tests/unit/test_reversal_patterns.py`
-- [ ] T041 [US2] Add short-specific integration test acceptance scenarios in `tests/integration/test_us2_short_signal.py`
-- [ ] T042 [P] [US2] Add risk manager test for short stop direction in `tests/unit/test_risk_manager_short.py`
-- [ ] T043 [US2] Add cooldown enforcement test in `tests/unit/test_cooldown.py`
-- [ ] T044 [P] [US2] Update CLI to toggle direction modes `src/cli/run_backtest.py`
+- [x] T039 [US2] Extend signal generator to support short logic in `src/strategy/trend_pullback/signal_generator.py`
+- [x] T040 [P] [US2] Extend reversal logic tests for bearish patterns in `tests/unit/test_reversal_patterns.py`
+- [x] T041 [US2] Add short-specific integration test acceptance scenarios in `tests/integration/test_us2_short_signal.py`
+- [x] T042 [P] [US2] Add risk manager test for short stop direction in `tests/unit/test_risk_manager_short.py`
+- [x] T043 [US2] Add cooldown enforcement test in `tests/unit/test_cooldown.py`
+- [x] T044 [P] [US2] Update CLI to toggle direction modes `src/cli/run_backtest.py`
 
 ## Phase 5: User Story US3 (P3) - Backtest Result Generation
 
