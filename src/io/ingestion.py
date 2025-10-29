@@ -76,6 +76,7 @@ def ingest_candles(
     rsi_period: int = 14,
     stoch_rsi_period: int = 14,
     expected_timeframe_minutes: int = 5,
+    allow_gaps: bool = False,
 ) -> Iterator[Candle]:
     """
     Load candles from CSV and yield Candle objects with computed indicators.
@@ -95,6 +96,7 @@ def ingest_candles(
         rsi_period: RSI period (default 14).
         stoch_rsi_period: Stochastic RSI period (default 14).
         expected_timeframe_minutes: Expected candle interval in minutes (default 5).
+        allow_gaps: If True, log gaps but don't raise errors (default False).
 
     Yields:
         Candle objects with computed indicators.
@@ -176,8 +178,15 @@ def ingest_candles(
         if prev_timestamp is not None:
             actual_delta = current_timestamp - prev_timestamp
             if actual_delta > expected_delta:
-                raise DataIntegrityError(
-                    "Timestamp gap detected",
+                gap_minutes = actual_delta.total_seconds() / 60
+                if allow_gaps:
+                    logger.warning(
+                        f"Timestamp gap detected (allowing): expected {expected_timeframe_minutes}m, "
+                        f"actual {gap_minutes:.1f}m at {current_timestamp}"
+                    )
+                else:
+                    raise DataIntegrityError(
+                        "Timestamp gap detected",
                     context={
                         "expected_minutes": expected_timeframe_minutes,
                         "actual_minutes": actual_delta.total_seconds() / 60,

@@ -98,6 +98,7 @@ def run_simple_backtest(
         rsi_period=parameters.rsi_length,
         stoch_rsi_period=parameters.rsi_length,
         expected_timeframe_minutes=1,  # M1 data
+        allow_gaps=True,  # FX data has natural gaps (weekends, low liquidity)
     ))
 
     logger.info(f"Loaded {len(candles)} candles")
