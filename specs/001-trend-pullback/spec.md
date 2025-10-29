@@ -178,6 +178,7 @@ User wants to run a historical backtest and obtain standardized performance metr
 ## Dependencies & Constraints
 
 - Requires reliable OHLCV historical data source (1m base) aggregated to target timeframes.
+- Raw market data stored in `/data/raw/` directory (excluded from version control via .gitignore; see Constitution Principle VI for manifest-based provenance).
 - Must conform to constitution risk management and reproducibility standards.
 - Restricted to transparent, interpretable indicators (EMA, RSI, ATR) only.
 - Memory footprint must support processing at least one year of 1m data per pair in single pass.

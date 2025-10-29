@@ -18,12 +18,13 @@ Develop a parsimonious FX trend-following strategy that enters after validated p
 -->
 
 **Language/Version**: Python 3.11 (chosen for ecosystem breadth, numerical libs, readability)
-**Primary Dependencies**: numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests)
+**Primary Dependencies**: numpy (vector math), pandas (time series handling), custom EMA/ATR/RSI implementation (preferred over ta-lib to avoid binary dependency complexity), pydantic (config validation), rich/logging (structured logs), pytest (tests)
 **Storage**: Local file system for manifests & logs; raw market data external (excluded via .gitignore)
 **Testing**: pytest + hypothesis (property tests for sizing & indicators) + custom fixture datasets
 **Target Platform**: Cross-platform (primary dev on Windows; CI on Linux runner)
 **Project Type**: Single library + CLI commands
 **Performance Goals**: ≥50k candles/sec backtest throughput; p95 candle processing latency ≤5ms; memory footprint ≤150MB for 1y 1m data (single pair) during streaming
+**Reference Machine**: Performance benchmarks measured on Intel Core i7-9700K @ 3.6GHz, 16GB RAM, Windows 11 Pro, Python 3.11, SSD storage
 **Constraints**: Deterministic outputs, reproducibility hash, interpretable indicators only, modular strategy boundary
 **Scale/Scope**: Initial focus: 1–3 FX pairs (EURUSD primary); extendable to portfolio later
 
