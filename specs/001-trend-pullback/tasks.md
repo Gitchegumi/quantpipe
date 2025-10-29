@@ -29,27 +29,27 @@ Essential repository and environment scaffolding.
 - [x] T007 Create `tests/conftest.py` with global fixtures (temp manifest path, sample parameters)
 - [x] T008 [P] Create `tests/fixtures/sample_candles_long.csv` synthetic dataset for US1 acceptance tests
 - [x] T009 [P] Create `tests/fixtures/sample_candles_short.csv` synthetic dataset for US2 acceptance tests
-- [x] T010 [P] Create `tests/fixtures/sample_candles_empty.csv` zero-trade dataset for US3 scenario 3
+- [x] T010 [P] Create `tests/fixtures/sample_candles_empty.csv` placeholder for US3 acceptance test
 
-## Phase 2: Foundational (Cross-Story Prerequisites)
+## Phase 2: Foundational (P1)
 
-Implements domain primitives & shared services required by all stories.
+Low-level modules (indicators, ingestion, manifest, reproducibility, metrics).
 
-- [ ] T011 Implement core dataclasses in `src/models/core.py` (Candle, TrendState, PullbackState, TradeSignal, TradeExecution, BacktestRun, DataManifest)
-- [ ] T012 Implement indicator functions (EMA, ATR, RSI) in `src/indicators/basic.py`
-- [ ] T013 [P] Implement streaming ingestion stub `src/io/ingestion.py` (iterator yielding Candle + gap check)
-- [ ] T014 [P] Implement manifest loader & validator in `src/io/manifest.py`
-- [ ] T015 Implement deterministic signal ID helper in `src/strategy/id_factory.py`
-- [ ] T016 Implement reproducibility service skeleton in `src/backtest/reproducibility.py`
-- [ ] T017 Implement metrics aggregator skeleton in `src/backtest/metrics.py`
-- [ ] T018 Implement latency sampling utility in `src/backtest/latency.py`
-- [ ] T019 [P] Setup structured logging JSON config in `src/cli/logging_setup.py`
-- [ ] T020 Implement base exceptions `src/models/exceptions.py` (DataIntegrityError, RiskLimitError, ExecutionSimulationError)
-- [ ] T021 Add initial unit tests for indicators in `tests/unit/test_indicators_basic.py`
-- [ ] T022 [P] Add unit tests for manifest validation in `tests/unit/test_manifest.py`
-- [ ] T023 [P] Add unit tests for id determinism in `tests/unit/test_id_factory.py`
-- [ ] T024 Add unit tests for reproducibility service hash stability in `tests/unit/test_reproducibility.py`
-- [ ] T025 Add unit tests for metrics aggregator zero-trade case in `tests/unit/test_metrics_zero.py`
+- [x] T011 Implement core models dataclasses in `src/models/core.py` (Candle, TrendState, PullbackState, TradeSignal, TradeExecution, BacktestRun, DataManifest, MetricsSummary)
+- [x] T012 Implement basic indicators (EMA, ATR, RSI) in `src/indicators/basic.py`
+- [x] T013 [P] Implement streaming ingestion stub (iterator yielding Candle + gap check) in `src/io/ingestion.py`
+- [x] T014 [P] Implement manifest loader & validator in `src/io/manifest.py`
+- [x] T015 Implement deterministic signal ID helper `src/strategy/id_factory.py` (SHA-256 from pair + timestamp + parameters)
+- [x] T016 Implement reproducibility service skeleton in `src/backtest/reproducibility.py` (hash accumulator + manifest ref tracking)
+- [x] T017 Implement metrics aggregator skeleton in `src/backtest/metrics.py` (basic metrics: N trades, win/loss count)
+- [x] T018 Implement latency sampling utility in `src/backtest/latency.py` (p95, mean from samples)
+- [x] T019 [P] Implement structured logging config in `src/cli/logging_setup.py` (JSON formatter with log levels)
+- [x] T020 Define base exceptions in `src/models/exceptions.py` (DataIntegrityError, RiskLimitError, ExecutionSimulationError)
+- [x] T021 Add initial unit tests for indicators in `tests/unit/test_indicators_basic.py`
+- [x] T022 [P] Add unit tests for manifest validation in `tests/unit/test_manifest.py`
+- [x] T023 [P] Add unit tests for id determinism in `tests/unit/test_id_factory.py`
+- [x] T024 Add unit tests for reproducibility service hash stability in `tests/unit/test_reproducibility.py`
+- [x] T025 Add unit tests for metrics aggregator zero-trade case in `tests/unit/test_metrics_zero.py`
 
 ## Phase 3: User Story US1 (P1) - Long Trade Signal
 
