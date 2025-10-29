@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2025-10-29
 
 ## Active Technologies
+- Python 3.11 + numpy, pandas, pydantic, rich (existing); no new dependencies required (002-directional-backtesting)
+- CSV files for price data input; text/JSON files for backtest results output (002-directional-backtesting)
 
 - Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests) (001-trend-pullback)
 - Poetry (mandatory package manager for dependency management and virtual environments)
@@ -57,6 +59,7 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - Line length ≤88 characters (Black standard)
 
 ## Recent Changes
+- 002-directional-backtesting: Added Python 3.11 + numpy, pandas, pydantic, rich (existing); no new dependencies required
 
 - 2025-10-29: Constitution v1.4.0 - Added Principle X (Code Quality Automation), formalized Black/Ruff/Pylint requirements, mandatory lazy logging
 - 001-trend-pullback: Added Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests)
