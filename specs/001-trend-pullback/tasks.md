@@ -99,18 +99,18 @@ Full metrics, error handling, zero-trade case.
 
 Refinements, quality, deferred items groundwork.
 
-- [ ] T055 Add statistical significance test harness (p-value) in `tests/integration/test_significance.py`
-- [ ] T056 [P] Add volatility regime adaptive sizing placeholder in `src/risk/adaptive_sizing.py`
-- [ ] T057 Add Stoch RSI optional indicator in `src/indicators/stoch_rsi.py`
-- [ ] T058 [P] Add higher timeframe filter implementation in `src/strategy/trend_pullback/htf_filter.py` (FR-016, FR-028: optional HTF EMA alignment check)
-- [ ] T059 [P] Add configuration documentation section in `README.md`
-- [ ] T060 Add ruff configuration file `.ruff.toml` with basic lint rules
-- [ ] T061 [P] Add pre-commit config `.pre-commit-config.yaml` for formatting & linting
-- [ ] T062 Add CLI help documentation in `src/cli/__init__.py`
-- [ ] T063 Add CLI dry-run mode flag in `src/cli/run_backtest.py` (FR-024: emit signals without execution)
-- [ ] T064 Final pass to ensure reproducibility hash documented in `specs/001-trend-pullback/quickstart.md`
-- [ ] T065 [P] Add example Jupyter notebook `examples/long_signal_walkthrough.ipynb` (synthetic demonstration)
-- [ ] T066 Add CHANGELOG entry in `CHANGELOG.md` summarizing feature implementation
+- [x] T055 Add statistical significance test harness (p-value) in `tests/integration/test_significance.py`
+- [x] T056 [P] Add volatility regime adaptive sizing placeholder in `src/risk/adaptive_sizing.py`
+- [x] T057 Add Stoch RSI optional indicator in `src/indicators/stoch_rsi.py`
+- [x] T058 [P] Add higher timeframe filter implementation in `src/strategy/trend_pullback/htf_filter.py` (FR-016, FR-028: optional HTF EMA alignment check)
+- [x] T059 [P] Add configuration documentation section in `README.md`
+- [x] T060 Add ruff configuration file `.ruff.toml` with basic lint rules
+- [x] T061 [P] Add pre-commit config `.pre-commit-config.yaml` for formatting & linting
+- [x] T062 Add CLI help documentation in `src/cli/__init__.py`
+- [x] T063 Add CLI dry-run mode flag in `src/cli/run_backtest.py` (FR-024: emit signals without execution)
+- [x] T064 Final pass to ensure reproducibility hash documented in `specs/001-trend-pullback/quickstart.md`
+- [x] T065 [P] Add example Jupyter notebook `examples/long_signal_walkthrough.ipynb` (synthetic demonstration)
+- [x] T066 Add CHANGELOG entry in `CHANGELOG.md` summarizing feature implementation
 
 ## Dependency Graph (User Story Order)
 

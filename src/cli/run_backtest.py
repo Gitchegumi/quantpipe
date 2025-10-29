@@ -162,6 +162,12 @@ def main():
         help="Logging level (default: INFO)",
     )
 
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate signals without execution (FR-024: signal-only mode)",
+    )
+
     args = parser.parse_args()
 
     # Validate data file exists
@@ -171,9 +177,22 @@ def main():
 
     # Determine output mode
     is_json_output = args.output_format == "json"
+    is_dry_run = args.dry_run
 
     # Route to appropriate implementation
     if args.direction == "LONG":
+        if is_dry_run:
+            print(f"DRY RUN MODE: Generating LONG signals from {args.data}")
+            print("Signals will be generated but NOT executed (FR-024)")
+            print("\nImplementation notes:")
+            print("- Load candles via ingestion.py")
+            print("- Generate signals via signal_generator.generate_long_signals()")
+            print("- Output signals without calling simulate_execution()")
+            print("- Useful for signal validation, parameter tuning, strategy debugging")
+            if is_json_output:
+                print("\nJSON output would include signal list with timestamps and parameters")
+            return 0
+
         if is_json_output:
             # Create sample JSON output structure (placeholder for real implementation)
             run_metadata = BacktestRun(
@@ -216,6 +235,17 @@ def main():
             print(f"          --data {args.data} --log-level {args.log_level}")
 
     elif args.direction == "SHORT":
+        if is_dry_run:
+            print(f"DRY RUN MODE: Generating SHORT signals from {args.data}")
+            print("Signals will be generated but NOT executed (FR-024)")
+            print("\nImplementation notes:")
+            print("- Load candles via ingestion.py")
+            print("- Generate signals via signal_generator.generate_short_signals()")
+            print("- Output signals without calling simulate_execution()")
+            if is_json_output:
+                print("\nJSON output would include signal list with timestamps and parameters")
+            return 0
+
         if is_json_output:
             print(
                 json.dumps(
@@ -237,6 +267,17 @@ def main():
             print("run_long_backtest.py but calling generate_short_signals()")
 
     elif args.direction == "BOTH":
+        if is_dry_run:
+            print(f"DRY RUN MODE: Generating BOTH directions signals from {args.data}")
+            print("Signals will be generated but NOT executed (FR-024)")
+            print("\nImplementation notes:")
+            print("- Generate both LONG and SHORT signals")
+            print("- Output combined signal list without execution")
+            print("- Useful for comparing signal frequency between directions")
+            if is_json_output:
+                print("\nJSON output would include signal list with direction tags")
+            return 0
+
         if is_json_output:
             print(
                 json.dumps(
