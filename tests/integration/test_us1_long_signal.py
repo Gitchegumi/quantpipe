@@ -6,12 +6,13 @@ signal generation, execution simulation, and metrics computation for long-only
 trend pullback strategy.
 """
 
-import pytest
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
 
+import pytest
+
+from src.cli.run_long_backtest import run_simple_backtest
 from src.config.parameters import StrategyParameters
-from src.cli.run_long_backtest import run_long_backtest
 
 
 class TestUS1LongSignalIntegration:
@@ -34,7 +35,7 @@ class TestUS1LongSignalIntegration:
 
         # Start with uptrend base
         base_price = 1.10000
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         # First 50 candles: establish uptrend
         for i in range(50):
@@ -68,7 +69,7 @@ class TestUS1LongSignalIntegration:
                 timestamp = timestamp.replace(day=timestamp.day + 1)
 
         # Next candle: bullish engulfing reversal
-        reversal_low = close_price
+        _reversal_low = close_price
         open_price = close_price
         close_price = open_price + 0.00080  # Large bullish candle
         high = close_price + 0.00010
@@ -81,7 +82,7 @@ class TestUS1LongSignalIntegration:
         timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
 
         # Final 129 candles: continuation uptrend
-        for i in range(129):
+        for _ in range(129):
             open_price = close_price
             close_price = open_price + 0.00010
             high = close_price + 0.00005
@@ -107,7 +108,7 @@ class TestUS1LongSignalIntegration:
         Then system should identify uptrend state.
         """
         # Run backtest
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=sample_price_data,
             output_dir=tmp_path / "results",
             log_level="WARNING",
@@ -124,7 +125,7 @@ class TestUS1LongSignalIntegration:
         When backtest runs,
         Then system should identify pullback state.
         """
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=sample_price_data,
             output_dir=tmp_path / "results",
             log_level="WARNING",
@@ -141,7 +142,7 @@ class TestUS1LongSignalIntegration:
         When backtest runs,
         Then system should confirm reversal and generate long signal.
         """
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=sample_price_data,
             output_dir=tmp_path / "results",
             log_level="WARNING",
@@ -150,7 +151,9 @@ class TestUS1LongSignalIntegration:
         # Should generate signal after reversal confirmation
         assert result.total_signals_generated >= 1
 
-    def test_us1_ac4_generate_long_signal(self, sample_price_data: Path, tmp_path: Path):
+    def test_us1_ac4_generate_long_signal(
+        self, sample_price_data: Path, tmp_path: Path
+    ):
         """
         US1 AC-4: System generates long signal with entry/stop/target.
 
@@ -158,7 +161,7 @@ class TestUS1LongSignalIntegration:
         When signal is generated,
         Then signal should include entry, stop-loss, and take-profit prices.
         """
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=sample_price_data,
             output_dir=tmp_path / "results",
             log_level="WARNING",
@@ -168,7 +171,9 @@ class TestUS1LongSignalIntegration:
         assert result.total_signals_generated >= 1
         # Note: Execution depends on enough subsequent candles
 
-    def test_us1_ac5_calculate_position_size(self, sample_price_data: Path, tmp_path: Path):
+    def test_us1_ac5_calculate_position_size(
+        self, sample_price_data: Path, tmp_path: Path
+    ):
         """
         US1 AC-5: System calculates position size based on risk %.
 
@@ -182,7 +187,7 @@ class TestUS1LongSignalIntegration:
             account_balance=10000.0,
         )
 
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=sample_price_data,
             output_dir=tmp_path / "results",
             parameters=params,
@@ -205,7 +210,7 @@ class TestUS1LongSignalIntegration:
         4. Compute performance metrics
         5. Return BacktestRun with reproducibility hash
         """
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=sample_price_data,
             output_dir=tmp_path / "results",
             log_level="WARNING",
@@ -242,15 +247,12 @@ class TestUS1LongSignalIntegration:
         csv_path = tmp_path / "ranging.csv"
         rows = ["timestamp_utc,open,high,low,close,volume"]
 
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
         base_price = 1.10000
 
         # Oscillate around base price to create crossovers
         for i in range(200):
-            if i % 10 < 5:
-                close_price = base_price + 0.00050
-            else:
-                close_price = base_price - 0.00050
+            close_price = base_price + 0.00050 if i % 10 < 5 else base_price - 0.00050
 
             open_price = close_price - 0.00005
             high = close_price + 0.00003
@@ -266,7 +268,7 @@ class TestUS1LongSignalIntegration:
 
         csv_path.write_text("\n".join(rows))
 
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=csv_path,
             output_dir=tmp_path / "results",
             log_level="WARNING",
@@ -275,7 +277,9 @@ class TestUS1LongSignalIntegration:
         # Ranging market should generate few or no signals
         assert result.total_signals_generated >= 0
 
-    def test_us1_cooldown_period_enforced(self, sample_price_data: Path, tmp_path: Path):
+    def test_us1_cooldown_period_enforced(
+        self, sample_price_data: Path, tmp_path: Path
+    ):
         """
         US1 Edge Case: Cooldown period prevents rapid signal generation.
 
@@ -287,7 +291,7 @@ class TestUS1LongSignalIntegration:
             signal_cooldown_candles=5,
         )
 
-        result = run_long_backtest(
+        result = run_simple_backtest(
             price_data_path=sample_price_data,
             output_dir=tmp_path / "results",
             parameters=params,

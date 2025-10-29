@@ -4,9 +4,7 @@ Unit tests for reproducibility tracker.
 Tests hash stability, event accumulation, and verification logic.
 """
 
-from datetime import datetime, timezone
-
-import pytest
+from datetime import datetime
 
 from src.backtest.reproducibility import ReproducibilityTracker
 

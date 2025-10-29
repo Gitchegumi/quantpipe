@@ -194,7 +194,7 @@ def rsi(prices: NDArray[np.float64], period: int = 14) -> NDArray[np.float64]:
     rsi_values[~valid_mask & (avg_gains == 0)] = 50.0
 
     # First 'period' values should be NaN (insufficient data)
-    rsi_values[: period] = np.nan
+    rsi_values[:period] = np.nan
 
     return rsi_values
 

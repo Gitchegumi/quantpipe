@@ -12,8 +12,9 @@ when manifest operations fail, as required by US3.
 """
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from src.io.manifest import load_manifest
 from src.models.exceptions import DataIntegrityError

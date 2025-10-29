@@ -13,17 +13,18 @@ can handle large datasets without excessive memory usage. Tests monitor:
 Target: Maintain <500MB peak memory for 100K candle dataset.
 """
 
-import pytest
-import gc
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
-import tempfile
 import csv
-from typing import List, Generator
+import gc
+import tempfile
+from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
+import pytest
+
+from src.backtest.metrics import compute_metrics
 from src.io.ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
-from src.backtest.metrics import compute_metrics
 
 
 def get_process_memory_mb() -> float:
@@ -34,8 +35,9 @@ def get_process_memory_mb() -> float:
         Memory usage in megabytes, or -1 if psutil unavailable.
     """
     try:
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         mem_info = process.memory_info()
@@ -61,7 +63,7 @@ def huge_dataset_path() -> Generator[Path, None, None]:
         writer = csv.writer(f)
         writer.writerow(["timestamp_utc", "open", "high", "low", "close", "volume"])
 
-        base_time = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
         price = 1.1000
 
         for i in range(100000):
@@ -141,7 +143,7 @@ def test_ingestion_memory_constant(huge_dataset_path: Path):
     memory_samples = []
     candle_count = 0
 
-    for candle in ingest_candles(
+    for _ in ingest_candles(
         huge_dataset_path,
         ema_fast=20,
         ema_slow=50,
@@ -189,8 +191,8 @@ def test_execution_list_memory_growth():
     if initial_mb < 0:
         pytest.skip("psutil not available for memory measurement")
 
-    executions: List[TradeExecution] = []
-    base_time = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    executions: list[TradeExecution] = []
+    base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
     for i in range(10000):
         execution = TradeExecution(
@@ -237,8 +239,8 @@ def test_metrics_computation_memory_spike():
         pytest.skip("psutil not available for memory measurement")
 
     # Create 5,000 executions
-    executions: List[TradeExecution] = []
-    base_time = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    executions: list[TradeExecution] = []
+    base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
     for i in range(5000):
         pnl_r = 2.0 if i % 3 == 0 else -1.0
@@ -259,8 +261,8 @@ def test_metrics_computation_memory_spike():
 
     mid_mb = get_process_memory_mb()
 
-    # Compute metrics
-    metrics = compute_metrics(executions)
+    # Compute metrics (testing memory impact)
+    _ = compute_metrics(executions)
 
     gc.collect()
     final_mb = get_process_memory_mb()
@@ -293,8 +295,8 @@ def test_candle_accumulation_memory():
     if initial_mb < 0:
         pytest.skip("psutil not available for memory measurement")
 
-    candles: List[Candle] = []
-    base_time = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    candles: list[Candle] = []
+    base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
     # Accumulate 10,000 candles
     for i in range(10000):
@@ -344,7 +346,7 @@ def test_garbage_collection_effectiveness():
     # Create and discard large list
     def create_temp_executions():
         temp_list = []
-        base_time = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
         for i in range(5000):
             execution = TradeExecution(
@@ -400,7 +402,7 @@ def test_peak_memory_large_backtest_simulation(huge_dataset_path: Path):
 
     print(f"\nInitial memory: {initial_mb:.1f} MB")
 
-    candle_window: List[Candle] = []
+    candle_window: list[Candle] = []
     window_size = 200
     candle_count = 0
     peak_mb = initial_mb
@@ -429,7 +431,7 @@ def test_peak_memory_large_backtest_simulation(huge_dataset_path: Path):
             )
 
     gc.collect()
-    final_mb = get_process_memory_mb()
+    _final_mb = get_process_memory_mb()
     total_growth = peak_mb - initial_mb
 
     print(

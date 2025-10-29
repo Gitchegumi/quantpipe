@@ -99,11 +99,11 @@ def load_manifest(manifest_path: Path, verify_checksum: bool = True) -> DataMani
     if not manifest_path.exists():
         raise FileNotFoundError(f"Manifest file not found: {manifest_path}")
 
-    logger.info(f"Loading manifest from {manifest_path}")
+    logger.info("Loading manifest from %s", manifest_path)
 
     # Read and parse JSON
     try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
+        with open(manifest_path, encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         raise DataIntegrityError(
@@ -143,7 +143,7 @@ def load_manifest(manifest_path: Path, verify_checksum: bool = True) -> DataMani
 
     # Verify checksum if requested
     if verify_checksum:
-        logger.debug(f"Verifying checksum for {data_file_path}")
+        logger.debug("Verifying checksum for %s", data_file_path)
         actual_checksum = _compute_file_checksum(data_file_path)
         expected_checksum = data["checksum"]
 
@@ -162,8 +162,8 @@ def load_manifest(manifest_path: Path, verify_checksum: bool = True) -> DataMani
     manifest = DataManifest(
         pair=data["pair"],
         timeframe=data["timeframe"],
-        start_date=data["start_date"],
-        end_date=data["end_date"],
+        date_range_start=data["start_date"],
+        date_range_end=data["end_date"],
         source_provider=data["source_provider"],
         checksum=data["checksum"],
         preprocessing_notes=data["preprocessing_notes"],
@@ -172,9 +172,12 @@ def load_manifest(manifest_path: Path, verify_checksum: bool = True) -> DataMani
     )
 
     logger.info(
-        f"Manifest loaded: {manifest.pair} {manifest.timeframe} "
-        f"({manifest.start_date} to {manifest.end_date}), "
-        f"{manifest.total_candles} candles"
+        "Manifest loaded: %s %s (%s to %s), %d candles",
+        manifest.pair,
+        manifest.timeframe,
+        manifest.date_range_start,
+        manifest.date_range_end,
+        manifest.total_candles,
     )
 
     return manifest
@@ -232,7 +235,7 @@ def create_manifest(
     if not data_file_path.exists():
         raise FileNotFoundError(f"Data file not found: {data_file_path}")
 
-    logger.info(f"Creating manifest for {data_file_path}")
+    logger.info("Creating manifest for %s", data_file_path)
 
     # Compute checksum
     checksum = _compute_file_checksum(data_file_path)
@@ -241,8 +244,8 @@ def create_manifest(
     manifest = DataManifest(
         pair=pair,
         timeframe=timeframe,
-        start_date=start_date,
-        end_date=end_date,
+        date_range_start=start_date,
+        date_range_end=end_date,
         source_provider=source_provider,
         checksum=checksum,
         preprocessing_notes=preprocessing_notes,
@@ -255,8 +258,8 @@ def create_manifest(
     manifest_data = {
         "pair": manifest.pair,
         "timeframe": manifest.timeframe,
-        "start_date": manifest.start_date,
-        "end_date": manifest.end_date,
+        "start_date": manifest.date_range_start,
+        "end_date": manifest.date_range_end,
         "source_provider": manifest.source_provider,
         "checksum": manifest.checksum,
         "preprocessing_notes": manifest.preprocessing_notes,
@@ -268,6 +271,6 @@ def create_manifest(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(manifest_data, f, indent=2)
 
-    logger.info(f"Manifest created: {output_path}")
+    logger.info("Manifest created: %s", output_path)
 
     return manifest

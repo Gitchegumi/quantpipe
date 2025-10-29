@@ -7,7 +7,6 @@ and handling of insufficient data periods.
 
 import numpy as np
 import pytest
-from numpy.testing import assert_array_almost_equal
 
 from src.indicators.basic import atr, ema, rsi, validate_indicator_inputs
 
@@ -125,7 +124,9 @@ class TestATR:
         low = np.array([9.0], dtype=np.float64)
         close = np.array([9.5, 10.5], dtype=np.float64)
 
-        with pytest.raises(ValueError, match="All price arrays must have the same length"):
+        with pytest.raises(
+            ValueError, match="All price arrays must have the same length"
+        ):
             atr(high, low, close, period=2)
 
 
@@ -178,7 +179,7 @@ class TestRSI:
     def test_rsi_bounds(self):
         """Test RSI stays within 0-100 range."""
         # Extreme uptrend
-        prices = np.array([1.0 * (1.1 ** i) for i in range(30)], dtype=np.float64)
+        prices = np.array([1.0 * (1.1**i) for i in range(30)], dtype=np.float64)
         period = 14
 
         result = rsi(prices, period)

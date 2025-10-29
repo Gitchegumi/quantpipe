@@ -7,8 +7,7 @@ confirmation.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Sequence
+from collections.abc import Sequence
 
 from ...models.core import Candle, PullbackState
 
@@ -77,8 +76,9 @@ def detect_reversal(
 
     if has_reversal:
         logger.info(
-            f"Reversal detected: direction={pullback_state.direction}, "
-            f"timestamp={recent_candles[-1].timestamp_utc.isoformat()}"
+            "Reversal detected: direction=%s, timestamp=%s",
+            pullback_state.direction,
+            recent_candles[-1].timestamp_utc.isoformat(),
         )
 
     return has_reversal
@@ -224,8 +224,7 @@ def _is_bullish_engulfing(prev_candle: Candle, curr_candle: Candle) -> bool:
 
     # Current body engulfs previous body
     engulfs = (
-        curr_candle.open < prev_candle.close
-        and curr_candle.close > prev_candle.open
+        curr_candle.open < prev_candle.close and curr_candle.close > prev_candle.open
     )
 
     return prev_bearish and curr_bullish and engulfs
@@ -259,8 +258,7 @@ def _is_bearish_engulfing(prev_candle: Candle, curr_candle: Candle) -> bool:
 
     # Current body engulfs previous body
     engulfs = (
-        curr_candle.open > prev_candle.close
-        and curr_candle.close < prev_candle.open
+        curr_candle.open > prev_candle.close and curr_candle.close < prev_candle.open
     )
 
     return prev_bullish and curr_bearish and engulfs

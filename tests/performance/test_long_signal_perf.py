@@ -5,15 +5,15 @@ Benchmarks signal generation throughput, execution simulation speed,
 and memory usage for large datasets.
 """
 
-import pytest
 import time
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
-from src.models.core import Candle
-from src.config.parameters import StrategyParameters
-from src.strategy.trend_pullback.signal_generator import generate_long_signals
+import pytest
+
 from src.backtest.execution import simulate_execution
+from src.config.parameters import StrategyParameters
+from src.models.core import Candle
+from src.strategy.trend_pullback.signal_generator import generate_long_signals
 
 
 class TestLongSignalPerformance:
@@ -28,7 +28,7 @@ class TestLongSignalPerformance:
         """
         candles = []
         base_price = 1.10000
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         for i in range(10000):
             # Simulate trending + ranging behavior
@@ -80,7 +80,7 @@ class TestLongSignalPerformance:
 
         signals_generated = 0
         for i in range(100, len(large_candle_dataset)):
-            window = large_candle_dataset[max(0, i - 100):i + 1]
+            window = large_candle_dataset[max(0, i - 100) : i + 1]
             signals = generate_long_signals(
                 candles=window,
                 parameters=parameters,
@@ -89,7 +89,7 @@ class TestLongSignalPerformance:
 
         elapsed = time.perf_counter() - start_time
 
-        print(f"\n--- Signal Generation Performance ---")
+        print("\n--- Signal Generation Performance ---")
         print(f"Candles processed: {len(large_candle_dataset)}")
         print(f"Signals generated: {signals_generated}")
         print(f"Total time: {elapsed:.3f}s")
@@ -134,8 +134,8 @@ class TestLongSignalPerformance:
 
         elapsed = time.perf_counter() - start_time
 
-        print(f"\n--- Execution Simulation Performance ---")
-        print(f"Simulations run: 100")
+        print("\n--- Execution Simulation Performance ---")
+        print("Simulations run: 100")
         print(f"Executions completed: {execution_count}")
         print(f"Total time: {elapsed:.3f}s")
         print(f"Avg time per simulation: {elapsed / 100 * 1000:.2f}ms")
@@ -159,7 +159,7 @@ class TestLongSignalPerformance:
 
         # Run signal generation and collect executions
         for i in range(100, len(large_candle_dataset)):
-            window = large_candle_dataset[max(0, i - 100):i + 1]
+            window = large_candle_dataset[max(0, i - 100) : i + 1]
             signals = generate_long_signals(
                 candles=window,
                 parameters=parameters,
@@ -168,7 +168,9 @@ class TestLongSignalPerformance:
             for signal in signals:
                 execution = simulate_execution(
                     signal=signal,
-                    candles=large_candle_dataset[i:min(i + 200, len(large_candle_dataset))],
+                    candles=large_candle_dataset[
+                        i : min(i + 200, len(large_candle_dataset))
+                    ],
                 )
                 if execution:
                     executions.append(execution)
@@ -176,13 +178,15 @@ class TestLongSignalPerformance:
         # Check execution list size
         execution_size = sys.getsizeof(executions)
 
-        print(f"\n--- Memory Usage ---")
+        print("\n--- Memory Usage ---")
         print(f"Candle dataset: {baseline_size / 1024:.2f} KB")
         print(f"Executions list: {execution_size / 1024:.2f} KB")
         print(f"Total executions: {len(executions)}")
 
         # Memory target: execution storage should be reasonable
-        assert execution_size < baseline_size * 2, "Excessive memory usage for executions"
+        assert (
+            execution_size < baseline_size * 2
+        ), "Excessive memory usage for executions"
 
     @pytest.mark.skip(reason="Stress test - run manually")
     def test_stress_100k_candles(self):
@@ -192,7 +196,7 @@ class TestLongSignalPerformance:
         This test is skipped by default. Run manually for extreme load testing.
         """
         candles = []
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
         base_price = 1.10000
 
         # Generate 100k candles
@@ -221,13 +225,13 @@ class TestLongSignalPerformance:
 
         signals_count = 0
         for i in range(100, len(candles), 100):  # Process every 100th for speed
-            window = candles[max(0, i - 100):i + 1]
+            window = candles[max(0, i - 100) : i + 1]
             signals = generate_long_signals(candles=window, parameters=parameters)
             signals_count += len(signals)
 
         elapsed = time.perf_counter() - start_time
 
-        print(f"\n--- Stress Test (100k candles) ---")
+        print("\n--- Stress Test (100k candles) ---")
         print(f"Total time: {elapsed:.3f}s")
         print(f"Signals generated: {signals_count}")
         print(f"Throughput: {len(candles) / elapsed:.0f} candles/sec")
@@ -245,24 +249,26 @@ class TestLatencyMeasurement:
         from src.models.core import Candle
 
         # Create 100-candle window
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
         candles = []
         for i in range(100):
-            candles.append(Candle(
-                timestamp_utc=timestamp + timedelta(hours=i),
-                pair="EURUSD",
-                timeframe_minutes=60,
-                open=1.10000,
-                high=1.10020,
-                low=1.09980,
-                close=1.10010,
-                volume=1000,
-                ema_fast=1.10005,
-                ema_slow=1.09995,
-                atr=0.00050,
-                rsi=50.0,
-                stoch_rsi=0.5,
-            ))
+            candles.append(
+                Candle(
+                    timestamp_utc=timestamp + timedelta(hours=i),
+                    pair="EURUSD",
+                    timeframe_minutes=60,
+                    open=1.10000,
+                    high=1.10020,
+                    low=1.09980,
+                    close=1.10010,
+                    volume=1000,
+                    ema_fast=1.10005,
+                    ema_slow=1.09995,
+                    atr=0.00050,
+                    rsi=50.0,
+                    stoch_rsi=0.5,
+                )
+            )
 
         parameters = StrategyParameters()
         latencies = []
@@ -279,7 +285,7 @@ class TestLatencyMeasurement:
         p95 = latencies[int(len(latencies) * 0.95)]
         p99 = latencies[int(len(latencies) * 0.99)]
 
-        print(f"\n--- Signal Generation Latency ---")
+        print("\n--- Signal Generation Latency ---")
         print(f"p50: {p50:.2f}ms")
         print(f"p95: {p95:.2f}ms")
         print(f"p99: {p99:.2f}ms")

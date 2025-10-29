@@ -7,8 +7,8 @@ when all conditions align.
 """
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Sequence
 
 from ...models.core import Candle, TradeSignal
 from ...strategy.id_factory import compute_parameters_hash, generate_signal_id
@@ -65,7 +65,7 @@ def generate_long_signals(
         raise ValueError("Candles sequence cannot be empty")
 
     if len(candles) < 50:
-        logger.debug(f"Insufficient candles for signal generation: {len(candles)} < 50")
+        logger.debug("Insufficient candles for signal generation: %d < 50", len(candles))
         return []
 
     # Compute parameters hash if not provided
@@ -79,12 +79,12 @@ def generate_long_signals(
             cross_count_threshold=parameters.get("trend_cross_count_threshold", 3),
         )
     except ValueError as e:
-        logger.warning(f"Trend classification failed: {e}")
+        logger.warning("Trend classification failed: %s", e)
         return []
 
     # Only proceed if in uptrend
     if trend_state.state != "UP":
-        logger.debug(f"Not in uptrend: {trend_state.state}")
+        logger.debug("Not in uptrend: %s", trend_state.state)
         return []
 
     # Step 2: Detect pullback
@@ -99,7 +99,7 @@ def generate_long_signals(
             pullback_max_age_candles=parameters.get("pullback_max_age", 20),
         )
     except ValueError as e:
-        logger.warning(f"Pullback detection failed: {e}")
+        logger.warning("Pullback detection failed: %s", e)
         return []
 
     # Only proceed if pullback is active
@@ -115,7 +115,7 @@ def generate_long_signals(
             min_candles_for_reversal=parameters.get("min_candles_reversal", 3),
         )
     except ValueError as e:
-        logger.warning(f"Reversal detection failed: {e}")
+        logger.warning("Reversal detection failed: %s", e)
         return []
 
     # Only generate signal if reversal confirmed
@@ -161,9 +161,11 @@ def generate_long_signals(
     )
 
     logger.info(
-        f"Long signal generated: id={signal_id[:16]}..., "
-        f"entry={entry_price:.5f}, stop={stop_price:.5f}, "
-        f"timestamp={latest_candle.timestamp_utc.isoformat()}"
+        "Long signal generated: id=%s..., entry=%.5f, stop=%.5f, timestamp=%s",
+        signal_id[:16],
+        entry_price,
+        stop_price,
+        latest_candle.timestamp_utc.isoformat(),
     )
 
     return [signal]
@@ -215,7 +217,7 @@ def generate_short_signals(
         raise ValueError("Candles sequence cannot be empty")
 
     if len(candles) < 50:
-        logger.debug(f"Insufficient candles for signal generation: {len(candles)} < 50")
+        logger.debug("Insufficient candles for signal generation: %d < 50", len(candles))
         return []
 
     # Compute parameters hash if not provided
@@ -229,12 +231,12 @@ def generate_short_signals(
             cross_count_threshold=parameters.get("trend_cross_count_threshold", 3),
         )
     except ValueError as e:
-        logger.warning(f"Trend classification failed: {e}")
+        logger.warning("Trend classification failed: %s", e)
         return []
 
     # Only proceed if in downtrend
     if trend_state.state != "DOWN":
-        logger.debug(f"Not in downtrend: {trend_state.state}")
+        logger.debug("Not in downtrend: %s", trend_state.state)
         return []
 
     # Step 2: Detect pullback (overbought for shorts)
@@ -249,7 +251,7 @@ def generate_short_signals(
             pullback_max_age_candles=parameters.get("pullback_max_age", 20),
         )
     except ValueError as e:
-        logger.warning(f"Pullback detection failed: {e}")
+        logger.warning("Pullback detection failed: %s", e)
         return []
 
     # Only proceed if pullback is active
@@ -265,7 +267,7 @@ def generate_short_signals(
             min_candles_for_reversal=parameters.get("min_candles_reversal", 3),
         )
     except ValueError as e:
-        logger.warning(f"Reversal detection failed: {e}")
+        logger.warning("Reversal detection failed: %s", e)
         return []
 
     # Only generate signal if reversal confirmed
@@ -311,9 +313,11 @@ def generate_short_signals(
     )
 
     logger.info(
-        f"Short signal generated: id={signal_id[:16]}..., "
-        f"entry={entry_price:.5f}, stop={stop_price:.5f}, "
-        f"timestamp={latest_candle.timestamp_utc.isoformat()}"
+        "Short signal generated: id=%s..., entry=%.5f, stop=%.5f, timestamp=%s",
+        signal_id[:16],
+        entry_price,
+        stop_price,
+        latest_candle.timestamp_utc.isoformat(),
     )
 
     return [signal]

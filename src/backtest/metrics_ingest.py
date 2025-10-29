@@ -6,10 +6,9 @@ executions complete, enabling real-time monitoring and final summary generation.
 """
 
 import logging
-from datetime import datetime
-from typing import Sequence
+from collections.abc import Sequence
 
-from ..models.core import TradeExecution, MetricsSummary
+from ..models.core import MetricsSummary, TradeExecution
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +96,10 @@ class MetricsIngestor:
             self.max_drawdown_r = current_drawdown
 
         logger.debug(
-            f"Ingested execution: signal_id={execution.signal_id[:16]}..., "
-            f"pnl_r={execution.pnl_r:.2f}R, total_trades={self.total_trades}"
+            "Ingested execution: signal_id=%s..., pnl_r=%.2fR, total_trades=%d",
+            execution.signal_id[:16],
+            execution.pnl_r,
+            self.total_trades,
         )
 
     def get_summary(self) -> MetricsSummary:
@@ -148,15 +149,26 @@ class MetricsIngestor:
         if self.total_trades > 1:
             pnl_returns = [e.pnl_r for e in self.executions]
             mean_return = sum(pnl_returns) / len(pnl_returns)
-            variance = sum((r - mean_return) ** 2 for r in pnl_returns) / (len(pnl_returns) - 1)
-            std_dev = variance ** 0.5
+            variance = sum((r - mean_return) ** 2 for r in pnl_returns) / (
+                len(pnl_returns) - 1
+            )
+            std_dev = variance**0.5
             sharpe_estimate = mean_return / std_dev if std_dev > 0 else 0.0
         else:
             sharpe_estimate = 0.0
 
         # Calculate avg win/loss
-        avg_win_r = sum(e.pnl_r for e in self.executions if e.pnl_r > 0) / self.winning_trades if self.winning_trades > 0 else 0.0
-        avg_loss_r = abs(sum(e.pnl_r for e in self.executions if e.pnl_r < 0)) / self.losing_trades if self.losing_trades > 0 else 0.0
+        avg_win_r = (
+            sum(e.pnl_r for e in self.executions if e.pnl_r > 0) / self.winning_trades
+            if self.winning_trades > 0
+            else 0.0
+        )
+        avg_loss_r = (
+            abs(sum(e.pnl_r for e in self.executions if e.pnl_r < 0))
+            / self.losing_trades
+            if self.losing_trades > 0
+            else 0.0
+        )
         avg_r = self.total_pnl_r / self.total_trades if self.total_trades > 0 else 0.0
 
         summary = MetricsSummary(
@@ -176,9 +188,10 @@ class MetricsIngestor:
         )
 
         logger.info(
-            f"Metrics summary: trade_count={summary.trade_count}, "
-            f"win_rate={summary.win_rate:.1%}, "
-            f"expectancy={summary.expectancy:.2f}R"
+            "Metrics summary: trade_count=%d, win_rate=%.1f%%, expectancy=%.2fR",
+            summary.trade_count,
+            summary.win_rate * 100,
+            summary.expectancy,
         )
 
         return summary
@@ -206,7 +219,9 @@ class MetricsIngestor:
         logger.debug("Metrics ingestor reset")
 
 
-def compute_trade_duration_stats(executions: Sequence[TradeExecution]) -> dict[str, float]:
+def compute_trade_duration_stats(
+    executions: Sequence[TradeExecution],
+) -> dict[str, float]:
     """
     Calculate trade duration statistics.
 

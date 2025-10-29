@@ -4,9 +4,7 @@ Unit tests for deterministic signal ID generation.
 Tests SHA-256 hash generation, determinism, and parameter hash computation.
 """
 
-from datetime import datetime, timezone
-
-import pytest
+from datetime import UTC, datetime
 
 from src.strategy.id_factory import compute_parameters_hash, generate_signal_id
 
@@ -16,7 +14,7 @@ class TestGenerateSignalID:
 
     def test_deterministic_id(self):
         """Test that identical inputs produce identical IDs."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         id1 = generate_signal_id(
             pair="EURUSD",
@@ -42,7 +40,7 @@ class TestGenerateSignalID:
 
     def test_different_pair_different_id(self):
         """Test that different pairs produce different IDs."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         id1 = generate_signal_id(
             pair="EURUSD",
@@ -68,8 +66,10 @@ class TestGenerateSignalID:
 
     def test_different_timestamp_different_id(self):
         """Test that different timestamps produce different IDs."""
-        timestamp1 = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
-        timestamp2 = datetime(2025, 1, 15, 12, 0, 1, tzinfo=timezone.utc)  # 1 second later
+        timestamp1 = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
+        timestamp2 = datetime(
+            2025, 1, 15, 12, 0, 1, tzinfo=UTC
+        )  # 1 second later
 
         id1 = generate_signal_id(
             pair="EURUSD",
@@ -95,7 +95,7 @@ class TestGenerateSignalID:
 
     def test_different_direction_different_id(self):
         """Test that different directions produce different IDs."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         id1 = generate_signal_id(
             pair="EURUSD",
@@ -121,7 +121,7 @@ class TestGenerateSignalID:
 
     def test_different_price_different_id(self):
         """Test that different prices produce different IDs."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         id1 = generate_signal_id(
             pair="EURUSD",
@@ -147,7 +147,7 @@ class TestGenerateSignalID:
 
     def test_different_parameters_hash_different_id(self):
         """Test that different parameter hashes produce different IDs."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         id1 = generate_signal_id(
             pair="EURUSD",
@@ -173,7 +173,7 @@ class TestGenerateSignalID:
 
     def test_id_length(self):
         """Test that signal ID has correct SHA-256 length."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         signal_id = generate_signal_id(
             pair="EURUSD",
@@ -190,7 +190,7 @@ class TestGenerateSignalID:
 
     def test_price_precision(self):
         """Test that price precision affects ID."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         # Prices differing only in 7th decimal place
         id1 = generate_signal_id(

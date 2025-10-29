@@ -10,10 +10,16 @@ from datetime import datetime
 from typing import Any
 
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
 
-from ..models.core import MetricsSummary, BacktestRun
+from ..models.core import BacktestRun, MetricsSummary
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -87,7 +93,9 @@ class ObservabilityReporter:
         )
 
         logger.info(
-            f"Backtest started: id={self.backtest_id}, total_candles={self.total_candles}"
+            "Backtest started: id=%s, total_candles=%d",
+            self.backtest_id,
+            self.total_candles,
         )
 
     def update_progress(self, candles_processed: int) -> None:
@@ -121,7 +129,9 @@ class ObservabilityReporter:
         console.print("\n[bold green]═══ Backtest Complete ═══[/bold green]\n")
 
         # Create metrics table
-        table = Table(title="Performance Metrics", show_header=True, header_style="bold magenta")
+        table = Table(
+            title="Performance Metrics", show_header=True, header_style="bold magenta"
+        )
         table.add_column("Metric", style="cyan", width=25)
         table.add_column("Value", style="green", justify="right")
 
@@ -145,8 +155,10 @@ class ObservabilityReporter:
             console.print(f"\n[dim]Duration: {duration.total_seconds():.1f}s[/dim]")
 
         logger.info(
-            f"Backtest metrics: trade_count={summary.trade_count}, "
-            f"win_rate={summary.win_rate:.2%}, expectancy={summary.expectancy:.3f}R"
+            "Backtest metrics: trade_count=%d, win_rate=%.2f%%, expectancy=%.3fR",
+            summary.trade_count,
+            summary.win_rate * 100,
+            summary.expectancy,
         )
 
     def report_signal_generated(self, signal_id: str, timestamp: datetime) -> None:
@@ -161,10 +173,14 @@ class ObservabilityReporter:
             >>> reporter.report_signal_generated("sig-123", datetime.now())
         """
         logger.debug(
-            f"Signal generated: id={signal_id[:16]}..., timestamp={timestamp.isoformat()}"
+            "Signal generated: id=%s..., timestamp=%s",
+            signal_id[:16],
+            timestamp.isoformat(),
         )
 
-    def report_trade_executed(self, signal_id: str, pnl_r: float, exit_reason: str) -> None:
+    def report_trade_executed(
+        self, signal_id: str, pnl_r: float, exit_reason: str
+    ) -> None:
         """
         Log trade execution event.
 
@@ -177,8 +193,10 @@ class ObservabilityReporter:
             >>> reporter.report_trade_executed("sig-123", 2.0, "TARGET")
         """
         logger.info(
-            f"Trade executed: signal_id={signal_id[:16]}..., "
-            f"pnl_r={pnl_r:.2f}R, exit_reason={exit_reason}"
+            "Trade executed: signal_id=%s..., pnl_r=%.2fR, exit_reason=%s",
+            signal_id[:16],
+            pnl_r,
+            exit_reason,
         )
 
     def report_error(self, error: Exception, context: dict[str, Any]) -> None:
@@ -193,7 +211,7 @@ class ObservabilityReporter:
             >>> reporter.report_error(ValueError("Bad data"), {"candle_idx": 42})
         """
         console.print(f"\n[bold red]ERROR:[/bold red] {error}", style="red")
-        logger.error(f"Backtest error: {error}", extra=context, exc_info=True)
+        logger.error("Backtest error: %s", error, extra=context, exc_info=True)
 
     def finish(self) -> None:
         """
@@ -205,7 +223,7 @@ class ObservabilityReporter:
         if self.progress:
             self.progress.stop()
 
-        logger.info(f"Backtest finished: id={self.backtest_id}")
+        logger.info("Backtest finished: id=%s", self.backtest_id)
 
 
 def report_backtest_run(backtest_run: BacktestRun) -> None:
@@ -223,14 +241,18 @@ def report_backtest_run(backtest_run: BacktestRun) -> None:
     console.print("\n[bold cyan]═══ Backtest Run Summary ═══[/bold cyan]\n")
 
     # Metadata table
-    meta_table = Table(title="Run Metadata", show_header=True, header_style="bold magenta")
+    meta_table = Table(
+        title="Run Metadata", show_header=True, header_style="bold magenta"
+    )
     meta_table.add_column("Field", style="cyan", width=20)
     meta_table.add_column("Value", style="white")
 
     meta_table.add_row("Run ID", backtest_run.run_id)
     meta_table.add_row("Strategy Name", backtest_run.strategy_name)
     meta_table.add_row("Parameters Hash", backtest_run.parameters_hash[:16] + "...")
-    meta_table.add_row("Data Manifest Hash", backtest_run.data_manifest_hash[:16] + "...")
+    meta_table.add_row(
+        "Data Manifest Hash", backtest_run.data_manifest_hash[:16] + "..."
+    )
     meta_table.add_row("Start Time", backtest_run.start_timestamp_utc.isoformat())
     meta_table.add_row("End Time", backtest_run.end_timestamp_utc.isoformat())
 

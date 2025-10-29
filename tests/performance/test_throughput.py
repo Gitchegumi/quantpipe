@@ -14,18 +14,18 @@ performance metrics for:
 Target: Process ≥10,000 candles/second for typical trend-pullback strategy.
 """
 
-import pytest
-import time
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
-import tempfile
 import csv
-from typing import List
+import tempfile
+import time
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
+import pytest
+
+from src.backtest.drawdown import compute_max_drawdown
+from src.backtest.metrics import compute_metrics
 from src.io.ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
-from src.backtest.metrics import compute_metrics
-from src.backtest.drawdown import compute_max_drawdown
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def large_dataset_path() -> Path:
         writer = csv.writer(f)
         writer.writerow(["timestamp_utc", "open", "high", "low", "close", "volume"])
 
-        base_time = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
         price = 1.1000
 
         for i in range(50000):
@@ -98,7 +98,7 @@ def test_ingestion_throughput(large_dataset_path: Path):
     start_time = time.perf_counter()
 
     candle_count = 0
-    for candle in ingest_candles(
+    for _ in ingest_candles(
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,
@@ -131,11 +131,11 @@ def test_metrics_computation_speed():
     - Metrics computed efficiently
     - No quadratic complexity issues
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     # Generate 1,000 synthetic executions
-    executions: List[TradeExecution] = []
-    base_time = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    executions: list[TradeExecution] = []
+    base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
     for i in range(1000):
         pnl_r = 1.5 if i % 3 == 0 else -1.0  # 33% win rate
@@ -161,9 +161,7 @@ def test_metrics_computation_speed():
 
     elapsed_ms = (end_time - start_time) * 1000
 
-    print(
-        f"\nMetrics computation: {len(executions)} trades in {elapsed_ms:.2f}ms"
-    )
+    print(f"\nMetrics computation: {len(executions)} trades in {elapsed_ms:.2f}ms")
 
     assert metrics.trade_count == 1000
     assert elapsed_ms < 100  # Should be very fast (<100ms even in worst case)
@@ -179,11 +177,11 @@ def test_drawdown_computation_speed():
     - Drawdown curve computed efficiently
     - Numpy operations optimized
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     # Generate 1,000 synthetic executions
-    executions: List[TradeExecution] = []
-    base_time = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    executions: list[TradeExecution] = []
+    base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
     for i in range(1000):
         # Alternating wins/losses
@@ -210,9 +208,7 @@ def test_drawdown_computation_speed():
 
     elapsed_ms = (end_time - start_time) * 1000
 
-    print(
-        f"\nDrawdown computation: {len(executions)} trades in {elapsed_ms:.2f}ms"
-    )
+    print(f"\nDrawdown computation: {len(executions)} trades in {elapsed_ms:.2f}ms")
 
     assert max_dd < 0  # Should have some drawdown
     assert elapsed_ms < 100  # Should be very fast
@@ -231,12 +227,13 @@ def test_signal_generation_throughput_estimate():
     - Candle consumption rate acceptable
     - No bottlenecks in indicator access
     """
+    from datetime import datetime
+
     from src.strategy.trend_pullback.trend_classifier import classify_trend
-    from datetime import datetime, timezone
 
     # Generate 5,000 synthetic candles
-    candles: List[Candle] = []
-    base_time = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    candles: list[Candle] = []
+    base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
     for i in range(5000):
         candle = Candle(
@@ -259,7 +256,7 @@ def test_signal_generation_throughput_estimate():
     trend_count = 0
     for i in range(50, len(candles)):  # Need history for trend detection
         window = candles[i - 50 : i + 1]
-        trend = classify_trend(window, lookback_candles=50)
+        _ = classify_trend(window, lookback_candles=50)
         trend_count += 1
 
     end_time = time.perf_counter()
@@ -292,7 +289,6 @@ def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
     start_time = time.perf_counter()
 
     candle_count = 0
-    last_candle = None
 
     for candle in ingest_candles(
         large_dataset_path,
@@ -302,7 +298,6 @@ def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
         allow_gaps=False,
     ):
         candle_count += 1
-        last_candle = candle
 
         # Simulate minimal processing
         if candle_count % 1000 == 0:
@@ -312,9 +307,7 @@ def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
     end_time = time.perf_counter()
     elapsed_seconds = end_time - start_time
 
-    print(
-        f"\nEnd-to-end simulation: {candle_count} candles in {elapsed_seconds:.2f}s"
-    )
+    print(f"\nEnd-to-end simulation: {candle_count} candles in {elapsed_seconds:.2f}s")
 
     assert candle_count == 50000
     assert elapsed_seconds < 60  # Should complete in under 1 minute
@@ -337,7 +330,7 @@ def test_memory_efficiency_during_ingestion(large_dataset_path: Path):
 
     # Process candles one at a time
     candle_count = 0
-    for candle in ingest_candles(
+    for _ in ingest_candles(
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,

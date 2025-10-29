@@ -96,22 +96,26 @@ def calculate_position_size(
     # Apply maximum position size limit
     if position_size > max_position_size:
         logger.warning(
-            f"Position size {position_size:.2f} exceeds maximum {max_position_size:.2f}, "
-            f"capping to maximum"
+            "Position size %.2f exceeds maximum %.2f, capping to maximum",
+            position_size,
+            max_position_size,
         )
         position_size = max_position_size
 
     # Ensure minimum position size
     if position_size < lot_step:
         logger.warning(
-            f"Calculated position size {position_size:.2f} below minimum {lot_step}, "
-            f"using minimum"
+            "Calculated position size %.2f below minimum %.2f, using minimum",
+            position_size,
+            lot_step,
         )
         position_size = lot_step
 
     logger.debug(
-        f"Position size calculated: {position_size:.2f} lots "
-        f"(risk=${risk_amount:.2f}, stop={stop_distance_pips:.1f} pips)"
+        "Position size calculated: %.2f lots (risk=$%.2f, stop=%.1f pips)",
+        position_size,
+        risk_amount,
+        stop_distance_pips,
     )
 
     return position_size
@@ -226,14 +230,15 @@ def validate_risk_limits(
     # Check drawdown limit
     if current_drawdown_pct >= max_drawdown_pct:
         logger.warning(
-            f"Current drawdown {current_drawdown_pct:.2f}% exceeds maximum "
-            f"{max_drawdown_pct:.2f}%, trade rejected"
+            "Current drawdown %.2f%% exceeds maximum %.2f%%, trade rejected",
+            current_drawdown_pct,
+            max_drawdown_pct,
         )
         return False
 
     # Check position size is reasonable (not zero or negative)
     if position_size <= 0:
-        logger.warning(f"Invalid position size: {position_size:.2f}")
+        logger.warning("Invalid position size: %.2f", position_size)
         return False
 
     return True

@@ -9,7 +9,7 @@ All functions handle empty sequences gracefully and return appropriate defaults.
 """
 
 import logging
-from typing import Sequence, Tuple
+from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -83,8 +83,9 @@ def compute_drawdown_curve(executions: Sequence[TradeExecution]) -> NDArray[np.f
     drawdown_curve = cumulative_equity - running_max
 
     logger.debug(
-        f"Computed drawdown curve: {len(drawdown_curve)} points, "
-        f"max_dd={np.min(drawdown_curve):.2f}R"
+        "Computed drawdown curve: %d points, max_dd=%.2fR",
+        len(drawdown_curve),
+        np.min(drawdown_curve),
     )
 
     return drawdown_curve
@@ -160,14 +161,14 @@ def compute_max_drawdown(executions: Sequence[TradeExecution]) -> float:
 
     max_dd = float(np.min(drawdown_curve))
 
-    logger.info(f"Maximum drawdown: {max_dd:.2f}R from {len(executions)} trades")
+    logger.info("Maximum drawdown: %.2fR from %d trades", max_dd, len(executions))
 
     return max_dd
 
 
 def find_drawdown_periods(
     executions: Sequence[TradeExecution],
-) -> list[Tuple[int, int, float]]:
+) -> list[tuple[int, int, float]]:
     """
     Identify all distinct drawdown periods in the execution sequence.
 
@@ -238,7 +239,7 @@ def find_drawdown_periods(
     running_max = np.maximum.accumulate(cumulative_equity)
     drawdown_curve = cumulative_equity - running_max
 
-    periods: list[Tuple[int, int, float]] = []
+    periods: list[tuple[int, int, float]] = []
     in_drawdown = False
     start_idx = 0
     dd_magnitude = 0.0
@@ -262,7 +263,7 @@ def find_drawdown_periods(
     if in_drawdown:
         periods.append((start_idx, len(drawdown_curve) - 1, dd_magnitude))
 
-    logger.debug(f"Found {len(periods)} drawdown period(s)")
+    logger.debug("Found %d drawdown period(s)", len(periods))
 
     return periods
 
@@ -348,11 +349,12 @@ def compute_recovery_time(
         if cumulative_equity[i] >= peak_before:
             recovery_trades = i - drawdown_start_idx + 1
             logger.debug(
-                f"Recovery from drawdown at {drawdown_start_idx}: "
-                f"{recovery_trades} trades"
+                "Recovery from drawdown at %d: %d trades",
+                drawdown_start_idx,
+                recovery_trades,
             )
             return recovery_trades
 
     # No recovery occurred
-    logger.debug(f"No recovery from drawdown starting at {drawdown_start_idx}")
+    logger.debug("No recovery from drawdown starting at %d", drawdown_start_idx)
     return 0

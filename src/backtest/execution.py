@@ -7,8 +7,7 @@ trailing stop timeout fallback per FR-026).
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Sequence
+from collections.abc import Sequence
 
 from ..models.core import Candle, TradeExecution, TradeSignal
 from ..models.exceptions import ExecutionSimulationError
@@ -77,7 +76,9 @@ def simulate_execution(
             break
 
     if entry_candle_idx is None:
-        logger.debug(f"No candles after signal timestamp {signal.timestamp_utc.isoformat()}")
+        logger.debug(
+            "No candles after signal timestamp %s", signal.timestamp_utc.isoformat()
+        )
         return None
 
     entry_candle = candles[entry_candle_idx]
@@ -89,9 +90,10 @@ def simulate_execution(
         entry_fill_price = entry_candle.open - (slippage_pips / 10000)
 
     logger.debug(
-        f"Entry simulated: signal_id={signal.id[:16]}..., "
-        f"timestamp={entry_candle.timestamp_utc.isoformat()}, "
-        f"fill={entry_fill_price:.5f}"
+        "Entry simulated: signal_id=%s..., timestamp=%s, fill=%.5f",
+        signal.id[:16],
+        entry_candle.timestamp_utc.isoformat(),
+        entry_fill_price,
     )
 
     # Track trade through subsequent candles
@@ -111,24 +113,28 @@ def simulate_execution(
         candles_in_trade += 1
 
         # Check if trailing stop should activate (FR-026 timeout)
-        if candles_in_trade >= trailing_stop_timeout_candles:
-            if not trailing_stop_active:
-                trailing_stop_active = True
-                trailing_stop_price = signal.initial_stop_price
-                logger.debug(
-                    f"Trailing stop activated after {trailing_stop_timeout_candles} candles"
-                )
+        if candles_in_trade >= trailing_stop_timeout_candles and not trailing_stop_active:
+            trailing_stop_active = True
+            trailing_stop_price = signal.initial_stop_price
+            logger.debug(
+                "Trailing stop activated after %d candles",
+                trailing_stop_timeout_candles,
+            )
 
         # Update trailing stop if active
         if trailing_stop_active:
             if signal.direction == "LONG":
                 # Trail stop up as price rises
-                potential_stop = candle.close - abs(signal.entry_price - signal.initial_stop_price)
+                potential_stop = candle.close - abs(
+                    signal.entry_price - signal.initial_stop_price
+                )
                 if potential_stop > trailing_stop_price:
                     trailing_stop_price = potential_stop
             else:  # SHORT
                 # Trail stop down as price falls
-                potential_stop = candle.close + abs(signal.entry_price - signal.initial_stop_price)
+                potential_stop = candle.close + abs(
+                    signal.entry_price - signal.initial_stop_price
+                )
                 if potential_stop < trailing_stop_price:
                     trailing_stop_price = potential_stop
 
@@ -155,7 +161,9 @@ def simulate_execution(
             pnl_r = pnl_distance / risk_distance if risk_distance > 0 else 0.0
 
             # Calculate costs
-            total_costs = (spread_pips / 10000) + (commission_per_lot * signal.calc_position_size / 100000)
+            total_costs = (spread_pips / 10000) + (
+                commission_per_lot * signal.calc_position_size / 100000
+            )
 
             execution = TradeExecution(
                 signal_id=signal.id,
@@ -171,15 +179,17 @@ def simulate_execution(
             )
 
             logger.info(
-                f"Trade closed: signal_id={signal.id[:16]}..., "
-                f"exit_reason={exit_reason}, pnl_r={pnl_r:.2f}R, "
-                f"duration={candles_in_trade} candles"
+                "Trade closed: signal_id=%s..., exit_reason=%s, pnl_r=%.2fR, duration=%d candles",
+                signal.id[:16],
+                exit_reason,
+                pnl_r,
+                candles_in_trade,
             )
 
             return execution
 
     # Trade still open (not enough candles)
-    logger.debug(f"Trade still open after {candles_in_trade} candles")
+    logger.debug("Trade still open after %d candles", candles_in_trade)
     return None
 
 
@@ -269,7 +279,8 @@ def calculate_max_adverse_excursion(
     """
     # Find candles within trade duration
     trade_candles = [
-        c for c in candles
+        c
+        for c in candles
         if execution.open_timestamp <= c.timestamp_utc <= execution.close_timestamp
     ]
 
@@ -277,7 +288,9 @@ def calculate_max_adverse_excursion(
         return 0.0
 
     # Determine direction from entry/exit prices
-    direction = "LONG" if execution.exit_fill_price > execution.entry_fill_price else "SHORT"
+    direction = (
+        "LONG" if execution.exit_fill_price > execution.entry_fill_price else "SHORT"
+    )
 
     worst_price = execution.entry_fill_price
     if direction == "LONG":
@@ -291,7 +304,9 @@ def calculate_max_adverse_excursion(
 
     # Convert to R-multiples
     # Assume stop distance from execution (not stored, so approximate)
-    risk_distance = abs(execution.pnl_r) / max(abs(execution.exit_fill_price - execution.entry_fill_price), 0.0001)
+    risk_distance = abs(execution.pnl_r) / max(
+        abs(execution.exit_fill_price - execution.entry_fill_price), 0.0001
+    )
     mae_r = mae_distance * risk_distance
 
     return mae_r
@@ -323,7 +338,8 @@ def calculate_max_favorable_excursion(
     """
     # Find candles within trade duration
     trade_candles = [
-        c for c in candles
+        c
+        for c in candles
         if execution.open_timestamp <= c.timestamp_utc <= execution.close_timestamp
     ]
 
@@ -331,7 +347,9 @@ def calculate_max_favorable_excursion(
         return 0.0
 
     # Determine direction from entry/exit prices
-    direction = "LONG" if execution.exit_fill_price > execution.entry_fill_price else "SHORT"
+    direction = (
+        "LONG" if execution.exit_fill_price > execution.entry_fill_price else "SHORT"
+    )
 
     best_price = execution.entry_fill_price
     if direction == "LONG":
@@ -344,7 +362,9 @@ def calculate_max_favorable_excursion(
         mfe_distance = execution.entry_fill_price - best_price
 
     # Convert to R-multiples
-    risk_distance = abs(execution.pnl_r) / max(abs(execution.exit_fill_price - execution.entry_fill_price), 0.0001)
+    risk_distance = abs(execution.pnl_r) / max(
+        abs(execution.exit_fill_price - execution.entry_fill_price), 0.0001
+    )
     mfe_r = mfe_distance * risk_distance
 
     return mfe_r

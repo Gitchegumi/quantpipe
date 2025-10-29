@@ -24,10 +24,9 @@ Usage:
 import argparse
 import json
 import sys
-from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from ..models.core import BacktestRun, MetricsSummary
 
@@ -35,7 +34,7 @@ from ..models.core import BacktestRun, MetricsSummary
 def format_backtest_results_as_json(
     run_metadata: BacktestRun,
     metrics: MetricsSummary,
-    additional_context: Dict[str, Any] = None,
+    additional_context: dict[str, Any] = None,
 ) -> str:
     """
     Format backtest results as JSON string.
@@ -178,16 +177,17 @@ def main():
         if is_json_output:
             # Create sample JSON output structure (placeholder for real implementation)
             run_metadata = BacktestRun(
-                run_id=f"long_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
+                run_id=f"long_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}",
                 parameters_hash="placeholder_hash",
                 manifest_ref=str(args.data),
-                start_time=datetime.now(timezone.utc),
-                end_time=datetime.now(timezone.utc),
+                start_time=datetime.now(UTC),
+                end_time=datetime.now(UTC),
                 total_candles_processed=0,
                 reproducibility_hash="placeholder_repro_hash",
             )
             # This would come from actual backtest execution
             import math
+
             metrics = MetricsSummary(
                 trade_count=0,
                 win_count=0,

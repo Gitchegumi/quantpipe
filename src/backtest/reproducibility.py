@@ -76,10 +76,10 @@ class ReproducibilityTracker:
         self._hash_accumulator.update(version.encode("utf-8"))
 
         logger.debug(
-            f"Reproducibility tracker initialized: "
-            f"params_hash={parameters_hash[:16]}..., "
-            f"manifest={manifest_ref}, "
-            f"version={version}"
+            "Reproducibility tracker initialized: params_hash=%s..., manifest=%s, version=%s",
+            parameters_hash[:16],
+            manifest_ref,
+            version,
         )
 
     def update_candle_count(self, count: int) -> None:
@@ -96,7 +96,7 @@ class ReproducibilityTracker:
             100
         """
         self.candle_count = count
-        logger.debug(f"Candle count updated: {count}")
+        logger.debug("Candle count updated: %d", count)
 
     def add_event(self, event_type: str, event_data: str) -> None:
         """
@@ -116,7 +116,7 @@ class ReproducibilityTracker:
         """
         event_str = f"{event_type}|{event_data}"
         self._hash_accumulator.update(event_str.encode("utf-8"))
-        logger.debug(f"Event recorded: {event_type} - {event_data[:32]}...")
+        logger.debug("Event recorded: %s - %s...", event_type, event_data[:32])
 
     def finalize(self) -> str:
         """
@@ -142,8 +142,10 @@ class ReproducibilityTracker:
         final_hash = self._hash_accumulator.hexdigest()
 
         logger.info(
-            f"Reproducibility hash finalized: {final_hash[:16]}... "
-            f"(candles={self.candle_count}, version={self.version})"
+            "Reproducibility hash finalized: %s... (candles=%d, version=%s)",
+            final_hash[:16],
+            self.candle_count,
+            self.version,
         )
 
         return final_hash
@@ -174,9 +176,9 @@ class ReproducibilityTracker:
             logger.info("Reproducibility verification PASSED")
         else:
             logger.warning(
-                f"Reproducibility verification FAILED: "
-                f"expected={expected_hash[:16]}..., "
-                f"actual={actual_hash[:16]}..."
+                "Reproducibility verification FAILED: expected=%s..., actual=%s...",
+                expected_hash[:16],
+                actual_hash[:16],
             )
 
         return matches

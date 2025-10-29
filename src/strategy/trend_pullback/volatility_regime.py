@@ -10,8 +10,8 @@ and percentile-based thresholds for regime classification.
 """
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import numpy as np
 
@@ -126,9 +126,7 @@ def classify_volatility_regime(
     baseline_atr = float(np.mean(atr_values))
 
     # Calculate percentile rank of current ATR
-    percentile_rank = float(
-        (np.sum(atr_values <= current_atr) / len(atr_values)) * 100
-    )
+    percentile_rank = float((np.sum(atr_values <= current_atr) / len(atr_values)) * 100)
 
     # Classify regime based on percentile thresholds
     if percentile_rank < low_threshold_percentile:
@@ -139,10 +137,11 @@ def classify_volatility_regime(
         regime = "NORMAL"
 
     logger.debug(
-        f"Volatility regime: {regime} | "
-        f"Current ATR: {current_atr:.6f} | "
-        f"Baseline ATR: {baseline_atr:.6f} | "
-        f"Percentile: {percentile_rank:.1f}%"
+        "Volatility regime: %s | Current ATR: %.6f | Baseline ATR: %.6f | Percentile: %.1f%%",
+        regime,
+        current_atr,
+        baseline_atr,
+        percentile_rank,
     )
 
     return VolatilityRegime(
@@ -192,9 +191,7 @@ def get_adaptive_risk_multiplier(regime: VolatilityRegime) -> float:
 
     multiplier = multipliers.get(regime.regime, 1.0)
 
-    logger.debug(
-        f"Risk multiplier for {regime.regime} volatility: {multiplier:.2f}x"
-    )
+    logger.debug("Risk multiplier for %s volatility: %.2fx", regime.regime, multiplier)
 
     return multiplier
 
@@ -238,8 +235,9 @@ def detect_volatility_expansion(
     """
     if len(candles) < window_size * 2:
         logger.warning(
-            f"Insufficient candles for expansion detection: "
-            f"{len(candles)} provided, {window_size * 2} recommended"
+            "Insufficient candles for expansion detection: %d provided, %d recommended",
+            len(candles),
+            window_size * 2,
         )
         return False
 
@@ -250,9 +248,7 @@ def detect_volatility_expansion(
     recent_atr = float(np.mean(atr_values[-window_size:]))
 
     # Historical ATR (average of previous window_size candles)
-    historical_atr = float(
-        np.mean(atr_values[-2 * window_size : -window_size])
-    )
+    historical_atr = float(np.mean(atr_values[-2 * window_size : -window_size]))
 
     # Avoid division by zero
     if historical_atr == 0:
@@ -265,8 +261,10 @@ def detect_volatility_expansion(
     is_expanding = expansion_ratio >= expansion_threshold
 
     logger.debug(
-        f"Volatility expansion check: ratio={expansion_ratio:.2f}, "
-        f"threshold={expansion_threshold:.2f}, expanding={is_expanding}"
+        "Volatility expansion check: ratio=%.2f, threshold=%.2f, expanding=%s",
+        expansion_ratio,
+        expansion_threshold,
+        is_expanding,
     )
 
     return is_expanding
@@ -313,8 +311,9 @@ def detect_volatility_contraction(
     """
     if len(candles) < window_size * 2:
         logger.warning(
-            f"Insufficient candles for contraction detection: "
-            f"{len(candles)} provided, {window_size * 2} recommended"
+            "Insufficient candles for contraction detection: %d provided, %d recommended",
+            len(candles),
+            window_size * 2,
         )
         return False
 
@@ -325,9 +324,7 @@ def detect_volatility_contraction(
     recent_atr = float(np.mean(atr_values[-window_size:]))
 
     # Historical ATR (average of previous window_size candles)
-    historical_atr = float(
-        np.mean(atr_values[-2 * window_size : -window_size])
-    )
+    historical_atr = float(np.mean(atr_values[-2 * window_size : -window_size]))
 
     # Avoid division by zero
     if historical_atr == 0:
@@ -340,8 +337,10 @@ def detect_volatility_contraction(
     is_contracting = contraction_ratio <= contraction_threshold
 
     logger.debug(
-        f"Volatility contraction check: ratio={contraction_ratio:.2f}, "
-        f"threshold={contraction_threshold:.2f}, contracting={is_contracting}"
+        "Volatility contraction check: ratio=%.2f, threshold=%.2f, contracting=%s",
+        contraction_ratio,
+        contraction_threshold,
+        is_contracting,
     )
 
     return is_contracting

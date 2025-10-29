@@ -7,13 +7,13 @@ size capping, and edge cases for ATR-based stop calculations.
 
 import pytest
 
+from src.models.exceptions import RiskLimitError
 from src.risk.manager import (
-    calculate_position_size,
     calculate_atr_stop,
+    calculate_position_size,
     calculate_take_profit,
     validate_risk_limits,
 )
-from src.models.exceptions import RiskLimitError
 
 
 class TestPositionSizeCalculation:
@@ -143,11 +143,11 @@ class TestPositionSizeCalculation:
         """
         test_cases = [
             # (account, risk_pct, stop_pips, expected_lots)
-            (10000.0, 1.0, 20.0, 0.5),     # 0.5 exact
-            (10000.0, 0.33, 20.0, 0.16),   # 0.165 → 0.16
-            (10000.0, 0.77, 20.0, 0.38),   # 0.385 → 0.38
-            (10000.0, 1.23, 20.0, 0.61),   # 0.615 → 0.61
-            (5000.0, 2.0, 15.0, 0.66),     # 0.666... → 0.66
+            (10000.0, 1.0, 20.0, 0.5),  # 0.5 exact
+            (10000.0, 0.33, 20.0, 0.16),  # 0.165 → 0.16
+            (10000.0, 0.77, 20.0, 0.38),  # 0.385 → 0.38
+            (10000.0, 1.23, 20.0, 0.61),  # 0.615 → 0.61
+            (5000.0, 2.0, 15.0, 0.66),  # 0.666... → 0.66
         ]
 
         for balance, risk_pct, stop_pips, expected in test_cases:
@@ -157,7 +157,9 @@ class TestPositionSizeCalculation:
                 stop_distance_pips=stop_pips,
                 pip_value=10.0,
             )
-            assert result == expected, f"Failed for {balance}, {risk_pct}%, {stop_pips} pips"
+            assert (
+                result == expected
+            ), f"Failed for {balance}, {risk_pct}%, {stop_pips} pips"
 
 
 class TestATRStopCalculation:
@@ -264,8 +266,8 @@ class TestTakeProfitCalculation:
             (1.0, "LONG", 1.10100),  # 1R
             (1.5, "LONG", 1.10150),  # 1.5R
             (3.0, "LONG", 1.10300),  # 3R
-            (1.0, "SHORT", 1.09900), # 1R
-            (2.5, "SHORT", 1.09750), # 2.5R
+            (1.0, "SHORT", 1.09900),  # 1R
+            (2.5, "SHORT", 1.09750),  # 2.5R
         ]
 
         for r_mult, direction, expected in test_cases:

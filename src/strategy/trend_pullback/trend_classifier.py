@@ -7,7 +7,7 @@ and RANGE when neither condition is stable.
 """
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 from ...models.core import Candle, TrendState
 
@@ -91,8 +91,9 @@ def classify_trend(
     if cross_count >= cross_count_threshold:
         current_state = "RANGE"
         logger.debug(
-            f"Trend classified as RANGE due to {cross_count} crossovers "
-            f"(threshold: {cross_count_threshold})"
+            "Trend classified as RANGE due to %d crossovers (threshold: %d)",
+            cross_count,
+            cross_count_threshold,
         )
 
     # Find when trend last changed
@@ -105,9 +106,10 @@ def classify_trend(
     )
 
     logger.debug(
-        f"Trend classified: {current_state} "
-        f"(crossovers={cross_count}, "
-        f"last_change={last_change_timestamp.isoformat() if last_change_timestamp else 'N/A'})"
+        "Trend classified: %s (crossovers=%d, last_change=%s)",
+        current_state,
+        cross_count,
+        last_change_timestamp.isoformat() if last_change_timestamp else "N/A",
     )
 
     return trend_state

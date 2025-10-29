@@ -9,9 +9,9 @@ All dataclasses are frozen to ensure immutability and thread-safety,
 supporting deterministic backtest reproducibility per Constitution Principle VI.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Sequence, Dict, Any
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ class Candle:
     ema50: float
     atr: float
     rsi: float
-    stoch_rsi: Optional[float] = None
+    stoch_rsi: float | None = None
 
 
 @dataclass(frozen=True)

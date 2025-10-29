@@ -10,7 +10,7 @@ defaults when no trades are executed.
 """
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -122,9 +122,7 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
     # Profit factor
     total_wins = np.sum(pnl_r_values[wins]) if win_count > 0 else 0.0
     total_losses = abs(np.sum(pnl_r_values[losses])) if loss_count > 0 else 0.0
-    profit_factor = (
-        float(total_wins / total_losses) if total_losses > 0 else np.inf
-    )
+    profit_factor = float(total_wins / total_losses) if total_losses > 0 else np.inf
 
     # Maximum drawdown (cumulative R)
     cumulative_r = np.cumsum(pnl_r_values)
@@ -153,9 +151,10 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
     )
 
     logger.info(
-        f"Metrics computed: {trade_count} trades, "
-        f"win_rate={win_rate:.2%}, "
-        f"expectancy={expectancy:.2f}R"
+        "Metrics computed: %d trades, win_rate=%.2f%%, expectancy=%.2fR",
+        trade_count,
+        win_rate * 100,
+        expectancy,
     )
 
     return metrics

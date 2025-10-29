@@ -5,7 +5,6 @@ This module provides type-safe parameter validation and loading for the
 trend pullback continuation strategy.
 """
 
-from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 

@@ -7,8 +7,8 @@ oscillators reach extreme levels.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import datetime
 
 from ...models.core import Candle, PullbackState, TrendState
 
@@ -80,8 +80,7 @@ def detect_pullback(
     # Determine if oscillators show extreme
     if trend_state.state == "UP":
         oscillator_extreme = (
-            latest_candle.rsi < rsi_oversold
-            or latest_candle.stoch_rsi < stoch_rsi_low
+            latest_candle.rsi < rsi_oversold or latest_candle.stoch_rsi < stoch_rsi_low
         )
         direction = "LONG"
     else:  # DOWN
@@ -97,7 +96,9 @@ def detect_pullback(
 
     if oscillator_extreme:
         # Look back to find when pullback started
-        for i in range(len(candles) - 1, max(len(candles) - pullback_max_age_candles - 1, -1), -1):
+        for i in range(
+            len(candles) - 1, max(len(candles) - pullback_max_age_candles - 1, -1), -1
+        ):
             candle = candles[i]
 
             if candle.rsi is None or candle.stoch_rsi is None:
@@ -131,8 +132,9 @@ def detect_pullback(
         if age_candles > pullback_max_age_candles:
             active = False
             logger.debug(
-                f"Pullback expired: age={age_candles} candles "
-                f"(max={pullback_max_age_candles})"
+                "Pullback expired: age=%d candles (max=%d)",
+                age_candles,
+                pullback_max_age_candles,
             )
 
     pullback_state = PullbackState(
@@ -145,9 +147,10 @@ def detect_pullback(
 
     if active:
         logger.debug(
-            f"Pullback detected: direction={direction}, "
-            f"start={start_timestamp.isoformat() if start_timestamp else 'N/A'}, "
-            f"qualifying_candles={len(qualifying_candle_ids)}"
+            "Pullback detected: direction=%s, start=%s, qualifying_candles=%d",
+            direction,
+            start_timestamp.isoformat() if start_timestamp else "N/A",
+            len(qualifying_candle_ids),
         )
 
     return pullback_state

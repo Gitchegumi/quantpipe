@@ -6,15 +6,15 @@ signal generation, execution simulation, and metrics computation for short-only
 trend pullback strategy.
 """
 
-import pytest
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timezone
 
-from src.config.parameters import StrategyParameters
-from src.io.ingestion import ingest_candles
-from src.strategy.trend_pullback.signal_generator import generate_short_signals
+import pytest
+
 from src.backtest.execution import simulate_execution
 from src.backtest.metrics_ingest import MetricsIngestor
+from src.io.ingestion import ingest_candles
+from src.strategy.trend_pullback.signal_generator import generate_short_signals
 
 
 class TestUS2ShortSignalIntegration:
@@ -71,7 +71,7 @@ class TestUS2ShortSignalIntegration:
                 timestamp = timestamp.replace(day=timestamp.day + 1)
 
         # Candles 96-97: Momentum turning down (2 small bearish candles)
-        for i in range(2):
+        for _ in range(2):
             open_price = close_price
             close_price = open_price - 0.00015  # Small bearish moves
             high = open_price + 0.00003
@@ -110,7 +110,7 @@ class TestUS2ShortSignalIntegration:
         timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
 
         # Final 101 candles: continuation downtrend
-        for i in range(101):
+        for _ in range(101):
             open_price = close_price
             close_price = open_price - 0.00015
             high = open_price + 0.00003

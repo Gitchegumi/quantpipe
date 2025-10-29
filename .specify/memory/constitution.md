@@ -1,15 +1,15 @@
 <!--
 Sync Impact Report:
-- Version change: 1.2.0 → 1.3.0
-- Modified principles: None
-- Added sections: Principle IX - Dependency Management & Reproducibility
+- Version change: 1.3.0 → 1.4.0
+- Modified principles: Principle VIII - Code Quality & Documentation Standards (enhanced with automated quality tooling requirements)
+- Added sections: Principle X - Code Quality Automation & Linting
 - Removed sections: None
 - Templates requiring updates:
-  ✅ plan-template.md - Compatible (references dependencies generically)
-  ✅ tasks-template.md - Will reference Poetry in setup tasks
+  ✅ plan-template.md - Compatible (already references code quality)
+  ✅ tasks-template.md - Should include quality validation tasks
   ✅ spec-template.md - Compatible (no changes needed)
   ✅ agent-file-template.md - Already updated in v1.2.0
-- Follow-up TODOs: Update any existing pyproject.toml/requirements.txt references in task templates
+- Follow-up TODOs: Ensure all new Python modules pass black, ruff, and pylint validation
 -->
 
 # Trading Strategies Constitution
@@ -99,37 +99,72 @@ Over-parameterized models or redundant indicators are prohibited unless explicit
 
 **Rationale**: Parsimonious models generalize better, reduce computational overhead, and align with disciplined quantitative methodology.
 
-### VIII. Code Quality & Documentation Standards
+### Principle VIII: Code Quality & Documentation Standards
 
-All Python code MUST comply with PEP 8 style guidelines without exception.
-Every module, class, method, and function MUST include complete docstrings following PEP 257 conventions.
-Docstrings MUST document parameters, return values, exceptions raised, and provide usage examples for public APIs.
+Code MUST be self-documenting. Every module, class, method, and function SHALL include complete docstrings (PEP 257). Type hints MUST be used for all function signatures. Code comments MUST explain "why", not "what". Line length MUST NOT exceed 88 characters (Black standard). Variable and function names MUST be descriptive and unambiguous.
 
-*Requirements:*
+**Python 3.11 Requirements:**
+- MUST follow PEP 8 style guidelines
+- MUST include complete docstrings (PEP 257) for all modules, classes, methods, functions
+- MUST use type hints for all signatures
+- Line length ≤88 characters (Black standard)
+- Variable and function names MUST be descriptive and unambiguous
+- Code comments MUST explain "why", not "what"
 
-**Module-level docstrings**:
-MUST appear at the top of every Python file, describing the module's purpose, key components, and any important usage notes.
+### Principle IX: Dependency Management & Reproducibility
 
-**Class docstrings**:
-MUST describe the class purpose, key attributes, and typical usage patterns. Include examples for complex classes.
+Python projects MUST use Poetry as the package manager. The use of `requirements.txt` is prohibited except for minimal production deployments when explicitly required. All dependencies MUST be declared in `pyproject.toml` with appropriate version constraints. Lock files (`poetry.lock`) MUST be committed to version control to ensure reproducible builds. Development dependencies MUST be separated from production dependencies.
 
-**Function/method docstrings**:
-MUST use the following format:
+**Poetry Requirements:**
+- Package manager: Poetry (mandatory)
+- Configuration: `pyproject.toml` (all dependencies declared)
+- Lock file: `poetry.lock` (MUST be committed)
+- No `requirements.txt` except for minimal production deployments
+- Development dependencies separated from production dependencies
 
-- Brief one-line summary
-- Extended description (if needed)
-- Args section listing each parameter with type and description
-- Returns section describing return value and type
-- Raises section documenting exceptions that may be raised
-- Examples section for public APIs or complex functionality
+### Principle X: Code Quality Automation & Linting
 
-**Type hints**:
-MUST be provided for all function signatures, method parameters, and return values. Use `typing` module constructs where appropriate.
+All Python code MUST be validated using automated quality tools before merge. The codebase SHALL maintain high code quality standards through continuous linting and formatting. Quality checks MUST pass in CI/CD pipelines.
 
-**Code formatting**:
-MUST use consistent indentation (4 spaces), line length ≤88 characters (Black formatter standard), and proper whitespace per PEP 8.
+**Required Quality Tools:**
 
-**Rationale**: Comprehensive documentation ensures code maintainability, enables effective collaboration, facilitates onboarding, and aligns with professional Python development standards. Type hints combined with docstrings provide both human and machine-readable contracts.
+- **Black**: Code formatter (≥23.10.0)
+  - Line length: 88 characters
+  - MUST format all Python files
+  - Configuration in `pyproject.toml`
+  
+- **Ruff**: Fast Python linter (≥0.1.0)
+  - MUST run on all Python files
+  - Configuration in `pyproject.toml`
+  - Zero errors required for merge
+  
+- **Pylint**: Comprehensive Python linter (≥3.3.0)
+  - Minimum score: 8.0/10 for new code
+  - MUST fix all W1203 (logging-fstring-interpolation) warnings
+  - Score improvement encouraged but not blocking
+
+**Mandatory Logging Standards:**
+
+- Logging calls MUST use lazy % formatting
+- F-strings in logging calls are PROHIBITED
+- Example (correct): `logger.info("Processing %d items", count)`
+- Example (incorrect): `logger.info(f"Processing {count} items")`
+- Rationale: Lazy evaluation prevents unnecessary string formatting when log level filters the message
+
+**Quality Workflow:**
+
+```bash
+# Format code
+poetry run black src/ tests/
+
+# Lint with ruff
+poetry run ruff check src/ tests/
+
+# Lint with pylint
+poetry run pylint src/ --score=yes
+```
+
+All quality checks SHOULD be automated in pre-commit hooks and CI/CD pipelines.
 
 ### IX. Dependency Management & Reproducibility
 
@@ -204,4 +239,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version**: 1.3.0 | **Ratified**: 2025-10-25 | **Last Amended**: 2025-10-28
+**Version:** 1.4.0  
+**Ratified:** October 25, 2025  
+**Last Amended:** October 29, 2025

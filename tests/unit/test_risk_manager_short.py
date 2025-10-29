@@ -5,8 +5,7 @@ Validates that stop loss placement for short positions is correctly
 positioned ABOVE the entry price (opposite of long positions).
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.models.core import TradeSignal
 
@@ -31,7 +30,7 @@ class TestRiskManagerShortPositions:
             calc_position_size=0.01,
             tags=["short", "test"],
             version="0.1.0",
-            timestamp_utc=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
         # Assert: Stop is above entry
@@ -107,7 +106,7 @@ class TestRiskManagerShortPositions:
             calc_position_size=0.01,
             tags=["short", "invalid"],
             version="0.1.0",
-            timestamp_utc=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
         # Assert: Model allows this, but it's logically wrong

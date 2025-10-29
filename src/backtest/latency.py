@@ -7,7 +7,7 @@ the backtest meets latency requirements (SC-010: <100ms p95).
 """
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import NDArray

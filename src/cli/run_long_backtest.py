@@ -6,17 +6,18 @@ Minimal implementation for MVP testing.
 
 import logging
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
 
-from ..config.parameters import StrategyParameters
-from ..io.ingestion import ingest_candles
-from ..strategy.trend_pullback.signal_generator import generate_long_signals
 from ..backtest.execution import simulate_execution
 from ..backtest.metrics_ingest import MetricsIngestor
 from ..backtest.observability import ObservabilityReporter
 from ..cli.logging_setup import setup_logging
+from ..config.parameters import StrategyParameters
+from ..io.ingestion import ingest_candles
+from ..strategy.trend_pullback.signal_generator import generate_long_signals
 
 logger = logging.getLogger(__name__)
 
@@ -38,22 +39,21 @@ def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
     df = pd.read_csv(
         csv_path,
         header=None,
-        names=['date', 'time', 'open', 'high', 'low', 'close', 'volume']
+        names=["date", "time", "open", "high", "low", "close", "volume"],
     )
 
     # Combine date and time into timestamp
-    df['timestamp_utc'] = pd.to_datetime(
-        df['date'] + ' ' + df['time'],
-        format='%Y.%m.%d %H:%M'
+    df["timestamp_utc"] = pd.to_datetime(
+        df["date"] + " " + df["time"], format="%Y.%m.%d %H:%M"
     )
 
     # Select required columns
-    df = df[['timestamp_utc', 'open', 'high', 'low', 'close', 'volume']]
+    df = df[["timestamp_utc", "open", "high", "low", "close", "volume"]]
 
     # Save converted CSV
     output_path = output_dir / f"converted_{csv_path.name}"
     df.to_csv(output_path, index=False)
-    logger.info(f"Saved converted CSV: {output_path}")
+    logger.info("Saved converted CSV: %s", output_path)
 
     return output_path
 
@@ -83,25 +83,27 @@ def run_simple_backtest(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Starting backtest: {price_data_path}")
+    logger.info("Starting backtest: %s", price_data_path)
 
     # Convert CSV if needed
     converted_csv = preprocess_metatrader_csv(price_data_path, output_dir)
 
     # Ingest candles
     logger.info("Ingesting candles...")
-    candles = list(ingest_candles(
-        csv_path=converted_csv,
-        ema_fast=parameters.ema_fast,
-        ema_slow=parameters.ema_slow,
-        atr_period=parameters.atr_length,
-        rsi_period=parameters.rsi_length,
-        stoch_rsi_period=parameters.rsi_length,
-        expected_timeframe_minutes=1,  # M1 data
-        allow_gaps=True,  # FX data has natural gaps (weekends, low liquidity)
-    ))
+    candles = list(
+        ingest_candles(
+            csv_path=converted_csv,
+            ema_fast=parameters.ema_fast,
+            ema_slow=parameters.ema_slow,
+            atr_period=parameters.atr_length,
+            rsi_period=parameters.rsi_length,
+            stoch_rsi_period=parameters.rsi_length,
+            expected_timeframe_minutes=1,  # M1 data
+            allow_gaps=True,  # FX data has natural gaps (weekends, low liquidity)
+        )
+    )
 
-    logger.info(f"Loaded {len(candles)} candles")
+    logger.info("Loaded %d candles", len(candles))
 
     # Setup reporting
     reporter = ObservabilityReporter(
@@ -124,7 +126,7 @@ def run_simple_backtest(
     }
 
     for i in range(parameters.ema_slow, len(candles)):
-        window = candles[max(0, i - 100):i + 1]
+        window = candles[max(0, i - 100) : i + 1]
 
         # Generate signals
         signals = generate_long_signals(
@@ -166,7 +168,7 @@ def run_simple_backtest(
     reporter.report_metrics(summary)
     reporter.finish()
 
-    logger.info(f"Backtest complete: {signals_generated} signals generated")
+    logger.info("Backtest complete: %d signals generated", signals_generated)
 
     return {
         "signals_generated": signals_generated,
@@ -185,8 +187,12 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Run long-only backtest")
     parser.add_argument("--data", type=Path, required=True, help="Path to CSV file")
-    parser.add_argument("--output", type=Path, default=Path("results"), help="Output directory")
-    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING"], default="INFO")
+    parser.add_argument(
+        "--output", type=Path, default=Path("results"), help="Output directory"
+    )
+    parser.add_argument(
+        "--log-level", choices=["DEBUG", "INFO", "WARNING"], default="INFO"
+    )
 
     args = parser.parse_args()
 
@@ -199,7 +205,7 @@ def main() -> int:
         print(f"\nResults: {result}")
         return 0
     except Exception as e:
-        logger.error(f"Backtest failed: {e}", exc_info=True)
+        logger.error("Backtest failed: %s", e, exc_info=True)
         return 1
 
 

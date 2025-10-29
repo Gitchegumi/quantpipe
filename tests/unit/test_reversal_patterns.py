@@ -5,18 +5,17 @@ Tests bullish and bearish candlestick patterns (engulfing, hammer, shooting star
 and momentum turn confirmation for pullback reversal detection.
 """
 
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from src.models.core import Candle
 from src.strategy.trend_pullback.reversal import (
-    detect_reversal,
-    _detect_bullish_reversal,
     _detect_bearish_reversal,
-    _is_bullish_engulfing,
+    _detect_bullish_reversal,
     _is_bearish_engulfing,
+    _is_bullish_engulfing,
     _is_hammer,
     _is_shooting_star,
+    detect_reversal,
 )
 
 
@@ -29,7 +28,7 @@ class TestBullishEngulfingPattern:
         When checking for bullish engulfing,
         Then should return True.
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         # Previous: small bearish candle
         prev_candle = Candle(
@@ -73,7 +72,7 @@ class TestBullishEngulfingPattern:
         When checking for bullish engulfing,
         Then should return False (must be bullish).
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         prev_candle = Candle(
             timestamp_utc=timestamp,
@@ -116,7 +115,7 @@ class TestBullishEngulfingPattern:
         When checking for bullish engulfing,
         Then should return False.
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         prev_candle = Candle(
             timestamp_utc=timestamp,
@@ -163,7 +162,7 @@ class TestBearishEngulfingPattern:
         When checking for bearish engulfing,
         Then should return True.
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         # Previous: small bullish candle
         prev_candle = Candle(
@@ -213,12 +212,12 @@ class TestHammerPattern:
         """
         # Hammer: lower_wick >= 2x body, upper_wick < 0.5x body
         candle = Candle(
-            timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             pair="EURUSD",
             timeframe_minutes=60,
             open=1.10050,
             high=1.10055,  # Small upper wick
-            low=1.10000,   # Long lower wick
+            low=1.10000,  # Long lower wick
             close=1.10045,  # Small body
             volume=1000,
             ema_fast=1.10000,
@@ -241,7 +240,7 @@ class TestHammerPattern:
         Then should return False.
         """
         candle = Candle(
-            timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             pair="EURUSD",
             timeframe_minutes=60,
             open=1.10000,
@@ -271,12 +270,12 @@ class TestShootingStarPattern:
         """
         # Shooting star: upper_wick >= 2x body, lower_wick < 0.5x body
         candle = Candle(
-            timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             pair="EURUSD",
             timeframe_minutes=60,
             open=1.10005,
             high=1.10060,  # Long upper wick
-            low=1.10000,   # Small lower wick
+            low=1.10000,  # Small lower wick
             close=1.10010,  # Small body
             volume=1000,
             ema_fast=1.10000,
@@ -302,7 +301,7 @@ class TestBullishReversalDetection:
         When detecting bullish reversal,
         Then should return True.
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
             # 3 candles ago: RSI declining
@@ -363,7 +362,7 @@ class TestBullishReversalDetection:
         When detecting bullish reversal,
         Then should return False (needs momentum confirmation).
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
             Candle(
@@ -410,7 +409,7 @@ class TestBearishReversalDetection:
         When detecting bearish reversal,
         Then should return True.
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
             # 2 candles ago: RSI at peak
@@ -459,7 +458,7 @@ class TestReversalDetection:
         When detecting reversal,
         Then should return True for long entry.
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
             Candle(
@@ -502,7 +501,7 @@ class TestReversalDetection:
         When detecting reversal,
         Then should return True for short entry.
         """
-        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
             Candle(
@@ -547,7 +546,7 @@ class TestReversalDetection:
         """
         candles = [
             Candle(
-                timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
+                timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
                 pair="EURUSD",
                 timeframe_minutes=60,
                 open=1.10000,

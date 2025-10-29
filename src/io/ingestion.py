@@ -114,7 +114,7 @@ def ingest_candles(
     if not csv_path.exists():
         raise FileNotFoundError(f"CSV file not found: {csv_path}")
 
-    logger.info(f"Starting ingestion from {csv_path}")
+    logger.info("Starting ingestion from %s", csv_path)
 
     # Read CSV
     try:
@@ -142,7 +142,11 @@ def ingest_candles(
     df = df.sort_values("timestamp_utc").reset_index(drop=True)
 
     # Validate OHLC relationships
-    invalid_ohlc = (df["high"] < df["low"]) | (df["high"] < df["close"]) | (df["low"] > df["close"])
+    invalid_ohlc = (
+        (df["high"] < df["low"])
+        | (df["high"] < df["close"])
+        | (df["low"] > df["close"])
+    )
     if invalid_ohlc.any():
         first_invalid_idx = invalid_ohlc.idxmax()
         raise DataIntegrityError(
@@ -181,19 +185,21 @@ def ingest_candles(
                 gap_minutes = actual_delta.total_seconds() / 60
                 if allow_gaps:
                     logger.warning(
-                        f"Timestamp gap detected (allowing): expected {expected_timeframe_minutes}m, "
-                        f"actual {gap_minutes:.1f}m at {current_timestamp}"
+                        "Timestamp gap detected (allowing): expected %dm, actual %.1fm at %s",
+                        expected_timeframe_minutes,
+                        gap_minutes,
+                        current_timestamp,
                     )
                 else:
                     raise DataIntegrityError(
                         "Timestamp gap detected",
-                    context={
-                        "expected_minutes": expected_timeframe_minutes,
-                        "actual_minutes": actual_delta.total_seconds() / 60,
-                        "previous_timestamp": str(prev_timestamp),
-                        "current_timestamp": str(current_timestamp),
-                    },
-                )
+                        context={
+                            "expected_minutes": expected_timeframe_minutes,
+                            "actual_minutes": actual_delta.total_seconds() / 60,
+                            "previous_timestamp": str(prev_timestamp),
+                            "current_timestamp": str(current_timestamp),
+                        },
+                    )
 
         # Yield Candle object
         candle = Candle(
@@ -213,4 +219,4 @@ def ingest_candles(
         yield candle
         prev_timestamp = current_timestamp
 
-    logger.info(f"Ingestion complete: {len(df)} candles processed from {csv_path}")
+    logger.info("Ingestion complete: %d candles processed from %s", len(df), csv_path)

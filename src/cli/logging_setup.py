@@ -7,7 +7,6 @@ and supports file-based JSON logs for production.
 """
 
 import logging
-import sys
 from pathlib import Path
 
 from rich.console import Console
@@ -88,9 +87,10 @@ def setup_logging(
 
     # Log initial configuration
     root_logger.debug(
-        f"Logging configured: level={level}, "
-        f"file={log_file if log_file else 'None'}, "
-        f"json={use_json}"
+        "Logging configured: level=%s, file=%s, json=%s",
+        level,
+        log_file if log_file else "None",
+        use_json,
     )
 
 

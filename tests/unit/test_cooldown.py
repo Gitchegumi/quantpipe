@@ -5,8 +5,9 @@ Validates that can_generate_signal() prevents signals from being
 generated within the minimum cooldown period (5 candles by default).
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timezone, timedelta
 
 from src.models.core import Candle
 from src.strategy.trend_pullback.signal_generator import can_generate_signal
@@ -19,7 +20,7 @@ class TestSignalCooldown:
     def sample_candles(self):
         """Create sample candle sequence for cooldown testing."""
         candles = []
-        base_time = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         for i in range(10):
             candle = Candle(
@@ -153,7 +154,7 @@ class TestSignalCooldown:
         # Act
         can_generate = can_generate_signal(
             [],
-            last_signal_timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            last_signal_timestamp=datetime(2024, 1, 1, tzinfo=UTC),
             cooldown_candles=5,
         )
 

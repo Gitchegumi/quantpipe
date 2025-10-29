@@ -4,12 +4,16 @@ Unit tests for metrics aggregation with zero-trade scenario.
 Tests metrics computation with empty execution list and edge cases.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import pytest
 
-from src.backtest.metrics import compute_metrics, compute_rolling_drawdown, compute_win_rate
+from src.backtest.metrics import (
+    compute_metrics,
+    compute_rolling_drawdown,
+    compute_win_rate,
+)
 from src.models.core import TradeExecution
 
 
@@ -39,8 +43,8 @@ class TestComputeMetricsZeroTrade:
         executions = [
             TradeExecution(
                 signal_id="sig1",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, 1, 18, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, 1, 18, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.10400,
@@ -67,8 +71,8 @@ class TestComputeMetricsZeroTrade:
         executions = [
             TradeExecution(
                 signal_id="sig1",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.09800,
@@ -95,8 +99,8 @@ class TestComputeMetricsZeroTrade:
         executions = [
             TradeExecution(
                 signal_id=f"sig{i}",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.10000,  # Breakeven
@@ -211,8 +215,8 @@ class TestComputeMetricsEdgeCases:
         executions = [
             TradeExecution(
                 signal_id=f"sig{i}",
-                open_timestamp=datetime(2025, 1, i, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, i, 18, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, i, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, i, 18, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.10400,
@@ -234,8 +238,8 @@ class TestComputeMetricsEdgeCases:
         executions = [
             TradeExecution(
                 signal_id=f"sig{i}",
-                open_timestamp=datetime(2025, 1, i, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, i, 14, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, i, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, i, 14, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.09800,
@@ -259,8 +263,8 @@ class TestComputeMetricsEdgeCases:
         executions = [
             TradeExecution(
                 signal_id="sig1",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, 1, 18, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, 1, 18, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.10400,
@@ -271,8 +275,8 @@ class TestComputeMetricsEdgeCases:
             ),
             TradeExecution(
                 signal_id="sig2",
-                open_timestamp=datetime(2025, 1, 2, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, 2, 14, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 2, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, 2, 14, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.09800,
@@ -283,8 +287,8 @@ class TestComputeMetricsEdgeCases:
             ),
             TradeExecution(
                 signal_id="sig3",
-                open_timestamp=datetime(2025, 1, 3, 12, 0, tzinfo=timezone.utc),
-                close_timestamp=datetime(2025, 1, 3, 14, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 3, 12, 0, tzinfo=UTC),
+                close_timestamp=datetime(2025, 1, 3, 14, 0, tzinfo=UTC),
                 fill_entry_price=1.10000,
                 fill_stop_price=1.09800,
                 fill_exit_price=1.09800,

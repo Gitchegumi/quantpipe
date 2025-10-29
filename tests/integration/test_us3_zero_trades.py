@@ -12,16 +12,15 @@ These tests ensure robust error handling as required by US3.
 """
 
 import math
-import pytest
-from typing import List
+from datetime import UTC
 
-from src.backtest.metrics import compute_metrics
 from src.backtest.drawdown import (
     compute_drawdown_curve,
     compute_max_drawdown,
     find_drawdown_periods,
 )
-from src.models.core import MetricsSummary, TradeExecution
+from src.backtest.metrics import compute_metrics
+from src.models.core import TradeExecution
 
 
 def test_metrics_zero_trades_empty_list():
@@ -33,7 +32,7 @@ def test_metrics_zero_trades_empty_list():
     - All rate-based metrics are NaN
     - No exceptions raised
     """
-    executions: List[TradeExecution] = []
+    executions: list[TradeExecution] = []
 
     metrics = compute_metrics(executions)
 
@@ -60,7 +59,7 @@ def test_drawdown_zero_trades_empty_curve():
     - find_drawdown_periods returns empty list
     - No exceptions raised
     """
-    executions: List[TradeExecution] = []
+    executions: list[TradeExecution] = []
 
     # Drawdown curve should be empty
     dd_curve = compute_drawdown_curve(executions)
@@ -84,21 +83,22 @@ def test_zero_trades_json_output_structure():
     - NaN values serialized appropriately
     - No missing required fields
     """
+    from datetime import datetime
+
     from src.cli.run_backtest import format_backtest_results_as_json
     from src.models.core import BacktestRun
-    from datetime import datetime, timezone
 
     run_metadata = BacktestRun(
         run_id="zero_trade_test",
         parameters_hash="test_hash",
         manifest_ref="test_manifest.json",
-        start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-        end_time=datetime(2025, 1, 1, 13, 0, tzinfo=timezone.utc),
+        start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+        end_time=datetime(2025, 1, 1, 13, 0, tzinfo=UTC),
         total_candles_processed=1000,
         reproducibility_hash="test_repro_hash",
     )
 
-    executions: List[TradeExecution] = []
+    executions: list[TradeExecution] = []
     metrics = compute_metrics(executions)
 
     # Should not raise exception
@@ -129,9 +129,9 @@ def test_zero_trades_ranging_market_scenario():
     - Appropriate NaN values returned
     - No false signals generated
     """
-    from pathlib import Path
-    import tempfile
     import csv
+    import tempfile
+    from pathlib import Path
 
     # Create temporary ranging market data
     with tempfile.NamedTemporaryFile(
@@ -171,7 +171,7 @@ def test_zero_trades_ranging_market_scenario():
     try:
         # Load candles (would normally go through ingestion)
         # For this test, we just verify metrics work with empty executions
-        executions: List[TradeExecution] = []
+        executions: list[TradeExecution] = []
 
         metrics = compute_metrics(executions)
 
@@ -223,7 +223,7 @@ def test_zero_trades_profit_factor_handling():
     - No division by zero errors
     - Consistent with other metrics
     """
-    executions: List[TradeExecution] = []
+    executions: list[TradeExecution] = []
     metrics = compute_metrics(executions)
 
     # Profit factor should be NaN for zero trades
@@ -239,7 +239,7 @@ def test_zero_trades_sharpe_ratio_handling():
     - No division by zero errors
     - Consistent with expectancy
     """
-    executions: List[TradeExecution] = []
+    executions: list[TradeExecution] = []
     metrics = compute_metrics(executions)
 
     # Sharpe ratio should be NaN for zero trades
@@ -256,7 +256,7 @@ def test_zero_trades_drawdown_consistency():
     - No curve data
     - No drawdown periods identified
     """
-    executions: List[TradeExecution] = []
+    executions: list[TradeExecution] = []
 
     # Max drawdown should be 0.0 (no trading, no drawdown)
     max_dd = compute_max_drawdown(executions)
@@ -280,7 +280,7 @@ def test_zero_trades_all_metrics_nan_except_counts():
     - All ratio/average fields are NaN
     - MetricsSummary object is valid
     """
-    executions: List[TradeExecution] = []
+    executions: list[TradeExecution] = []
     metrics = compute_metrics(executions)
 
     # Counts should be zero
