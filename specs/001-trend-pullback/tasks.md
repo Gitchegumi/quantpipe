@@ -65,9 +65,9 @@ Implements long-side logic; independently testable.
 - [x] T033 [US1] Implement observability reporter in `src/backtest/observability.py`
 - [x] T034 [US1] Create CLI command `src/cli/run_long_backtest.py` for running long-signal-only backtest
 - [x] T035 [US1] Add integration test for acceptance scenarios in `tests/integration/test_us1_long_signal.py`
-- [ ] T036 [P] [US1] Add unit tests for reversal patterns in `tests/unit/test_reversal_patterns.py`
-- [ ] T037 [US1] Add unit tests for risk sizing rounding in `tests/unit/test_risk_manager_rounding.py`
-- [ ] T038 [US1] Add performance test harness stub in `tests/performance/test_long_signal_perf.py`
+- [x] T036 [P] [US1] Add unit tests for reversal patterns in `tests/unit/test_reversal_patterns.py`
+- [x] T037 [US1] Add unit tests for risk sizing rounding in `tests/unit/test_risk_manager_rounding.py`
+- [x] T038 [US1] Add performance test harness stub in `tests/performance/test_long_signal_perf.py`
 
 ## Phase 4: User Story US2 (P2) - Short Trade Signal
 
