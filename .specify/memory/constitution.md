@@ -236,7 +236,7 @@ After completing any development milestone (feature implementation, code quality
 
 **Example:**
 
-```
+```md
 feat(quality): enforce lazy logging and add constitution Principle X
 
 - Fix 62 logging calls: f-strings → lazy % formatting (16 files)
