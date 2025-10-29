@@ -1,5 +1,5 @@
 # Pre-commit hooks for trading-strategies project
-# Install: poetry run pre-commit install
+# Install: poetry add --group dev pre-commit
 # Run manually: poetry run pre-commit run --all-files
 
 repos:
@@ -8,7 +8,6 @@ repos:
     rev: 23.10.0
     hooks:
       - id: black
-        language_version: python3.11
         args: ['--line-length=88']
 
   # Ruff linter (fast Python linter)
@@ -49,4 +48,4 @@ repos:
         args: ['--check']
 
 # Run hooks on push (not just commit)
-default_stages: [commit, push]
+default_stages: [pre-commit, pre-push]
