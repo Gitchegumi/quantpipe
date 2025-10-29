@@ -2,7 +2,7 @@
 Sync Impact Report:
 - Version change: 1.3.0 → 1.4.0
 - Modified principles: Principle VIII - Code Quality & Documentation Standards (enhanced with automated quality tooling requirements)
-- Added sections: Principle X - Code Quality Automation & Linting
+- Added sections: Principle X - Code Quality Automation & Linting, Development Workflow - Milestone Commit Messages
 - Removed sections: None
 - Templates requiring updates:
   ✅ plan-template.md - Compatible (already references code quality)
@@ -66,7 +66,7 @@ Trading logs MUST maintain audit trails for regulatory compliance and performanc
 
 All historical and live market data used in research, backtesting, and production MUST be traceable, reproducible, and verifiable without requiring storage of raw data in the version control system.
 
-*Requirements:*
+_Requirements:_
 
 **Data Manifest**:
 Each dataset MUST have a manifest file stored in version control (e.g., data_manifest.yaml or .json) containing:
@@ -104,6 +104,7 @@ Over-parameterized models or redundant indicators are prohibited unless explicit
 Code MUST be self-documenting. Every module, class, method, and function SHALL include complete docstrings (PEP 257). Type hints MUST be used for all function signatures. Code comments MUST explain "why", not "what". Line length MUST NOT exceed 88 characters (Black standard). Variable and function names MUST be descriptive and unambiguous.
 
 **Python 3.11 Requirements:**
+
 - MUST follow PEP 8 style guidelines
 - MUST include complete docstrings (PEP 257) for all modules, classes, methods, functions
 - MUST use type hints for all signatures
@@ -116,6 +117,7 @@ Code MUST be self-documenting. Every module, class, method, and function SHALL i
 Python projects MUST use Poetry as the package manager. The use of `requirements.txt` is prohibited except for minimal production deployments when explicitly required. All dependencies MUST be declared in `pyproject.toml` with appropriate version constraints. Lock files (`poetry.lock`) MUST be committed to version control to ensure reproducible builds. Development dependencies MUST be separated from production dependencies.
 
 **Poetry Requirements:**
+
 - Package manager: Poetry (mandatory)
 - Configuration: `pyproject.toml` (all dependencies declared)
 - Lock file: `poetry.lock` (MUST be committed)
@@ -132,12 +134,10 @@ All Python code MUST be validated using automated quality tools before merge. Th
   - Line length: 88 characters
   - MUST format all Python files
   - Configuration in `pyproject.toml`
-  
 - **Ruff**: Fast Python linter (≥0.1.0)
   - MUST run on all Python files
   - Configuration in `pyproject.toml`
   - Zero errors required for merge
-  
 - **Pylint**: Comprehensive Python linter (≥3.3.0)
   - Minimum score: 8.0/10 for new code
   - MUST fix all W1203 (logging-fstring-interpolation) warnings
@@ -172,7 +172,7 @@ All Python projects MUST use Poetry for dependency management and packaging.
 The use of requirements.txt files is prohibited for dependency specification.
 All dependencies MUST be declared in pyproject.toml with appropriate version constraints.
 
-*Requirements:*
+_Requirements:_
 
 **Poetry Configuration**:
 Every Python project MUST contain a pyproject.toml file managed by Poetry, including:
@@ -220,6 +220,33 @@ Strategy development follows a structured pipeline:
 5. **Production Phase**: Live deployment with continuous monitoring and performance tracking
 
 All phases MUST include peer review and compliance verification before progression.
+
+### Milestone Commit Messages
+
+After completing any development milestone (feature implementation, code quality improvements, constitution amendments, etc.), a concise commit message MUST be provided that summarizes all changes made during that milestone.
+
+**Commit Message Requirements:**
+
+- Use conventional commit format: `type(scope): brief description`
+- Include key metrics or file counts when relevant (e.g., "16 files", "score improved 8.78→9.68")
+- List major changes as bullet points in the commit body
+- Cover all significant modifications in a single coherent message
+- Keep descriptions concise but informative
+- Combine related changes into one commit when appropriate
+
+**Example:**
+
+```
+feat(quality): enforce lazy logging and add constitution Principle X
+
+- Fix 62 logging calls: f-strings → lazy % formatting (16 files)
+- Eliminate W1203 warnings, improve pylint 8.78→9.68/10
+- Constitution v1.4.0: formalize Black/Ruff/Pylint requirements
+- Mandate lazy % logging, prohibit f-strings in logging calls
+- Update copilot-instructions.md with quality standards
+```
+
+**Rationale**: Structured commit messages provide clear change history, facilitate code review, and enable efficient navigation of project evolution. Milestone-based commits ensure related changes are grouped logically rather than scattered across multiple small commits.
 
 ## Governance
 
