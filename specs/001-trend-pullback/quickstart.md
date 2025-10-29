@@ -1,6 +1,6 @@
 # Quickstart: Trend Pullback Continuation Strategy
 
-Branch: `001-trend-pullback`  
+Branch: `001-trend-pullback`
 Artifacts: `spec.md`, `research.md`, `data-model.md`, `contracts/`, `plan.md`
 
 ## 1. Prerequisites

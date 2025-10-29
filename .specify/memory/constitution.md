@@ -266,6 +266,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.4.0  
-**Ratified:** October 25, 2025  
+**Version:** 1.4.0
+**Ratified:** October 25, 2025
 **Last Amended:** October 29, 2025

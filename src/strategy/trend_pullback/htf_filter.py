@@ -42,9 +42,7 @@ def check_htf_ema_alignment(
         - For short trades: HTF close < HTF EMA
     """
     if len(htf_candles) < ema_period:
-        logger.debug(
-            "Insufficient HTF candles: %d < %d", len(htf_candles), ema_period
-        )
+        logger.debug("Insufficient HTF candles: %d < %d", len(htf_candles), ema_period)
         return False
 
     # Compute HTF EMA
@@ -212,7 +210,9 @@ def filter_trade_with_htf(
         return False, reason
 
     # Check alignment
-    aligned = check_htf_ema_alignment(htf_candles, ema_period=htf_ema_period, direction=direction)
+    aligned = check_htf_ema_alignment(
+        htf_candles, ema_period=htf_ema_period, direction=direction
+    )
 
     if not aligned:
         reason = f"HTF EMA not aligned for {direction} trade"

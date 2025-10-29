@@ -188,9 +188,13 @@ def main():
             print("- Load candles via ingestion.py")
             print("- Generate signals via signal_generator.generate_long_signals()")
             print("- Output signals without calling simulate_execution()")
-            print("- Useful for signal validation, parameter tuning, strategy debugging")
+            print(
+                "- Useful for signal validation, parameter tuning, strategy debugging"
+            )
             if is_json_output:
-                print("\nJSON output would include signal list with timestamps and parameters")
+                print(
+                    "\nJSON output would include signal list with timestamps and parameters"
+                )
             return 0
 
         if is_json_output:
@@ -243,7 +247,9 @@ def main():
             print("- Generate signals via signal_generator.generate_short_signals()")
             print("- Output signals without calling simulate_execution()")
             if is_json_output:
-                print("\nJSON output would include signal list with timestamps and parameters")
+                print(
+                    "\nJSON output would include signal list with timestamps and parameters"
+                )
             return 0
 
         if is_json_output:

@@ -11,14 +11,14 @@ Implement a unified backtesting CLI (`run_backtest.py`) that manages all directi
 
 ## Technical Context
 
-**Language/Version**: Python 3.11  
-**Primary Dependencies**: numpy, pandas, pydantic, rich (existing); no new dependencies required  
-**Storage**: CSV files for price data input; text/JSON files for backtest results output  
-**Testing**: pytest with hypothesis for property-based testing  
-**Target Platform**: Cross-platform CLI (Windows/Linux/macOS)  
-**Project Type**: Single project (CLI-based backtesting tool)  
-**Performance Goals**: Process 100K candles in ≤30 seconds (LONG/SHORT), ≤10 seconds for dry-run mode  
-**Constraints**: Deterministic results (reproducibility_hash verification), JSON output ≤10MB for 100K candles  
+**Language/Version**: Python 3.11
+**Primary Dependencies**: numpy, pandas, pydantic, rich (existing); no new dependencies required
+**Storage**: CSV files for price data input; text/JSON files for backtest results output
+**Testing**: pytest with hypothesis for property-based testing
+**Target Platform**: Cross-platform CLI (Windows/Linux/macOS)
+**Project Type**: Single project (CLI-based backtesting tool)
+**Performance Goals**: Process 100K candles in ≤30 seconds (LONG/SHORT), ≤10 seconds for dry-run mode
+**Constraints**: Deterministic results (reproducibility_hash verification), JSON output ≤10MB for 100K candles
 **Scale/Scope**: Extends existing backtest infrastructure; adds ~500-800 LOC across CLI, orchestration, and metrics aggregation modules
 
 ## Constitution Check
@@ -104,7 +104,7 @@ tests/
 
 ## Phase 0: Research (COMPLETE)
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Output**: [research.md](./research.md)
 
 **Key Decisions Documented**:
@@ -125,7 +125,7 @@ tests/
 
 ## Phase 1: Design & Contracts (COMPLETE)
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Outputs**:
 
 - [data-model.md](./data-model.md) - Complete data model specification
@@ -159,7 +159,7 @@ tests/
 
 ## Phase 2: Implementation (PENDING)
 
-**Status**: ⏸️ Awaiting developer  
+**Status**: ⏸️ Awaiting developer
 **Reference**: See [quickstart.md](./quickstart.md) for detailed implementation guide
 
 **Implementation Phases** (from quickstart):
@@ -231,9 +231,9 @@ No new risks or violations identified in design phase.
 
 ## Branch Information
 
-**Branch**: `002-directional-backtesting`  
-**Spec File**: `E:\GitHub\trading-strategies\specs\002-directional-backtesting\spec.md`  
-**Plan File**: `E:\GitHub\trading-strategies\specs\002-directional-backtesting\plan.md`  
+**Branch**: `002-directional-backtesting`
+**Spec File**: `E:\GitHub\trading-strategies\specs\002-directional-backtesting\spec.md`
+**Plan File**: `E:\GitHub\trading-strategies\specs\002-directional-backtesting\plan.md`
 **Specs Directory**: `E:\GitHub\trading-strategies\specs\002-directional-backtesting`
 
 All planning documents are committed to the feature branch and ready for implementation.

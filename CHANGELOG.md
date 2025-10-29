@@ -304,6 +304,6 @@ See `.specify/memory/constitution.md` for full governance framework.
 
 ---
 
-**Branch**: `001-trend-pullback`  
-**Spec**: `specs/001-trend-pullback/spec.md`  
+**Branch**: `001-trend-pullback`
+**Spec**: `specs/001-trend-pullback/spec.md`
 **Constitution**: v1.4.0 (ratified 2025-10-25, amended 2025-10-29)

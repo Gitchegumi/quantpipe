@@ -1,7 +1,7 @@
 # CLI Interface Contract
 
-**Feature**: 002-directional-backtesting  
-**Command**: `run_backtest.py`  
+**Feature**: 002-directional-backtesting
+**Command**: `run_backtest.py`
 **Purpose**: Unified CLI for directional backtesting
 
 ## Command Synopsis
@@ -14,8 +14,8 @@ python -m src.cli.run_backtest [OPTIONS]
 
 ### `--data PATH`
 
-**Type**: Path to CSV file  
-**Required**: Yes  
+**Type**: Path to CSV file
+**Required**: Yes
 **Description**: Path to historical price data file in CSV format
 
 **Example**:
@@ -41,9 +41,9 @@ python -m src.cli.run_backtest [OPTIONS]
 
 ### `--direction {LONG,SHORT,BOTH}`
 
-**Type**: Choice  
-**Required**: No  
-**Default**: LONG  
+**Type**: Choice
+**Required**: No
+**Default**: LONG
 **Description**: Trading direction mode
 
 **Values**:
@@ -67,9 +67,9 @@ python -m src.cli.run_backtest [OPTIONS]
 
 ### `--output PATH`
 
-**Type**: Directory path  
-**Required**: No  
-**Default**: `results/`  
+**Type**: Directory path
+**Required**: No
+**Default**: `results/`
 **Description**: Output directory for backtest results
 
 **Example**:
@@ -101,9 +101,9 @@ Examples:
 
 ### `--output-format {text,json}`
 
-**Type**: Choice  
-**Required**: No  
-**Default**: text  
+**Type**: Choice
+**Required**: No
+**Default**: text
 **Description**: Output format for backtest results
 
 **Values**:
@@ -126,9 +126,9 @@ Examples:
 
 ### `--log-level {DEBUG,INFO,WARNING,ERROR}`
 
-**Type**: Choice  
-**Required**: No  
-**Default**: INFO  
+**Type**: Choice
+**Required**: No
+**Default**: INFO
 **Description**: Logging verbosity level
 
 **Values**:
@@ -153,9 +153,9 @@ Examples:
 
 ### `--dry-run`
 
-**Type**: Flag  
-**Required**: No  
-**Default**: False  
+**Type**: Flag
+**Required**: No
+**Default**: False
 **Description**: Generate signals without executing them (signal-only mode)
 
 **Example**:
@@ -367,9 +367,9 @@ error: argument --output-format: invalid choice: 'xml' (choose from 'text', 'jso
 
 ## Compatibility
 
-**Python Version**: 3.11+  
-**Operating Systems**: Windows, Linux, macOS  
-**Terminal**: PowerShell, Bash, Zsh  
+**Python Version**: 3.11+
+**Operating Systems**: Windows, Linux, macOS
+**Terminal**: PowerShell, Bash, Zsh
 **Dependencies**: See pyproject.toml (no new dependencies)
 
 ---

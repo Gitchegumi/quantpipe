@@ -7,6 +7,16 @@ target-version = "py311"
 # Line length matches Black formatter
 line-length = 88
 
+# Exclude generated and third-party code
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
 # Enable specific rule sets
 [lint]
 select = [
@@ -45,16 +55,6 @@ ignore = [
 # Allow autofix for all enabled rules
 fixable = ["ALL"]
 unfixable = []
-
-# Exclude generated and third-party code
-exclude = [
-    ".git",
-    ".venv",
-    "__pycache__",
-    "build",
-    "dist",
-    "*.egg-info",
-]
 
 [lint.per-file-ignores]
 # Test files can use magic values and have longer functions

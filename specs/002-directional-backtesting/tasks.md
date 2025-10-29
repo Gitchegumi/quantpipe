@@ -1,8 +1,8 @@
 # Implementation Tasks: Directional Backtesting System
 
-**Feature**: 002-directional-backtesting  
-**Branch**: `002-directional-backtesting`  
-**Date**: 2025-10-29  
+**Feature**: 002-directional-backtesting
+**Branch**: `002-directional-backtesting`
+**Date**: 2025-10-29
 **Input**: Implementation plan from plan.md, specification from spec.md
 
 ## Overview
@@ -421,7 +421,7 @@ All tests pass, code quality checks pass, performance targets met, manual smoke 
 
 ## Summary
 
-**Total Tasks**: 101  
+**Total Tasks**: 101
 **Task Distribution by User Story**:
 
 - Phase 1 (Setup): 7 tasks

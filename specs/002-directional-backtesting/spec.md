@@ -1,8 +1,8 @@
 # Feature Specification: Directional Backtesting System
 
-**Feature Branch**: `002-directional-backtesting`  
-**Created**: 2025-10-29  
-**Status**: Draft  
+**Feature Branch**: `002-directional-backtesting`
+**Created**: 2025-10-29
+**Status**: Draft
 **Input**: User description: "I need to implement the logic for LONG, SHORT, and BOTH direction back testing and allow run_backtest.py to manage all backtesting"
 
 ## Clarifications

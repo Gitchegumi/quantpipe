@@ -113,7 +113,10 @@ def simulate_execution(
         candles_in_trade += 1
 
         # Check if trailing stop should activate (FR-026 timeout)
-        if candles_in_trade >= trailing_stop_timeout_candles and not trailing_stop_active:
+        if (
+            candles_in_trade >= trailing_stop_timeout_candles
+            and not trailing_stop_active
+        ):
             trailing_stop_active = True
             trailing_stop_price = signal.initial_stop_price
             logger.debug(

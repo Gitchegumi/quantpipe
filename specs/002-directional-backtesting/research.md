@@ -1,7 +1,7 @@
 # Research: Directional Backtesting System
 
-**Feature**: 002-directional-backtesting  
-**Date**: 2025-10-29  
+**Feature**: 002-directional-backtesting
+**Date**: 2025-10-29
 **Purpose**: Resolve technical unknowns and document architectural decisions
 
 ## Overview
