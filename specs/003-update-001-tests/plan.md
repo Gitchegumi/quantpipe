@@ -23,93 +23,113 @@ No outstanding NEEDS CLARIFICATION items after clarify phase.
 
 ## Constitution Check
 
-### Initial Gate Assessment (Pre-Phase 0)
+**Branch**: `003-update-001-tests` | **Date**: 2025-10-30 | **Spec**: `specs/003-update-001-tests/spec.md`
+**Input**: Feature specification clarified and expanded post-analysis.
+
+## Constitution Summary
+
+Realign, prune, and stabilize the 001 Trend Pullback test suite while introducing a three-tier execution model (Unit <5s, Integration <30s, Performance <120s). Audit existing tests, categorize, refactor for determinism using *deterministic synthetic fixtures*, remove obsolete/redundant cases, and ensure each functional requirement (FR-001..FR-012) is covered by at least one test.
+
+## Constitution Technical Context
+
+**Language/Version**: Python 3.11
+**Primary Dependencies**: pytest, numpy, pandas, pydantic, rich/logging, Black, Ruff, Pylint
+**Storage**: File-based fixtures (CSV deterministic synthetic fixtures); no database
+**Testing**: pytest with markers (`unit`, `integration`, `performance`) + `pytest.ini`
+**Target Platform**: Windows dev, Linux CI (GitHub Actions ubuntu-latest ~2 vCPU, 7 GB RAM)
+**Project Type**: Single Python package (`src/` + `tests/`)
+**Performance Goals**: Unit <5s, Integration <30s, Performance <120s (±20% tolerance; hard fail if >1.2× threshold)
+**Constraints**: Deterministic outcomes, no network calls, no reliance on real-time clock; maintain Pylint ≥8.0, zero Ruff errors, Black formatting.
+**Scale/Scope**: Limited to 001 strategy tests; retained tests ≤ original count with ≤30% reduction unless justified.
+
+## Constitution Double Check
 
 | Principle | Compliance | Notes |
 |-----------|------------|-------|
-| I Strategy-First | ✅ | Tests align with existing strategy modules, no new coupling. |
-| II Risk Management | ✅ | Risk sizing tests retained/improved (FR-007). |
-| III Backtesting & Validation | ✅ (scope-limited) | Strategy validated indirectly; backtest performance not altered. |
-| IV Real-Time Monitoring | N/A | Feature targets test suite only. |
-| V Data Integrity & Security | ✅ | Fixtures deterministic; no credentials involved. |
-| VI Data Version Control | ✅ | Using small synthetic fixture datasets, can add manifest if new files added. |
-| VII Parsimony | ✅ | Removing redundant tests reduces complexity. |
-| VIII Code Quality & Docs | ✅ | Will add docstrings to test helpers; enforce line length. |
-| IX Dependency Mgmt | ✅ | No new deps; Poetry unchanged. |
-| X Code Quality Automation | ✅ | Plan includes running Black, Ruff, Pylint post-refactor. |
-| Risk Management Standards | ✅ | Risk tests maintained. |
-| Milestone Commit Messages | ✅ | Will use conventional commit with summary bullets. |
+| I Strategy-First | ✅ | Tests align with existing strategy modules. |
+| II Risk Management | ✅ | Risk sizing edge cases expanded (FR-007). |
+| III Backtesting & Validation | ✅ (scope-limited) | Validation via deterministic tests. |
+| IV Real-Time Monitoring | N/A | Not in scope. |
+| V Data Integrity & Security | ✅ | Deterministic fixtures only. |
+| VI Data Version Control | ✅ | Fixture manifest (T006a) added early. |
+| VII Parsimony | ✅ | Redundant tests consolidated. |
+| VIII Code Quality & Docs | ✅ | Docstring template defined (FR-010). |
+| IX Dependency Mgmt | ✅ | No new deps. |
+| X Code Quality Automation | ✅ | Early gate (T018a) before bulk additions. |
+| Risk Management Standards | ✅ | Risk tests maintained, drawdown explicitly out-of-scope. |
+| Milestone Commit Messages | ✅ | Commit draft task included. |
 
-Gate Result: PASS — proceed to Phase 0.
+Gate Result: PASS.
 
 ## Project Structure
-
-### Documentation (this feature)
-
-```text
-specs/[###-feature]/
-├── plan.md              # This file (/speckit.plan command output)
-├── research.md          # Phase 0 output (/speckit.plan command)
-├── data-model.md        # Phase 1 output (/speckit.plan command)
-├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
-└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
-```
-
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
 specs/003-update-001-tests/
 ├── spec.md
 ├── plan.md
-├── research.md              # (Phase 0 to be generated)
-├── data-model.md            # (Phase 1)
-├── quickstart.md            # (Phase 1)
-├── contracts/               # (Phase 1)
-└── checklists/requirements.md
-
-src/
-├── strategy/                # 001 strategy implementation
-├── indicators/              # Indicator calculations used by tests
-├── risk/                    # Risk sizing logic
-└── cli/                     # CLI entry points (unchanged)
+├── research.md
+├── data-model.md
+├── quickstart.md
+├── contracts/
+├── mapping.md
+├── analysis-report.md
+├── removal-notes.md
+└── checklists/
 
 tests/
-├── unit/                    # Will house unit tier tests (fast deterministic)
-├── integration/             # Will house integration tier tests (strategy flows)
-├── performance/             # Will house performance tier tests (optional long-running)
-└── fixtures/                # Shared deterministic fixtures
+├── unit/
+├── integration/
+├── performance/
+└── fixtures/
 ```
 
-**Structure Decision**: Retain single-package layout; reorganize tests into explicit tier directories (unit/integration/performance) while preserving existing fixture sharing.
+**Structure Decision**: Use deterministic synthetic fixtures + tier directories; one tier marker per file.
 
 ## Complexity Tracking
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Additional test tier directory (performance) | Isolates long-running tests from default runs | Mixing all tests increases CI time and obscures failures |
-| Introduction of pytest markers | Enables selective execution per tier | Reliance on directory alone limits granularity for mixed cases |
+| Additional performance tier dir | Isolate long scenarios | Mixing obscures failures & increases CI time |
+| Pytest markers | Selective tier execution | Directory alone lacks granularity |
+| Early quality gate task | Catch issues early | Delayed linting increases rework |
 
 ## Constitution Re-Check (Post-Design)
 
-No changes introduce new strategies, data sources, or dependencies. Added artifacts (research.md, data-model.md, contracts/test-tiering.md, quickstart.md) reinforce Principles II, VIII, X. Performance tier isolation supports Principle III by keeping validation focused. All gates remain PASS.
+All added artifacts reinforce Principles II, VI, VIII, X; performance tier optional in default run.
 
 | Principle | Post-Design Status | Delta |
 |-----------|--------------------|-------|
 | I Strategy-First | ✅ | Unchanged |
-| II Risk Management | ✅ | Risk edge cases documented in fixtures scope |
-| III Backtesting & Validation | ✅ | Performance tier optionally used for longer scenario runs |
-| V Data Integrity | ✅ | Deterministic fixture approach affirmed |
-| VIII Code Quality | ✅ | Naming/documentation conventions established |
-| X Automation | ✅ | Plan integrates lint/test flows in quickstart |
-| Risk Management Standards | ✅ | Retained and covered by FR-007 |
+| II Risk Management | ✅ | Expanded edge cases |
+| III Backtesting & Validation | ✅ | Added flakiness stabilization tasks |
+| V Data Integrity | ✅ | Fixture manifest integrated |
+| VIII Code Quality | ✅ | Docstring template + mapping |
+| X Automation | ✅ | Early gate + final gate |
+| Risk Management Standards | ✅ | Drawdown marked out-of-scope here |
 
-Result: Ready for Phase 2 task breakdown.
+Result: Ready for task execution.
+
+## Governance Mapping
+
+| Item | Principle(s) |
+|------|--------------|
+| T006a fixture manifest | VI Data Version Control |
+| T018a early quality gate | X Code Quality Automation |
+| T045 lazy logging enforcement | X Code Quality Automation |
+| Tier markers (T011–T013) | I Strategy-First |
+| Flakiness stabilization (T026, T026a, T026b) | III Backtesting & Validation |
+
+## Determinism Summary
+
+Deterministic synthetic fixtures + seeded randomness (conftest) ensure repeatable outcomes; no additional determinism tasks beyond T016, T035–T039 required.
+
+## Independent Test Criteria Summary
+
+- US1: Run unit + integration tiers to verify signals, indicators, risk sizing.
+- US2: Run full suite; confirm reduced count & unchanged coverage metrics.
+- US3: Time tiers; confirm thresholds and determinism via perf counter.
+
+## Exit Criteria
+
+MVP: FR-001..FR-009 + SC-001..SC-004 satisfied; tier markers operational.
+Full Completion: FR-001..FR-012 + SC-001..SC-009 satisfied; analysis-report.md populated.
