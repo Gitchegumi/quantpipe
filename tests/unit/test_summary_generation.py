@@ -4,8 +4,10 @@ Feature: 004-timeseries-dataset
 Task: T026 - Test summary validation
 """
 
-import pytest
+# pylint: disable=unused-import
+
 from datetime import datetime, timezone, timedelta
+import pytest
 
 from src.io.dataset_builder import build_summary
 from src.models.metadata import BuildSummary, SkippedSymbol, SkipReason
