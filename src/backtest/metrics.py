@@ -7,6 +7,8 @@ metrics (expectancy, Sharpe ratio estimate, profit factor, max drawdown).
 
 All metrics handle the zero-trade case gracefully, returning NaN or appropriate
 defaults when no trades are executed.
+
+Supports directional metrics for LONG/SHORT/BOTH mode backtesting.
 """
 
 import logging
@@ -16,6 +18,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ..models.core import MetricsSummary, TradeExecution
+from ..models.directional import DirectionalMetrics
+from ..models.enums import DirectionMode
 
 logger = logging.getLogger(__name__)
 
@@ -212,3 +216,74 @@ def compute_win_rate(pnl_r_series: NDArray[np.float64]) -> float:
     total = len(pnl_r_series)
 
     return float(wins / total)
+
+
+def calculate_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
+    """
+    Alias for compute_metrics for directional backtesting compatibility.
+
+    Args:
+        executions: Sequence of completed TradeExecution objects.
+
+    Returns:
+        MetricsSummary with computed performance statistics.
+    """
+    return compute_metrics(executions)
+
+
+def calculate_directional_metrics(
+    executions: Sequence[TradeExecution], direction: DirectionMode
+) -> DirectionalMetrics:
+    """
+    Calculate three-tier metrics for directional backtesting.
+
+    Provides metrics breakdown for LONG-only, SHORT-only, and combined results.
+    The tier population depends on the direction mode:
+    - LONG mode: long_only and combined are identical (short_only is None)
+    - SHORT mode: short_only and combined are identical (long_only is None)
+    - BOTH mode: all three tiers populated (requires direction tracking)
+
+    Args:
+        executions: Sequence of completed trade executions to analyze.
+        direction: Direction mode of the backtest (LONG/SHORT/BOTH).
+
+    Returns:
+        DirectionalMetrics with long_only, short_only, and combined metrics.
+
+    Examples:
+        >>> metrics = calculate_directional_metrics(executions, DirectionMode.LONG)
+        >>> metrics.combined.trade_count
+        50
+        >>> metrics.long_only.trade_count
+        50
+        >>> metrics.short_only is None
+        True
+
+    Note:
+        BOTH mode currently calculates combined metrics only. Full directional
+        breakdown requires TradeExecution to include direction field or signal
+        tracking mechanism. This is a known limitation to be addressed in
+        future iterations.
+    """
+    logger.info("Calculating directional metrics for mode=%s", direction.value)
+
+    if direction == DirectionMode.LONG:
+        combined = calculate_metrics(executions)
+        return DirectionalMetrics(
+            long_only=combined, short_only=None, combined=combined
+        )
+    elif direction == DirectionMode.SHORT:
+        combined = calculate_metrics(executions)
+        return DirectionalMetrics(
+            long_only=None, short_only=combined, combined=combined
+        )
+    else:  # DirectionMode.BOTH
+        # TODO: Implement direction filtering when TradeExecution has direction field
+        # For now, calculate combined metrics only
+        logger.warning(
+            "BOTH mode: direction-specific breakdown not yet implemented; "
+            "returning combined metrics only"
+        )
+        combined = calculate_metrics(executions)
+
+        return DirectionalMetrics(long_only=None, short_only=None, combined=combined)

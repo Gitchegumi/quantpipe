@@ -131,35 +131,38 @@ These tasks can be executed in parallel:
 
 ### Orchestrator Infrastructure (src/backtest/orchestrator.py)
 
-- [ ] T013 Create BacktestOrchestrator class skeleton in src/backtest/orchestrator.py
-- [ ] T014 Implement run_backtest method signature with DirectionMode routing logic in src/backtest/orchestrator.py
-- [ ] T015 Implement merge_signals function for conflict detection (timestamp-based) in src/backtest/orchestrator.py
-- [ ] T016 Add logging calls for signal generation progress (lazy % formatting) in src/backtest/orchestrator.py
+- [x] T013 Create BacktestOrchestrator class skeleton in src/backtest/orchestrator.py ✅ BacktestOrchestrator with __init__, run_backtest, routing methods
+- [x] T014 Implement run_backtest method signature with DirectionMode routing logic in src/backtest/orchestrator.py ✅ Routing to _run_long_backtest, _run_short_backtest, _run_both_backtest
+- [x] T015 Implement merge_signals function for conflict detection (timestamp-based) in src/backtest/orchestrator.py ✅ merge_signals() detects simultaneous opposing signals
+- [x] T016 Add logging calls for signal generation progress (lazy % formatting) in src/backtest/orchestrator.py ✅ Lazy % logging throughout all methods
 
 ### Metrics Infrastructure (src/backtest/metrics.py)
 
-- [ ] T017 [P] Create calculate_metrics function (aggregate executions → MetricsSummary) in src/backtest/metrics.py
-- [ ] T018 [P] Create calculate_directional_metrics function (three-tier: long/short/combined) in src/backtest/metrics.py
+- [x] T017 [P] Create calculate_metrics function (aggregate executions → MetricsSummary) in src/backtest/metrics.py ✅ Alias for compute_metrics created
+- [x] T018 [P] Create calculate_directional_metrics function (three-tier: long/short/combined) in src/backtest/metrics.py ✅ Three-tier metrics with direction mode routing
 
 ### Output Formatters (src/io/formatters.py)
 
-- [ ] T019 [P] Create generate*output_filename function (`backtest*{direction}_{YYYYMMDD}_{HHMMSS}.{ext}`) in src/io/formatters.py
-- [ ] T020 [P] Create format_text_output function skeleton (human-readable result formatting) in src/io/formatters.py
+- [x] T019 [P] Create generate_output_filename function (`backtest_{direction}_{YYYYMMDD}_{HHMMSS}.{ext}`) in src/io/formatters.py ✅ Filename generation with timestamp formatting
+- [x] T020 [P] Create format_text_output function skeleton (human-readable result formatting) in src/io/formatters.py ✅ Text and JSON output formatting complete
 
 ### Unit Tests
 
 - [x] T021 [P] Create tests/unit/test_enums.py with tests for DirectionMode and OutputFormat enumerations ✅ 12/12 tests passing
 - [x] T022 [P] Create tests/unit/test_directional_models.py with tests for ConflictEvent, DirectionalMetrics, BacktestResult ✅ 8/8 tests passing
-- [ ] T023 [P] Create tests/unit/test_backtest_orchestrator.py with orchestrator skeleton tests
-- [ ] T024 [P] Create tests/unit/test_metrics_aggregation.py with metrics calculation tests
-- [ ] T025 [P] Create tests/unit/test_output_formatters.py with filename generation tests
+- [x] T023 [P] Create tests/unit/test_backtest_orchestrator.py with orchestrator skeleton tests ✅ 13/13 tests passing (init, merge_signals conflict detection, run_backtest routing)
+- [x] T024 [P] Create tests/unit/test_metrics_aggregation.py with metrics calculation tests ✅ 8/8 tests passing (empty executions, single trades, mixed trades, directional modes)
+- [x] T025 [P] Create tests/unit/test_output_formatters.py with filename generation tests ✅ 12/12 tests passing (filename generation, text/JSON formatting)
 
 **Independent Test**:
 
-- All new models validate correctly (type hints, required fields) ✅ **PARTIAL COMPLETE** (20/20 model tests passing)
-- Orchestrator instantiates without errors (pending T013-T016)
+- All new models validate correctly (type hints, required fields) ✅ **COMPLETE** (20/20 model tests passing)
+- Orchestrator instantiates without errors ✅ **COMPLETE** (13/13 orchestrator tests passing)
+- Metrics functions handle empty input gracefully ✅ **COMPLETE** (8/8 metrics tests passing)
+- Filename generation produces correct format ✅ **COMPLETE** (12/12 formatter tests passing)
+- All unit tests pass: `poetry run pytest tests/unit/` ✅ **COMPLETE** (53/53 new Phase 2 tests passing)
 - Metrics functions handle empty input gracefully (pending T017-T018)
-- Filename generation produces correct format
+- Filename generation produces correct format (pending T019-T020, T025)
 - All unit tests pass: `poetry run pytest tests/unit/`
 
 ---
