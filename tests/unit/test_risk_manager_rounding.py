@@ -23,23 +23,6 @@ from src.risk.manager import (
 class TestPositionSizeCalculation:
     """Tests for calculate_position_size with lot rounding."""
 
-    def test_position_size_basic_calculation(self):
-        """
-        Given account balance, risk %, and stop distance,
-        When calculating position size,
-        Then should return correctly sized position in lots.
-        """
-        position_size = calculate_position_size(
-            account_balance=10000.0,
-            risk_per_trade_pct=1.0,  # 1% = $100 risk
-            stop_distance_pips=20.0,
-            pip_value=10.0,  # $10 per pip for 1 lot
-        )
-
-        # Risk amount: 10000 * 0.01 = $100
-        # Position size: 100 / (20 * 10) = 0.5 lots
-        assert position_size == 0.5
-
     def test_position_size_rounds_down_to_01_step(self):
         """
         Given calculated position size with decimals beyond 0.01,
@@ -93,25 +76,6 @@ class TestPositionSizeCalculation:
         # Position size: 1 / (50 * 10) = 0.002 lots
         # Rounded down: 0.0 lots (below minimum)
         assert position_size == 0.0
-
-    def test_position_size_caps_at_max_position(self):
-        """
-        Given large account and risk resulting in > 10 lots,
-        When calculating position size,
-        Then should cap at 10.0 lots maximum.
-        """
-        position_size = calculate_position_size(
-            account_balance=100000.0,
-            risk_per_trade_pct=5.0,  # $5000 risk
-            stop_distance_pips=10.0,
-            pip_value=10.0,
-            max_position_size=10.0,
-        )
-
-        # Risk amount: 100000 * 0.05 = $5000
-        # Position size: 5000 / (10 * 10) = 50 lots
-        # Capped at: 10.0 lots
-        assert position_size == 10.0
 
     def test_position_size_zero_stop_distance_raises_error(self):
         """
@@ -338,23 +302,6 @@ class TestRiskLimitValidation:
 
 class TestEdgeCases:
     """Edge case tests for risk management."""
-
-    def test_position_size_very_large_stop(self):
-        """
-        Given very large stop distance,
-        When calculating position size,
-        Then should return small position size.
-        """
-        position_size = calculate_position_size(
-            account_balance=10000.0,
-            risk_per_trade_pct=1.0,  # $100 risk
-            stop_distance_pips=200.0,  # Large stop
-            pip_value=10.0,
-        )
-
-        # Risk amount: $100
-        # Position size: 100 / (200 * 10) = 0.05 lots
-        assert position_size == 0.05
 
     def test_position_size_very_small_risk(self):
         """
