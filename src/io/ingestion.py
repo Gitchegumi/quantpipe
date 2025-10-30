@@ -119,11 +119,10 @@ def ingest_candles(
 
     # Read CSV
     try:
-        df = pd.read_csv(
-            csv_path,
-            parse_dates=["timestamp_utc"],
-            date_format="%Y-%m-%d %H:%M:%S",
-        )
+        df = pd.read_csv(csv_path)
+        # Convert timestamp column to datetime if it's not already
+        if not pd.api.types.is_datetime64_any_dtype(df["timestamp_utc"]):
+            df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"])
     except Exception as e:
         raise DataIntegrityError(
             f"Failed to parse CSV: {csv_path}",
