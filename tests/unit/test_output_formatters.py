@@ -10,8 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.unit
+import jsonschema
 
 from src.io.formatters import (
     format_json_output,
@@ -21,6 +20,8 @@ from src.io.formatters import (
 from src.models.core import MetricsSummary
 from src.models.directional import BacktestResult, ConflictEvent, DirectionalMetrics
 from src.models.enums import DirectionMode, OutputFormat
+
+pytestmark = pytest.mark.unit
 
 
 class TestGenerateOutputFilename:
@@ -426,8 +427,6 @@ class TestFormatJsonOutput:
         # Note: This test requires jsonschema library
         # Test will be skipped if jsonschema not installed
         pytest.importorskip("jsonschema")
-
-        import jsonschema
 
         # Load schema
         schema_path = (

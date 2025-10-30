@@ -184,7 +184,7 @@ class TestCreateManifest:
         assert manifest_file.exists()
 
         # Load and verify JSON content
-        with open(manifest_file) as f:
+        with open(manifest_file, encoding="utf-8") as f:
             manifest_data = json.load(f)
         assert manifest_data["pair"] == "EURUSD"
         assert manifest_data["checksum"] == manifest.checksum
