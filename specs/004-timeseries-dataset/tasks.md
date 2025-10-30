@@ -12,19 +12,19 @@
 
 ## Phase 2: Foundational
 
-- [ ] T006 Implement symbol discovery function in `src/io/dataset_builder.py` (scan `price_data/raw/*/`)
-- [ ] T007 Implement raw file schema validator in `src/io/dataset_builder.py` (timestamp + OHLCV columns)
-- [ ] T008 Implement raw merge & sort routine in `src/io/dataset_builder.py` (dedup duplicates) capturing gap/overlap counts
-- [ ] T009 Implement deterministic partitioning function in `src/io/dataset_builder.py` (floor 80% test, remainder validation)
-- [ ] T010 Implement metadata record builder in `src/io/dataset_builder.py` (JSON structure per spec)
-- [ ] T011 Implement consolidated summary builder in `src/io/dataset_builder.py` (aggregate counts & durations)
-- [ ] T012 Implement file output writers (CSV partitions + metadata + summary) in `src/io/dataset_builder.py`
-- [ ] T013 Add pydantic model definitions for MetadataRecord & BuildSummary in `src/models/metadata.py`
-- [ ] T014 Add gap/overlap detection helper in `src/io/dataset_builder.py` (silent gap counting, explicit overlap reporting)
+- [X] T006 Implement symbol discovery function in `src/io/dataset_builder.py` (scan `price_data/raw/*/`)
+- [X] T007 Implement raw file schema validator in `src/io/dataset_builder.py` (timestamp + OHLCV columns)
+- [X] T008 Implement raw merge & sort routine in `src/io/dataset_builder.py` (dedup duplicates) capturing gap/overlap counts
+- [X] T009 Implement deterministic partitioning function in `src/io/dataset_builder.py` (floor 80% test, remainder validation)
+- [X] T010 Implement metadata record builder in `src/io/dataset_builder.py` (JSON structure per spec)
+- [X] T011 Implement consolidated summary builder in `src/io/dataset_builder.py` (aggregate counts & durations)
+- [X] T012 Implement file output writers (CSV partitions + metadata + summary) in `src/io/dataset_builder.py`
+- [X] T013 Add pydantic model definitions for MetadataRecord & BuildSummary in `src/models/metadata.py`
+- [X] T014 Add gap/overlap detection helper in `src/io/dataset_builder.py` (silent gap counting, explicit overlap reporting)
 
 ## Phase 3: User Story 1 (P1) Generate Chronological Split
 
-- [ ] T015 [US1] Integrate all foundational components into `build_symbol_dataset` function in `src/io/dataset_builder.py`
+- [X] T015 [US1] Integrate all foundational components into `build_symbol_dataset` function in `src/io/dataset_builder.py`
 - [ ] T016 [US1] Add CLI command `build-dataset` in `src/cli/dataset.py` invoking symbol build for single symbol
 - [ ] T017 [US1] Add CLI option for `--symbol <symbol>` to restrict build to one symbol
 - [ ] T018 [US1] Implement unit test for partition size logic in `tests/unit/test_dataset_split.py`
@@ -34,7 +34,7 @@
 
 ## Phase 4: User Story 2 (P2) Multi-Symbol Processing
 
-- [ ] T022 [US2] Add multi-symbol build orchestration `build_all_symbols` in `src/io/dataset_builder.py`
+- [X] T022 [US2] Add multi-symbol build orchestration `build_all_symbols` in `src/io/dataset_builder.py`
 - [ ] T023 [US2] Extend CLI `build-dataset` to support `--all` and optional `--force` flags in `src/cli/dataset.py`
 - [ ] T024 [US2] Implement integration test multi-symbol build in `tests/integration/test_multi_symbol_build.py`
 - [ ] T025 [US2] Implement performance test with synthetic large dataset in `tests/performance/test_large_build_timing.py`
