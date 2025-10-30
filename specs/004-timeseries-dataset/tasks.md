@@ -35,11 +35,11 @@
 ## Phase 4: User Story 2 (P2) Multi-Symbol Processing
 
 - [X] T022 [US2] Add multi-symbol build orchestration `build_all_symbols` in `src/io/dataset_builder.py`
-- [ ] T023 [US2] Extend CLI `build-dataset` to support `--all` and optional `--force` flags in `src/cli/dataset.py`
-- [ ] T024 [US2] Implement integration test multi-symbol build in `tests/integration/test_multi_symbol_build.py`
-- [ ] T025 [US2] Implement performance test with synthetic large dataset in `tests/performance/test_large_build_timing.py`
-- [ ] T026 [US2] Implement summary validation unit test in `tests/unit/test_summary_generation.py`
-- [ ] T027 [US2] Document multi-symbol usage and force rebuild option in `quickstart.md`
+- [X] T023 [US2] Extend CLI `build-dataset` to support `--all` and optional `--force` flags in `src/cli/dataset.py`
+- [X] T024 [US2] Implement integration test multi-symbol build in `tests/integration/test_multi_symbol_build.py`
+- [X] T025 [US2] Implement performance test with synthetic large dataset in `tests/performance/test_large_build_timing.py`
+- [X] T026 [US2] Implement summary validation unit test in `tests/unit/test_summary_generation.py`
+- [X] T027 [US2] Document multi-symbol usage and force rebuild option in `quickstart.md`
 
 ## Phase 5: User Story 3 (P3) Backtest Integration
 
