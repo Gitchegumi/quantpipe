@@ -142,10 +142,32 @@ class BacktestOrchestrator:
         start_time: datetime,
         **signal_params,
     ) -> BacktestResult:
-        """Execute LONG-only backtest."""
+        """Execute LONG-only backtest using sliding window approach."""
         logger.info("Generating LONG signals for pair=%s", pair)
         parameters = {"pair": pair, **signal_params}
-        signals = generate_long_signals(candles, parameters)
+        
+        # Process candles in sliding windows (like run_long_backtest.py)
+        all_signals = []
+        ema_slow = signal_params.get("ema_slow", 50)
+        window_size = 100
+        
+        logger.info("Processing %d candles with sliding window (size=%d)", len(candles), window_size)
+        
+        for i in range(ema_slow, len(candles)):
+            window = candles[max(0, i - window_size) : i + 1]
+            
+            # Generate signals for this window
+            window_signals = generate_long_signals(candles=window, parameters=parameters)
+            
+            if window_signals:
+                # Only take the first signal from each window
+                signal = window_signals[0]
+                # Skip if we already have this signal (deduplication by timestamp)
+                if not any(s.timestamp_utc == signal.timestamp_utc for s in all_signals):
+                    all_signals.append(signal)
+                    logger.debug("New signal at %s", signal.timestamp_utc)
+        
+        signals = all_signals
         logger.info("Generated %d LONG signals", len(signals))
 
         # Execute signals (skip if dry-run)
@@ -198,10 +220,32 @@ class BacktestOrchestrator:
         start_time: datetime,
         **signal_params,
     ) -> BacktestResult:
-        """Execute SHORT-only backtest."""
+        """Execute SHORT-only backtest using sliding window approach."""
         logger.info("Generating SHORT signals for pair=%s", pair)
         parameters = {"pair": pair, **signal_params}
-        signals = generate_short_signals(candles, parameters)
+        
+        # Process candles in sliding windows (like run_long_backtest.py)
+        all_signals = []
+        ema_slow = signal_params.get("ema_slow", 50)
+        window_size = 100
+        
+        logger.info("Processing %d candles with sliding window (size=%d)", len(candles), window_size)
+        
+        for i in range(ema_slow, len(candles)):
+            window = candles[max(0, i - window_size) : i + 1]
+            
+            # Generate signals for this window
+            window_signals = generate_short_signals(candles=window, parameters=parameters)
+            
+            if window_signals:
+                # Only take the first signal from each window
+                signal = window_signals[0]
+                # Skip if we already have this signal (deduplication by timestamp)
+                if not any(s.timestamp_utc == signal.timestamp_utc for s in all_signals):
+                    all_signals.append(signal)
+                    logger.debug("New signal at %s", signal.timestamp_utc)
+        
+        signals = all_signals
         logger.info("Generated %d SHORT signals", len(signals))
 
         # Execute signals (skip if dry-run)

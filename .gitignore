@@ -212,7 +212,7 @@ __marimo__/
 
 #Historical Price Data
 price_data/*
-results/*.csv
+results/*
 
 #  Trading Strategy Project-Specific
 .venv/
