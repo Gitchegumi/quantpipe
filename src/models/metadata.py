@@ -4,6 +4,8 @@ Feature: 004-timeseries-dataset
 Task: T013 - MetadataRecord & BuildSummary models
 """
 
+# pylint: disable=unused-argument line-too-long arguments-differ
+
 from datetime import datetime
 from enum import Enum
 from typing import Literal
@@ -96,7 +98,7 @@ class MetadataRecord(BaseModel):
                 f"({self.validation_rows}) must equal total_rows ({self.total_rows})"
             )
 
-        if not (self.start_timestamp <= self.validation_start_timestamp <= self.end_timestamp):
+        if not self.start_timestamp <= self.validation_start_timestamp <= self.end_timestamp:
             raise ValueError(
                 "validation_start_timestamp must be between start and end timestamps"
             )

@@ -4,6 +4,8 @@ Feature: 004-timeseries-dataset
 Tasks: T016, T017
 """
 
+# pylint: disable=line-too-long f-string-without-interpolation broad-exception-caught
+
 import argparse
 import logging
 import sys

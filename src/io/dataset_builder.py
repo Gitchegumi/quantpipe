@@ -10,6 +10,8 @@ Feature: 004-timeseries-dataset
 Status: Phase 2 implementation (T006-T014)
 """
 
+# pylint: disable=broad-exception-caught line-too-long
+
 import json
 import logging
 from datetime import datetime, timezone
