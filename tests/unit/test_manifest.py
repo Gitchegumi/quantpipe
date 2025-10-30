@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from src.io.manifest import _compute_file_checksum, create_manifest, load_manifest
 from src.models.exceptions import DataIntegrityError
 

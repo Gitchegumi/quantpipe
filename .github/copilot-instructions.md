@@ -1,16 +1,19 @@
 ﻿# trading-strategies Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-10-29
+Auto-generated from all feature plans. Last updated: 2025-10-30
 
 ## Active Technologies
 - Python 3.11 + numpy, pandas, pydantic, rich (existing); no new dependencies required (002-directional-backtesting)
 - CSV files for price data input; text/JSON files for backtest results output (002-directional-backtesting)
+- Python 3.11 + pytest (for tests), numpy, pandas (used in indicator calculations), pydantic (configs), rich/logging (structured output), Black/Ruff/Pylint (quality gates) (003-update-001-tests)
+- File-based fixtures (CSV / in-repo small synthetic datasets); no database (003-update-001-tests)
 
 - Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests) (001-trend-pullback)
 - Poetry (mandatory package manager for dependency management and virtual environments)
 - Black (≥23.10.0) - code formatter
 - Ruff (≥0.1.0) - fast Python linter
 - Pylint (≥3.3.0) - comprehensive linter
+- Markdownlint (markdownlint-cli2) - Markdown linter
 
 ## Project Structure
 
@@ -34,6 +37,7 @@ poetry run pytest
 poetry run black src/ tests/
 poetry run ruff check src/ tests/
 poetry run pylint src/ --score=yes
+markdownlint-cli2 "**/*.md" "!poetry.lock"
 ```
 
 ## Dependency Management
@@ -46,6 +50,7 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - Black: Format all code (88 char lines)
 - Ruff: Zero errors required
 - Pylint: Minimum 8.0/10 score
+- Markdownlint: Validate all Markdown files (*.md)
 
 **Logging Standards:**
 - MUST use lazy % formatting: `logger.info("Processing %d items", count)`
@@ -59,10 +64,11 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - Line length ≤88 characters (Black standard)
 
 ## Recent Changes
+- 003-update-001-tests: Added Python 3.11 + pytest (for tests), numpy, pandas (used in indicator calculations), pydantic (configs), rich/logging (structured output), Black/Ruff/Pylint (quality gates)
 - 002-directional-backtesting: Added Python 3.11 + numpy, pandas, pydantic, rich (existing); no new dependencies required
 
+- 2025-10-30: Constitution v1.5.0 - Added Markdownlint to Principle X (Code Quality Automation), formalized Markdown linting requirements
 - 2025-10-29: Constitution v1.4.0 - Added Principle X (Code Quality Automation), formalized Black/Ruff/Pylint requirements, mandatory lazy logging
-- 001-trend-pullback: Added Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

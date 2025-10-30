@@ -5,10 +5,13 @@ Benchmarks signal generation throughput, execution simulation speed,
 and memory usage for large datasets.
 """
 
+import pytest
+
+
+pytestmark = pytest.mark.performance
+
 import time
 from datetime import UTC, datetime, timedelta
-
-import pytest
 
 from src.backtest.execution import simulate_execution
 from src.config.parameters import StrategyParameters
@@ -50,15 +53,13 @@ class TestLongSignalPerformance:
 
             candle = Candle(
                 timestamp_utc=timestamp,
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=open_price,
                 high=high,
                 low=low,
                 close=close_price,
                 volume=1000 + (i % 100),
-                ema_fast=base_price + 0.00010,
-                ema_slow=base_price - 0.00010,
+                ema20=base_price + 0.00010,
+                ema50=base_price - 0.00010,
                 atr=0.00050,
                 rsi=50.0 + ((i % 40) - 20),  # Oscillate 30-70
                 stoch_rsi=0.5 + ((i % 40) - 20) / 100,
@@ -106,18 +107,18 @@ class TestLongSignalPerformance:
         """
         from src.models.core import TradeSignal
 
-        # Create sample signal
+        # Create sample signal aligned with current dataclass fields
         signal = TradeSignal(
             id="test-signal-123",
-            timestamp_utc=large_candle_dataset[100].timestamp_utc,
             pair="EURUSD",
             direction="LONG",
             entry_price=1.10000,
-            stop_loss_price=1.09900,
-            take_profit_price=1.10200,
+            initial_stop_price=1.09900,
+            risk_per_trade_pct=0.25,
             calc_position_size=1.0,
-            timeframe_minutes=60,
-            parameters_hash="test-hash-123",
+            tags=["perf", "test"],
+            version="0.1.0",
+            timestamp_utc=large_candle_dataset[100].timestamp_utc,
         )
 
         start_time = time.perf_counter()
@@ -204,15 +205,13 @@ class TestLongSignalPerformance:
             base_price += 0.00001 if i % 2 == 0 else -0.00001
             candle = Candle(
                 timestamp_utc=timestamp,
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=base_price,
                 high=base_price + 0.00005,
                 low=base_price - 0.00005,
                 close=base_price + 0.00002,
                 volume=1000,
-                ema_fast=base_price,
-                ema_slow=base_price,
+                ema20=base_price,
+                ema50=base_price,
                 atr=0.00050,
                 rsi=50.0,
                 stoch_rsi=0.5,
@@ -246,8 +245,6 @@ class TestLatencyMeasurement:
 
         Target: p99 < 50ms for real-time suitability.
         """
-        from src.models.core import Candle
-
         # Create 100-candle window
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
         candles = []
@@ -255,15 +252,13 @@ class TestLatencyMeasurement:
             candles.append(
                 Candle(
                     timestamp_utc=timestamp + timedelta(hours=i),
-                    pair="EURUSD",
-                    timeframe_minutes=60,
                     open=1.10000,
                     high=1.10020,
                     low=1.09980,
                     close=1.10010,
                     volume=1000,
-                    ema_fast=1.10005,
-                    ema_slow=1.09995,
+                    ema20=1.10005,
+                    ema50=1.09995,
                     atr=0.00050,
                     rsi=50.0,
                     stoch_rsi=0.5,

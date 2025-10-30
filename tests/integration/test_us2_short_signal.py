@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 from src.backtest.execution import simulate_execution
 from src.backtest.metrics_ingest import MetricsIngestor
 from src.io.ingestion import ingest_candles

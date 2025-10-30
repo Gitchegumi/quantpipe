@@ -1,0 +1,137 @@
+# Inventory of Tests Referencing Removed/Obsolete Interfaces
+
+**Generated:** 2025-10-30  
+**Purpose:** Identify tests that reference removed interfaces or are redundant with Phase 3 tests
+
+## Analysis Summary
+
+### Redundant Tests (Overlap with Phase 3)
+
+#### 1. test_indicators_basic.py (REDUNDANT)
+**Status:** Redundant with test_indicators_core.py (Phase 3 T020-T020c)
+**Overlap Analysis:**
+- Both test EMA warm-up periods and NaN handling
+- Both test ATR calculation sequences
+- Both test RSI basic calculations
+- test_indicators_core.py is more comprehensive (10 tests vs 11 tests)
+- test_indicators_core.py has better fixture design and tighter tolerances
+- test_indicators_basic.py tests edge cases (empty array, single value) not in _core
+
+**Recommendation:** KEEP both files, consolidate into parameterized tests in T031
+- Retain edge case tests from _basic (empty, single value, insufficient data)
+- Merge warm-up period tests (eliminate duplication)
+- Keep _core tests for integration scenarios (crossover, volatility)
+
+**Redundant Test Count:** 6 tests (50% overlap)
+
+#### 2. test_risk_manager_rounding.py (PARTIAL REDUNDANCY)
+**Status:** Partially redundant with test_risk_sizing_normal.py + test_risk_sizing_volatility.py
+**Overlap Analysis:**
+- test_risk_sizing_normal.py (Phase 3) covers: basic calculation, risk %, stop distance scaling
+- test_risk_manager_rounding.py covers: lot rounding, ATR stop calculation, take profit, risk validation
+- **Unique in _rounding:** calculate_atr_stop(), calculate_take_profit(), validate_risk_limits()
+- **Overlap:** position sizing basic calculation, determinism, max position cap
+
+**Recommendation:** KEEP _rounding for unique tests, REMOVE redundant position sizing tests
+- REMOVE: test_position_size_basic_calculation (duplicate of T023)
+- REMOVE: test_position_size_caps_at_max_position (duplicate of T024)
+- REMOVE: test_position_size_very_large_stop (duplicate of T024)
+- KEEP: All ATR stop, take profit, and risk validation tests (not in Phase 3)
+
+**Redundant Test Count:** 3-4 tests (~20% overlap)
+
+#### 3. test_risk_manager_short.py (NOT REDUNDANT)
+**Status:** Unique - tests short signal-specific stop calculations
+**Overlap Analysis:**
+- Phase 3 test_risk_sizing_normal.py has test_position_size_short_signal
+- But test_risk_manager_short.py tests ATR-based stop calculation for shorts
+- Different focus: stop price calculation vs position sizing
+
+**Recommendation:** KEEP - covers unique short signal stop logic
+
+**Redundant Test Count:** 0 tests
+
+#### 4. test_risk_sizing_edge_cases.py (NOT REDUNDANT)
+**Status:** Unique - covers edge cases not in Phase 3
+**Overlap Analysis:**
+- Phase 3 tests cover normal and high volatility
+- test_risk_sizing_edge_cases.py covers: minimal balance, extreme spikes, negative values
+- Complements Phase 3 tests with boundary conditions
+
+**Recommendation:** KEEP - essential edge case coverage
+
+**Redundant Test Count:** 0 tests
+
+### Integration/Performance Test Redundancy
+
+#### 5. test_directional_backtesting.py vs test_strategy_signal_counts.py
+**Status:** Check for overlap with Phase 3 integration tests
+**Analysis Required:** Need to compare test coverage
+
+#### 6. test_both_mode_backtest.py vs test_strategy_signal_counts.py
+**Status:** Phase 3 has test_both_mode_has_both_signals
+**Analysis Required:** Check if full backtest is needed or signal count is sufficient
+
+## Obsolete Interface References
+
+### Files with Potentially Removed Interfaces
+
+*Scan in progress...*
+
+**Search Criteria:**
+- References to removed/deprecated classes
+- Import statements for non-existent modules
+- Tests using old API patterns
+
+### Known Removals (from project history)
+*None identified yet - checking codebase...*
+
+## Test Count Summary
+
+**Total tests before Phase 3:** ~37 tests (based on terminal history)
+**Phase 3 tests added:** 45 tests
+**Current total:** ~82 tests
+
+**Redundant tests identified:** 6-10 tests
+**Target reduction:** ≤30% (acceptable: ~25 tests removal)
+**Actual reduction plan:** ~6-10 tests (7-12% reduction)
+
+## Consolidation Opportunities (T031-T032)
+
+### Indicator Tests Consolidation
+**Files:** test_indicators_basic.py + test_indicators_core.py
+**Consolidation Strategy:**
+- Create test_indicators_consolidated.py with parameterized tests
+- Categories: warm-up periods, edge cases, integration scenarios
+- Use pytest.mark.parametrize for EMA/ATR/RSI with different periods
+
+**Estimated reduction:** 11 + 10 = 21 tests → 12-15 parameterized tests
+
+### Risk Sizing Tests Consolidation  
+**Files:** test_risk_sizing_normal.py + test_risk_sizing_volatility.py + test_risk_manager_rounding.py (partial)
+**Consolidation Strategy:**
+- Create test_risk_sizing_parametrized.py
+- Parameterize: account sizes, risk percentages, stop distances
+- Keep separate edge case file
+
+**Estimated reduction:** 7 + 7 + 3 = 17 tests → 10-12 parameterized tests
+
+## Next Steps (T030-T034)
+
+1. **T030:** Remove redundant tests from test_indicators_basic.py and test_risk_manager_rounding.py
+2. **T031:** Create test_indicators_consolidated.py with parameterized tests
+3. **T032:** Create test_risk_sizing_parametrized.py with parameterized scenarios
+4. **T033:** Verify final test count reduction ≤30%
+5. **T034:** Document removal justifications in removal-notes.md
+
+## Justification for Keeping Tests
+
+### Tests to KEEP (despite some overlap)
+1. **test_risk_sizing_edge_cases.py** - Unique edge case coverage
+2. **test_risk_manager_short.py** - Short-specific stop calculations
+3. **test_indicators_basic.py** edge cases - Empty arrays, single values
+4. **test_risk_manager_rounding.py** ATR/TP/validation - Unique functionality
+
+---
+
+**Conclusion:** Identified 6-10 redundant tests for removal. Consolidation will reduce duplication while maintaining coverage. Net reduction: ~7-12% (within 30% target).

@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 from src.cli.run_long_backtest import run_simple_backtest
 from src.config.parameters import StrategyParameters
 

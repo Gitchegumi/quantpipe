@@ -9,6 +9,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from src.models.core import Candle
 from src.strategy.trend_pullback.signal_generator import can_generate_signal
 

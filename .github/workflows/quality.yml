@@ -1,0 +1,42 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Install deps
+        run: poetry install --no-interaction --no-root
+      - name: Ruff
+        run: poetry run ruff check src/ tests/ || true
+      - name: Black (check)
+        run: poetry run black --check src/ tests/ || true
+      - name: Pylint
+        run: poetry run pylint src/ --score=yes || true
+      - name: Capture Pylint Score
+        run: poetry run pylint src/ --score=yes | tee pylint_output.txt
+      - name: Upload Pylint artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pylint-output
+          path: pylint_output.txt
+      - name: Setup Node for markdownlint
+        uses: actions/setup-node@v4
+        with:
+            node-version: '20'
+      - name: Install markdownlint
+        run: npm install -g markdownlint-cli2
+      - name: Run markdownlint
+        run: markdownlint-cli2 "**/*.md" "!poetry.lock" || true

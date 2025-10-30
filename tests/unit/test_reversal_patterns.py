@@ -6,8 +6,9 @@ and momentum turn confirmation for pullback reversal detection.
 """
 
 from datetime import UTC, datetime, timedelta
+import pytest
 
-from src.models.core import Candle
+from src.models.core import Candle, PullbackState
 from src.strategy.trend_pullback.reversal import (
     _detect_bearish_reversal,
     _detect_bullish_reversal,
@@ -17,6 +18,8 @@ from src.strategy.trend_pullback.reversal import (
     _is_shooting_star,
     detect_reversal,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestBullishEngulfingPattern:
@@ -33,15 +36,13 @@ class TestBullishEngulfingPattern:
         # Previous: small bearish candle
         prev_candle = Candle(
             timestamp_utc=timestamp,
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10000,
             high=1.10010,
             low=1.09980,
             close=1.09990,  # Close < open (bearish)
             volume=1000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=35.0,
             stoch_rsi=0.3,
@@ -50,21 +51,19 @@ class TestBullishEngulfingPattern:
         # Current: larger bullish candle that engulfs previous
         current_candle = Candle(
             timestamp_utc=timestamp + timedelta(hours=1),
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.09985,  # Opens below prev close
             high=1.10030,
             low=1.09975,  # Low below prev low
             close=1.10020,  # Close above prev open (engulfs)
             volume=2000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=40.0,
             stoch_rsi=0.35,
         )
 
-        assert _is_bullish_engulfing(current_candle, prev_candle) is True
+        assert _is_bullish_engulfing(prev_candle, current_candle) is True
 
     def test_bullish_engulfing_fails_if_current_bearish(self):
         """
@@ -76,15 +75,13 @@ class TestBullishEngulfingPattern:
 
         prev_candle = Candle(
             timestamp_utc=timestamp,
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10000,
             high=1.10010,
             low=1.09980,
             close=1.09990,
             volume=1000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=35.0,
             stoch_rsi=0.3,
@@ -93,21 +90,19 @@ class TestBullishEngulfingPattern:
         # Current is bearish (close < open)
         current_candle = Candle(
             timestamp_utc=timestamp + timedelta(hours=1),
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10020,
             high=1.10030,
             low=1.09975,
             close=1.09985,  # Bearish
             volume=2000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=40.0,
             stoch_rsi=0.35,
         )
 
-        assert _is_bullish_engulfing(current_candle, prev_candle) is False
+        assert _is_bullish_engulfing(prev_candle, current_candle) is False
 
     def test_bullish_engulfing_fails_if_not_engulfing(self):
         """
@@ -119,15 +114,13 @@ class TestBullishEngulfingPattern:
 
         prev_candle = Candle(
             timestamp_utc=timestamp,
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10000,
             high=1.10010,
             low=1.09980,
             close=1.09990,
             volume=1000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=35.0,
             stoch_rsi=0.3,
@@ -136,21 +129,19 @@ class TestBullishEngulfingPattern:
         # Current doesn't fully engulf (close < prev open)
         current_candle = Candle(
             timestamp_utc=timestamp + timedelta(hours=1),
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.09985,
             high=1.10005,
             low=1.09975,
             close=1.09995,  # Doesn't reach prev open
             volume=2000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=40.0,
             stoch_rsi=0.35,
         )
 
-        assert _is_bullish_engulfing(current_candle, prev_candle) is False
+        assert _is_bullish_engulfing(prev_candle, current_candle) is False
 
 
 class TestBearishEngulfingPattern:
@@ -167,15 +158,13 @@ class TestBearishEngulfingPattern:
         # Previous: small bullish candle
         prev_candle = Candle(
             timestamp_utc=timestamp,
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10000,
             high=1.10020,
             low=1.09990,
             close=1.10010,  # Close > open (bullish)
             volume=1000,
-            ema_fast=1.10000,
-            ema_slow=1.10100,
+            ema20=1.10000,
+            ema50=1.10100,
             atr=0.00050,
             rsi=65.0,
             stoch_rsi=0.7,
@@ -184,21 +173,19 @@ class TestBearishEngulfingPattern:
         # Current: larger bearish candle that engulfs previous
         current_candle = Candle(
             timestamp_utc=timestamp + timedelta(hours=1),
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10015,  # Opens above prev close
             high=1.10025,  # High above prev high
             low=1.09985,
             close=1.09990,  # Close below prev open (engulfs)
             volume=2000,
-            ema_fast=1.10000,
-            ema_slow=1.10100,
+            ema20=1.10000,
+            ema50=1.10100,
             atr=0.00050,
             rsi=60.0,
             stoch_rsi=0.65,
         )
 
-        assert _is_bearish_engulfing(current_candle, prev_candle) is True
+        assert _is_bearish_engulfing(prev_candle, current_candle) is True
 
 
 class TestHammerPattern:
@@ -213,23 +200,21 @@ class TestHammerPattern:
         # Hammer: lower_wick >= 2x body, upper_wick < 0.5x body
         candle = Candle(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10050,
-            high=1.10055,  # Small upper wick
+            high=1.10052,  # Small upper wick (0.00002, < 0.5x body)
             low=1.10000,  # Long lower wick
-            close=1.10045,  # Small body
+            close=1.10045,  # Small body (0.00005)
             volume=1000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=32.0,
             stoch_rsi=0.25,
         )
 
         # Body = |close - open| = 0.00005
-        # Lower wick = open - low = 0.00050 (10x body, > 2x requirement)
-        # Upper wick = high - close = 0.00010 (2x body, < 0.5x fails but example)
+        # Lower wick = min(open, close) - low = 1.10045 - 1.10000 = 0.00045 (9x body, > 2x ✓)
+        # Upper wick = high - max(open, close) = 1.10052 - 1.10050 = 0.00002 (0.4x body, < 0.5x ✓)
 
         assert _is_hammer(candle) is True
 
@@ -241,15 +226,13 @@ class TestHammerPattern:
         """
         candle = Candle(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10000,
             high=1.10055,
             low=1.09990,  # Short lower wick
             close=1.10050,  # Large body
             volume=1000,
-            ema_fast=1.10000,
-            ema_slow=1.09900,
+            ema20=1.10000,
+            ema50=1.09900,
             atr=0.00050,
             rsi=32.0,
             stoch_rsi=0.25,
@@ -271,23 +254,21 @@ class TestShootingStarPattern:
         # Shooting star: upper_wick >= 2x body, lower_wick < 0.5x body
         candle = Candle(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
-            pair="EURUSD",
-            timeframe_minutes=60,
             open=1.10005,
             high=1.10060,  # Long upper wick
-            low=1.10000,  # Small lower wick
-            close=1.10010,  # Small body
+            low=1.10003,  # Small lower wick (0.00002, < 0.5x body)
+            close=1.10010,  # Small body (0.00005)
             volume=1000,
-            ema_fast=1.10000,
-            ema_slow=1.10100,
+            ema20=1.10000,
+            ema50=1.10100,
             atr=0.00050,
             rsi=68.0,
             stoch_rsi=0.75,
         )
 
         # Body = |close - open| = 0.00005
-        # Upper wick = high - close = 0.00050 (10x body, > 2x requirement)
-        # Lower wick = open - low = 0.00005 (1x body, < 0.5x requirement)
+        # Upper wick = high - max(open, close) = 1.10060 - 1.10010 = 0.00050 (10x body, > 2x ✓)
+        # Lower wick = min(open, close) - low = 1.10005 - 1.10003 = 0.00002 (0.4x body, < 0.5x ✓)
 
         assert _is_shooting_star(candle) is True
 
@@ -307,15 +288,13 @@ class TestBullishReversalDetection:
             # 3 candles ago: RSI declining
             Candle(
                 timestamp_utc=timestamp - timedelta(hours=2),
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.10000,
                 high=1.10010,
                 low=1.09990,
                 close=1.09995,
                 volume=1000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
                 rsi=32.0,
                 stoch_rsi=0.28,
@@ -323,15 +302,13 @@ class TestBullishReversalDetection:
             # 2 candles ago: RSI at bottom
             Candle(
                 timestamp_utc=timestamp - timedelta(hours=1),
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.09995,
                 high=1.10000,
                 low=1.09980,
                 close=1.09985,
                 volume=1000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
                 rsi=28.0,  # Oversold
                 stoch_rsi=0.18,  # Oversold
@@ -339,22 +316,20 @@ class TestBullishReversalDetection:
             # Current: RSI turning up + bullish engulfing
             Candle(
                 timestamp_utc=timestamp,
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.09980,
                 high=1.10020,
                 low=1.09975,
                 close=1.10015,  # Strong bullish candle
                 volume=2000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
                 rsi=35.0,  # Turning up (35 > 28)
                 stoch_rsi=0.25,  # Turning up (0.25 > 0.18)
             ),
         ]
 
-        assert _detect_bullish_reversal(candles, "UP") is True
+        assert _detect_bullish_reversal(candles) is True
 
     def test_bullish_reversal_fails_without_momentum_turn(self):
         """
@@ -367,37 +342,33 @@ class TestBullishReversalDetection:
         candles = [
             Candle(
                 timestamp_utc=timestamp - timedelta(hours=1),
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.09995,
                 high=1.10000,
                 low=1.09980,
                 close=1.09985,
                 volume=1000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
                 rsi=32.0,
                 stoch_rsi=0.28,
             ),
             Candle(
                 timestamp_utc=timestamp,
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.09980,
                 high=1.10020,
                 low=1.09975,
                 close=1.10015,  # Bullish engulfing
                 volume=2000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
                 rsi=30.0,  # Still declining (30 < 32)
                 stoch_rsi=0.25,
             ),
         ]
 
-        assert _detect_bullish_reversal(candles, "UP") is False
+        assert _detect_bullish_reversal(candles) is False
 
 
 class TestBearishReversalDetection:
@@ -415,15 +386,13 @@ class TestBearishReversalDetection:
             # 2 candles ago: RSI at peak
             Candle(
                 timestamp_utc=timestamp - timedelta(hours=1),
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.10000,
                 high=1.10020,
                 low=1.09990,
                 close=1.10015,
                 volume=1000,
-                ema_fast=1.10000,
-                ema_slow=1.10100,
+                ema20=1.10000,
+                ema50=1.10100,
                 atr=0.00050,
                 rsi=72.0,  # Overbought
                 stoch_rsi=0.82,  # Overbought
@@ -431,22 +400,20 @@ class TestBearishReversalDetection:
             # Current: RSI turning down + bearish engulfing
             Candle(
                 timestamp_utc=timestamp,
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.10020,
                 high=1.10025,
                 low=1.09985,
                 close=1.09990,  # Strong bearish candle
                 volume=2000,
-                ema_fast=1.10000,
-                ema_slow=1.10100,
+                ema20=1.10000,
+                ema50=1.10100,
                 atr=0.00050,
                 rsi=65.0,  # Turning down (65 < 72)
                 stoch_rsi=0.75,  # Turning down (0.75 < 0.82)
             ),
         ]
 
-        assert _detect_bearish_reversal(candles, "DOWN") is True
+        assert _detect_bearish_reversal(candles) is True
 
 
 class TestReversalDetection:
@@ -462,38 +429,55 @@ class TestReversalDetection:
 
         candles = [
             Candle(
+                timestamp_utc=timestamp - timedelta(hours=2),
+                open=1.10005,
+                high=1.10010,
+                low=1.09990,
+                close=1.09995,  # Neutral/bearish
+                volume=800,
+                ema20=1.10000,
+                ema50=1.09900,
+                atr=0.00050,
+                rsi=32.0,
+                stoch_rsi=0.22,
+            ),
+            Candle(
                 timestamp_utc=timestamp - timedelta(hours=1),
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.09995,
                 high=1.10000,
                 low=1.09980,
-                close=1.09985,
+                close=1.09985,  # Bearish
                 volume=1000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
-                rsi=28.0,
+                rsi=28.0,  # Low RSI
                 stoch_rsi=0.18,
             ),
             Candle(
-                timestamp_utc=timestamp,
-                pair="EURUSD",
-                timeframe_minutes=60,
-                open=1.09980,
+                timestamp_utc=timestamp - timedelta(minutes=30),
+                open=1.09980,  # Opens below prev close (1.09985)
                 high=1.10020,
                 low=1.09975,
-                close=1.10015,
-                volume=2000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                close=1.10015,  # Closes above prev open (1.09995) - ENGULFING!
+                volume=1200,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
-                rsi=35.0,  # Turning up
-                stoch_rsi=0.25,  # Turning up
+                rsi=35.0,  # Rising from low (35 > 28)
+                stoch_rsi=0.25,  # Rising from low (0.25 > 0.18)
             ),
         ]
 
-        assert detect_reversal(candles, trend_direction="UP") is True
+        # Build a minimal PullbackState for detect_reversal usage
+        pullback_state = PullbackState(
+            active=True,
+            direction="LONG",
+            start_timestamp=timestamp,
+            qualifying_candle_ids=[],
+            oscillator_extreme_flag=True,
+        )
+        assert detect_reversal(candles, pullback_state=pullback_state) is True
 
     def test_reversal_detection_downtrend_pullback(self):
         """
@@ -505,61 +489,83 @@ class TestReversalDetection:
 
         candles = [
             Candle(
+                timestamp_utc=timestamp - timedelta(hours=2),
+                open=1.09995,
+                high=1.10005,
+                low=1.09985,
+                close=1.10000,  # Neutral/bullish
+                volume=900,
+                ema20=1.10000,
+                ema50=1.10100,
+                atr=0.00050,
+                rsi=68.0,
+                stoch_rsi=0.78,
+            ),
+            Candle(
                 timestamp_utc=timestamp - timedelta(hours=1),
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.10000,
                 high=1.10020,
                 low=1.09990,
-                close=1.10015,
+                close=1.10015,  # Bullish (close > open)
                 volume=1000,
-                ema_fast=1.10000,
-                ema_slow=1.10100,
+                ema20=1.10000,
+                ema50=1.10100,
                 atr=0.00050,
-                rsi=72.0,
+                rsi=72.0,  # High RSI
                 stoch_rsi=0.82,
             ),
             Candle(
-                timestamp_utc=timestamp,
-                pair="EURUSD",
-                timeframe_minutes=60,
-                open=1.10020,
+                timestamp_utc=timestamp - timedelta(minutes=30),
+                open=1.10020,  # Opens above prev close (1.10015)
                 high=1.10025,
                 low=1.09985,
-                close=1.09990,
-                volume=2000,
-                ema_fast=1.10000,
-                ema_slow=1.10100,
+                close=1.09990,  # Closes below prev open (1.10000) - ENGULFING!
+                volume=1300,
+                ema20=1.10000,
+                ema50=1.10100,
                 atr=0.00050,
-                rsi=65.0,
-                stoch_rsi=0.75,
+                rsi=65.0,  # Falling from high (65 < 72)
+                stoch_rsi=0.75,  # Falling from high (0.75 < 0.82)
             ),
         ]
 
-        assert detect_reversal(candles, trend_direction="DOWN") is True
+        pullback_state = PullbackState(
+            active=True,
+            direction="SHORT",
+            start_timestamp=timestamp,
+            qualifying_candle_ids=[],
+            oscillator_extreme_flag=True,
+        )
+        assert detect_reversal(candles, pullback_state=pullback_state) is True
 
     def test_reversal_detection_insufficient_candles(self):
         """
-        Given less than 2 candles,
+        Given fewer candles than required minimum,
         When detecting reversal,
-        Then should return False.
+        Then should raise ValueError.
         """
         candles = [
             Candle(
                 timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
-                pair="EURUSD",
-                timeframe_minutes=60,
                 open=1.10000,
                 high=1.10020,
                 low=1.09980,
                 close=1.10010,
                 volume=1000,
-                ema_fast=1.10000,
-                ema_slow=1.09900,
+                ema20=1.10000,
+                ema50=1.09900,
                 atr=0.00050,
                 rsi=35.0,
                 stoch_rsi=0.3,
             ),
         ]
-
-        assert detect_reversal(candles, trend_direction="UP") is False
+        pullback_state = PullbackState(
+            active=True,
+            direction="LONG",
+            start_timestamp=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            qualifying_candle_ids=[],
+            oscillator_extreme_flag=True,
+        )
+        # detect_reversal should raise ValueError for insufficient candles (min default 3)
+        with pytest.raises(ValueError):
+            detect_reversal(candles, pullback_state=pullback_state)

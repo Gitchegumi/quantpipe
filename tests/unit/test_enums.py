@@ -6,6 +6,8 @@ Tests type-safe enums for direction modes and output formats.
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from src.models.enums import DirectionMode, OutputFormat
 
 

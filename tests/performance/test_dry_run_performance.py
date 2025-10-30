@@ -11,13 +11,16 @@ Test Coverage:
 - SC-007: Deterministic results (signals always generated the same way)
 """
 
+import pytest
+
+
+pytestmark = pytest.mark.performance
+
 import csv
 import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-
-import pytest
 
 from src.backtest.orchestrator import BacktestOrchestrator
 from src.config.parameters import StrategyParameters

@@ -48,14 +48,14 @@ poetry run python -m src.cli.run_backtest `
 
 ### CLI Options
 
-| Option | Values | Default | Description |
-|--------|--------|---------|-------------|
-| `--data` | PATH | Required | Path to CSV price data file |
-| `--direction` | `LONG`, `SHORT`, `BOTH` | `LONG` | Trade direction mode |
-| `--output` | PATH | `results/` | Output directory for results |
-| `--output-format` | `text`, `json` | `text` | Output format |
-| `--log-level` | `DEBUG`, `INFO`, `WARNING`, `ERROR` | `INFO` | Logging verbosity |
-| `--dry-run` | flag | - | Generate signals without execution |
+| Option            | Values                              | Default    | Description                        |
+| ----------------- | ----------------------------------- | ---------- | ---------------------------------- |
+| `--data`          | PATH                                | Required   | Path to CSV price data file        |
+| `--direction`     | `LONG`, `SHORT`, `BOTH`             | `LONG`     | Trade direction mode               |
+| `--output`        | PATH                                | `results/` | Output directory for results       |
+| `--output-format` | `text`, `json`                      | `text`     | Output format                      |
+| `--log-level`     | `DEBUG`, `INFO`, `WARNING`, `ERROR` | `INFO`     | Logging verbosity                  |
+| `--dry-run`       | flag                                | -          | Generate signals without execution |
 
 ### Data File Format
 
@@ -102,11 +102,94 @@ src/
 └── config/              # Configuration management
 
 tests/
-├── unit/                # Unit tests
-├── integration/         # Integration tests
-├── performance/         # Performance benchmarks
-└── fixtures/            # Test data fixtures
+├── unit/                # Unit tests (<5s, <100 rows, synthetic fixtures)
+├── integration/         # Integration tests (<30s, 100-10K rows, real data)
+├── performance/         # Performance benchmarks (<120s, >10K rows, full load)
+└── fixtures/            # Test data fixtures (6 deterministic CSVs with manifest)
 ```
+
+## Testing
+
+### Test Organization
+
+Tests are organized into three tiers with distinct runtime and dataset characteristics:
+
+**Unit Tests** (`tests/unit/`):
+
+- **Purpose**: Fast feedback on individual components
+- **Runtime Target**: <5 seconds total
+- **Dataset Size**: <100 rows (synthetic fixtures)
+- **Scope**: Indicators, risk management, models
+- **Markers**: `@pytest.mark.unit`
+
+**Integration Tests** (`tests/integration/`):
+
+- **Purpose**: Multi-component interaction validation
+- **Runtime Target**: <30 seconds total
+- **Dataset Size**: 100-10,000 rows (small real data)
+- **Scope**: Strategy signals, backtest orchestration
+- **Markers**: `@pytest.mark.integration`
+
+**Performance Tests** (`tests/performance/`):
+
+- **Purpose**: Full system load testing
+- **Runtime Target**: <120 seconds total
+- **Dataset Size**: >10,000 rows (full production volumes)
+- **Scope**: Full-year backtests, memory profiling, throughput
+- **Markers**: `@pytest.mark.performance`
+
+### Running Tests
+
+```bash
+# Run all tests
+poetry run pytest
+
+# Run by tier (selective execution)
+poetry run pytest -m unit              # Fast feedback (<5s)
+poetry run pytest -m integration       # Multi-component (<30s)
+poetry run pytest -m performance       # Full system (<120s)
+
+# Run with coverage
+poetry run pytest --cov=src --cov-report=term-missing
+
+# Run specific test file
+poetry run pytest tests/unit/test_indicators_consolidated.py -v
+```
+
+### Test Fixtures
+
+Deterministic test fixtures are located in `tests/fixtures/` with metadata in `manifest.yaml`:
+
+- **fixture_trend_example.csv**: Uptrend scenario (20 candles)
+- **fixture_flat_prices.csv**: Ranging market (20 candles)
+- **fixture_spike_outlier.csv**: Volatility spike (20 candles)
+- **sample_candles_long.csv**: Long signal scenario (40 candles)
+- **sample_candles_short.csv**: Short signal scenario (40 candles)
+- **sample_candles_flat.csv**: No signal scenario (40 candles)
+
+Each fixture includes:
+
+- Checksum for integrity validation
+- Seed for reproducibility
+- Scenario type and indicators covered
+- OHLC data validation
+
+### Test Metrics
+
+- **Total Tests**: ~148 tests
+- **Coverage**: ≥70% for core modules
+- **Pass Rate**: 100% (all new/consolidated tests)
+- **Code Quality**: Pylint 9.52/10 (src/), 10.00/10 (tests/)
+- **Determinism**: 17 repeatability tests validate bitwise identical results
+
+### Quality Gates
+
+All code changes must pass:
+
+1. **Formatting**: `poetry run black src/ tests/` (88 char lines)
+2. **Linting**: `poetry run ruff check src/ tests/` (zero errors)
+3. **Quality**: `poetry run pylint src/ --score=yes` (≥8.0/10)
+4. **Tests**: `poetry run pytest -m unit` (<5s pass rate)
 
 ## Features
 

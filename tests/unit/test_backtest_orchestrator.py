@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from src.backtest.orchestrator import BacktestOrchestrator, merge_signals
 from src.models.core import Candle, TradeSignal
 from src.models.enums import DirectionMode

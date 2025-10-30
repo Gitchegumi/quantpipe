@@ -1,15 +1,18 @@
 <!--
 Sync Impact Report:
-- Version change: 1.3.0 → 1.4.0
-- Modified principles: Principle VIII - Code Quality & Documentation Standards (enhanced with automated quality tooling requirements)
-- Added sections: Principle X - Code Quality Automation & Linting, Development Workflow - Milestone Commit Messages
+- Version change: 1.4.0 → 1.5.0
+- Modified principles: Principle X - Code Quality Automation & Linting (added markdownlint requirement)
+- Added sections: Markdownlint quality tool in Principle X
 - Removed sections: None
 - Templates requiring updates:
   ✅ plan-template.md - Compatible (already references code quality)
-  ✅ tasks-template.md - Should include quality validation tasks
+  ✅ tasks-template.md - Should include markdownlint validation tasks
   ✅ spec-template.md - Compatible (no changes needed)
   ✅ agent-file-template.md - Already updated in v1.2.0
-- Follow-up TODOs: Ensure all new Python modules pass black, ruff, and pylint validation
+- Follow-up TODOs: 
+  - Ensure all Markdown files pass markdownlint validation
+  - Configure markdownlint rules in .markdownlint.json or .markdownlintrc
+  - Add markdownlint to quality workflow
 -->
 
 # Trading Strategies Constitution
@@ -126,7 +129,7 @@ Python projects MUST use Poetry as the package manager. The use of `requirements
 
 ### Principle X: Code Quality Automation & Linting
 
-All Python code MUST be validated using automated quality tools before merge. The codebase SHALL maintain high code quality standards through continuous linting and formatting. Quality checks MUST pass in CI/CD pipelines.
+All Python code MUST be validated using automated quality tools before merge. All Markdown documentation MUST be validated for consistency and style. The codebase SHALL maintain high code quality standards through continuous linting and formatting. Quality checks MUST pass in CI/CD pipelines.
 
 **Required Quality Tools:**
 
@@ -142,6 +145,12 @@ All Python code MUST be validated using automated quality tools before merge. Th
   - Minimum score: 8.0/10 for new code
   - MUST fix all W1203 (logging-fstring-interpolation) warnings
   - Score improvement encouraged but not blocking
+- **Markdownlint**: Markdown linter (markdownlint-cli2)
+  - MUST validate all Markdown files (*.md)
+  - Configuration in `.markdownlint.json` or `.markdownlintrc`
+  - Enforces consistent formatting, heading hierarchy, and style
+  - Common rules: MD032 (blanks-around-lists), MD024 (no-duplicate-heading), MD031 (blanks-around-fences)
+  - Warnings are informational; critical errors MUST be fixed before merge
 
 **Mandatory Logging Standards:**
 
@@ -154,14 +163,17 @@ All Python code MUST be validated using automated quality tools before merge. Th
 **Quality Workflow:**
 
 ```bash
-# Format code
+# Format Python code
 poetry run black src/ tests/
 
-# Lint with ruff
+# Lint Python with ruff
 poetry run ruff check src/ tests/
 
-# Lint with pylint
+# Lint Python with pylint
 poetry run pylint src/ --score=yes
+
+# Lint Markdown
+markdownlint-cli2 "**/*.md" "!poetry.lock"
 ```
 
 All quality checks SHOULD be automated in pre-commit hooks and CI/CD pipelines.
@@ -266,6 +278,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.4.0
+**Version:** 1.5.0
 **Ratified:** October 25, 2025
-**Last Amended:** October 29, 2025
+**Last Amended:** October 30, 2025

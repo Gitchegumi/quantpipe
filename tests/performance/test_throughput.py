@@ -1,3 +1,7 @@
+import pytest
+
+
+pytestmark = pytest.mark.performance
 """
 Performance throughput tests for backtest execution.
 
@@ -19,8 +23,6 @@ import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-
-import pytest
 
 from src.backtest.drawdown import compute_max_drawdown
 from src.backtest.metrics import compute_metrics
@@ -131,8 +133,6 @@ def test_metrics_computation_speed():
     - Metrics computed efficiently
     - No quadratic complexity issues
     """
-    from datetime import datetime
-
     # Generate 1,000 synthetic executions
     executions: list[TradeExecution] = []
     base_time = datetime(2025, 1, 1, tzinfo=UTC)
@@ -144,13 +144,14 @@ def test_metrics_computation_speed():
             signal_id=f"sig_{i}",
             open_timestamp=base_time + timedelta(hours=i),
             close_timestamp=base_time + timedelta(hours=i, minutes=30),
-            fill_entry_price=1.1000 + (i * 0.00001),
-            fill_stop_price=1.0950 + (i * 0.00001),
-            fill_exit_price=1.1050 + (i * 0.00001),
-            exit_reason="TARGET" if pnl_r > 0 else "STOP",
+            entry_fill_price=1.1000 + (i * 0.00001),
+            exit_fill_price=1.1050 + (i * 0.00001),
+            exit_reason="TARGET" if pnl_r > 0 else "STOP_LOSS",
             pnl_r=pnl_r,
-            slippage_pips=0.3,
-            execution_costs_pct=0.001,
+            slippage_entry_pips=0.2,
+            slippage_exit_pips=0.1,
+            costs_total=1.0,
+            direction="LONG" if pnl_r > 0 else "SHORT",
         )
         executions.append(execution)
 
@@ -177,8 +178,6 @@ def test_drawdown_computation_speed():
     - Drawdown curve computed efficiently
     - Numpy operations optimized
     """
-    from datetime import datetime
-
     # Generate 1,000 synthetic executions
     executions: list[TradeExecution] = []
     base_time = datetime(2025, 1, 1, tzinfo=UTC)
@@ -190,14 +189,15 @@ def test_drawdown_computation_speed():
         execution = TradeExecution(
             signal_id=f"sig_{i}",
             open_timestamp=base_time + timedelta(hours=i),
+            entry_fill_price=1.1000,
             close_timestamp=base_time + timedelta(hours=i, minutes=30),
-            fill_entry_price=1.1000,
-            fill_stop_price=1.0950,
-            fill_exit_price=1.1050,
-            exit_reason="TARGET" if pnl_r > 0 else "STOP",
+            exit_fill_price=1.1050,
+            exit_reason="TARGET" if pnl_r > 0 else "STOP_LOSS",
             pnl_r=pnl_r,
-            slippage_pips=0.3,
-            execution_costs_pct=0.001,
+            slippage_entry_pips=0.2,
+            slippage_exit_pips=0.1,
+            costs_total=1.0,
+            direction="LONG" if pnl_r > 0 else "SHORT",
         )
         executions.append(execution)
 
@@ -227,8 +227,6 @@ def test_signal_generation_throughput_estimate():
     - Candle consumption rate acceptable
     - No bottlenecks in indicator access
     """
-    from datetime import datetime
-
     from src.strategy.trend_pullback.trend_classifier import classify_trend
 
     # Generate 5,000 synthetic candles
@@ -256,7 +254,7 @@ def test_signal_generation_throughput_estimate():
     trend_count = 0
     for i in range(50, len(candles)):  # Need history for trend detection
         window = candles[i - 50 : i + 1]
-        _ = classify_trend(window, lookback_candles=50)
+        _ = classify_trend(window)
         trend_count += 1
 
     end_time = time.perf_counter()
@@ -289,7 +287,6 @@ def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
     start_time = time.perf_counter()
 
     candle_count = 0
-
     for candle in ingest_candles(
         large_dataset_path,
         ema_fast=20,

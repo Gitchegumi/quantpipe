@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from src.backtest.metrics import calculate_directional_metrics, calculate_metrics
 from src.models.core import TradeExecution
 from src.models.enums import DirectionMode

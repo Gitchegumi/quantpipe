@@ -1,3 +1,7 @@
+import pytest
+
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for risk manager with short positions.
 
