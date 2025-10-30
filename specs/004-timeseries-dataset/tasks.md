@@ -20,7 +20,7 @@
 - [ ] T011 Implement consolidated summary builder in `src/io/dataset_builder.py` (aggregate counts & durations)
 - [ ] T012 Implement file output writers (CSV partitions + metadata + summary) in `src/io/dataset_builder.py`
 - [ ] T013 Add pydantic model definitions for MetadataRecord & BuildSummary in `src/models/metadata.py`
-- [ ] T014 Add gap/overlap detection helper in `src/io/dataset_builder.py` (report-only)
+- [ ] T014 Add gap/overlap detection helper in `src/io/dataset_builder.py` (silent gap counting, explicit overlap reporting)
 
 ## Phase 3: User Story 1 (P1) Generate Chronological Split
 
@@ -59,25 +59,31 @@
 - [ ] T038 Run quality gates (Black, Ruff, Pylint, pytest, Markdownlint) CI verification script
 - [ ] T039 Optimize merge routine for memory if needed (chunking) in `src/io/dataset_builder.py`
 - [ ] T040 Add README performance expectations section in `README.md`
+- [ ] T041 Add unit test ensuring no gap warnings emitted (only overlaps) in `tests/unit/test_gap_warning_suppression.py`
 
 ## Dependencies / Story Order
+
 1. Setup → Foundational → US1 → US2 → US3 → Polish
 2. US2 depends on foundational + US1 functions validated
 3. US3 depends on US1 partitions existing
 
 ## Parallel Execution Examples
+
 - [ ] T008 [P] and T010 [P] can proceed after T007 validation logic finalized (different areas)
 - [ ] T018 [P] and T019 [P] unit tests parallel (independent test files)
 - [ ] T024 [P] integration multi-symbol and T025 [P] performance test generation can start after T022
 - [ ] T028 [P] refactor orchestrator and T030 [P] metrics output changes (distinct files) after partitions stable
 
 ## Independent Test Criteria by Story
+
 - US1: Single symbol build creates correct partitions & metadata; tests T018–T020 pass.
 - US2: Multi-symbol build summary accurate; performance test within threshold; tests T024–T026 pass.
 - US3: Backtest produces separate test/validation metrics; missing partitions produce warning; tests T028–T033 pass.
 
 ## MVP Scope
+
 Implement through US1 (Tasks T001–T021). Provides usable dataset partitions for a single symbol.
 
 ## Format Validation
+
 All tasks follow `- [ ] T### [P]? [USn]? Description with file path` pattern.

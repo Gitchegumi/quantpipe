@@ -62,7 +62,7 @@ As a user running backtests I want the backtest tool to operate on the standardi
 
 ### Edge Cases
 
-- Raw data contains gaps or overlapping timestamps: system identifies and reports counts but DOES NOT alter, fill, interpolate, or resample; raw sequence preserved in partitions.
+- Raw data contains gaps or overlapping timestamps: system identifies counts for gaps silently (no warnings emitted for expected gaps) and reports overlaps explicitly; DOES NOT alter, fill, interpolate, or resample; raw sequence preserved in partitions.
 - Raw data very small (fewer than 10 rows): system aborts split for that symbol and flags it as insufficient for partitioning.
 - Multiple raw files per symbol with differing schemas: system flags schema mismatch and skips symbol.
 - Time zone inconsistencies detected across files: system normalizes to a stated canonical time zone assumption and records assumption.
