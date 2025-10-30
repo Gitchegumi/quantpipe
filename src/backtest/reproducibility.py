@@ -69,6 +69,7 @@ class ReproducibilityTracker:
         self.version = version
         self.start_time = datetime.utcnow()
         self.candle_count = 0
+        self._finalized_hash: str | None = None  # Cache finalized hash
 
         # Initialize hash accumulator
         self._hash_accumulator = hashlib.sha256()
@@ -126,6 +127,8 @@ class ReproducibilityTracker:
         Incorporates candle count and returns the cumulative SHA-256 hash.
         This hash uniquely identifies the backtest run's inputs and operations.
 
+        The result is cached after first call to ensure idempotency.
+
         Returns:
             64-character hexadecimal SHA-256 hash string.
 
@@ -137,10 +140,17 @@ class ReproducibilityTracker:
             >>> len(final_hash)
             64
         """
+        # Return cached hash if already finalized
+        if self._finalized_hash is not None:
+            return self._finalized_hash
+
         # Add candle count to final hash
         self._hash_accumulator.update(str(self.candle_count).encode("utf-8"))
 
         final_hash = self._hash_accumulator.hexdigest()
+
+        # Cache the result
+        self._finalized_hash = final_hash
 
         logger.info(
             "Reproducibility hash finalized: %s... (candles=%d, version=%s)",

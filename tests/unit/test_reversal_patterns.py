@@ -1,7 +1,3 @@
-import pytest
-
-
-pytestmark = pytest.mark.unit
 """
 Unit tests for reversal pattern detection logic.
 
@@ -10,6 +6,7 @@ and momentum turn confirmation for pullback reversal detection.
 """
 
 from datetime import UTC, datetime, timedelta
+import pytest
 
 from src.models.core import Candle, PullbackState
 from src.strategy.trend_pullback.reversal import (
@@ -21,6 +18,8 @@ from src.strategy.trend_pullback.reversal import (
     _is_shooting_star,
     detect_reversal,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestBullishEngulfingPattern:
@@ -64,7 +63,7 @@ class TestBullishEngulfingPattern:
             stoch_rsi=0.35,
         )
 
-        assert _is_bullish_engulfing(current_candle, prev_candle) is True
+        assert _is_bullish_engulfing(prev_candle, current_candle) is True
 
     def test_bullish_engulfing_fails_if_current_bearish(self):
         """
@@ -103,7 +102,7 @@ class TestBullishEngulfingPattern:
             stoch_rsi=0.35,
         )
 
-        assert _is_bullish_engulfing(current_candle, prev_candle) is False
+        assert _is_bullish_engulfing(prev_candle, current_candle) is False
 
     def test_bullish_engulfing_fails_if_not_engulfing(self):
         """
@@ -142,7 +141,7 @@ class TestBullishEngulfingPattern:
             stoch_rsi=0.35,
         )
 
-        assert _is_bullish_engulfing(current_candle, prev_candle) is False
+        assert _is_bullish_engulfing(prev_candle, current_candle) is False
 
 
 class TestBearishEngulfingPattern:
@@ -186,7 +185,7 @@ class TestBearishEngulfingPattern:
             stoch_rsi=0.65,
         )
 
-        assert _is_bearish_engulfing(current_candle, prev_candle) is True
+        assert _is_bearish_engulfing(prev_candle, current_candle) is True
 
 
 class TestHammerPattern:
@@ -202,9 +201,9 @@ class TestHammerPattern:
         candle = Candle(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             open=1.10050,
-            high=1.10055,  # Small upper wick
+            high=1.10052,  # Small upper wick (0.00002, < 0.5x body)
             low=1.10000,  # Long lower wick
-            close=1.10045,  # Small body
+            close=1.10045,  # Small body (0.00005)
             volume=1000,
             ema20=1.10000,
             ema50=1.09900,
@@ -214,8 +213,8 @@ class TestHammerPattern:
         )
 
         # Body = |close - open| = 0.00005
-        # Lower wick = open - low = 0.00050 (10x body, > 2x requirement)
-        # Upper wick = high - close = 0.00010 (2x body, < 0.5x fails but example)
+        # Lower wick = min(open, close) - low = 1.10045 - 1.10000 = 0.00045 (9x body, > 2x ✓)
+        # Upper wick = high - max(open, close) = 1.10052 - 1.10050 = 0.00002 (0.4x body, < 0.5x ✓)
 
         assert _is_hammer(candle) is True
 
@@ -257,8 +256,8 @@ class TestShootingStarPattern:
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             open=1.10005,
             high=1.10060,  # Long upper wick
-            low=1.10000,  # Small lower wick
-            close=1.10010,  # Small body
+            low=1.10003,  # Small lower wick (0.00002, < 0.5x body)
+            close=1.10010,  # Small body (0.00005)
             volume=1000,
             ema20=1.10000,
             ema50=1.10100,
@@ -268,8 +267,8 @@ class TestShootingStarPattern:
         )
 
         # Body = |close - open| = 0.00005
-        # Upper wick = high - close = 0.00050 (10x body, > 2x requirement)
-        # Lower wick = open - low = 0.00005 (1x body, < 0.5x requirement)
+        # Upper wick = high - max(open, close) = 1.10060 - 1.10010 = 0.00050 (10x body, > 2x ✓)
+        # Lower wick = min(open, close) - low = 1.10005 - 1.10003 = 0.00002 (0.4x body, < 0.5x ✓)
 
         assert _is_shooting_star(candle) is True
 
@@ -430,43 +429,43 @@ class TestReversalDetection:
 
         candles = [
             Candle(
+                timestamp_utc=timestamp - timedelta(hours=2),
+                open=1.10005,
+                high=1.10010,
+                low=1.09990,
+                close=1.09995,  # Neutral/bearish
+                volume=800,
+                ema20=1.10000,
+                ema50=1.09900,
+                atr=0.00050,
+                rsi=32.0,
+                stoch_rsi=0.22,
+            ),
+            Candle(
                 timestamp_utc=timestamp - timedelta(hours=1),
                 open=1.09995,
                 high=1.10000,
                 low=1.09980,
-                close=1.09985,
+                close=1.09985,  # Bearish
                 volume=1000,
                 ema20=1.10000,
                 ema50=1.09900,
                 atr=0.00050,
-                rsi=28.0,
+                rsi=28.0,  # Low RSI
                 stoch_rsi=0.18,
             ),
             Candle(
                 timestamp_utc=timestamp - timedelta(minutes=30),
-                open=1.09985,
-                high=1.10005,
-                low=1.09970,
-                close=1.09990,
+                open=1.09980,  # Opens below prev close (1.09985)
+                high=1.10020,
+                low=1.09975,
+                close=1.10015,  # Closes above prev open (1.09995) - ENGULFING!
                 volume=1200,
                 ema20=1.10000,
                 ema50=1.09900,
                 atr=0.00050,
-                rsi=30.0,
-                stoch_rsi=0.20,
-            ),
-            Candle(
-                timestamp_utc=timestamp,
-                open=1.09980,
-                high=1.10020,
-                low=1.09975,
-                close=1.10015,
-                volume=2000,
-                ema20=1.10000,
-                ema50=1.09900,
-                atr=0.00050,
-                rsi=35.0,  # Turning up
-                stoch_rsi=0.25,  # Turning up
+                rsi=35.0,  # Rising from low (35 > 28)
+                stoch_rsi=0.25,  # Rising from low (0.25 > 0.18)
             ),
         ]
 
@@ -490,25 +489,12 @@ class TestReversalDetection:
 
         candles = [
             Candle(
-                timestamp_utc=timestamp - timedelta(hours=1),
-                open=1.10000,
-                high=1.10020,
-                low=1.09990,
-                close=1.10015,
-                volume=1000,
-                ema20=1.10000,
-                ema50=1.10100,
-                atr=0.00050,
-                rsi=72.0,
-                stoch_rsi=0.82,
-            ),
-            Candle(
-                timestamp_utc=timestamp - timedelta(minutes=30),
-                open=1.10015,
-                high=1.10025,
-                low=1.09995,
-                close=1.10005,
-                volume=1300,
+                timestamp_utc=timestamp - timedelta(hours=2),
+                open=1.09995,
+                high=1.10005,
+                low=1.09985,
+                close=1.10000,  # Neutral/bullish
+                volume=900,
                 ema20=1.10000,
                 ema50=1.10100,
                 atr=0.00050,
@@ -516,17 +502,30 @@ class TestReversalDetection:
                 stoch_rsi=0.78,
             ),
             Candle(
-                timestamp_utc=timestamp,
-                open=1.10020,
-                high=1.10025,
-                low=1.09985,
-                close=1.09990,
-                volume=2000,
+                timestamp_utc=timestamp - timedelta(hours=1),
+                open=1.10000,
+                high=1.10020,
+                low=1.09990,
+                close=1.10015,  # Bullish (close > open)
+                volume=1000,
                 ema20=1.10000,
                 ema50=1.10100,
                 atr=0.00050,
-                rsi=65.0,
-                stoch_rsi=0.75,
+                rsi=72.0,  # High RSI
+                stoch_rsi=0.82,
+            ),
+            Candle(
+                timestamp_utc=timestamp - timedelta(minutes=30),
+                open=1.10020,  # Opens above prev close (1.10015)
+                high=1.10025,
+                low=1.09985,
+                close=1.09990,  # Closes below prev open (1.10000) - ENGULFING!
+                volume=1300,
+                ema20=1.10000,
+                ema50=1.10100,
+                atr=0.00050,
+                rsi=65.0,  # Falling from high (65 < 72)
+                stoch_rsi=0.75,  # Falling from high (0.75 < 0.82)
             ),
         ]
 
