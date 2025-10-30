@@ -39,6 +39,17 @@ run_backtest.py
         # Dry run (signals only, no execution)
         poetry run python -m src.cli.run_backtest --data data.csv --manifest manifest.yaml --dry-run
 
+build_dataset.py (PLACEHOLDER - Feature 004)
+    Build time series dataset with test/validation splits
+
+    Usage:
+        poetry run python -m src.cli.build_dataset [options]
+
+    Options:
+        --symbol SYMBOL: Build dataset for specific symbol
+        --all: Build datasets for all discovered symbols
+        --force: Force rebuild even if processed data exists
+
 Configuration:
 --------------
 

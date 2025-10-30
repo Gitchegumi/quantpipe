@@ -4,11 +4,11 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Ensure Poetry environment up to date (`pyproject.toml`, lock) – verify Python 3.11
-- [ ] T002 Add placeholder CLI entry point for dataset build in `src/cli/__init__.py`
-- [ ] T003 Create module scaffold `src/io/dataset_builder.py` for build orchestration
-- [ ] T004 Configure logging pattern (lazy formatting) reference in `src/backtest/observability.py`
-- [ ] T005 Create synthetic raw fixture directory `tests/fixtures/raw/eurusd/` with minimal CSV (≥600 rows) for testing
+- [X] T001 Ensure Poetry environment up to date (`pyproject.toml`, lock) – verify Python 3.11
+- [X] T002 Add placeholder CLI entry point for dataset build in `src/cli/__init__.py`
+- [X] T003 Create module scaffold `src/io/dataset_builder.py` for build orchestration
+- [X] T004 Configure logging pattern (lazy formatting) reference in `src/backtest/observability.py`
+- [X] T005 Create synthetic raw fixture directory `tests/fixtures/raw/eurusd/` with minimal CSV (≥600 rows) for testing
 
 ## Phase 2: Foundational
 
