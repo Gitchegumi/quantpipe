@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.unit
 """
 Unit tests for directional backtesting data models.
 
@@ -8,6 +7,8 @@ Tests ConflictEvent, DirectionalMetrics, and BacktestResult data structures.
 from datetime import UTC, datetime
 
 import pytest
+
+pytestmark = pytest.mark.unit
 
 from src.models.core import MetricsSummary
 from src.models.directional import BacktestResult, ConflictEvent, DirectionalMetrics

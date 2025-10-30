@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.unit
 """
 Unit tests for metrics aggregation functions.
 
@@ -9,6 +8,8 @@ like empty executions.
 from datetime import UTC, datetime
 
 import pytest
+
+pytestmark = pytest.mark.unit
 
 from src.backtest.metrics import calculate_directional_metrics, calculate_metrics
 from src.models.core import TradeExecution

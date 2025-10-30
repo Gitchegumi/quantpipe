@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.integration
 """
 Integration test for US2: Short Signal Generation acceptance criteria.
 
@@ -11,6 +10,8 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.integration
 
 from src.backtest.execution import simulate_execution
 from src.backtest.metrics_ingest import MetricsIngestor

@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.integration
 """Integration tests for BOTH mode backtest execution (User Story 3).
 
 Tests three-tier metrics display, conflict handling, and output formatting.
@@ -7,6 +6,8 @@ Tests three-tier metrics display, conflict handling, and output formatting.
 import json
 
 import pytest
+
+pytestmark = pytest.mark.integration
 
 from src.backtest.orchestrator import BacktestOrchestrator
 from src.config.parameters import StrategyParameters

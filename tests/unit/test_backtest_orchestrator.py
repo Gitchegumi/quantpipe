@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.unit
 """
 Unit tests for BacktestOrchestrator and signal merging logic.
 
@@ -9,6 +8,8 @@ and signal merging in BOTH mode.
 from datetime import UTC, datetime
 
 import pytest
+
+pytestmark = pytest.mark.unit
 
 from src.backtest.orchestrator import BacktestOrchestrator, merge_signals
 from src.models.core import Candle, TradeSignal

@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.integration
 """
 Integration tests for manifest error handling (US3).
 
@@ -16,6 +15,8 @@ import json
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.integration
 
 from src.io.manifest import load_manifest
 from src.models.exceptions import DataIntegrityError

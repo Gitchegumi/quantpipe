@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.integration
 """
 Integration test for US1: Long Signal Generation acceptance criteria.
 
@@ -11,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.integration
 
 from src.cli.run_long_backtest import run_simple_backtest
 from src.config.parameters import StrategyParameters

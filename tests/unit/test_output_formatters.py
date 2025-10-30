@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.unit
 """
 Unit tests for output formatters.
 
@@ -11,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.unit
 
 from src.io.formatters import (
     format_json_output,

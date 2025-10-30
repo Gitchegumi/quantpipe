@@ -1,4 +1,3 @@
-pytestmark = pytest.mark.unit
 """
 Unit tests for signal cooldown enforcement.
 
@@ -9,6 +8,8 @@ generated within the minimum cooldown period (5 candles by default).
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
+pytestmark = pytest.mark.unit
 
 from src.models.core import Candle
 from src.strategy.trend_pullback.signal_generator import can_generate_signal
