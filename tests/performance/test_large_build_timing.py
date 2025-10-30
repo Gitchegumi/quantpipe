@@ -5,11 +5,13 @@ Task: T025 - Performance test with large synthetic dataset
 Success Criteria: SC-005 - Build completes within 2 minutes for 1M rows
 """
 
-import pytest
-import pandas as pd
+# pylint: disable=unused-argument unused-import redefined-outer-name line-too-long
+
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import time
+import pytest
+import pandas as pd
 
 from src.io.dataset_builder import build_symbol_dataset
 

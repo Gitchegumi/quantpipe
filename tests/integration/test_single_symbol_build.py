@@ -4,6 +4,8 @@ Feature: 004-timeseries-dataset
 Task: T020 - Test end-to-end single-symbol build
 """
 
+# pylint: disable=unused-argument unused-import redefined-outer-name
+
 import json
 import shutil
 from pathlib import Path
@@ -170,7 +172,7 @@ class TestSingleSymbolBuild:
         assert result["success"] is True
 
         metadata_file = processed_path / "eurusd" / "metadata.json"
-        with open(metadata_file) as f:
+        with open(metadata_file, encoding="utf-8") as f:
             metadata_json = json.load(f)
 
         assert metadata_json["symbol"] == "eurusd"

@@ -4,6 +4,8 @@ Generates minimal CSV files with OHLCV price data for testing purposes.
 Feature: 004-timeseries-dataset, Task: T005
 """
 
+# pylint: disable=f-string-without-interpolation
+
 import csv
 from datetime import datetime, timedelta
 from pathlib import Path

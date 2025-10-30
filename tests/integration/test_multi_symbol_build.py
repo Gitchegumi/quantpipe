@@ -4,6 +4,8 @@ Feature: 004-timeseries-dataset
 Task: T024 - Test multi-symbol orchestration
 """
 
+# pylint: disable=unused-argument unused-import redefined-outer-name
+
 import json
 from pathlib import Path
 
@@ -214,7 +216,7 @@ class TestMultiSymbolBuild:
         build_all_symbols(str(raw_path), str(processed_path))
 
         summary_file = processed_path / "build_summary.json"
-        with open(summary_file) as f:
+        with open(summary_file, encoding="utf-8") as f:
             summary_json = json.load(f)
 
         assert "build_timestamp" in summary_json
@@ -247,14 +249,14 @@ class TestMultiSymbolBuild:
 
         # Check eurusd metadata
         eurusd_metadata = processed_path / "eurusd" / "metadata.json"
-        with open(eurusd_metadata) as f:
+        with open(eurusd_metadata, encoding="utf-8") as f:
             eurusd_data = json.load(f)
         assert eurusd_data["symbol"] == "eurusd"
         assert eurusd_data["total_rows"] == 600
 
         # Check usdjpy metadata
         usdjpy_metadata = processed_path / "usdjpy" / "metadata.json"
-        with open(usdjpy_metadata) as f:
+        with open(usdjpy_metadata, encoding="utf-8") as f:
             usdjpy_data = json.load(f)
         assert usdjpy_data["symbol"] == "usdjpy"
         assert usdjpy_data["total_rows"] == 800
