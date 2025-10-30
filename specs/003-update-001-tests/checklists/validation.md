@@ -19,6 +19,7 @@ Review each success criterion and mark as ✅ PASS or ❌ FAIL. Provide evidence
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - Phase 3 added 45 new tests covering indicators, signals, risk sizing
 - Phase 5 added 59 tests for fixtures, repeatability, runtime
 - All core modules have comprehensive test coverage
@@ -39,12 +40,14 @@ Review each success criterion and mark as ✅ PASS or ❌ FAIL. Provide evidence
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - Pre-Phase 4: ~95 tests
 - Post-Phase 4: ~89 tests
 - Net reduction: 6 tests (6.3%)
 - Well within 30% threshold
 
 **Details**:
+
 - Direct removals: 3 duplicate tests
 - Consolidations: 21 tests → 15 parameterized tests (6 functions eliminated)
 - All reductions documented in removal-notes.md
@@ -62,6 +65,7 @@ Review each success criterion and mark as ✅ PASS or ❌ FAIL. Provide evidence
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - FR-001 (EMA calculation): test_indicators_consolidated.py (TestEMAWarmUp)
 - FR-002 (ATR calculation): test_indicators_consolidated.py (TestATRWarmUp)
 - FR-003 (RSI calculation): test_indicators_consolidated.py (TestRSICalculation)
@@ -85,6 +89,7 @@ Review each success criterion and mark as ✅ PASS or ❌ FAIL. Provide evidence
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - pytest.ini configured with marker registrations
 - All test files have tier markers applied
 - Selective execution works:
@@ -93,6 +98,7 @@ Review each success criterion and mark as ✅ PASS or ❌ FAIL. Provide evidence
   - `pytest -m performance` runs only performance tests
 
 **Test Commands**:
+
 ```bash
 pytest -m unit -v          # Unit tier only
 pytest -m integration -v   # Integration tier only
@@ -112,6 +118,7 @@ pytest -m performance -v   # Performance tier only
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - Unit tier runtime: <5s target (6s with 20% tolerance)
 - test_runtime_threshold.py validates this threshold
 - All unit tests execute quickly (<0.1s each typical)
@@ -131,6 +138,7 @@ pytest -m performance -v   # Performance tier only
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - manifest.yaml exists with 6 documented fixtures:
   1. fixture_trend_example.csv
   2. fixture_flat_prices.csv
@@ -140,10 +148,12 @@ pytest -m performance -v   # Performance tier only
   6. sample_empty_v1.csv (sample_candles_flat.csv)
 
 **Manifest Fields**:
+
 - id, filename, scenario_type, row_count, checksum, seed
 - indicators_covered, created, notes
 
 **Validation Tests**:
+
 - test_fixture_validation.py (15 tests)
 - All manifest entries validated
 
@@ -160,6 +170,7 @@ pytest -m performance -v   # Performance tier only
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - test_indicator_repeatability.py: 17 tests
 - EMA repeatability: 5 tests (3-run identical results)
 - ATR repeatability: 5 tests (3-run identical results)
@@ -168,6 +179,7 @@ pytest -m performance -v   # Performance tier only
 - Cross-indicator: 2 tests (EMA crossover determinism)
 
 **Validation Method**:
+
 - Run same indicator 3 times with identical inputs
 - Assert bitwise identical results (np.testing.assert_array_equal)
 
@@ -184,17 +196,20 @@ pytest -m performance -v   # Performance tier only
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - test_runtime_threshold.py: 7 tests (unit tier <5s)
 - test_integration_runtime.py: 9 tests (integration tier <30s)
 - test_performance_runtime.py: 11 tests (performance tier <120s)
 - **Total**: 27 runtime threshold tests
 
 **Thresholds**:
+
 - Unit: <5s (6s with 20% tolerance)
 - Integration: <30s (36s with tolerance)
 - Performance: <120s (144s with tolerance)
 
 **Dataset Size Guidelines**:
+
 - Unit: <100 rows (synthetic)
 - Integration: 100-10K rows (small real data)
 - Performance: >10K rows (full production)
@@ -212,12 +227,14 @@ pytest -m performance -v   # Performance tier only
 **Status**: ✅ PASS
 
 **Evidence**:
+
 - **src/ score**: 9.52/10 (exceeds 8.0 threshold)
 - **tests/ score**: 10.00/10 (perfect score)
 - Black formatting: All files compliant (88 char lines)
 - Ruff linting: Critical errors fixed (F841 unused variables)
 
 **Quality Tools**:
+
 - Black ≥23.10.0: Code formatter
 - Ruff ≥0.1.0: Fast linter
 - Pylint ≥3.3.0: Comprehensive quality checks

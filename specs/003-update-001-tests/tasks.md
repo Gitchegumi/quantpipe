@@ -115,8 +115,6 @@ Quality assurance and documentation finalization:
 - Documentation: README updated with test tiers, commit draft created, validation checklist complete
 - Total new tests: 0 (polish only)
 
-
-
 ## Dependencies & Ordering
 
 User Story Order: US1 → US2 → US3 (priority-based). US1 establishes correctness; US2 reduces noise; US3 optimizes performance.
