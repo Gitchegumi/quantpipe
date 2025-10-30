@@ -9,7 +9,7 @@
   "gap_count": 0,
   "overlap_count": 0,
   "canonical_timezone": "UTC",
-  "build_timestamp": "2025-10-30T18:25:49.747734Z",
+  "build_timestamp": "2025-10-30T18:28:57.604552Z",
   "schema_version": "v1",
   "source_files": [
     "tests\\fixtures\\raw\\eurusd\\eurusd_test.csv"

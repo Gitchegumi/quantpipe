@@ -25,12 +25,12 @@
 ## Phase 3: User Story 1 (P1) Generate Chronological Split
 
 - [X] T015 [US1] Integrate all foundational components into `build_symbol_dataset` function in `src/io/dataset_builder.py`
-- [ ] T016 [US1] Add CLI command `build-dataset` in `src/cli/dataset.py` invoking symbol build for single symbol
-- [ ] T017 [US1] Add CLI option for `--symbol <symbol>` to restrict build to one symbol
-- [ ] T018 [US1] Implement unit test for partition size logic in `tests/unit/test_dataset_split.py`
-- [ ] T019 [US1] Implement unit test for metadata correctness in `tests/unit/test_metadata_generation.py`
-- [ ] T020 [US1] Implement integration test single-symbol build in `tests/integration/test_single_symbol_build.py`
-- [ ] T021 [US1] Update quickstart examples with single-symbol build usage in `specs/004-timeseries-dataset/quickstart.md`
+- [X] T016 [US1] Add CLI command `build-dataset` in `src/cli/build_dataset.py` invoking symbol build for single symbol
+- [X] T017 [US1] Add CLI option for `--symbol <symbol>` to restrict build to one symbol
+- [X] T018 [US1] Implement unit test for partition size logic in `tests/unit/test_dataset_split.py`
+- [X] T019 [US1] Implement unit test for metadata correctness in `tests/unit/test_metadata_generation.py`
+- [X] T020 [US1] Implement integration test single-symbol build in `tests/integration/test_single_symbol_build.py`
+- [X] T021 [US1] Update quickstart examples with single-symbol build usage in `specs/004-timeseries-dataset/quickstart.md`
 
 ## Phase 4: User Story 2 (P2) Multi-Symbol Processing
 
