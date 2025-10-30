@@ -1,7 +1,3 @@
-import pytest
-
-
-pytestmark = pytest.mark.integration
 """
 Integration tests for zero-trade scenarios (US3).
 
@@ -17,6 +13,7 @@ These tests ensure robust error handling as required by US3.
 
 import math
 from datetime import UTC
+import pytest
 
 from src.backtest.drawdown import (
     compute_drawdown_curve,
@@ -25,6 +22,8 @@ from src.backtest.drawdown import (
 )
 from src.backtest.metrics import compute_metrics
 from src.models.core import TradeExecution
+
+pytestmark = pytest.mark.integration
 
 
 def test_metrics_zero_trades_empty_list():
