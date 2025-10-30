@@ -181,23 +181,25 @@ These tasks can be executed in parallel:
 
 ### LONG Implementation
 
-- [ ] T025 [US1] Implement LONG direction routing in BacktestOrchestrator.run_backtest (call generate_long_signals) in src/backtest/orchestrator.py
-- [ ] T026 [US1] Implement execution loop for LONG signals (call simulate_execution for each signal) in src/backtest/orchestrator.py
-- [ ] T027 [US1] Integrate calculate_directional_metrics for LONG mode (combined = long_only) in src/backtest/orchestrator.py
-- [ ] T028 [US1] Implement format_text_output for LONG results (metrics, run metadata, statistics) in src/io/formatters.py
-- [ ] T029 [US1] Update CLI argument parser to accept --direction LONG in src/cli/run_backtest.py
-- [ ] T030 [US1] Wire orchestrator call for LONG mode in CLI main function in src/cli/run_backtest.py
-- [ ] T031 [US1] Add output file writing logic (text format) in src/cli/run_backtest.py
-- [ ] T032 [US1] Add logging calls for LONG mode progress (signal count, execution progress) in src/cli/run_backtest.py
+- [x] T025 [US1] Implement LONG direction routing in BacktestOrchestrator.run_backtest (call generate_long_signals) in src/backtest/orchestrator.py ✅ **COMPLETE**
+- [x] T026 [US1] Implement execution loop for LONG signals (call simulate_execution for each signal) in src/backtest/orchestrator.py ✅ **COMPLETE**
+- [x] T027 [US1] Integrate calculate_directional_metrics for LONG mode (combined = long_only) in src/backtest/orchestrator.py ✅ **COMPLETE**
+- [x] T028 [US1] Implement format_text_output for LONG results (metrics, run metadata, statistics) in src/io/formatters.py ✅ **COMPLETE** (Phase 2)
+- [x] T029 [US1] Update CLI argument parser to accept --direction LONG in src/cli/run_backtest.py ✅ **COMPLETE**
+- [x] T030 [US1] Wire orchestrator call for LONG mode in CLI main function in src/cli/run_backtest.py ✅ **COMPLETE**
+- [x] T031 [US1] Add output file writing logic (text format) in src/cli/run_backtest.py ✅ **COMPLETE**
+- [x] T032 [US1] Add logging calls for LONG mode progress (signal count, execution progress) in src/cli/run_backtest.py ✅ **COMPLETE**
 
 ### Testing
 
-- [ ] T033 [US1] Create tests/integration/test_directional_backtesting.py with LONG mode end-to-end test
-- [ ] T034 [US1] Add test for LONG mode with fixture data (verify signal generation, execution, metrics) in tests/integration/test_directional_backtesting.py
-- [ ] T035 [US1] Add test for LONG mode output file creation and content validation in tests/integration/test_directional_backtesting.py
+- [x] T033 [US1] Create tests/integration/test_directional_backtesting.py with LONG mode end-to-end test ✅ **COMPLETE**
+- [x] T034 [US1] Add test for LONG mode with fixture data (verify signal generation, execution, metrics) in tests/integration/test_directional_backtesting.py ✅ **COMPLETE**
+- [x] T035 [US1] Add test for LONG mode output file creation and content validation in tests/integration/test_directional_backtesting.py ✅ **COMPLETE**
 
 **Independent Test**:
 Run `poetry run python -m src.cli.run_backtest --direction LONG --data price_data/eurusd/DAT_MT_EURUSD_M1_2020.csv` → generates LONG signals, executes trades, outputs text file with metrics (win_rate, avg_r, drawdown). Verify output file exists and contains valid metrics.
+
+**Phase 3 Status**: ✅ **COMPLETE** (8/8 tasks complete, 4/4 integration tests passing)
 
 **Acceptance Criteria**:
 

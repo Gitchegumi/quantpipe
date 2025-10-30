@@ -11,6 +11,8 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Literal
 
+from ..backtest.execution import simulate_execution
+from ..backtest.metrics import calculate_directional_metrics
 from ..models.core import Candle, TradeExecution, TradeSignal
 from ..models.directional import BacktestResult, ConflictEvent, DirectionalMetrics
 from ..models.enums import DirectionMode
@@ -146,7 +148,32 @@ class BacktestOrchestrator:
         signals = generate_long_signals(candles, parameters)
         logger.info("Generated %d LONG signals", len(signals))
 
-        # Placeholder: execution and metrics logic to be implemented
+        # Execute signals (skip if dry-run)
+        executions = []
+        if not self.dry_run:
+            logger.info("Simulating execution for %d LONG signals", len(signals))
+            for idx, signal in enumerate(signals, 1):
+                execution = simulate_execution(signal, candles)
+                if execution:
+                    executions.append(execution)
+                if idx % 10 == 0:
+                    logger.debug("Processed %d/%d signals", idx, len(signals))
+            logger.info(
+                "Execution complete: %d/%d signals executed",
+                len(executions),
+                len(signals),
+            )
+
+        # Calculate metrics
+        metrics = None
+        if executions:
+            metrics = calculate_directional_metrics(executions, DirectionMode.LONG)
+            logger.info(
+                "Metrics calculated: %d trades, win_rate=%.2f%%",
+                metrics.combined.trade_count,
+                metrics.combined.win_rate * 100,
+            )
+
         end_time = datetime.now(timezone.utc)
         return BacktestResult(
             run_id=run_id,
@@ -156,9 +183,9 @@ class BacktestOrchestrator:
             data_start_date=candles[0].timestamp_utc,
             data_end_date=candles[-1].timestamp_utc,
             total_candles=len(candles),
-            metrics=None,  # Placeholder for metrics
+            metrics=metrics,
             signals=signals if self.dry_run else None,
-            executions=None,
+            executions=executions if not self.dry_run else None,
             conflicts=[],
             dry_run=self.dry_run,
         )
@@ -177,7 +204,32 @@ class BacktestOrchestrator:
         signals = generate_short_signals(candles, parameters)
         logger.info("Generated %d SHORT signals", len(signals))
 
-        # Placeholder: execution and metrics logic to be implemented
+        # Execute signals (skip if dry-run)
+        executions = []
+        if not self.dry_run:
+            logger.info("Simulating execution for %d SHORT signals", len(signals))
+            for idx, signal in enumerate(signals, 1):
+                execution = simulate_execution(signal, candles)
+                if execution:
+                    executions.append(execution)
+                if idx % 10 == 0:
+                    logger.debug("Processed %d/%d signals", idx, len(signals))
+            logger.info(
+                "Execution complete: %d/%d signals executed",
+                len(executions),
+                len(signals),
+            )
+
+        # Calculate metrics
+        metrics = None
+        if executions:
+            metrics = calculate_directional_metrics(executions, DirectionMode.SHORT)
+            logger.info(
+                "Metrics calculated: %d trades, win_rate=%.2f%%",
+                metrics.combined.trade_count,
+                metrics.combined.win_rate * 100,
+            )
+
         end_time = datetime.now(timezone.utc)
         return BacktestResult(
             run_id=run_id,
@@ -187,9 +239,9 @@ class BacktestOrchestrator:
             data_start_date=candles[0].timestamp_utc,
             data_end_date=candles[-1].timestamp_utc,
             total_candles=len(candles),
-            metrics=None,  # Placeholder for metrics
+            metrics=metrics,
             signals=signals if self.dry_run else None,
-            executions=None,
+            executions=executions if not self.dry_run else None,
             conflicts=[],
             dry_run=self.dry_run,
         )
