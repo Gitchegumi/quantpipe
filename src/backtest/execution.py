@@ -170,6 +170,7 @@ def simulate_execution(
 
             execution = TradeExecution(
                 signal_id=signal.id,
+                direction=signal.direction,
                 open_timestamp=entry_candle.timestamp_utc,
                 entry_fill_price=entry_fill_price,
                 close_timestamp=candle.timestamp_utc,

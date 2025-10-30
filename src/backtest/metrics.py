@@ -278,12 +278,16 @@ def calculate_directional_metrics(
             long_only=None, short_only=combined, combined=combined
         )
     else:  # DirectionMode.BOTH
-        # TODO: Implement direction filtering when TradeExecution has direction field
-        # For now, calculate combined metrics only
-        logger.warning(
-            "BOTH mode: direction-specific breakdown not yet implemented; "
-            "returning combined metrics only"
+        # Filter executions by direction
+        long_executions = [e for e in executions if e.direction == "LONG"]
+        short_executions = [e for e in executions if e.direction == "SHORT"]
+
+        long_metrics = calculate_metrics(long_executions) if long_executions else None
+        short_metrics = (
+            calculate_metrics(short_executions) if short_executions else None
         )
         combined = calculate_metrics(executions)
 
-        return DirectionalMetrics(long_only=None, short_only=None, combined=combined)
+        return DirectionalMetrics(
+            long_only=long_metrics, short_only=short_metrics, combined=combined
+        )

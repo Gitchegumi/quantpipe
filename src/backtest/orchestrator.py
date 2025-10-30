@@ -314,11 +314,54 @@ class BacktestOrchestrator:
         start_time: datetime,
         **signal_params,
     ) -> BacktestResult:
-        """Execute BOTH directions backtest with conflict resolution."""
+        """
+        Execute BOTH directions backtest with conflict resolution using sliding windows.
+        """
         logger.info("Generating LONG and SHORT signals for pair=%s", pair)
         parameters = {"pair": pair, **signal_params}
-        long_signals = generate_long_signals(candles, parameters)
-        short_signals = generate_short_signals(candles, parameters)
+
+        # Process candles in sliding windows for both directions
+        all_long_signals = []
+        all_short_signals = []
+        ema_slow = signal_params.get("ema_slow", 50)
+        window_size = 100
+
+        logger.info(
+            "Processing %d candles with sliding window (size=%d) for BOTH directions",
+            len(candles),
+            window_size,
+        )
+
+        for i in range(ema_slow, len(candles)):
+            window = candles[max(0, i - window_size) : i + 1]
+
+            # Generate LONG signals for this window
+            long_window_signals = generate_long_signals(
+                candles=window, parameters=parameters
+            )
+            if long_window_signals:
+                signal = long_window_signals[0]
+                if not any(
+                    s.timestamp_utc == signal.timestamp_utc for s in all_long_signals
+                ):
+                    all_long_signals.append(signal)
+                    logger.debug("New LONG signal at %s", signal.timestamp_utc)
+
+            # Generate SHORT signals for this window
+            short_window_signals = generate_short_signals(
+                candles=window, parameters=parameters
+            )
+            if short_window_signals:
+                signal = short_window_signals[0]
+                if not any(
+                    s.timestamp_utc == signal.timestamp_utc for s in all_short_signals
+                ):
+                    all_short_signals.append(signal)
+                    logger.debug("New SHORT signal at %s", signal.timestamp_utc)
+
+        long_signals = all_long_signals
+        short_signals = all_short_signals
+
         logger.info(
             "Generated %d LONG signals, %d SHORT signals",
             len(long_signals),
@@ -337,7 +380,46 @@ class BacktestOrchestrator:
             len(conflicts),
         )
 
-        # Placeholder: execution and metrics logic to be implemented
+        # Execute signals (skip if dry-run)
+        executions = []
+        if not self.dry_run:
+            logger.info(
+                "Simulating execution for %d merged signals", len(merged_signals)
+            )
+            for idx, signal in enumerate(merged_signals, 1):
+                execution = simulate_execution(signal, candles)
+                if execution:
+                    executions.append(execution)
+                if idx % 10 == 0:
+                    logger.debug("Processed %d/%d signals", idx, len(merged_signals))
+            logger.info(
+                "Execution complete: %d/%d signals executed",
+                len(executions),
+                len(merged_signals),
+            )
+
+        # Calculate three-tier metrics (long_only, short_only, combined)
+        metrics = None
+        if executions:
+            metrics = calculate_directional_metrics(executions, DirectionMode.BOTH)
+            logger.info(
+                "Metrics calculated - Combined: %d trades, win_rate=%.2f%%",
+                metrics.combined.trade_count,
+                metrics.combined.win_rate * 100,
+            )
+            if metrics.long_only:
+                logger.info(
+                    "  Long-only: %d trades, win_rate=%.2f%%",
+                    metrics.long_only.trade_count,
+                    metrics.long_only.win_rate * 100,
+                )
+            if metrics.short_only:
+                logger.info(
+                    "  Short-only: %d trades, win_rate=%.2f%%",
+                    metrics.short_only.trade_count,
+                    metrics.short_only.win_rate * 100,
+                )
+
         end_time = datetime.now(timezone.utc)
         return BacktestResult(
             run_id=run_id,
@@ -347,9 +429,9 @@ class BacktestOrchestrator:
             data_start_date=candles[0].timestamp_utc,
             data_end_date=candles[-1].timestamp_utc,
             total_candles=len(candles),
-            metrics=None,  # Placeholder for DirectionalMetrics
+            metrics=metrics,
             signals=merged_signals if self.dry_run else None,
-            executions=None,
+            executions=executions if not self.dry_run else None,
             conflicts=conflicts,
             dry_run=self.dry_run,
         )

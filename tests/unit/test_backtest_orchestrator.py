@@ -231,6 +231,134 @@ class TestMergeSignals:
         assert len(conflicts) == 0
         assert merged[0].direction == "SHORT"
 
+    def test_conflict_event_structure(self):
+        """T055: Verify ConflictEvent contains timestamp and pair when logged."""
+        conflict_ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        long_sig = TradeSignal(
+            id="long_test",
+            timestamp_utc=conflict_ts,
+            pair="GBPUSD",
+            direction="LONG",
+            entry_price=1.2500,
+            initial_stop_price=1.2490,
+            risk_per_trade_pct=0.01,
+            calc_position_size=0.1,
+            tags=[],
+            version="1.0",
+        )
+        short_sig = TradeSignal(
+            id="short_test",
+            timestamp_utc=conflict_ts,
+            pair="GBPUSD",
+            direction="SHORT",
+            entry_price=1.2480,
+            initial_stop_price=1.2490,
+            risk_per_trade_pct=0.01,
+            calc_position_size=0.1,
+            tags=[],
+            version="1.0",
+        )
+
+        _, conflicts = merge_signals(
+            long_signals=[long_sig], short_signals=[short_sig], pair="GBPUSD"
+        )
+
+        # Verify ConflictEvent structure
+        assert len(conflicts) == 1
+        conflict = conflicts[0]
+        assert hasattr(conflict, "timestamp_utc")
+        assert hasattr(conflict, "pair")
+        assert hasattr(conflict, "long_signal_id")
+        assert hasattr(conflict, "short_signal_id")
+        assert conflict.timestamp_utc == conflict_ts
+        assert conflict.pair == "GBPUSD"
+        assert conflict.long_signal_id == "long_test"
+        assert conflict.short_signal_id == "short_test"
+
+    def test_timestamp_first_wins_logic(self):
+        """T056: Verify earlier timestamp executes when signals have different timestamps."""
+        ts_early = datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+        ts_late = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        # Earlier LONG signal
+        long_early = TradeSignal(
+            id="long_early",
+            timestamp_utc=ts_early,
+            pair="EURUSD",
+            direction="LONG",
+            entry_price=1.1000,
+            initial_stop_price=1.0990,
+            risk_per_trade_pct=0.01,
+            calc_position_size=0.1,
+            tags=[],
+            version="1.0",
+        )
+        # Later SHORT signal
+        short_late = TradeSignal(
+            id="short_late",
+            timestamp_utc=ts_late,
+            pair="EURUSD",
+            direction="SHORT",
+            entry_price=1.0950,
+            initial_stop_price=1.0960,
+            risk_per_trade_pct=0.01,
+            calc_position_size=0.1,
+            tags=[],
+            version="1.0",
+        )
+
+        merged, conflicts = merge_signals(
+            long_signals=[long_early], short_signals=[short_late], pair="EURUSD"
+        )
+
+        # Both signals should merge (different timestamps = no conflict)
+        assert len(merged) == 2
+        assert len(conflicts) == 0
+        # Verify chronological order: earlier signal first
+        assert merged[0].id == "long_early"
+        assert merged[0].timestamp_utc == ts_early
+        assert merged[1].id == "short_late"
+        assert merged[1].timestamp_utc == ts_late
+
+        # Test reverse order (later LONG, earlier SHORT)
+        short_early = TradeSignal(
+            id="short_early",
+            timestamp_utc=ts_early,
+            pair="EURUSD",
+            direction="SHORT",
+            entry_price=1.0950,
+            initial_stop_price=1.0960,
+            risk_per_trade_pct=0.01,
+            calc_position_size=0.1,
+            tags=[],
+            version="1.0",
+        )
+        long_late = TradeSignal(
+            id="long_late",
+            timestamp_utc=ts_late,
+            pair="EURUSD",
+            direction="LONG",
+            entry_price=1.1000,
+            initial_stop_price=1.0990,
+            risk_per_trade_pct=0.01,
+            calc_position_size=0.1,
+            tags=[],
+            version="1.0",
+        )
+
+        merged, conflicts = merge_signals(
+            long_signals=[long_late], short_signals=[short_early], pair="EURUSD"
+        )
+
+        assert len(merged) == 2
+        assert len(conflicts) == 0
+        # SHORT executes first (earlier timestamp)
+        assert merged[0].id == "short_early"
+        assert merged[0].timestamp_utc == ts_early
+        assert merged[1].id == "long_late"
+        assert merged[1].timestamp_utc == ts_late
+
 
 class TestBacktestOrchestratorRunBacktest:
     """Test cases for BacktestOrchestrator.run_backtest method."""

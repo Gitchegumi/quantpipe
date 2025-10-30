@@ -181,6 +181,7 @@ class TradeExecution:
 
     Attributes:
         signal_id: Reference to the originating TradeSignal.id.
+        direction: Trade direction - 'LONG' or 'SHORT'.
         open_timestamp: UTC timestamp of trade entry.
         entry_fill_price: Actual entry fill price including slippage.
         close_timestamp: UTC timestamp of trade exit.
@@ -196,6 +197,7 @@ class TradeExecution:
         >>> from datetime import datetime, timezone
         >>> execution = TradeExecution(
         ...     signal_id='a1b2c3d4e5f6g7h8',
+        ...     direction='LONG',
         ...     open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
         ...     entry_fill_price=1.1002,
         ...     close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
@@ -220,6 +222,7 @@ class TradeExecution:
     slippage_entry_pips: float
     slippage_exit_pips: float
     costs_total: float
+    direction: str = ""  # Literal['LONG', 'SHORT'], empty for backward compatibility
 
 
 @dataclass(frozen=True)
