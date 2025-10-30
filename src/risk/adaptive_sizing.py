@@ -13,8 +13,8 @@ Future enhancements may include:
 
 from typing import Optional
 
-from src.models.core import VolatilityRegime
 from src.config.parameters import StrategyParameters
+from src.models.core import VolatilityRegime
 
 
 def compute_volatility_adjustment(

@@ -8,18 +8,18 @@ simulation, and metrics aggregation.
 
 import logging
 from collections.abc import Sequence
-from datetime import datetime, timezone
-from typing import Literal
+from datetime import UTC, datetime
 
 from ..backtest.execution import simulate_execution
 from ..backtest.metrics import calculate_directional_metrics
-from ..models.core import Candle, TradeExecution, TradeSignal
-from ..models.directional import BacktestResult, ConflictEvent, DirectionalMetrics
+from ..models.core import Candle, TradeSignal
+from ..models.directional import BacktestResult, ConflictEvent
 from ..models.enums import DirectionMode
 from ..strategy.trend_pullback.signal_generator import (
     generate_long_signals,
     generate_short_signals,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class BacktestOrchestrator:
         if not candles:
             raise ValueError("Candles sequence cannot be empty")
 
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         logger.info("Starting backtest run_id=%s, pair=%s", run_id, pair)
 
         # Route to direction-specific workflow
@@ -204,7 +204,7 @@ class BacktestOrchestrator:
                 metrics.combined.win_rate * 100,
             )
 
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         return BacktestResult(
             run_id=run_id,
             direction_mode=DirectionMode.LONG.value,
@@ -290,7 +290,7 @@ class BacktestOrchestrator:
                 metrics.combined.win_rate * 100,
             )
 
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         return BacktestResult(
             run_id=run_id,
             direction_mode=DirectionMode.SHORT.value,
@@ -420,7 +420,7 @@ class BacktestOrchestrator:
                     metrics.short_only.win_rate * 100,
                 )
 
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         return BacktestResult(
             run_id=run_id,
             direction_mode=DirectionMode.BOTH.value,

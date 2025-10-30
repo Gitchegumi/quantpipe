@@ -47,7 +47,7 @@ def get_process_memory_mb() -> float:
         return -1.0
 
 
-@pytest.fixture
+@pytest.fixture()
 def huge_dataset_path() -> Generator[Path, None, None]:
     """
     Create a very large dataset for memory testing.
@@ -120,7 +120,7 @@ def test_memory_baseline():
     assert baseline_mb < 500  # Very generous threshold
 
 
-@pytest.mark.slow
+@pytest.mark.slow()
 def test_ingestion_memory_constant(huge_dataset_path: Path):
     """
     Verify that iterator-based ingestion maintains constant memory.
@@ -278,7 +278,7 @@ def test_metrics_computation_memory_spike():
     assert abs(memory_spike) < 50  # Allow small variation
 
 
-@pytest.mark.slow
+@pytest.mark.slow()
 def test_candle_accumulation_memory():
     """
     Test memory usage when accumulating candles in a list.
@@ -383,7 +383,7 @@ def test_garbage_collection_effectiveness():
     assert memory_delta < 50
 
 
-@pytest.mark.slow
+@pytest.mark.slow()
 def test_peak_memory_large_backtest_simulation(huge_dataset_path: Path):
     """
     Simulate full backtest and measure peak memory usage.

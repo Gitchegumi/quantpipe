@@ -4,11 +4,11 @@ Unit tests for directional backtesting data models.
 Tests ConflictEvent, DirectionalMetrics, and BacktestResult data structures.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
-from src.models.core import MetricsSummary, TradeSignal
+from src.models.core import MetricsSummary
 from src.models.directional import BacktestResult, ConflictEvent, DirectionalMetrics
 from src.models.enums import DirectionMode
 
@@ -18,7 +18,7 @@ class TestConflictEvent:
 
     def test_conflict_event_creation(self):
         """Verify ConflictEvent can be instantiated with required fields."""
-        timestamp = datetime(2025, 1, 29, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 29, 12, 0, 0, tzinfo=UTC)
         conflict = ConflictEvent(
             timestamp_utc=timestamp,
             pair="EURUSD",
@@ -34,7 +34,7 @@ class TestConflictEvent:
     def test_conflict_event_frozen(self):
         """Verify ConflictEvent is immutable (frozen dataclass)."""
         conflict = ConflictEvent(
-            timestamp_utc=datetime.now(timezone.utc),
+            timestamp_utc=datetime.now(UTC),
             pair="USDJPY",
             long_signal_id="xyz789",
             short_signal_id="uvw321",
@@ -47,7 +47,7 @@ class TestConflictEvent:
 class TestDirectionalMetrics:
     """Test cases for DirectionalMetrics model."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_metrics(self):
         """Provide sample MetricsSummary instances for testing."""
         long_metrics = MetricsSummary(
@@ -126,7 +126,7 @@ class TestDirectionalMetrics:
 class TestBacktestResult:
     """Test cases for BacktestResult model."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_result_long(self):
         """Provide sample BacktestResult for LONG mode."""
         metrics = MetricsSummary(
@@ -147,10 +147,10 @@ class TestBacktestResult:
         return BacktestResult(
             run_id="20250129_120000_LONG",
             direction_mode=DirectionMode.LONG.value,
-            start_time=datetime(2025, 1, 29, 12, 0, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 29, 12, 5, 30, tzinfo=timezone.utc),
-            data_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 29, 12, 0, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 29, 12, 5, 30, tzinfo=UTC),
+            data_start_date=datetime(2020, 1, 1, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, tzinfo=UTC),
             total_candles=100000,
             metrics=metrics,
             signals=None,
@@ -190,10 +190,10 @@ class TestBacktestResult:
         result = BacktestResult(
             run_id="20250129_120000_DRY",
             direction_mode=DirectionMode.SHORT.value,
-            start_time=datetime.now(timezone.utc),
-            end_time=datetime.now(timezone.utc),
-            data_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, tzinfo=timezone.utc),
+            start_time=datetime.now(UTC),
+            end_time=datetime.now(UTC),
+            data_start_date=datetime(2020, 1, 1, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, tzinfo=UTC),
             total_candles=50000,
             metrics=metrics,
             signals=[],  # Dry-run mode includes signals
@@ -259,7 +259,7 @@ class TestBacktestResult:
             combined=combined_metrics,
         )
         conflict = ConflictEvent(
-            timestamp_utc=datetime(2023, 5, 15, 14, 30, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2023, 5, 15, 14, 30, tzinfo=UTC),
             pair="GBPUSD",
             long_signal_id="signal_long_123",
             short_signal_id="signal_short_456",
@@ -268,10 +268,10 @@ class TestBacktestResult:
         result = BacktestResult(
             run_id="20250129_120000_BOTH",
             direction_mode=DirectionMode.BOTH.value,
-            start_time=datetime(2025, 1, 29, 12, 0, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 29, 12, 10, 45, tzinfo=timezone.utc),
-            data_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 29, 12, 0, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 29, 12, 10, 45, tzinfo=UTC),
+            data_start_date=datetime(2020, 1, 1, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, tzinfo=UTC),
             total_candles=150000,
             metrics=dir_metrics,
             signals=None,

@@ -12,15 +12,14 @@ Formula:
 Optional enhancement for trend-pullback strategy to improve reversal detection.
 """
 
-from typing import List
 
 import numpy as np
 
 
 def compute_stoch_rsi(
-    rsi_values: List[float],
+    rsi_values: list[float],
     lookback: int = 14,
-) -> List[float]:
+) -> list[float]:
     """Compute Stochastic RSI from RSI values.
 
     Args:
@@ -61,11 +60,11 @@ def compute_stoch_rsi(
 
 
 def compute_stoch_rsi_k_d(
-    rsi_values: List[float],
+    rsi_values: list[float],
     lookback: int = 14,
     k_smooth: int = 3,
     d_smooth: int = 3,
-) -> tuple[List[float], List[float]]:
+) -> tuple[list[float], list[float]]:
     """Compute smoothed Stochastic RSI %K and %D lines.
 
     %K = SMA of Stochastic RSI over k_smooth periods
@@ -130,7 +129,7 @@ def compute_stoch_rsi_k_d(
 
 
 def detect_stoch_rsi_oversold(
-    k_values: List[float],
+    k_values: list[float],
     threshold: float = 0.2,
 ) -> bool:
     """Detect if Stochastic RSI is in oversold territory.
@@ -156,7 +155,7 @@ def detect_stoch_rsi_oversold(
 
 
 def detect_stoch_rsi_overbought(
-    k_values: List[float],
+    k_values: list[float],
     threshold: float = 0.8,
 ) -> bool:
     """Detect if Stochastic RSI is in overbought territory.
@@ -182,8 +181,8 @@ def detect_stoch_rsi_overbought(
 
 
 def detect_bullish_crossover(
-    k_values: List[float],
-    d_values: List[float],
+    k_values: list[float],
+    d_values: list[float],
 ) -> bool:
     """Detect bullish crossover (%K crosses above %D).
 
@@ -215,8 +214,8 @@ def detect_bullish_crossover(
 
 
 def detect_bearish_crossover(
-    k_values: List[float],
-    d_values: List[float],
+    k_values: list[float],
+    d_values: list[float],
 ) -> bool:
     """Detect bearish crossover (%K crosses below %D).
 

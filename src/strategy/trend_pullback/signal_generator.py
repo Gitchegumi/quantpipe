@@ -16,6 +16,7 @@ from .pullback_detector import detect_pullback
 from .reversal import detect_reversal
 from .trend_classifier import classify_trend
 
+
 logger = logging.getLogger(__name__)
 
 

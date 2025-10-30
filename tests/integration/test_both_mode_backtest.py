@@ -17,7 +17,7 @@ from src.models.enums import DirectionMode
 class TestBothModeBacktest:
     """Test BOTH mode backtest execution (User Story 3)."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_candles(self, tmp_path):
         """Create a small CSV fixture with valid candles."""
         csv_content = """timestamp_utc,open,high,low,close,volume

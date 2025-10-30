@@ -16,7 +16,7 @@ from src.strategy.trend_pullback.signal_generator import can_generate_signal
 class TestSignalCooldown:
     """Tests for signal generation cooldown logic."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_candles(self):
         """Create sample candle sequence for cooldown testing."""
         candles = []

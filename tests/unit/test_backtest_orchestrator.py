@@ -5,7 +5,7 @@ Tests orchestrator initialization, direction mode routing, conflict detection,
 and signal merging in BOTH mode.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -48,12 +48,12 @@ class TestBacktestOrchestratorInit:
 class TestMergeSignals:
     """Test cases for merge_signals conflict detection logic."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_long_signal(self):
         """Provide sample long signal for testing."""
         return TradeSignal(
             id="long_001",
-            timestamp_utc=datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
             pair="EURUSD",
             direction="LONG",
             entry_price=1.1000,
@@ -64,12 +64,12 @@ class TestMergeSignals:
             version="1.0",
         )
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_short_signal(self):
         """Provide sample short signal for testing."""
         return TradeSignal(
             id="short_001",
-            timestamp_utc=datetime(2025, 1, 1, 14, 0, 0, tzinfo=timezone.utc),
+            timestamp_utc=datetime(2025, 1, 1, 14, 0, 0, tzinfo=UTC),
             pair="EURUSD",
             direction="SHORT",
             entry_price=1.0950,
@@ -95,7 +95,7 @@ class TestMergeSignals:
 
     def test_merge_signals_with_conflict(self):
         """Verify conflicting signals are rejected (same timestamp)."""
-        conflict_ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        conflict_ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         long_sig = TradeSignal(
             id="long_conflict",
@@ -135,9 +135,9 @@ class TestMergeSignals:
 
     def test_merge_signals_multiple_with_partial_conflicts(self):
         """Verify merge handles mix of conflicting and non-conflicting signals."""
-        ts1 = datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
-        ts2 = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)  # Conflict
-        ts3 = datetime(2025, 1, 1, 14, 0, 0, tzinfo=timezone.utc)
+        ts1 = datetime(2025, 1, 1, 10, 0, 0, tzinfo=UTC)
+        ts2 = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)  # Conflict
+        ts3 = datetime(2025, 1, 1, 14, 0, 0, tzinfo=UTC)
 
         long_signals = [
             TradeSignal(
@@ -233,7 +233,7 @@ class TestMergeSignals:
 
     def test_conflict_event_structure(self):
         """T055: Verify ConflictEvent contains timestamp and pair when logged."""
-        conflict_ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        conflict_ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         long_sig = TradeSignal(
             id="long_test",
@@ -278,8 +278,8 @@ class TestMergeSignals:
 
     def test_timestamp_first_wins_logic(self):
         """T056: Verify earlier timestamp executes when signals have different timestamps."""
-        ts_early = datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
-        ts_late = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        ts_early = datetime(2025, 1, 1, 10, 0, 0, tzinfo=UTC)
+        ts_late = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         # Earlier LONG signal
         long_early = TradeSignal(
@@ -363,12 +363,12 @@ class TestMergeSignals:
 class TestBacktestOrchestratorRunBacktest:
     """Test cases for BacktestOrchestrator.run_backtest method."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_candles(self):
         """Provide sample candle sequence for testing."""
         return [
             Candle(
-                timestamp_utc=datetime(2025, 1, 1, i, 0, 0, tzinfo=timezone.utc),
+                timestamp_utc=datetime(2025, 1, 1, i, 0, 0, tzinfo=UTC),
                 open=1.1000 + i * 0.0001,
                 high=1.1010 + i * 0.0001,
                 low=1.0990 + i * 0.0001,

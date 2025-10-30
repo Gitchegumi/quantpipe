@@ -12,7 +12,7 @@ import pytest
 from src.config.parameters import StrategyParameters
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_parameters():
     """
     Provide default strategy parameters for testing.
@@ -27,7 +27,7 @@ def sample_parameters():
     return StrategyParameters()
 
 
-@pytest.fixture
+@pytest.fixture()
 def custom_parameters():
     """
     Provide customizable strategy parameters factory.
@@ -47,7 +47,7 @@ def custom_parameters():
     return _create_params
 
 
-@pytest.fixture
+@pytest.fixture()
 def temp_manifest_path(tmp_path):
     """
     Provide temporary path for manifest files.
@@ -68,7 +68,7 @@ def temp_manifest_path(tmp_path):
     return manifest_dir
 
 
-@pytest.fixture
+@pytest.fixture()
 def fixtures_dir():
     """
     Provide path to test fixtures directory.

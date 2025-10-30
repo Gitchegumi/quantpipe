@@ -19,6 +19,7 @@ from ..config.parameters import StrategyParameters
 from ..io.ingestion import ingest_candles
 from ..strategy.trend_pullback.signal_generator import generate_long_signals
 
+
 logger = logging.getLogger(__name__)
 
 

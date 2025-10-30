@@ -23,7 +23,7 @@ from src.models.enums import DirectionMode
 class TestLongModeBacktest:
     """Test LONG-only backtest execution (User Story 1)."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_candles(self, tmp_path):
         """Create a small CSV fixture with valid candles."""
         csv_content = """timestamp_utc,open,high,low,close,volume
@@ -218,7 +218,7 @@ class TestLongModeBacktest:
 class TestShortModeBacktest:
     """Test SHORT-only backtest execution (User Story 2)."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_candles(self, tmp_path):
         """Create a small CSV fixture with valid candles."""
         csv_content = """timestamp_utc,open,high,low,close,volume
@@ -411,7 +411,7 @@ class TestShortModeBacktest:
 class TestJsonOutputAllModes:
     """Test JSON output format for all direction modes (T127)."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_candles(self, tmp_path):
         """Create a small CSV fixture with valid candles."""
         csv_content = """timestamp_utc,open,high,low,close,volume

@@ -25,6 +25,7 @@ from ..indicators.basic import atr, ema, rsi
 from ..models.core import Candle
 from ..models.exceptions import DataIntegrityError
 
+
 logger = logging.getLogger(__name__)
 
 

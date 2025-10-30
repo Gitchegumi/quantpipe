@@ -6,7 +6,7 @@ Tests generate_output_filename, format_text_output, and format_json_output.
 
 import json
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -16,8 +16,8 @@ from src.io.formatters import (
     format_text_output,
     generate_output_filename,
 )
-from src.models.directional import BacktestResult, ConflictEvent, DirectionalMetrics
 from src.models.core import MetricsSummary
+from src.models.directional import BacktestResult, ConflictEvent, DirectionalMetrics
 from src.models.enums import DirectionMode, OutputFormat
 
 
@@ -26,28 +26,28 @@ class TestGenerateOutputFilename:
 
     def test_long_mode_text_format(self):
         """Verify filename generation for LONG mode with TEXT format."""
-        ts = datetime(2025, 1, 15, 14, 30, 45, tzinfo=timezone.utc)
+        ts = datetime(2025, 1, 15, 14, 30, 45, tzinfo=UTC)
         filename = generate_output_filename(DirectionMode.LONG, OutputFormat.TEXT, ts)
 
         assert filename == "backtest_long_20250115_143045.txt"
 
     def test_short_mode_json_format(self):
         """Verify filename generation for SHORT mode with JSON format."""
-        ts = datetime(2025, 2, 20, 9, 15, 30, tzinfo=timezone.utc)
+        ts = datetime(2025, 2, 20, 9, 15, 30, tzinfo=UTC)
         filename = generate_output_filename(DirectionMode.SHORT, OutputFormat.JSON, ts)
 
         assert filename == "backtest_short_20250220_091530.json"
 
     def test_both_mode_text_format(self):
         """Verify filename generation for BOTH mode with TEXT format."""
-        ts = datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+        ts = datetime(2025, 12, 31, 23, 59, 59, tzinfo=UTC)
         filename = generate_output_filename(DirectionMode.BOTH, OutputFormat.TEXT, ts)
 
         assert filename == "backtest_both_20251231_235959.txt"
 
     def test_timestamp_formatting(self):
         """Verify timestamp formatting in filename."""
-        ts = datetime(2025, 3, 5, 8, 5, 3, tzinfo=timezone.utc)
+        ts = datetime(2025, 3, 5, 8, 5, 3, tzinfo=UTC)
         filename = generate_output_filename(DirectionMode.LONG, OutputFormat.TEXT, ts)
 
         # Check zero-padding
@@ -58,16 +58,16 @@ class TestGenerateOutputFilename:
 class TestFormatTextOutput:
     """Test cases for format_text_output function."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def minimal_result(self):
         """Provide minimal BacktestResult for testing."""
         return BacktestResult(
             run_id="test_run_001",
             direction_mode="LONG",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 12, 30, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 12, 30, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=100000,
             metrics=None,
             signals=None,
@@ -76,7 +76,7 @@ class TestFormatTextOutput:
             dry_run=False,
         )
 
-    @pytest.fixture
+    @pytest.fixture()
     def result_with_metrics(self):
         """Provide BacktestResult with metrics for testing."""
         metrics = MetricsSummary(
@@ -98,10 +98,10 @@ class TestFormatTextOutput:
         return BacktestResult(
             run_id="test_run_002",
             direction_mode="SHORT",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=50000,
             metrics=metrics,
             signals=None,
@@ -155,13 +155,13 @@ class TestFormatTextOutput:
         """Verify conflict formatting in output."""
         conflicts = [
             ConflictEvent(
-                timestamp_utc=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+                timestamp_utc=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
                 pair="EURUSD",
                 long_signal_id="long_001",
                 short_signal_id="short_001",
             ),
             ConflictEvent(
-                timestamp_utc=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
+                timestamp_utc=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
                 pair="EURUSD",
                 long_signal_id="long_002",
                 short_signal_id="short_002",
@@ -171,10 +171,10 @@ class TestFormatTextOutput:
         result = BacktestResult(
             run_id="test_run_003",
             direction_mode="BOTH",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=10000,
             metrics=None,
             signals=None,
@@ -194,16 +194,16 @@ class TestFormatTextOutput:
 class TestFormatJsonOutput:
     """Test cases for format_json_output function."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def minimal_result(self):
         """Provide minimal BacktestResult for testing."""
         return BacktestResult(
             run_id="test_run_json_001",
             direction_mode="LONG",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 12, 30, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 12, 30, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=100000,
             metrics=None,
             signals=None,
@@ -261,10 +261,10 @@ class TestFormatJsonOutput:
         result = BacktestResult(
             run_id="test_run_json_002",
             direction_mode="SHORT",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=50000,
             metrics=metrics,
             signals=None,
@@ -301,10 +301,10 @@ class TestFormatJsonOutput:
         result = BacktestResult(
             run_id="test_run_json_003",
             direction_mode="LONG",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=50000,
             metrics=metrics,
             signals=None,
@@ -387,10 +387,10 @@ class TestFormatJsonOutput:
         result = BacktestResult(
             run_id="test_run_json_004",
             direction_mode="BOTH",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=75000,
             metrics=directional_metrics,
             signals=None,
@@ -428,8 +428,14 @@ class TestFormatJsonOutput:
         import jsonschema
 
         # Load schema
-        schema_path = Path(__file__).parent.parent.parent / "specs" / "002-directional-backtesting" / "contracts" / "json-output-schema.json"
-        
+        schema_path = (
+            Path(__file__).parent.parent.parent
+            / "specs"
+            / "002-directional-backtesting"
+            / "contracts"
+            / "json-output-schema.json"
+        )
+
         with open(schema_path, encoding="utf-8") as f:
             schema = json.load(f)
 
@@ -453,10 +459,10 @@ class TestFormatJsonOutput:
         result = BacktestResult(
             run_id="test_run_json_005",
             direction_mode="LONG",
-            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=timezone.utc),
-            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
-            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+            start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+            end_time=datetime(2025, 1, 1, 13, 0, tzinfo=UTC),
+            data_start_date=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+            data_end_date=datetime(2024, 12, 31, 23, 59, tzinfo=UTC),
             total_candles=50000,
             metrics=metrics,
             signals=None,

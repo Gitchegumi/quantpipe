@@ -12,6 +12,7 @@ from datetime import datetime
 from src.models.directional import BacktestResult
 from src.models.enums import DirectionMode, OutputFormat
 
+
 logger = logging.getLogger(__name__)
 
 

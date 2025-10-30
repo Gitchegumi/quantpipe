@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from ..models.core import Candle, TradeExecution, TradeSignal
 from ..models.exceptions import ExecutionSimulationError
 
+
 logger = logging.getLogger(__name__)
 
 

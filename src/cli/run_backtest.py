@@ -19,19 +19,19 @@ Multi-Strategy/Multi-Pair Support:
 Usage:
     # Basic LONG backtest
     python -m src.cli.run_backtest --direction LONG --data <csv_path>
-    
+
     # With explicit strategy and pair
     python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
         --strategy trend-pullback --pair EURUSD
-    
+
     # Multiple pairs (future support)
     python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
         --pair EURUSD GBPUSD USDJPY
-    
+
     # JSON output
     python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
         --output-format json
-    
+
     # Dry-run (signals only)
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
@@ -54,6 +54,7 @@ from ..io.formatters import (
 )
 from ..io.ingestion import ingest_candles
 from ..models.enums import DirectionMode, OutputFormat
+
 
 logger = logging.getLogger(__name__)
 

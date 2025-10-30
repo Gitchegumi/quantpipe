@@ -10,6 +10,7 @@ from collections.abc import Sequence
 
 from ..models.core import MetricsSummary, TradeExecution
 
+
 logger = logging.getLogger(__name__)
 
 

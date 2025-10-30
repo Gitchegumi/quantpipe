@@ -25,7 +25,7 @@ from src.io.ingestion import ingest_candles
 from src.models.enums import DirectionMode
 
 
-@pytest.fixture
+@pytest.fixture()
 def dataset_100k_candles() -> Path:
     """
     Create a 100K candle dataset for dry-run performance testing.
@@ -209,7 +209,7 @@ def test_dry_run_deterministic_signals(dataset_100k_candles: Path):
     # SC-007: Deterministic results
     assert len(result1.signals) == len(result2.signals), "Signal count should match"
 
-    for sig1, sig2 in zip(result1.signals, result2.signals):
+    for sig1, sig2 in zip(result1.signals, result2.signals, strict=False):
         assert sig1.timestamp == sig2.timestamp, "Signal timestamps should match"
         assert sig1.pair == sig2.pair, "Signal pair should match"
         assert sig1.direction == sig2.direction, "Signal direction should match"
@@ -220,7 +220,7 @@ def test_dry_run_deterministic_signals(dataset_100k_candles: Path):
     print(f"\nDeterminism verified: {len(result1.signals)} signals matched")
 
 
-@pytest.mark.slow
+@pytest.mark.slow()
 def test_dry_run_all_directions_performance(dataset_100k_candles: Path):
     """
     Validate dry-run performance for all directions.
@@ -289,4 +289,3 @@ def test_dry_run_all_directions_performance(dataset_100k_candles: Path):
         assert result.dry_run is True
         assert result.executions is None
         assert result.metrics is None
-

@@ -6,15 +6,13 @@ Uses bootstrap resampling and permutation tests to compute p-values.
 """
 
 import random
-from typing import List, Tuple
 
 import numpy as np
-import pytest
 
 from src.models.core import TradeExecution
 
 
-def compute_sharpe_ratio(returns: List[float], risk_free_rate: float = 0.0) -> float:
+def compute_sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
     """Compute Sharpe ratio from list of returns.
 
     Args:
@@ -38,7 +36,7 @@ def compute_sharpe_ratio(returns: List[float], risk_free_rate: float = 0.0) -> f
     return (mean_return - risk_free_rate) / std_return
 
 
-def compute_expectancy(returns: List[float]) -> float:
+def compute_expectancy(returns: list[float]) -> float:
     """Compute expectancy (average R-multiple per trade).
 
     Args:
@@ -53,7 +51,7 @@ def compute_expectancy(returns: List[float]) -> float:
 
 
 def bootstrap_sharpe_p_value(
-    returns: List[float], n_iterations: int = 10000, seed: int = 42
+    returns: list[float], n_iterations: int = 10000, seed: int = 42
 ) -> float:
     """Compute p-value for Sharpe ratio using bootstrap resampling.
 
@@ -91,7 +89,7 @@ def bootstrap_sharpe_p_value(
 
 
 def permutation_test_expectancy(
-    returns: List[float], n_iterations: int = 10000, seed: int = 42
+    returns: list[float], n_iterations: int = 10000, seed: int = 42
 ) -> float:
     """Compute p-value for expectancy using permutation test.
 
@@ -130,8 +128,8 @@ def permutation_test_expectancy(
 
 
 def assess_statistical_significance(
-    executions: List[TradeExecution], alpha: float = 0.05
-) -> Tuple[bool, dict]:
+    executions: list[TradeExecution], alpha: float = 0.05
+) -> tuple[bool, dict]:
     """Assess whether backtest results are statistically significant.
 
     Args:

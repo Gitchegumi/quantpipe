@@ -11,6 +11,7 @@ import math
 
 from ..models.core import TradeSignal
 
+
 logger = logging.getLogger(__name__)
 
 

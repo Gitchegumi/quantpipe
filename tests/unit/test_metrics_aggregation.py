@@ -5,7 +5,7 @@ Tests calculate_metrics, calculate_directional_metrics, and edge cases
 like empty executions.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -30,9 +30,9 @@ class TestCalculateMetrics:
         executions = [
             TradeExecution(
                 signal_id="sig1",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
                 entry_fill_price=1.1000,
-                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
+                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
                 exit_fill_price=1.1020,
                 exit_reason="TARGET",
                 pnl_r=2.0,
@@ -55,9 +55,9 @@ class TestCalculateMetrics:
         executions = [
             TradeExecution(
                 signal_id="sig1",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
                 entry_fill_price=1.1000,
-                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
+                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
                 exit_fill_price=1.0990,
                 exit_reason="STOP_LOSS",
                 pnl_r=-1.0,
@@ -80,9 +80,9 @@ class TestCalculateMetrics:
         executions = [
             TradeExecution(
                 signal_id="sig1",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
                 entry_fill_price=1.1000,
-                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
+                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
                 exit_fill_price=1.1020,
                 exit_reason="TARGET",
                 pnl_r=2.0,
@@ -92,9 +92,9 @@ class TestCalculateMetrics:
             ),
             TradeExecution(
                 signal_id="sig2",
-                open_timestamp=datetime(2025, 1, 2, 12, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 2, 12, 0, tzinfo=UTC),
                 entry_fill_price=1.1050,
-                close_timestamp=datetime(2025, 1, 2, 14, 0, tzinfo=timezone.utc),
+                close_timestamp=datetime(2025, 1, 2, 14, 0, tzinfo=UTC),
                 exit_fill_price=1.1040,
                 exit_reason="STOP_LOSS",
                 pnl_r=-1.0,
@@ -104,9 +104,9 @@ class TestCalculateMetrics:
             ),
             TradeExecution(
                 signal_id="sig3",
-                open_timestamp=datetime(2025, 1, 3, 12, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 3, 12, 0, tzinfo=UTC),
                 entry_fill_price=1.1030,
-                close_timestamp=datetime(2025, 1, 3, 14, 0, tzinfo=timezone.utc),
+                close_timestamp=datetime(2025, 1, 3, 14, 0, tzinfo=UTC),
                 exit_fill_price=1.1050,
                 exit_reason="TARGET",
                 pnl_r=2.0,
@@ -128,15 +128,15 @@ class TestCalculateMetrics:
 class TestCalculateDirectionalMetrics:
     """Test cases for calculate_directional_metrics function."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_executions(self):
         """Provide sample executions for testing."""
         return [
             TradeExecution(
                 signal_id="sig1",
-                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
                 entry_fill_price=1.1000,
-                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=timezone.utc),
+                close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
                 exit_fill_price=1.1020,
                 exit_reason="TARGET",
                 pnl_r=2.0,
@@ -146,9 +146,9 @@ class TestCalculateDirectionalMetrics:
             ),
             TradeExecution(
                 signal_id="sig2",
-                open_timestamp=datetime(2025, 1, 2, 12, 0, tzinfo=timezone.utc),
+                open_timestamp=datetime(2025, 1, 2, 12, 0, tzinfo=UTC),
                 entry_fill_price=1.1050,
-                close_timestamp=datetime(2025, 1, 2, 14, 0, tzinfo=timezone.utc),
+                close_timestamp=datetime(2025, 1, 2, 14, 0, tzinfo=UTC),
                 exit_fill_price=1.1040,
                 exit_reason="STOP_LOSS",
                 pnl_r=-1.0,
@@ -160,9 +160,7 @@ class TestCalculateDirectionalMetrics:
 
     def test_long_mode_metrics(self, sample_executions):
         """Verify LONG mode populates long_only and combined (identical)."""
-        metrics = calculate_directional_metrics(
-            sample_executions, DirectionMode.LONG
-        )
+        metrics = calculate_directional_metrics(sample_executions, DirectionMode.LONG)
 
         assert metrics.long_only is not None
         assert metrics.short_only is None
@@ -173,9 +171,7 @@ class TestCalculateDirectionalMetrics:
 
     def test_short_mode_metrics(self, sample_executions):
         """Verify SHORT mode populates short_only and combined (identical)."""
-        metrics = calculate_directional_metrics(
-            sample_executions, DirectionMode.SHORT
-        )
+        metrics = calculate_directional_metrics(sample_executions, DirectionMode.SHORT)
 
         assert metrics.long_only is None
         assert metrics.short_only is not None
@@ -186,9 +182,7 @@ class TestCalculateDirectionalMetrics:
 
     def test_both_mode_metrics(self, sample_executions):
         """Verify BOTH mode calculates combined metrics (direction breakdown pending)."""
-        metrics = calculate_directional_metrics(
-            sample_executions, DirectionMode.BOTH
-        )
+        metrics = calculate_directional_metrics(sample_executions, DirectionMode.BOTH)
 
         # Current implementation: combined only (direction filtering TODO)
         assert metrics.long_only is None
