@@ -19,7 +19,7 @@ from src.strategy.trend_pullback.signal_generator import generate_long_signals
 class TestLongSignalPerformance:
     """Performance benchmarks for US1 long signal generation."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def large_candle_dataset(self) -> list[Candle]:
         """
         Generate large synthetic candle dataset for performance testing.

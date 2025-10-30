@@ -18,7 +18,7 @@ from src.config.parameters import StrategyParameters
 class TestUS1LongSignalIntegration:
     """Integration tests for US1 acceptance criteria."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_price_data(self, tmp_path: Path) -> Path:
         """
         Create sample CSV price data for testing.

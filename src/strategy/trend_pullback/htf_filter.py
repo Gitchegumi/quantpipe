@@ -14,16 +14,17 @@ Configuration:
 - htf_ema_period: EMA period for HTF trend check
 """
 
-from typing import List, Optional
 import logging
+from typing import Optional
 
 from src.models.core import Candle
+
 
 logger = logging.getLogger(__name__)
 
 
 def check_htf_ema_alignment(
-    htf_candles: List[Candle],
+    htf_candles: list[Candle],
     ema_period: int = 50,
     direction: str = "long",
 ) -> bool:
@@ -42,9 +43,7 @@ def check_htf_ema_alignment(
         - For short trades: HTF close < HTF EMA
     """
     if len(htf_candles) < ema_period:
-        logger.debug(
-            "Insufficient HTF candles: %d < %d", len(htf_candles), ema_period
-        )
+        logger.debug("Insufficient HTF candles: %d < %d", len(htf_candles), ema_period)
         return False
 
     # Compute HTF EMA
@@ -81,7 +80,7 @@ def check_htf_ema_alignment(
     return False
 
 
-def compute_ema(values: List[float], period: int) -> List[float]:
+def compute_ema(values: list[float], period: int) -> list[float]:
     """Compute Exponential Moving Average.
 
     Args:
@@ -113,9 +112,9 @@ def compute_ema(values: List[float], period: int) -> List[float]:
 
 
 def convert_timeframe_to_htf(
-    base_candles: List[Candle],
+    base_candles: list[Candle],
     multiplier: int = 4,
-) -> List[Candle]:
+) -> list[Candle]:
     """Convert lower timeframe candles to higher timeframe.
 
     Args:
@@ -144,7 +143,7 @@ def convert_timeframe_to_htf(
     return htf_candles
 
 
-def aggregate_candles(candles: List[Candle]) -> Candle:
+def aggregate_candles(candles: list[Candle]) -> Candle:
     """Aggregate multiple candles into a single higher timeframe candle.
 
     Args:
@@ -180,7 +179,7 @@ def aggregate_candles(candles: List[Candle]) -> Candle:
 
 
 def filter_trade_with_htf(
-    base_candles: List[Candle],
+    base_candles: list[Candle],
     direction: str,
     htf_enabled: bool = False,
     htf_multiplier: int = 4,
@@ -212,7 +211,9 @@ def filter_trade_with_htf(
         return False, reason
 
     # Check alignment
-    aligned = check_htf_ema_alignment(htf_candles, ema_period=htf_ema_period, direction=direction)
+    aligned = check_htf_ema_alignment(
+        htf_candles, ema_period=htf_ema_period, direction=direction
+    )
 
     if not aligned:
         reason = f"HTF EMA not aligned for {direction} trade"

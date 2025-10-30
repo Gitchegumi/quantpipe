@@ -12,6 +12,7 @@ from datetime import datetime
 
 from ...models.core import Candle, PullbackState, TrendState
 
+
 logger = logging.getLogger(__name__)
 
 

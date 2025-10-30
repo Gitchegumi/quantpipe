@@ -1,7 +1,7 @@
 # Strategy Contracts: Trend Pullback Continuation
 
-Version: 0.1.0  
-Feature Branch: 001-trend-pullback  
+Version: 0.1.0
+Feature Branch: 001-trend-pullback
 Source Artifacts: `spec.md`, `research.md`, `data-model.md`
 
 ## Purpose

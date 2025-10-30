@@ -67,9 +67,7 @@ class TestGenerateSignalID:
     def test_different_timestamp_different_id(self):
         """Test that different timestamps produce different IDs."""
         timestamp1 = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
-        timestamp2 = datetime(
-            2025, 1, 15, 12, 0, 1, tzinfo=UTC
-        )  # 1 second later
+        timestamp2 = datetime(2025, 1, 15, 12, 0, 1, tzinfo=UTC)  # 1 second later
 
         id1 = generate_signal_id(
             pair="EURUSD",

@@ -16,6 +16,7 @@ from numpy.typing import NDArray
 
 from ..models.core import TradeExecution
 
+
 logger = logging.getLogger(__name__)
 
 

@@ -1,7 +1,7 @@
 # Data Model: Trend Pullback Continuation Strategy
 
-**Branch**: 001-trend-pullback  
-**Date**: 2025-10-25  
+**Branch**: 001-trend-pullback
+**Date**: 2025-10-25
 **Source**: ./spec.md, research.md
 
 ## Entities

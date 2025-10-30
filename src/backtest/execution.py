@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from ..models.core import Candle, TradeExecution, TradeSignal
 from ..models.exceptions import ExecutionSimulationError
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -113,7 +114,10 @@ def simulate_execution(
         candles_in_trade += 1
 
         # Check if trailing stop should activate (FR-026 timeout)
-        if candles_in_trade >= trailing_stop_timeout_candles and not trailing_stop_active:
+        if (
+            candles_in_trade >= trailing_stop_timeout_candles
+            and not trailing_stop_active
+        ):
             trailing_stop_active = True
             trailing_stop_price = signal.initial_stop_price
             logger.debug(
@@ -167,6 +171,7 @@ def simulate_execution(
 
             execution = TradeExecution(
                 signal_id=signal.id,
+                direction=signal.direction,
                 open_timestamp=entry_candle.timestamp_utc,
                 entry_fill_price=entry_fill_price,
                 close_timestamp=candle.timestamp_utc,

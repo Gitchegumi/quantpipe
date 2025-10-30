@@ -11,6 +11,7 @@ from collections.abc import Sequence
 
 from ...models.core import Candle, PullbackState
 
+
 logger = logging.getLogger(__name__)
 
 

@@ -1,6 +1,6 @@
 # Quickstart: Trend Pullback Continuation Strategy
 
-Branch: `001-trend-pullback`  
+Branch: `001-trend-pullback`
 Artifacts: `spec.md`, `research.md`, `data-model.md`, `contracts/`, `plan.md`
 
 ## 1. Prerequisites
@@ -16,6 +16,7 @@ python -m venv .venv
 ./.venv/Scripts/Activate.ps1
 pip install numpy pandas pydantic rich pytest hypothesis
 ```
+
 (Add TA-Lib later if needed; initial version uses pure Python indicators.)
 
 ## 3. Core Concepts
@@ -38,6 +39,7 @@ from specs001_trend_pullback.contracts.interfaces import (
     MetricsAggregator, ReproducibilityService, ObservabilityReporter
 )
 ```
+
 (Actual import path will be adjusted once code is organized into packages.)
 
 ## 5. Minimal Wiring Example (Pseudo-Code)

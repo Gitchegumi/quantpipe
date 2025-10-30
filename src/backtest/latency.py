@@ -12,6 +12,7 @@ from collections.abc import Sequence
 import numpy as np
 from numpy.typing import NDArray
 
+
 logger = logging.getLogger(__name__)
 
 

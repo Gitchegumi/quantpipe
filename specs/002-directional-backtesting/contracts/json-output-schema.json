@@ -1,0 +1,346 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trading-strategies/schemas/backtest-result-v1.json",
+  "title": "Backtest Result",
+  "description": "JSON schema for directional backtesting output",
+  "type": "object",
+  "required": ["run_metadata", "metrics"],
+  "properties": {
+    "run_metadata": {
+      "type": "object",
+      "description": "Backtest execution metadata",
+      "required": [
+        "run_id",
+        "direction",
+        "parameters_hash",
+        "manifest_ref",
+        "start_time",
+        "end_time",
+        "total_candles_processed",
+        "reproducibility_hash"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "description": "Unique backtest run identifier",
+          "pattern": "^(long|short|both)_[0-9]{8}_[0-9]{6}$",
+          "examples": ["long_20251029_143052", "both_20251029_150000"]
+        },
+        "direction": {
+          "type": "string",
+          "description": "Trading direction mode",
+          "enum": ["LONG", "SHORT", "BOTH"]
+        },
+        "parameters_hash": {
+          "type": "string",
+          "description": "SHA-256 hash of strategy parameters",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "manifest_ref": {
+          "type": "string",
+          "description": "Reference to data manifest file",
+          "examples": ["price_data/eurusd/DAT_MT_EURUSD_M1_2020.csv"]
+        },
+        "start_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Backtest start timestamp (ISO 8601 UTC)",
+          "examples": ["2025-10-29T14:30:52Z"]
+        },
+        "end_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Backtest end timestamp (ISO 8601 UTC)",
+          "examples": ["2025-10-29T14:31:05Z"]
+        },
+        "total_candles_processed": {
+          "type": "integer",
+          "description": "Number of candles processed",
+          "minimum": 0,
+          "examples": [105120]
+        },
+        "reproducibility_hash": {
+          "type": "string",
+          "description": "Hash for determinism verification",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Performance metrics (directional breakdown)",
+      "required": ["combined"],
+      "properties": {
+        "combined": {
+          "$ref": "#/definitions/MetricsSummary",
+          "description": "Metrics for all trades aggregated"
+        },
+        "long_only": {
+          "oneOf": [
+            {"$ref": "#/definitions/MetricsSummary"},
+            {"type": "null"}
+          ],
+          "description": "Metrics for long trades only (null if direction=SHORT)"
+        },
+        "short_only": {
+          "oneOf": [
+            {"$ref": "#/definitions/MetricsSummary"},
+            {"type": "null"}
+          ],
+          "description": "Metrics for short trades only (null if direction=LONG)"
+        }
+      }
+    },
+    "signals": {
+      "type": "array",
+      "description": "Generated signals (dry-run mode only)",
+      "items": {
+        "$ref": "#/definitions/TradeSignal"
+      },
+      "default": []
+    },
+    "executions": {
+      "type": "array",
+      "description": "Completed executions (full backtest only)",
+      "items": {
+        "$ref": "#/definitions/TradeExecution"
+      },
+      "default": []
+    },
+    "conflicts": {
+      "type": "array",
+      "description": "Conflict events (BOTH mode only)",
+      "items": {
+        "$ref": "#/definitions/ConflictEvent"
+      },
+      "default": []
+    }
+  },
+  "definitions": {
+    "MetricsSummary": {
+      "type": "object",
+      "description": "Aggregated performance metrics",
+      "required": [
+        "trade_count",
+        "win_count",
+        "loss_count",
+        "win_rate",
+        "avg_win_r",
+        "avg_loss_r",
+        "avg_r",
+        "expectancy",
+        "sharpe_estimate",
+        "profit_factor",
+        "max_drawdown_r",
+        "latency_p95_ms",
+        "latency_mean_ms"
+      ],
+      "properties": {
+        "trade_count": {
+          "type": "integer",
+          "description": "Total number of trades",
+          "minimum": 0
+        },
+        "win_count": {
+          "type": "integer",
+          "description": "Number of winning trades",
+          "minimum": 0
+        },
+        "loss_count": {
+          "type": "integer",
+          "description": "Number of losing trades",
+          "minimum": 0
+        },
+        "win_rate": {
+          "oneOf": [
+            {"type": "number", "minimum": 0, "maximum": 100},
+            {"type": "null"}
+          ],
+          "description": "Percentage of winning trades (null if trade_count=0)"
+        },
+        "avg_win_r": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "null"}
+          ],
+          "description": "Average R-multiple for wins (null if no wins)"
+        },
+        "avg_loss_r": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "null"}
+          ],
+          "description": "Average R-multiple for losses (null if no losses)"
+        },
+        "avg_r": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "null"}
+          ],
+          "description": "Average R-multiple across all trades (null if trade_count=0)"
+        },
+        "expectancy": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "null"}
+          ],
+          "description": "Expected value per trade (null if trade_count=0)"
+        },
+        "sharpe_estimate": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "null"}
+          ],
+          "description": "Sharpe ratio estimate (null if insufficient data)"
+        },
+        "profit_factor": {
+          "oneOf": [
+            {"type": "number", "minimum": 0},
+            {"type": "null"}
+          ],
+          "description": "Gross profit / gross loss (null if no losses)"
+        },
+        "max_drawdown_r": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "null"}
+          ],
+          "description": "Maximum drawdown in R-multiples (null if trade_count=0)"
+        },
+        "latency_p95_ms": {
+          "oneOf": [
+            {"type": "number", "minimum": 0},
+            {"type": "null"}
+          ],
+          "description": "95th percentile execution latency in ms (null if trade_count=0)"
+        },
+        "latency_mean_ms": {
+          "oneOf": [
+            {"type": "number", "minimum": 0},
+            {"type": "null"}
+          ],
+          "description": "Mean execution latency in ms (null if trade_count=0)"
+        }
+      }
+    },
+    "TradeSignal": {
+      "type": "object",
+      "description": "Trade entry signal (dry-run mode)",
+      "required": [
+        "timestamp",
+        "pair",
+        "direction",
+        "entry_price",
+        "stop_price"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Signal timestamp (ISO 8601 UTC)"
+        },
+        "pair": {
+          "type": "string",
+          "description": "Currency pair",
+          "examples": ["EURUSD", "USDJPY"]
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["LONG", "SHORT"],
+          "description": "Trade direction"
+        },
+        "entry_price": {
+          "type": "number",
+          "description": "Intended entry price",
+          "exclusiveMinimum": 0
+        },
+        "stop_price": {
+          "type": "number",
+          "description": "Initial stop-loss price",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "TradeExecution": {
+      "type": "object",
+      "description": "Completed trade execution (full backtest)",
+      "required": [
+        "signal_id",
+        "entry_timestamp",
+        "entry_fill_price",
+        "exit_timestamp",
+        "exit_fill_price",
+        "exit_reason",
+        "pnl_r",
+        "duration_candles"
+      ],
+      "properties": {
+        "signal_id": {
+          "type": "string",
+          "description": "Reference to originating signal ID",
+          "pattern": "^[a-f0-9]{16}$"
+        },
+        "entry_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Actual entry timestamp (ISO 8601 UTC)"
+        },
+        "entry_fill_price": {
+          "type": "number",
+          "description": "Actual entry price (with slippage)",
+          "exclusiveMinimum": 0
+        },
+        "exit_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Actual exit timestamp (ISO 8601 UTC)"
+        },
+        "exit_fill_price": {
+          "type": "number",
+          "description": "Actual exit price (with slippage)",
+          "exclusiveMinimum": 0
+        },
+        "exit_reason": {
+          "type": "string",
+          "enum": ["TARGET", "STOP", "TIMEOUT"],
+          "description": "Exit reason"
+        },
+        "pnl_r": {
+          "type": "number",
+          "description": "Profit/loss in R-multiples"
+        },
+        "duration_candles": {
+          "type": "integer",
+          "description": "Trade duration in candles",
+          "minimum": 0
+        }
+      }
+    },
+    "ConflictEvent": {
+      "type": "object",
+      "description": "Signal conflict in BOTH mode",
+      "required": [
+        "timestamp",
+        "pair",
+        "resolution"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Conflict timestamp (ISO 8601 UTC)"
+        },
+        "pair": {
+          "type": "string",
+          "description": "Currency pair",
+          "examples": ["EURUSD", "USDJPY"]
+        },
+        "resolution": {
+          "type": "string",
+          "const": "REJECTED_BOTH",
+          "description": "Resolution action (always REJECTED_BOTH)"
+        }
+      }
+    }
+  }
+}

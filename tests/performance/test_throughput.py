@@ -28,7 +28,7 @@ from src.io.ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
 
 
-@pytest.fixture
+@pytest.fixture()
 def large_dataset_path() -> Path:
     """
     Create a large synthetic dataset for throughput testing.
@@ -313,7 +313,7 @@ def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
     assert elapsed_seconds < 60  # Should complete in under 1 minute
 
 
-@pytest.mark.slow
+@pytest.mark.slow()
 def test_memory_efficiency_during_ingestion(large_dataset_path: Path):
     """
     Verify that ingestion doesn't load entire dataset into memory.

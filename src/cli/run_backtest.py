@@ -3,122 +3,104 @@
 Unified backtest CLI with direction mode support and JSON output.
 
 This CLI supports running backtests in three modes:
-- LONG: Long-only signals (existing run_long_backtest.py functionality)
-- SHORT: Short-only signals (using generate_short_signals)
-- BOTH: Both long and short signals (future Phase 5 implementation)
+- LONG: Long-only signals (buy setups)
+- SHORT: Short-only signals (sell setups)
+- BOTH: Both long and short signals with conflict resolution
 
 Output Formats:
 - text: Human-readable console output (default)
 - json: Machine-readable JSON format for programmatic processing
 
-Phase 4 Status: Demonstrates CLI interface structure. Full BOTH mode
-implementation deferred to Phase 5 when dual-direction execution is needed.
+Multi-Strategy/Multi-Pair Support:
+- --strategy: Accepts multiple strategy names (future: will run each strategy)
+- --pair: Accepts multiple currency pairs (future: will run each pair)
+- Current: Uses first strategy/pair; future iterations will loop over all
 
 Usage:
+    # Basic LONG backtest
     python -m src.cli.run_backtest --direction LONG --data <csv_path>
-    python -m src.cli.run_backtest --direction SHORT --data <csv_path>
-    python -m src.cli.run_backtest --direction BOTH --data <csv_path>
-    python -m src.cli.run_backtest --direction LONG --data <csv_path> --output-format json
+
+    # With explicit strategy and pair
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
+        --strategy trend-pullback --pair EURUSD
+
+    # Multiple pairs (future support)
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
+        --pair EURUSD GBPUSD USDJPY
+
+    # JSON output
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
+        --output-format json
+
+    # Dry-run (signals only)
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
 import argparse
-import json
+import logging
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
-from ..models.core import BacktestRun, MetricsSummary
+import pandas as pd
+
+from ..backtest.orchestrator import BacktestOrchestrator
+from ..cli.logging_setup import setup_logging
+from ..config.parameters import StrategyParameters
+from ..io.formatters import (
+    format_json_output,
+    format_text_output,
+    generate_output_filename,
+)
+from ..io.ingestion import ingest_candles
+from ..models.enums import DirectionMode, OutputFormat
 
 
-def format_backtest_results_as_json(
-    run_metadata: BacktestRun,
-    metrics: MetricsSummary,
-    additional_context: dict[str, Any] = None,
-) -> str:
+logger = logging.getLogger(__name__)
+
+
+def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
     """
-    Format backtest results as JSON string.
+    Convert MetaTrader CSV format to expected format.
 
     Args:
-        run_metadata: BacktestRun metadata object.
-        metrics: MetricsSummary with performance statistics.
-        additional_context: Optional dict with extra fields to include.
+        csv_path: Path to MetaTrader CSV (Date,Time,O,H,L,C,V).
+        output_dir: Directory to save converted CSV.
 
     Returns:
-        JSON-formatted string with complete backtest results.
-
-    Examples:
-        >>> from datetime import datetime, timezone
-        >>> from models.core import BacktestRun, MetricsSummary
-        >>> import math
-        >>> run = BacktestRun(
-        ...     run_id="test_run",
-        ...     parameters_hash="abc123",
-        ...     manifest_ref="/data/test.csv",
-        ...     start_time=datetime(2025, 1, 1, tzinfo=timezone.utc),
-        ...     end_time=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
-        ...     total_candles_processed=1000,
-        ...     reproducibility_hash="xyz789"
-        ... )
-        >>> metrics = MetricsSummary(
-        ...     trade_count=10,
-        ...     win_count=6,
-        ...     loss_count=4,
-        ...     win_rate=0.6,
-        ...     avg_win_r=2.0,
-        ...     avg_loss_r=1.0,
-        ...     avg_r=0.8,
-        ...     expectancy=0.8,
-        ...     sharpe_estimate=1.2,
-        ...     profit_factor=3.0,
-        ...     max_drawdown_r=2.5,
-        ...     latency_p95_ms=math.nan,
-        ...     latency_mean_ms=math.nan
-        ... )
-        >>> json_output = format_backtest_results_as_json(run, metrics)
-        >>> "run_id" in json_output
-        True
+        Path to converted CSV file.
     """
-    # Convert dataclasses to dicts
-    result = {
-        "run_metadata": {
-            "run_id": run_metadata.run_id,
-            "parameters_hash": run_metadata.parameters_hash,
-            "manifest_ref": run_metadata.manifest_ref,
-            "start_time": run_metadata.start_time.isoformat(),
-            "end_time": run_metadata.end_time.isoformat(),
-            "total_candles_processed": run_metadata.total_candles_processed,
-            "reproducibility_hash": run_metadata.reproducibility_hash,
-        },
-        "metrics": {
-            "trade_count": metrics.trade_count,
-            "win_count": metrics.win_count,
-            "loss_count": metrics.loss_count,
-            "win_rate": metrics.win_rate,
-            "avg_win_r": metrics.avg_win_r,
-            "avg_loss_r": metrics.avg_loss_r,
-            "avg_r": metrics.avg_r,
-            "expectancy": metrics.expectancy,
-            "sharpe_estimate": metrics.sharpe_estimate,
-            "profit_factor": metrics.profit_factor,
-            "max_drawdown_r": metrics.max_drawdown_r,
-            "latency_p95_ms": metrics.latency_p95_ms,
-            "latency_mean_ms": metrics.latency_mean_ms,
-        },
-    }
+    logger.info("Converting MetaTrader CSV format")
 
-    if additional_context:
-        result["additional_context"] = additional_context
+    # Read CSV (MetaTrader format: Date,Time,Open,High,Low,Close,Volume)
+    df = pd.read_csv(
+        csv_path,
+        header=None,
+        names=["date", "time", "open", "high", "low", "close", "volume"],
+    )
 
-    return json.dumps(result, indent=2, default=str)
+    # Combine date and time into timestamp
+    df["timestamp_utc"] = pd.to_datetime(
+        df["date"] + " " + df["time"], format="%Y.%m.%d %H:%M"
+    )
+
+    # Select required columns
+    output_df = df[["timestamp_utc", "open", "high", "low", "close", "volume"]]
+
+    # Save converted file
+    converted_filename = f"converted_{csv_path.name}"
+    converted_path = output_dir / converted_filename
+    output_df.to_csv(converted_path, index=False)
+
+    logger.info("Converted CSV saved to %s", converted_path)
+    return converted_path
 
 
 def main():
     """
     Main entry point for unified backtest CLI.
 
-    Phase 4: Provides interface, delegates to existing implementations.
-    Phase 5: Will add full BOTH mode with dual-direction execution.
+    Supports LONG, SHORT, and BOTH direction modes with text/JSON output.
     """
     parser = argparse.ArgumentParser(
         description="Run trend-pullback backtest with configurable direction"
@@ -129,14 +111,32 @@ def main():
         type=str,
         choices=["LONG", "SHORT", "BOTH"],
         default="LONG",
-        help="Trading direction: LONG (buy only), SHORT (sell only), or BOTH (Phase 5)",
+        help="Trading direction: LONG (buy only), SHORT (sell only), or BOTH",
     )
 
     parser.add_argument(
         "--data",
         type=Path,
         required=True,
-        help="Path to CSV price data file",
+        help="Path to CSV price data file (MetaTrader format or standard format)",
+    )
+
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        nargs="+",
+        default=["trend-pullback"],
+        help="Strategy name(s) to run (default: trend-pullback). Supports multiple: \
+            --strategy strat1 strat2",
+    )
+
+    parser.add_argument(
+        "--pair",
+        type=str,
+        nargs="+",
+        default=["EURUSD"],
+        help="Currency pair(s) to backtest (default: EURUSD). Supports multiple: \
+            --pair EURUSD GBPUSD",
     )
 
     parser.add_argument(
@@ -165,7 +165,7 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Generate signals without execution (FR-024: signal-only mode)",
+        help="Generate signals without execution (signal-only mode)",
     )
 
     args = parser.parse_args()
@@ -175,127 +175,122 @@ def main():
         print(f"Error: Data file not found: {args.data}", file=sys.stderr)
         sys.exit(1)
 
-    # Determine output mode
-    is_json_output = args.output_format == "json"
-    is_dry_run = args.dry_run
+    # Setup logging
+    setup_logging(level=args.log_level)
+    logger.info("Starting directional backtest")
+    logger.info("Direction: %s", args.direction)
+    logger.info("Strategy: %s", ", ".join(args.strategy))
+    logger.info("Pair(s): %s", ", ".join(args.pair))
+    logger.info("Data: %s", args.data)
+    logger.info("Dry-run: %s", args.dry_run)
 
-    # Route to appropriate implementation
-    if args.direction == "LONG":
-        if is_dry_run:
-            print(f"DRY RUN MODE: Generating LONG signals from {args.data}")
-            print("Signals will be generated but NOT executed (FR-024)")
-            print("\nImplementation notes:")
-            print("- Load candles via ingestion.py")
-            print("- Generate signals via signal_generator.generate_long_signals()")
-            print("- Output signals without calling simulate_execution()")
-            print("- Useful for signal validation, parameter tuning, strategy debugging")
-            if is_json_output:
-                print("\nJSON output would include signal list with timestamps and parameters")
-            return 0
+    # Create output directory
+    args.output.mkdir(parents=True, exist_ok=True)
 
-        if is_json_output:
-            # Create sample JSON output structure (placeholder for real implementation)
-            run_metadata = BacktestRun(
-                run_id=f"long_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}",
-                parameters_hash="placeholder_hash",
-                manifest_ref=str(args.data),
-                start_time=datetime.now(UTC),
-                end_time=datetime.now(UTC),
-                total_candles_processed=0,
-                reproducibility_hash="placeholder_repro_hash",
-            )
-            # This would come from actual backtest execution
-            import math
+    # Convert MetaTrader CSV if needed
+    logger.info("Preprocessing CSV data")
+    converted_csv = preprocess_metatrader_csv(args.data, args.output)
 
-            metrics = MetricsSummary(
-                trade_count=0,
-                win_count=0,
-                loss_count=0,
-                win_rate=math.nan,
-                avg_win_r=math.nan,
-                avg_loss_r=math.nan,
-                avg_r=math.nan,
-                expectancy=math.nan,
-                sharpe_estimate=math.nan,
-                profit_factor=math.nan,
-                max_drawdown_r=math.nan,
-                latency_p95_ms=math.nan,
-                latency_mean_ms=math.nan,
-            )
-            json_output = format_backtest_results_as_json(
-                run_metadata,
-                metrics,
-                additional_context={"direction": "LONG", "status": "placeholder"},
-            )
-            print(json_output)
-        else:
-            print(f"Running LONG-only backtest on {args.data}")
-            print("Delegating to run_long_backtest.py...")
-            print("\nTo run: poetry run python -m src.cli.run_long_backtest \\")
-            print(f"          --data {args.data} --log-level {args.log_level}")
+    # Load strategy parameters (using defaults)
+    parameters = StrategyParameters()
+    logger.info(
+        "Using strategy parameters: EMA(%d/%d), ATR mult: %.1f",
+        parameters.ema_fast,
+        parameters.ema_slow,
+        parameters.atr_stop_mult,
+    )
 
-    elif args.direction == "SHORT":
-        if is_dry_run:
-            print(f"DRY RUN MODE: Generating SHORT signals from {args.data}")
-            print("Signals will be generated but NOT executed (FR-024)")
-            print("\nImplementation notes:")
-            print("- Load candles via ingestion.py")
-            print("- Generate signals via signal_generator.generate_short_signals()")
-            print("- Output signals without calling simulate_execution()")
-            if is_json_output:
-                print("\nJSON output would include signal list with timestamps and parameters")
-            return 0
+    # Ingest candles
+    logger.info("Ingesting candles from %s", converted_csv)
+    candles = list(
+        ingest_candles(
+            csv_path=converted_csv,
+            ema_fast=parameters.ema_fast,
+            ema_slow=parameters.ema_slow,
+            atr_period=parameters.atr_length,
+            rsi_period=parameters.rsi_length,
+            stoch_rsi_period=parameters.rsi_length,
+            expected_timeframe_minutes=1,
+            allow_gaps=True,
+        )
+    )
+    logger.info("Loaded %d candles", len(candles))
 
-        if is_json_output:
-            print(
-                json.dumps(
-                    {
-                        "error": "SHORT mode JSON output not yet implemented",
-                        "direction": "SHORT",
-                        "status": "Phase 4 interface defined",
-                    },
-                    indent=2,
-                )
-            )
-        else:
-            print(f"Running SHORT-only backtest on {args.data}")
-            print("\nSHORT mode implementation:")
-            print("- Uses generate_short_signals() from signal_generator.py")
-            print("- Executes with simulate_execution() (supports SHORT direction)")
-            print("- Same metrics aggregation as LONG mode")
-            print("\nFull implementation: Create run_short_backtest.py mirroring")
-            print("run_long_backtest.py but calling generate_short_signals()")
+    # Create orchestrator
+    direction_mode = DirectionMode[args.direction]
+    orchestrator = BacktestOrchestrator(
+        direction_mode=direction_mode, dry_run=args.dry_run
+    )
 
-    elif args.direction == "BOTH":
-        if is_dry_run:
-            print(f"DRY RUN MODE: Generating BOTH directions signals from {args.data}")
-            print("Signals will be generated but NOT executed (FR-024)")
-            print("\nImplementation notes:")
-            print("- Generate both LONG and SHORT signals")
-            print("- Output combined signal list without execution")
-            print("- Useful for comparing signal frequency between directions")
-            if is_json_output:
-                print("\nJSON output would include signal list with direction tags")
-            return 0
+    # Run backtest
+    # TODO: Future enhancement - loop over multiple pairs and strategies:
+    # for pair in args.pair:
+    #     for strategy in args.strategy:
+    #         result = run_strategy_on_pair(pair, strategy, candles)
+    # For now, use first pair/strategy from lists
+    pair = args.pair[0]
+    strategy = args.strategy[0]  # Currently only trend-pullback supported
 
-        if is_json_output:
-            print(
-                json.dumps(
-                    {
-                        "error": "BOTH mode not yet implemented",
-                        "direction": "BOTH",
-                        "status": "Phase 5 feature",
-                    },
-                    indent=2,
-                )
-            )
-        else:
-            print(f"Running BOTH directions backtest on {args.data}")
-            print("\nBOTH mode (Phase 5 feature):")
-            print("- Generates both LONG and SHORT signals")
-            print("- Requires conflict resolution (avoid simultaneous positions)")
-            print("- Enhanced metrics for combined performance")
-            print("\nStatus: Interface defined, full implementation in Phase 5")
+    run_id = f"{args.direction.lower()}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+    logger.info(
+        "Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy
+    )
+
+    # Build signal parameters from strategy config
+    signal_params = {
+        "ema_fast": parameters.ema_fast,
+        "ema_slow": parameters.ema_slow,
+        "atr_stop_mult": parameters.atr_stop_mult,
+        "target_r_mult": parameters.target_r_mult,
+        "cooldown_candles": parameters.cooldown_candles,
+        "rsi_length": parameters.rsi_length,
+    }
+
+    result = orchestrator.run_backtest(
+        candles=candles,
+        pair=pair,
+        run_id=run_id,
+        **signal_params,
+    )
+
+    logger.info("Backtest complete: %s", result.run_id)
+
+    # Format output
+    output_format = (
+        OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
+    )
+
+    if output_format == OutputFormat.JSON:
+        output_content = format_json_output(result)
+    else:
+        output_content = format_text_output(result)
+
+    # Generate output filename
+    output_filename = generate_output_filename(
+        direction=direction_mode,
+        output_format=output_format,
+        timestamp=result.start_time,
+    )
+    output_path = args.output / output_filename
+
+    # Write output file
+    output_path.write_text(output_content)
+    logger.info("Results written to %s", output_path)
+
+    # Print summary to console
+    if output_format == OutputFormat.TEXT:
+        print(output_content)
+    else:
+        print(f"Results saved to: {output_path}")
+        print(f"Direction: {result.direction_mode}")
+        print(f"Total candles: {result.total_candles}")
+        if result.metrics and hasattr(result.metrics, "combined"):
+            metrics = result.metrics.combined
+            print(f"Trades: {metrics.trade_count}")
+            print(f"Win rate: {metrics.win_rate:.2%}")
+        elif result.metrics:
+            print(f"Trades: {result.metrics.trade_count}")
+            print(f"Win rate: {result.metrics.win_rate:.2%}")
 
     return 0
 

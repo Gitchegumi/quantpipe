@@ -20,7 +20,7 @@ from src.strategy.trend_pullback.signal_generator import generate_short_signals
 class TestUS2ShortSignalIntegration:
     """Integration tests for US2 acceptance criteria."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def sample_short_data(self, tmp_path: Path) -> Path:
         """
         Create sample CSV price data for short signal testing.

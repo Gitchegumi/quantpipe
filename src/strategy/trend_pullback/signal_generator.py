@@ -16,6 +16,7 @@ from .pullback_detector import detect_pullback
 from .reversal import detect_reversal
 from .trend_classifier import classify_trend
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,7 +66,9 @@ def generate_long_signals(
         raise ValueError("Candles sequence cannot be empty")
 
     if len(candles) < 50:
-        logger.debug("Insufficient candles for signal generation: %d < 50", len(candles))
+        logger.debug(
+            "Insufficient candles for signal generation: %d < 50", len(candles)
+        )
         return []
 
     # Compute parameters hash if not provided
@@ -217,7 +220,9 @@ def generate_short_signals(
         raise ValueError("Candles sequence cannot be empty")
 
     if len(candles) < 50:
-        logger.debug("Insufficient candles for signal generation: %d < 50", len(candles))
+        logger.debug(
+            "Insufficient candles for signal generation: %d < 50", len(candles)
+        )
         return []
 
     # Compute parameters hash if not provided

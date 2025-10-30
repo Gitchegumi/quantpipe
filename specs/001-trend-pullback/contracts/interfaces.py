@@ -232,9 +232,7 @@ class PullbackDetector(Protocol):
     extremes to identify potential reversal opportunities.
     """
 
-    def update(
-        self, candle: Candle, trend: TrendState
-    ) -> Optional[PullbackState]:
+    def update(self, candle: Candle, trend: TrendState) -> Optional[PullbackState]:
         """Assess for new or ongoing pullback context.
 
         Args:
@@ -435,6 +433,7 @@ class ExecutionSimulationError(Exception):
     Examples include invalid state transitions, missing required candle data,
     or logical inconsistencies in trade lifecycle management.
     """
+
 
 __all__ = [
     "Candle",

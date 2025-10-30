@@ -19,6 +19,7 @@ from ..config.parameters import StrategyParameters
 from ..io.ingestion import ingest_candles
 from ..strategy.trend_pullback.signal_generator import generate_long_signals
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +34,13 @@ def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
     Returns:
         Path to converted CSV file.
     """
+    # Check if CSV is already in converted format (has timestamp_utc header)
+    with open(csv_path, encoding="utf-8") as f:
+        first_line = f.readline().strip()
+        if "timestamp_utc" in first_line.lower():
+            logger.info("CSV already in converted format, using as-is")
+            return csv_path
+
     logger.info("Converting MetaTrader CSV format")
 
     # Read CSV (MetaTrader format: Date,Time,Open,High,Low,Close,Volume)
@@ -171,6 +179,7 @@ def run_simple_backtest(
     logger.info("Backtest complete: %d signals generated", signals_generated)
 
     return {
+        "strategy_name": "trend_pullback_long_only",
         "signals_generated": signals_generated,
         "trade_count": summary.trade_count,
         "win_rate": summary.win_rate,
@@ -178,6 +187,7 @@ def run_simple_backtest(
         "avg_r": summary.avg_r,
         "sharpe_estimate": summary.sharpe_estimate,
         "profit_factor": summary.profit_factor,
+        "max_drawdown_r": summary.max_drawdown_r,
     }
 
 

@@ -17,6 +17,7 @@ import numpy as np
 
 from ...models.core import Candle
 
+
 logger = logging.getLogger(__name__)
 
 

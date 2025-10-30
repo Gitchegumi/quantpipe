@@ -21,6 +21,7 @@ from rich.table import Table
 
 from ..models.core import BacktestRun, MetricsSummary
 
+
 logger = logging.getLogger(__name__)
 console = Console()
 
