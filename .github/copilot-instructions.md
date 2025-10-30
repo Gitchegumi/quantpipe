@@ -1,6 +1,6 @@
 ﻿# trading-strategies Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-10-29
+Auto-generated from all feature plans. Last updated: 2025-10-30
 
 ## Active Technologies
 - Python 3.11 + numpy, pandas, pydantic, rich (existing); no new dependencies required (002-directional-backtesting)
@@ -13,6 +13,7 @@ Auto-generated from all feature plans. Last updated: 2025-10-29
 - Black (≥23.10.0) - code formatter
 - Ruff (≥0.1.0) - fast Python linter
 - Pylint (≥3.3.0) - comprehensive linter
+- Markdownlint (markdownlint-cli2) - Markdown linter
 
 ## Project Structure
 
@@ -36,6 +37,7 @@ poetry run pytest
 poetry run black src/ tests/
 poetry run ruff check src/ tests/
 poetry run pylint src/ --score=yes
+markdownlint-cli2 "**/*.md" "!poetry.lock"
 ```
 
 ## Dependency Management
@@ -48,6 +50,7 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - Black: Format all code (88 char lines)
 - Ruff: Zero errors required
 - Pylint: Minimum 8.0/10 score
+- Markdownlint: Validate all Markdown files (*.md)
 
 **Logging Standards:**
 - MUST use lazy % formatting: `logger.info("Processing %d items", count)`
@@ -64,6 +67,7 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - 003-update-001-tests: Added Python 3.11 + pytest (for tests), numpy, pandas (used in indicator calculations), pydantic (configs), rich/logging (structured output), Black/Ruff/Pylint (quality gates)
 - 002-directional-backtesting: Added Python 3.11 + numpy, pandas, pydantic, rich (existing); no new dependencies required
 
+- 2025-10-30: Constitution v1.5.0 - Added Markdownlint to Principle X (Code Quality Automation), formalized Markdown linting requirements
 - 2025-10-29: Constitution v1.4.0 - Added Principle X (Code Quality Automation), formalized Black/Ruff/Pylint requirements, mandatory lazy logging
 
 <!-- MANUAL ADDITIONS START -->
