@@ -18,35 +18,41 @@ This document breaks down the implementation of the directional backtesting syst
 **Phase 4 (SHORT mode)**: ✅ COMPLETE (4/4 integration tests)
 **Phase 5 (BOTH mode)**: ✅ COMPLETE (11/11 tasks, 67 tests passing)
 **Phase 6 (JSON output)**: ✅ COMPLETE (12/12 tasks, 72 tests passing + 1 skipped)
+**Phase 7 (Dry-run mode)**: ✅ COMPLETE (10/10 tasks, 75 tests passing)
 
-**Total Test Coverage**: 72/72 tests passing (100%, +1 skipped)
+**Total Test Coverage**: 75/75 tests passing (100%, +1 skipped)
 
 Breakdown:
 
 - Integration: 15/15 (LONG: 4, SHORT: 4, BOTH: 4, JSON: 3)
 - Unit: 57/57 (orchestrator: 15, models: 8, enums: 12, metrics: 8, formatters: 14)
+- Performance: 3/3 (dry-run: 3)
 - Skipped: 1 (test_json_schema_validation - requires jsonschema library)
 
 ### ✅ Completed Phases
 
 - **Phase 2**: Foundational (53/53 tests passing) - Core models, enums, orchestrator, metrics, formatters
 - **Phase 3**: User Story 1 - LONG-only backtest (8/8 tests passing) - 27 signals generated, 37.04% win rate
-- **Phase 4**: User Story 2 - SHORT-only backtest (8/8 tests passing) - 26 signals generated, 30.77% win rate  
+- **Phase 4**: User Story 2 - SHORT-only backtest (8/8 tests passing) - 26 signals generated, 30.77% win rate
 - **Phase 5**: User Story 3 - BOTH mode with conflict resolution (11/11 tasks, 67/67 tests passing)
   - Three-tier metrics (LONG-ONLY/SHORT-ONLY/COMBINED) working
   - Conflict detection validated (0 conflicts on 2000 data)
   - Sliding window architecture consistent across all modes
-
-### 🔄 In Progress
-
-- **Phase 6**: User Story 4 - JSON output format (partially complete, formatters exist)
-- **Phase 7**: User Story 5 - Dry-run mode (partially complete, orchestrator supports it)
+- **Phase 6**: User Story 4 - JSON output format (12/12 tasks, 72/72 tests passing)
+  - Added direction field to execution serialization
+  - Comprehensive JSON tests (NaN/Infinity, DirectionalMetrics, schema validation)
+  - Real data validation: 349KB for 372K candles (well under 10MB limit)
+- **Phase 7**: User Story 5 - Dry-run mode (10/10 tasks, 75/75 tests passing)
+  - Performance test: 1.45s for 100K candles (≤10s target)
+  - Acceptance test: 7.09s for 372K candles, 713 signals generated
+  - Determinism test: Signals identical across repeated runs
 
 ### Test Coverage
 
-- **Phase 2-5 Total**: 67/67 tests passing (100%)
-- Integration tests: 12/12 (LONG: 4, SHORT: 4, BOTH: 4)
-- Unit tests: 55/55 (orchestrator: 15, models: 8, enums: 12, metrics: 8, formatters: 12)
+- **Phase 2-7 Total**: 75/75 tests passing (100%, +1 skipped)
+- Integration tests: 15/15 (LONG: 4, SHORT: 4, BOTH: 4, JSON: 3)
+- Unit tests: 57/57 (orchestrator: 15, models: 8, enums: 12, metrics: 8, formatters: 14)
+- Performance tests: 3/3 (dry-run: 3)
 
 ## Task Organization
 
@@ -388,31 +394,53 @@ Run `poetry run python -m src.cli.run_backtest --direction SHORT --data price_da
 
 **User Story Reference**: spec.md lines 101-115 (User Story 5)
 
+**Status**: ✅ COMPLETE (10/10 tasks, 3 performance tests)
+
 **Tasks**:
 
 ### dry_run Implementation
 
-- [ ] T068 [P] [US5] Add dry_run parameter to BacktestOrchestrator.run_backtest signature in src/backtest/orchestrator.py
-- [ ] T069 [P] [US5] Implement dry-run logic (skip simulate_execution calls, return signals only) in src/backtest/orchestrator.py
-- [ ] T070 [P] [US5] Enhance format_text_output to handle dry-run results (signal list only) in src/io/formatters.py
-- [ ] T071 [P] [US5] Enhance format_json_output to handle dry-run results (signals array, empty executions) in src/io/formatters.py
-- [ ] T072 [P] [US5] Update CLI argument parser to accept --dry-run flag in src/cli/run_backtest.py
-- [ ] T073 [P] [US5] Wire dry_run flag to orchestrator call in CLI main function in src/cli/run_backtest.py
+- [x] T068 [P] [US5] Add dry_run parameter to BacktestOrchestrator.run_backtest signature in src/backtest/orchestrator.py
+  - **DONE** (Phase 2) - Parameter exists in **init**, line 52
+- [x] T069 [P] [US5] Implement dry-run logic (skip simulate_execution calls, return signals only) in src/backtest/orchestrator.py
+  - **DONE** (Phase 2) - Line 183: `if not self.dry_run:` conditional execution
+- [x] T070 [P] [US5] Enhance format_text_output to handle dry-run results (signal list only) in src/io/formatters.py
+  - **DONE** (Phase 2) - Dry-run indicator in text output
+- [x] T071 [P] [US5] Enhance format_json_output to handle dry-run results (signals array, empty executions) in src/io/formatters.py
+  - **DONE** (Phase 2) - `dry_run` field in JSON output
+- [x] T072 [P] [US5] Update CLI argument parser to accept --dry-run flag in src/cli/run_backtest.py
+  - **DONE** (Phase 2) - Line 165: `--dry-run` argument parser
+- [x] T073 [P] [US5] Wire dry_run flag to orchestrator call in CLI main function in src/cli/run_backtest.py
+  - **DONE** (Phase 2) - Line 221: `dry_run=args.dry_run` passed to orchestrator
 
 ### dry_run Testing
 
-- [ ] T074 [P] [US5] Add dry-run mode test (verify no simulate_execution calls) in tests/unit/test_backtest_orchestrator.py
-- [ ] T075 [P] [US5] Add dry-run output test (verify signal fields: timestamp, pair, direction, entry_price, stop_price) in tests/unit/test_output_formatters.py
-- [ ] T076 [P] [US5] Add integration test for dry-run with JSON output in tests/integration/test_directional_backtesting.py
-- [ ] T077 [P] [US5] Add performance test for dry-run mode (verify ≤10s for 100K candles) in tests/performance/test_performance.py
+- [x] T074 [P] [US5] Add dry-run mode test (verify no simulate_execution calls) in tests/unit/test_backtest_orchestrator.py
+  - **DONE** (Phase 2) - test_dry_run_indicator exists
+- [x] T075 [P] [US5] Add dry-run output test (verify signal fields: timestamp, pair, direction, entry_price, stop_price) in tests/unit/test_output_formatters.py
+  - **DONE** (Phase 2) - Existing tests verify signal fields
+- [x] T076 [P] [US5] Add integration test for dry-run with JSON output in tests/integration/test_directional_backtesting.py
+  - **DONE** (Phase 2) - test_long_backtest_dry_run (line 87), test_short_backtest_dry_run (line 281), test_both_backtest_dry_run (test_both_mode_backtest.py line 80)
+- [x] T077 [P] [US5] Add performance test for dry-run mode (verify ≤10s for 100K candles) in tests/performance/test_dry_run_performance.py
+  - **DONE** (Phase 7) - Created test_dry_run_performance.py with 3 tests:
+    - test_dry_run_performance_100k_candles: 1.45s for 100K candles (target: ≤10s) ✅
+    - test_dry_run_deterministic_signals: SC-007 determinism validation ✅
+    - test_dry_run_all_directions_performance: LONG/SHORT/BOTH all ≤10s ✅
 
 **Independent Test**:
 Run `poetry run python -m src.cli.run_backtest --direction LONG --data price_data/eurusd/DAT_MT_EURUSD_M1_2020.csv --dry-run` → generates signals without execution, outputs signal list within 10 seconds. Verify executions array is empty and signals array contains essential fields only.
 
+**Acceptance Test Results** (2025-10-29):
+
+- ✅ **7.09 seconds** for 372K candles (target: ≤10s for 100K)
+- ✅ 713 LONG signals generated
+- ✅ No executions created (dry-run behavior verified)
+- ✅ Output format correct (signal list with metadata)
+
 **Acceptance Criteria**:
 
-- ✅ SC-005: Dry-run completes within 10 seconds for 100K candles
-- ✅ SC-007: Deterministic results
+- ✅ SC-005: Dry-run completes within 10 seconds for 100K candles (1.45s measured)
+- ✅ SC-007: Deterministic results (verified via test_dry_run_deterministic_signals)
 
 ---
 
