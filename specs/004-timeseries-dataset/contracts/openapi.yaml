@@ -1,0 +1,179 @@
+openapi: 3.1.2
+info:
+  title: Dataset Build & Backtest Integration API (Internal)
+  version: 0.1.0
+  description: Internal service endpoints for triggering dataset build and querying metadata.
+servers:
+  - url: http://localhost/internal
+paths:
+  /dataset/build:
+    post:
+      summary: Trigger dataset build for all symbols or a subset.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional subset of symbols to process; if omitted all discovered symbols.
+                forceRebuild:
+                  type: boolean
+                  default: false
+                  description: If true, reprocess even if processed output exists.
+      responses:
+        '202':
+          description: Build accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildAccepted'
+  /dataset/summary:
+    get:
+      summary: Retrieve latest build summary.
+      responses:
+        '200':
+          description: Summary returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildSummary'
+  /dataset/{symbol}/metadata:
+    get:
+      summary: Retrieve metadata for a symbol.
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metadata returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataRecord'
+        '404':
+          description: Not found
+  /backtest/run:
+    post:
+      summary: Execute backtest using processed partitions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+              properties:
+                symbol:
+                  type: string
+                strategyConfig:
+                  type: object
+                  description: Strategy parameters (opaque to this API).
+                partitionMode:
+                  type: string
+                  enum: [split]
+                  description: Mode must be 'split' for test/validation pattern.
+      responses:
+        '200':
+          description: Backtest completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestResult'
+        '400':
+          description: Invalid request or missing processed data
+components:
+  schemas:
+    BuildAccepted:
+      type: object
+      properties:
+        buildId:
+          type: string
+        acceptedAt:
+          type: string
+          format: date-time
+    SkippedSymbol:
+      type: object
+      properties:
+        symbol:
+          type: string
+        reason:
+          type: string
+        details:
+          type: string
+    MetadataRecord:
+      type: object
+      properties:
+        symbol:
+          type: string
+        total_rows:
+          type: integer
+        test_rows:
+          type: integer
+        validation_rows:
+          type: integer
+        start_timestamp:
+          type: string
+          format: date-time
+        end_timestamp:
+          type: string
+          format: date-time
+        validation_start_timestamp:
+          type: string
+          format: date-time
+        gap_count:
+          type: integer
+        overlap_count:
+          type: integer
+        canonical_timezone:
+          type: string
+        build_timestamp:
+          type: string
+          format: date-time
+        schema_version:
+          type: string
+    BuildSummary:
+      type: object
+      properties:
+        build_timestamp:
+          type: string
+          format: date-time
+        symbols_processed:
+          type: array
+          items:
+            type: string
+        symbols_skipped:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedSymbol'
+        total_rows_processed:
+          type: integer
+        total_test_rows:
+          type: integer
+        total_validation_rows:
+          type: integer
+        duration_seconds:
+          type: number
+    BacktestResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        test_metrics:
+          type: object
+        validation_metrics:
+          type: object
+        run_timestamp:
+          type: string
+          format: date-time
+        partition_mode:
+          type: string
+          enum: [split]
