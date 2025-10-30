@@ -26,3 +26,30 @@ fixtures:
     indicators_covered: [ATR14]
     created: 2025-10-30T00:00:00Z
     notes: "Single large spike candle then stabilization"
+  - id: sample_long_v1
+    filename: sample_candles_long.csv
+    scenario_type: uptrend
+    row_count: 40
+    checksum: ""
+    seed: deterministic
+    indicators_covered: [EMA20, EMA50, ATR14, RSI14]
+    created: 2025-10-30T00:00:00Z
+    notes: "Upward trending candles for long signal testing with volume column"
+  - id: sample_short_v1
+    filename: sample_candles_short.csv
+    scenario_type: downtrend
+    row_count: 40
+    checksum: ""
+    seed: deterministic
+    indicators_covered: [EMA20, EMA50, ATR14, RSI14]
+    created: 2025-10-30T00:00:00Z
+    notes: "Downward trending candles for short signal testing with volume column"
+  - id: sample_empty_v1
+    filename: sample_candles_empty.csv
+    scenario_type: flat
+    row_count: 40
+    checksum: ""
+    seed: deterministic
+    indicators_covered: []
+    created: 2025-10-30T00:00:00Z
+    notes: "Flat-ranging candles (renamed from 'empty' - actually contains data)"
