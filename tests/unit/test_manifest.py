@@ -1,3 +1,4 @@
+pytestmark = pytest.mark.unit
 """
 Unit tests for manifest loading and validation.
 

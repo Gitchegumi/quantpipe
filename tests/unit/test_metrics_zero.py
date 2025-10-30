@@ -1,3 +1,7 @@
+import pytest
+
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for metrics aggregation with zero-trade scenario.
 
@@ -7,7 +11,6 @@ Tests metrics computation with empty execution list and edge cases.
 from datetime import UTC, datetime
 
 import numpy as np
-import pytest
 
 from src.backtest.metrics import (
     compute_metrics,
@@ -33,8 +36,8 @@ class TestComputeMetricsZeroTrade:
         assert np.isnan(metrics.avg_win_r)
         assert np.isnan(metrics.avg_loss_r)
         assert np.isnan(metrics.avg_r)
-        assert np.isnan(metrics.expectancy_r)
-        assert np.isnan(metrics.sharpe_ratio)
+        assert np.isnan(metrics.expectancy)
+        assert np.isnan(metrics.sharpe_estimate)
         assert np.isnan(metrics.profit_factor)
         assert np.isnan(metrics.max_drawdown_r)
 
@@ -44,14 +47,15 @@ class TestComputeMetricsZeroTrade:
             TradeExecution(
                 signal_id="sig1",
                 open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, 1, 18, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.10400,
+                exit_fill_price=1.10400,
                 exit_reason="TARGET",
                 pnl_r=2.0,
-                slippage_pips=0.5,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.5,
+                slippage_exit_pips=0.2,
+                costs_total=1.0,
+                direction="LONG",
             )
         ]
 
@@ -72,14 +76,15 @@ class TestComputeMetricsZeroTrade:
             TradeExecution(
                 signal_id="sig1",
                 open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.09800,
-                exit_reason="STOP",
+                exit_fill_price=1.09800,
+                exit_reason="STOP_LOSS",
                 pnl_r=-1.0,
-                slippage_pips=0.3,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.3,
+                slippage_exit_pips=0.2,
+                costs_total=1.0,
+                direction="LONG",
             )
         ]
 
@@ -100,14 +105,15 @@ class TestComputeMetricsZeroTrade:
             TradeExecution(
                 signal_id=f"sig{i}",
                 open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, 1, 14, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.10000,  # Breakeven
-                exit_reason="STOP",
+                exit_fill_price=1.10000,  # Breakeven
+                exit_reason="STOP_LOSS",
                 pnl_r=0.0,
-                slippage_pips=0.0,
-                execution_costs_pct=0.0,
+                slippage_entry_pips=0.0,
+                slippage_exit_pips=0.0,
+                costs_total=0.0,
+                direction="LONG",
             )
             for i in range(5)
         ]
@@ -119,7 +125,7 @@ class TestComputeMetricsZeroTrade:
         assert metrics.loss_count == 0
         assert metrics.win_rate == pytest.approx(0.0)
         assert metrics.avg_r == pytest.approx(0.0)
-        assert metrics.expectancy_r == pytest.approx(0.0)
+        assert metrics.expectancy == pytest.approx(0.0)
 
 
 class TestComputeRollingDrawdown:
@@ -216,14 +222,15 @@ class TestComputeMetricsEdgeCases:
             TradeExecution(
                 signal_id=f"sig{i}",
                 open_timestamp=datetime(2025, 1, i, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, i, 18, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.10400,
+                exit_fill_price=1.10400,
                 exit_reason="TARGET",
                 pnl_r=2.0,  # Consistent wins
-                slippage_pips=0.5,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.5,
+                slippage_exit_pips=0.2,
+                costs_total=1.0,
+                direction="LONG",
             )
             for i in range(1, 11)
         ]
@@ -231,7 +238,7 @@ class TestComputeMetricsEdgeCases:
         metrics = compute_metrics(executions)
 
         # With zero variance, Sharpe will be inf or undefined
-        assert metrics.sharpe_ratio == np.inf or np.isnan(metrics.sharpe_ratio)
+        assert metrics.sharpe_estimate == np.inf or np.isnan(metrics.sharpe_estimate)
 
     def test_negative_expectancy(self):
         """Test metrics with negative expectancy."""
@@ -239,21 +246,22 @@ class TestComputeMetricsEdgeCases:
             TradeExecution(
                 signal_id=f"sig{i}",
                 open_timestamp=datetime(2025, 1, i, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, i, 14, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.09800,
-                exit_reason="STOP",
+                exit_fill_price=1.09800,
+                exit_reason="STOP_LOSS",
                 pnl_r=-1.0,  # All losses
-                slippage_pips=0.3,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.3,
+                slippage_exit_pips=0.2,
+                costs_total=1.0,
+                direction="LONG",
             )
             for i in range(1, 11)
         ]
 
         metrics = compute_metrics(executions)
 
-        assert metrics.expectancy_r < 0
+        assert metrics.expectancy < 0
         assert metrics.win_rate == pytest.approx(0.0)
         assert metrics.profit_factor == pytest.approx(0.0)
 
@@ -264,38 +272,41 @@ class TestComputeMetricsEdgeCases:
             TradeExecution(
                 signal_id="sig1",
                 open_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, 1, 18, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.10400,
+                exit_fill_price=1.10400,
                 exit_reason="TARGET",
                 pnl_r=2.0,
-                slippage_pips=0.5,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.5,
+                slippage_exit_pips=0.2,
+                costs_total=1.0,
+                direction="LONG",
             ),
             TradeExecution(
                 signal_id="sig2",
                 open_timestamp=datetime(2025, 1, 2, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, 2, 14, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.09800,
-                exit_reason="STOP",
+                exit_fill_price=1.09800,
+                exit_reason="STOP_LOSS",
                 pnl_r=-1.0,
-                slippage_pips=0.3,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.3,
+                slippage_exit_pips=0.2,
+                costs_total=1.0,
+                direction="LONG",
             ),
             TradeExecution(
                 signal_id="sig3",
                 open_timestamp=datetime(2025, 1, 3, 12, 0, tzinfo=UTC),
+                entry_fill_price=1.10000,
                 close_timestamp=datetime(2025, 1, 3, 14, 0, tzinfo=UTC),
-                fill_entry_price=1.10000,
-                fill_stop_price=1.09800,
-                fill_exit_price=1.09800,
-                exit_reason="STOP",
+                exit_fill_price=1.09800,
+                exit_reason="STOP_LOSS",
                 pnl_r=-1.0,
-                slippage_pips=0.3,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.3,
+                slippage_exit_pips=0.2,
+                costs_total=1.0,
+                direction="LONG",
             ),
         ]
 

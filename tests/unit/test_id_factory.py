@@ -1,3 +1,7 @@
+import pytest
+
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for deterministic signal ID generation.
 

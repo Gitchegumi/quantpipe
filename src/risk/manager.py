@@ -57,8 +57,7 @@ def calculate_position_size(
         ...     pair="EURUSD",
         ...     direction="LONG",
         ...     entry_price=1.10000,
-        ...     stop_loss_price=1.09800,  # 20 pips
-        ...     take_profit_price=1.10400,
+        ...     initial_stop_price=1.09800,  # 20 pips
         ...     risk_per_trade_pct=0.25,
         ...     calc_position_size=0.0,
         ...     tags=[],
@@ -81,7 +80,7 @@ def calculate_position_size(
     risk_amount = account_balance * (risk_per_trade_pct / 100.0)
 
     # Calculate stop distance in pips
-    price_difference = abs(signal.entry_price - signal.stop_loss_price)
+    price_difference = abs(signal.entry_price - signal.initial_stop_price)
     stop_distance_pips = price_difference * 10000  # Forex pips conversion
 
     if stop_distance_pips == 0:
@@ -203,7 +202,7 @@ def calculate_take_profit(
 
 def validate_risk_limits(
     position_size: float,
-    account_balance: float,
+    _account_balance: float,
     max_drawdown_pct: float = 10.0,
     current_drawdown_pct: float = 0.0,
 ) -> bool:

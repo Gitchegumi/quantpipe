@@ -8,6 +8,9 @@ and handling of insufficient data periods.
 import numpy as np
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from src.indicators.basic import atr, ema, rsi, validate_indicator_inputs
 
 

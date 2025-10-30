@@ -1,3 +1,4 @@
+pytestmark = pytest.mark.integration
 """
 Integration test for US1: Long Signal Generation acceptance criteria.
 

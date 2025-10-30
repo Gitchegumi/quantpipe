@@ -1,3 +1,4 @@
+pytestmark = pytest.mark.integration
 """
 Integration test for US2: Short Signal Generation acceptance criteria.
 

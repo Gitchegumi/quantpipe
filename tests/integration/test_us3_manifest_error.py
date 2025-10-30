@@ -1,3 +1,4 @@
+pytestmark = pytest.mark.integration
 """
 Integration tests for manifest error handling (US3).
 

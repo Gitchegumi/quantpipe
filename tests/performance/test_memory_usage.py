@@ -1,6 +1,10 @@
-"""
-Performance memory usage tests for backtest execution.
+"""Performance memory usage tests for backtest execution."""
 
+import pytest
+
+
+pytestmark = pytest.mark.performance
+"""
 This module measures and validates memory consumption to ensure the system
 can handle large datasets without excessive memory usage. Tests monitor:
 
@@ -19,8 +23,6 @@ import tempfile
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-
-import pytest
 
 from src.backtest.metrics import compute_metrics
 from src.io.ingestion import ingest_candles
@@ -198,14 +200,15 @@ def test_execution_list_memory_growth():
         execution = TradeExecution(
             signal_id=f"signal_{i:06d}",
             open_timestamp=base_time + timedelta(hours=i),
+            entry_fill_price=1.1000 + (i * 0.00001),
             close_timestamp=base_time + timedelta(hours=i, minutes=30),
-            fill_entry_price=1.1000 + (i * 0.00001),
-            fill_stop_price=1.0950 + (i * 0.00001),
-            fill_exit_price=1.1050 + (i * 0.00001),
+            exit_fill_price=1.1050 + (i * 0.00001),
             exit_reason="TARGET",
             pnl_r=1.5,
-            slippage_pips=0.3,
-            execution_costs_pct=0.001,
+            slippage_entry_pips=0.2,
+            slippage_exit_pips=0.1,
+            costs_total=1.0,
+            direction="LONG",
         )
         executions.append(execution)
 
@@ -248,14 +251,15 @@ def test_metrics_computation_memory_spike():
         execution = TradeExecution(
             signal_id=f"sig_{i}",
             open_timestamp=base_time + timedelta(hours=i),
+            entry_fill_price=1.1000,
             close_timestamp=base_time + timedelta(hours=i, minutes=30),
-            fill_entry_price=1.1000,
-            fill_stop_price=1.0950,
-            fill_exit_price=1.1050,
-            exit_reason="TARGET" if pnl_r > 0 else "STOP",
+            exit_fill_price=1.1050,
+            exit_reason="TARGET" if pnl_r > 0 else "STOP_LOSS",
             pnl_r=pnl_r,
-            slippage_pips=0.3,
-            execution_costs_pct=0.001,
+            slippage_entry_pips=0.2,
+            slippage_exit_pips=0.1,
+            costs_total=1.0,
+            direction="LONG" if pnl_r > 0 else "SHORT",
         )
         executions.append(execution)
 
@@ -352,14 +356,15 @@ def test_garbage_collection_effectiveness():
             execution = TradeExecution(
                 signal_id=f"temp_{i}",
                 open_timestamp=base_time + timedelta(hours=i),
+                entry_fill_price=1.1000,
                 close_timestamp=base_time + timedelta(hours=i, minutes=30),
-                fill_entry_price=1.1000,
-                fill_stop_price=1.0950,
-                fill_exit_price=1.1050,
+                exit_fill_price=1.1050,
                 exit_reason="TARGET",
                 pnl_r=1.5,
-                slippage_pips=0.3,
-                execution_costs_pct=0.001,
+                slippage_entry_pips=0.2,
+                slippage_exit_pips=0.1,
+                costs_total=1.0,
+                direction="LONG",
             )
             temp_list.append(execution)
         return temp_list

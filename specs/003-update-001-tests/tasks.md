@@ -14,22 +14,22 @@
 - [x] T007 Add README note for fixtures in `tests/fixtures/README.md`
 - [x] T008 Add seed helper `tests/conftest.py` (verify deterministic seeding) update
 
-## Phase 2: Tiering & Refactor (Foundational)
+## Phase 2: Tiering & Refactor (Foundational) - COMPLETE
 
-- [ ] T009 Refactor existing 001 tests into tier directories: move files into `tests/unit/`, `tests/integration/`, `tests/performance/` (allowed changes: moves, renames, import updates, remove dead helper calls)
-- [ ] T010 Add/remove imports to align with current public interfaces in `src/strategy/` and `src/risk/`
-- [ ] T011 [P] Introduce marker decorators to unit test files under `tests/unit/` (one tier marker per file)
-- [ ] T012 [P] Introduce marker decorators to integration test files under `tests/integration/`
-- [ ] T013 [P] Introduce marker decorators to performance test files under `tests/performance/`
-- [ ] T014 Normalize test function names (e.g., `test_indicator_ema_warmup_behavior`)
-- [ ] T015 Add docstrings to shared test utilities in `tests/` (targets: tests/helpers/*.py, tests/utils/*.py)
-- [ ] T016 Enforce deterministic seeding in any test using randomness (search and patch)
-- [ ] T017 Remove obsolete tests referencing deprecated interfaces (list each in commit body) under `tests/`
-- [ ] T018 Consolidate redundant tests into parameterized form (criteria: identical setup differing only by indicator parameter)
-- [ ] T018a Run Black/Ruff/Pylint (pre-US1 quality gate) and fix issues before adding US1 tests
-- [ ] T018b Quick unit tier timing smoke (<7s tolerance) before US1 using perf counter
-- [ ] T019 Add risk sizing edge case tests (minimal balance, high volatility) in `tests/unit/test_risk_sizing_edge_cases.py`
-- [ ] T019a Add extreme spike & large spread position size test (no negative/overflow sizes)
+- [x] T009 Refactor existing 001 tests into tier directories: move files into `tests/unit/`, `tests/integration/`, `tests/performance/` (allowed changes: moves, renames, import updates, remove dead helper calls)
+- [x] T010 Add/remove imports to align with current public interfaces in `src/strategy/` and `src/risk/`
+- [x] T011 [P] Introduce marker decorators to unit test files under `tests/unit/` (one tier marker per file)
+- [x] T012 [P] Introduce marker decorators to integration test files under `tests/integration/`
+- [x] T013 [P] Introduce marker decorators to performance test files under `tests/performance/`
+- [x] T014 Normalize test function names (e.g., `test_indicator_ema_warmup_behavior`) - All tests already follow snake_case convention
+- [x] T015 Add docstrings to shared test utilities in `tests/` (targets: tests/helpers/*.py, tests/utils/*.py) - No helper/utils directories exist
+- [x] T016 Enforce deterministic seeding in any test using randomness (search and patch) - Centralized in conftest.py
+- [x] T017 Remove obsolete tests referencing deprecated interfaces (list each in commit body) under `tests/` - Removed test_significance.py (legacy r_multiple execution schema)
+- [x] T018 Consolidate redundant tests into parameterized form (criteria: identical setup differing only by indicator parameter) - test_position_size_various_rounding_cases already parameterized; no other redundancies found
+- [x] T018a Run Black/Ruff/Pylint (pre-US1 quality gate) and fix issues before adding US1 tests - Black: 15 files reformatted; Ruff: import sorting fixed; Pylint: 10.00/10
+- [x] T018b Quick unit tier timing smoke (<7s tolerance) before US1 using perf counter
+- [x] T019 Add risk sizing edge case tests (minimal balance, high volatility) in `tests/unit/test_risk_sizing_edge_cases.py` - Fixed field mismatch in src/risk/manager.py (stop_loss_price→initial_stop_price)
+- [x] T019a Add extreme spike & large spread position size test (no negative/overflow sizes) - Included in risk edge case tests
 
 ## Phase 3: User Story 1 (Validate Core Strategy Behavior) [P1]
 

@@ -5,15 +5,18 @@ This module provides shared test fixtures used across the test suite,
 including parameter configurations, temporary file paths, and sample data.
 """
 
-from pathlib import Path
 import random
-import numpy as np
+import time
+from pathlib import Path
 
+import numpy as np
 import pytest
 
 from src.config.parameters import StrategyParameters
 
+
 SEED = 42
+
 
 def _apply_global_seed():
     """Apply global deterministic seed for tests.
@@ -23,7 +26,17 @@ def _apply_global_seed():
     random.seed(SEED)
     np.random.seed(SEED)
 
+
 _apply_global_seed()
+
+
+def pytest_sessionstart(session):  # noqa: D401
+    """Record session start time for runtime smoke assertions.
+
+    Stored on the config object as `_suite_start_time` for later retrieval
+    by runtime tests (e.g., Phase 2 timing smoke test T018b).
+    """
+    session.config._suite_start_time = time.perf_counter()
 
 
 @pytest.fixture()

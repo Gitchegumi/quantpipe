@@ -1,3 +1,4 @@
+pytestmark = pytest.mark.integration
 """Integration tests for BOTH mode backtest execution (User Story 3).
 
 Tests three-tier metrics display, conflict handling, and output formatting.
