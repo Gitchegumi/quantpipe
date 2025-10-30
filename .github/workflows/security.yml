@@ -1,0 +1,40 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  deps-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Export requirements
+        run: poetry export --without-hashes -f requirements.txt -o requirements.txt
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt --progress-spinner=off
+
+  bandit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Bandit & deps
+        run: pip install bandit && pip install .
+      - name: Run Bandit
+        run: bandit -r src/ -f txt -o bandit.txt || true
+      - name: Upload Bandit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit.txt
