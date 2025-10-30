@@ -143,7 +143,7 @@ These tasks can be executed in parallel:
 
 ### Output Formatters (src/io/formatters.py)
 
-- [x] T019 [P] Create generate_output_filename function (`backtest_{direction}_{YYYYMMDD}_{HHMMSS}.{ext}`) in src/io/formatters.py ✅ Filename generation with timestamp formatting
+- [x] T019 [P] Create generate*output_filename function (`backtest*{direction}_{YYYYMMDD}_{HHMMSS}.{ext}`) in src/io/formatters.py ✅ Filename generation with timestamp formatting
 - [x] T020 [P] Create format_text_output function skeleton (human-readable result formatting) in src/io/formatters.py ✅ Text and JSON output formatting complete
 
 ### Unit Tests
@@ -243,6 +243,7 @@ Run `poetry run python -m src.cli.run_backtest --direction SHORT --data price_da
 **Phase 4 Status**: ✅ **COMPLETE** (9/9 tasks complete, 4/4 integration tests passing)
 
 **Test Results**:
+
 - SHORT mode generates 26 signals from 2000 data (30.77% win rate, -0.15R avg)
 - All 4 SHORT integration tests passing
 - Text and JSON output validated
