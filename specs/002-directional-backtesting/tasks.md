@@ -131,8 +131,8 @@ These tasks can be executed in parallel:
 
 ### Orchestrator Infrastructure (src/backtest/orchestrator.py)
 
-- [x] T013 Create BacktestOrchestrator class skeleton in src/backtest/orchestrator.py ✅ BacktestOrchestrator with __init__, run_backtest, routing methods
-- [x] T014 Implement run_backtest method signature with DirectionMode routing logic in src/backtest/orchestrator.py ✅ Routing to _run_long_backtest, _run_short_backtest, _run_both_backtest
+- [x] T013 Create BacktestOrchestrator class skeleton in src/backtest/orchestrator.py ✅ BacktestOrchestrator with `__init__`, run_backtest, routing methods
+- [x] T014 Implement run_backtest method signature with DirectionMode routing logic in src/backtest/orchestrator.py ✅ Routing to `_run_long_backtest`, `_run_short_backtest`, `_run_both_backtest`
 - [x] T015 Implement merge_signals function for conflict detection (timestamp-based) in src/backtest/orchestrator.py ✅ merge_signals() detects simultaneous opposing signals
 - [x] T016 Add logging calls for signal generation progress (lazy % formatting) in src/backtest/orchestrator.py ✅ Lazy % logging throughout all methods
 
