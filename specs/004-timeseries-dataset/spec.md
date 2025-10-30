@@ -5,6 +5,14 @@
 **Status**: Draft
 **Input**: User description: "Build a time series dataset from price_data directory. Raw data per symbol in `price_data/raw/<symbol>`. Produce processed outputs into `price_data/processed/<symbol>/test` and `price_data/processed/<symbol>/validate`. Perform chronological 80/20 split favoring recent data for validation (contiguous last 20%). Adjust current backtest behavior: instead of converting a single CSV and writing to results, integrate dataset building and operate over processed splits for each symbol."
 
+## Clarifications
+
+### Session 2025-10-30
+
+- Q: How should gaps and overlapping timestamps be handled (report vs modify: drop/forward-fill/interpolate/resample)? → A: Report only; do not modify.
+
+Applied Impact: Edge case handling updated to specify non-mutating behavior. Added functional requirement to ensure only reporting of gaps/overlaps without data alteration, preserving raw integrity for backtests.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Generate Chronological Split (Priority: P1)
@@ -54,7 +62,7 @@ As a user running backtests I want the backtest tool to operate on the standardi
 
 ### Edge Cases
 
-- Raw data contains gaps or overlapping timestamps: system identifies and reports count of gaps/overlaps; continues with cleaning if feasible.
+- Raw data contains gaps or overlapping timestamps: system identifies and reports counts but DOES NOT alter, fill, interpolate, or resample; raw sequence preserved in partitions.
 - Raw data very small (fewer than 10 rows): system aborts split for that symbol and flags it as insufficient for partitioning.
 - Multiple raw files per symbol with differing schemas: system flags schema mismatch and skips symbol.
 - Time zone inconsistencies detected across files: system normalizes to a stated canonical time zone assumption and records assumption.
