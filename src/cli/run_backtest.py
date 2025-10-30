@@ -95,9 +95,6 @@ def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
     return converted_path
 
 
-
-
-
 def main():
     """
     Main entry point for unified backtest CLI.
@@ -128,7 +125,8 @@ def main():
         type=str,
         nargs="+",
         default=["trend-pullback"],
-        help="Strategy name(s) to run (default: trend-pullback). Supports multiple: --strategy strat1 strat2",
+        help="Strategy name(s) to run (default: trend-pullback). Supports multiple: \
+            --strategy strat1 strat2",
     )
 
     parser.add_argument(
@@ -136,7 +134,8 @@ def main():
         type=str,
         nargs="+",
         default=["EURUSD"],
-        help="Currency pair(s) to backtest (default: EURUSD). Supports multiple: --pair EURUSD GBPUSD",
+        help="Currency pair(s) to backtest (default: EURUSD). Supports multiple: \
+            --pair EURUSD GBPUSD",
     )
 
     parser.add_argument(
@@ -230,9 +229,11 @@ def main():
     # For now, use first pair/strategy from lists
     pair = args.pair[0]
     strategy = args.strategy[0]  # Currently only trend-pullback supported
-    
+
     run_id = f"{args.direction.lower()}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-    logger.info("Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy)
+    logger.info(
+        "Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy
+    )
 
     # Build signal parameters from strategy config
     signal_params = {
