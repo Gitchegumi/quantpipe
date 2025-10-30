@@ -77,7 +77,6 @@ class TestSignalCountDeterminism:
             output_dir=tmp_path / "run2",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         result3 = run_simple_backtest(
@@ -85,7 +84,6 @@ class TestSignalCountDeterminism:
             output_dir=tmp_path / "run3",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         # Verify all runs produced same signal count
@@ -118,7 +116,6 @@ class TestSignalCountDeterminism:
             output_dir=tmp_path / "run1",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         result2 = run_simple_backtest(
@@ -126,7 +123,6 @@ class TestSignalCountDeterminism:
             output_dir=tmp_path / "run2",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         # Both should have same signal count
@@ -158,7 +154,6 @@ class TestSignalCountByDirection:
             output_dir=tmp_path / "results",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         # Long-only mode should generate signals
@@ -189,7 +184,6 @@ class TestSignalCountByDirection:
             output_dir=tmp_path / "default",
             parameters=params_default,
             log_level="ERROR",
-            
         )
 
         # Run with more conservative parameters (higher RSI threshold)
@@ -205,7 +199,6 @@ class TestSignalCountByDirection:
             output_dir=tmp_path / "conservative",
             parameters=params_conservative,
             log_level="ERROR",
-            
         )
 
         # Conservative parameters should produce same or fewer signals
@@ -240,13 +233,14 @@ class TestSignalCountReasonableness:
             output_dir=tmp_path / "results",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         # Signal rate should be reasonable
         # Trend pullback strategy should not signal every candle
         # Full 2020 dataset: 372,335 candles, ~713 signals = 0.19% rate
-        signal_rate = result["signals_generated"] / 372335  # Approx candle count for 2020
+        signal_rate = (
+            result["signals_generated"] / 372335
+        )  # Approx candle count for 2020
 
         assert signal_rate < 0.01, "Signal rate should be < 1% of candles"
         assert signal_rate > 0.0001, "Signal rate should be > 0.01% of candles"
@@ -309,7 +303,6 @@ class TestSignalCountConsistency:
             output_dir=tmp_path / "3k",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         # Process first 3000 candles again (should be identical)
@@ -318,7 +311,6 @@ class TestSignalCountConsistency:
             output_dir=tmp_path / "3k_repeat",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         # Verify determinism
@@ -332,7 +324,6 @@ class TestSignalCountConsistency:
             output_dir=tmp_path / "5k",
             parameters=params,
             log_level="ERROR",
-            
         )
 
         # More data should produce same or more signals

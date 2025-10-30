@@ -42,9 +42,7 @@ class TestPerformanceRuntimeThreshold:
 
         # Exclude this file from count
         performance_test_files = [
-            f
-            for f in performance_test_files
-            if f.name != "test_performance_runtime.py"
+            f for f in performance_test_files if f.name != "test_performance_runtime.py"
         ]
 
         elapsed = time.time() - start_time
@@ -99,9 +97,9 @@ class TestPerformanceRuntimeThreshold:
         elapsed = time.time() - start_time
 
         assert dummy_calc == 49995000, "Sanity check"
-        assert elapsed < 1.0, (
-            f"Simple calculation took {elapsed:.2f}s, system performance issue"
-        )
+        assert (
+            elapsed < 1.0
+        ), f"Simple calculation took {elapsed:.2f}s, system performance issue"
 
 
 class TestPerformanceTestOrganization:
@@ -130,16 +128,15 @@ class TestPerformanceTestOrganization:
         """
         # Validate price_data directory exists for performance tests
         workspace_root = Path(__file__).parent.parent.parent
-        price_data_dir = workspace_root / "price_data"
 
         # Performance tests should use price_data for realistic scenarios
         assert workspace_root.exists(), "Workspace root should exist"
 
         # Document the data size expectation
         min_rows_for_performance = 10000
-        assert min_rows_for_performance >= 10000, (
-            "Performance tests should use datasets ≥10K rows"
-        )
+        assert (
+            min_rows_for_performance >= 10000
+        ), "Performance tests should use datasets ≥10K rows"
 
     def test_performance_tests_run_periodically(self):
         """
@@ -160,9 +157,9 @@ class TestPerformanceTestOrganization:
             "performance": "periodic",  # main merge, nightly, on-demand
         }
 
-        assert execution_schedule["performance"] == "periodic", (
-            "Performance tests should run periodically, not every PR"
-        )
+        assert (
+            execution_schedule["performance"] == "periodic"
+        ), "Performance tests should run periodically, not every PR"
 
         # Validate schedule makes sense
         assert execution_schedule["unit"] == "every_pr", "Unit tests run every PR"
@@ -187,17 +184,17 @@ class TestPerformanceMonitoring:
 
         # Validate requirement is reasonable
         assert expected_max_runtime > 0, "Runtime threshold must be positive"
-        assert expected_max_runtime < 600, (
-            "Performance tests taking >600s (10min) indicate design issues"
-        )
+        assert (
+            expected_max_runtime < 600
+        ), "Performance tests taking >600s (10min) indicate design issues"
 
         # Document tolerance for CI variability
         tolerance_factor = 1.2  # 20% overhead
         threshold_with_tolerance = expected_max_runtime * tolerance_factor
 
-        assert threshold_with_tolerance == 144.0, (
-            f"Expected 144.0s threshold, got {threshold_with_tolerance}s"
-        )
+        assert (
+            threshold_with_tolerance == 144.0
+        ), f"Expected 144.0s threshold, got {threshold_with_tolerance}s"
 
     def test_runtime_measurement_strategy(self):
         """
@@ -228,9 +225,7 @@ class TestPerformanceMonitoring:
             _ = 2**10
         elapsed = time.time() - start_time
 
-        assert elapsed < 2.0, (
-            f"Simple loop took {elapsed:.2f}s, performance issue"
-        )
+        assert elapsed < 2.0, f"Simple loop took {elapsed:.2f}s, performance issue"
 
     def test_tier_runtime_hierarchy(self):
         """
@@ -294,18 +289,18 @@ class TestDatasetSizeGuidelines:
         }
 
         # Validate guidelines
-        assert size_guidelines["performance"]["min"] >= 10000, (
-            "Performance tests should use ≥10K rows"
-        )
+        assert (
+            size_guidelines["performance"]["min"] >= 10000
+        ), "Performance tests should use ≥10K rows"
 
         # Example: M1 data for full year
         minutes_per_year = 365 * 24 * 60
         assert minutes_per_year == 525600, "525,600 minutes in a year"
 
         # Performance tests using full year data validate realistic throughput
-        assert size_guidelines["performance"]["min"] < minutes_per_year, (
-            "Full year M1 data exceeds minimum performance dataset size"
-        )
+        assert (
+            size_guidelines["performance"]["min"] < minutes_per_year
+        ), "Full year M1 data exceeds minimum performance dataset size"
 
     def test_performance_metrics_documented(self):
         """

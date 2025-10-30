@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+
 pytestmark = pytest.mark.unit
 
 from src.models.core import TradeSignal

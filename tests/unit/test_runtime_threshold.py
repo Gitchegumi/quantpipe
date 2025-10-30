@@ -18,7 +18,7 @@ import pytest
 class TestUnitRuntimeThreshold:
     """Validate unit test suite runtime meets performance targets."""
 
-    @pytest.mark.unit
+    @pytest.mark.unit()
     def test_unit_suite_runtime_under_5_seconds(self):
         """
         Given unit test suite execution,
@@ -59,7 +59,7 @@ class TestUnitRuntimeThreshold:
             "indicating potential performance issues"
         )
 
-    @pytest.mark.unit
+    @pytest.mark.unit()
     def test_individual_unit_tests_fast(self):
         """
         Given individual unit test execution,
@@ -84,7 +84,7 @@ class TestUnitRuntimeThreshold:
             "exceeds 1s threshold - consider refactoring"
         )
 
-    @pytest.mark.unit
+    @pytest.mark.unit()
     def test_unit_tests_marked_correctly(self):
         """
         Given test files in tests/unit/,
@@ -94,9 +94,6 @@ class TestUnitRuntimeThreshold:
         This ensures proper test categorization and enables selective
         test execution by tier.
         """
-        # This test validates marker presence by checking this test's markers
-        current_test_markers = [mark.name for mark in pytest.mark.unit.mark.args]
-
         # Verify this test has unit marker
         assert hasattr(pytest.mark.unit, "mark"), "Unit marker should exist"
 
@@ -115,7 +112,7 @@ class TestUnitRuntimeThreshold:
 class TestUnitTestOrganization:
     """Validate unit test organization and structure."""
 
-    @pytest.mark.unit
+    @pytest.mark.unit()
     def test_unit_tests_in_correct_directory(self):
         """
         Given unit test files,
@@ -123,11 +120,11 @@ class TestUnitTestOrganization:
         Then all should be in tests/unit/ directory.
         """
         test_file = Path(__file__)
-        assert test_file.parent.name == "unit", (
-            f"Unit tests should be in tests/unit/, found in {test_file.parent}"
-        )
+        assert (
+            test_file.parent.name == "unit"
+        ), f"Unit tests should be in tests/unit/, found in {test_file.parent}"
 
-    @pytest.mark.unit
+    @pytest.mark.unit()
     def test_unit_tests_use_small_fixtures(self):
         """
         Given unit tests,
@@ -145,15 +142,13 @@ class TestUnitTestOrganization:
         sample_files = list(fixtures_dir.glob("sample_*.csv"))
 
         all_fixtures = fixture_files + sample_files
-        assert len(all_fixtures) > 0, (
-            "Should have fixture files for unit testing"
-        )
+        assert len(all_fixtures) > 0, "Should have fixture files for unit testing"
 
 
 class TestPerformanceMonitoring:
     """Monitor and document performance expectations."""
 
-    @pytest.mark.unit
+    @pytest.mark.unit()
     def test_performance_baseline_documented(self):
         """
         Given unit test suite,
@@ -168,19 +163,19 @@ class TestPerformanceMonitoring:
 
         # Validate requirement is reasonable
         assert expected_max_runtime > 0, "Runtime threshold must be positive"
-        assert expected_max_runtime < 60, (
-            "Unit tests taking >60s should be integration tests"
-        )
+        assert (
+            expected_max_runtime < 60
+        ), "Unit tests taking >60s should be integration tests"
 
         # Document tolerance for CI variability
         tolerance_factor = 1.2  # 20% overhead
         threshold_with_tolerance = expected_max_runtime * tolerance_factor
 
-        assert threshold_with_tolerance == 6.0, (
-            f"Expected 6.0s threshold, got {threshold_with_tolerance}s"
-        )
+        assert (
+            threshold_with_tolerance == 6.0
+        ), f"Expected 6.0s threshold, got {threshold_with_tolerance}s"
 
-    @pytest.mark.unit
+    @pytest.mark.unit()
     def test_runtime_measurement_strategy(self):
         """
         Given runtime threshold requirements,
@@ -207,6 +202,4 @@ class TestPerformanceMonitoring:
             _ = 2**10
         elapsed = time.time() - start_time
 
-        assert elapsed < 0.5, (
-            f"Simple loop took {elapsed:.2f}s, performance issue"
-        )
+        assert elapsed < 0.5, f"Simple loop took {elapsed:.2f}s, performance issue"

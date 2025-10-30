@@ -94,7 +94,9 @@ class TestRiskSizingVolatility:
         position_size = calculate_position_size(extreme_signal, 10000.0, 1.0, 10.0)
 
         # Should still produce a valid positive size
-        assert position_size > 0, "Extreme volatility should still produce positive size"
+        assert (
+            position_size > 0
+        ), "Extreme volatility should still produce positive size"
         assert (
             position_size >= 0.01
         ), "Position size should be at least lot_step minimum"

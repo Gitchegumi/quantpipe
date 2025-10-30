@@ -55,9 +55,9 @@ class TestFlakinessSmoke:
                 test_counts.append(int(match.group(1)))
 
         # Verify all runs had same test count
-        assert len(set(test_counts)) == 1, (
-            f"Test counts varied across runs: {test_counts}"
-        )
+        assert (
+            len(set(test_counts)) == 1
+        ), f"Test counts varied across runs: {test_counts}"
 
     def test_integration_tests_run_three_times_without_failures(self):
         """
@@ -91,9 +91,9 @@ class TestFlakinessSmoke:
                 test_counts.append(int(match.group(1)))
 
         # Verify all runs had same test count
-        assert len(set(test_counts)) == 1, (
-            f"Test counts varied across runs: {test_counts}"
-        )
+        assert (
+            len(set(test_counts)) == 1
+        ), f"Test counts varied across runs: {test_counts}"
 
     def test_deterministic_backtest_results(self):
         """
@@ -148,7 +148,10 @@ class TestFlakinessSmoke:
             }
 
             result = orchestrator.run_backtest(
-                candles=candles, pair="EURUSD", run_id=f"flake_test_{i}", **signal_params
+                candles=candles,
+                pair="EURUSD",
+                run_id=f"flake_test_{i}",
+                **signal_params,
             )
 
             results.append(result)

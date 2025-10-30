@@ -158,7 +158,9 @@ class TestBacktestPerformance:
 
         # Timing can vary but should be consistently fast
         avg_time = sum(times) / len(times)
-        assert avg_time < 10.0, f"Average execution time should be < 10s, got {avg_time:.2f}s"
+        assert (
+            avg_time < 10.0
+        ), f"Average execution time should be < 10s, got {avg_time:.2f}s"
 
     def test_backtest_memory_stability(self):
         """

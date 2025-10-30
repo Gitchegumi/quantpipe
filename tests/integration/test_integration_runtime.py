@@ -40,9 +40,7 @@ class TestIntegrationRuntimeThreshold:
 
         # Exclude this file from count
         integration_test_files = [
-            f
-            for f in integration_test_files
-            if f.name != "test_integration_runtime.py"
+            f for f in integration_test_files if f.name != "test_integration_runtime.py"
         ]
 
         elapsed = time.time() - start_time
@@ -97,9 +95,9 @@ class TestIntegrationRuntimeThreshold:
         elapsed = time.time() - start_time
 
         assert dummy_calc == 499500, "Sanity check"
-        assert elapsed < 0.5, (
-            f"Simple calculation took {elapsed:.2f}s, system performance issue"
-        )
+        assert (
+            elapsed < 0.5
+        ), f"Simple calculation took {elapsed:.2f}s, system performance issue"
 
 
 class TestIntegrationTestOrganization:
@@ -128,7 +126,6 @@ class TestIntegrationTestOrganization:
         """
         # Validate price_data directory exists for integration tests
         workspace_root = Path(__file__).parent.parent.parent
-        price_data_dir = workspace_root / "price_data"
 
         # Integration tests may use price_data for realistic scenarios
         # This is acceptable as long as runtime stays <30s
@@ -155,17 +152,17 @@ class TestPerformanceMonitoring:
 
         # Validate requirement is reasonable
         assert expected_max_runtime > 0, "Runtime threshold must be positive"
-        assert expected_max_runtime < 300, (
-            "Integration tests taking >300s should be performance tests"
-        )
+        assert (
+            expected_max_runtime < 300
+        ), "Integration tests taking >300s should be performance tests"
 
         # Document tolerance for CI variability
         tolerance_factor = 1.2  # 20% overhead
         threshold_with_tolerance = expected_max_runtime * tolerance_factor
 
-        assert threshold_with_tolerance == 36.0, (
-            f"Expected 36.0s threshold, got {threshold_with_tolerance}s"
-        )
+        assert (
+            threshold_with_tolerance == 36.0
+        ), f"Expected 36.0s threshold, got {threshold_with_tolerance}s"
 
     def test_runtime_measurement_strategy(self):
         """
@@ -194,9 +191,7 @@ class TestPerformanceMonitoring:
             _ = 2**10
         elapsed = time.time() - start_time
 
-        assert elapsed < 1.0, (
-            f"Simple loop took {elapsed:.2f}s, performance issue"
-        )
+        assert elapsed < 1.0, f"Simple loop took {elapsed:.2f}s, performance issue"
 
     def test_integration_vs_performance_distinction(self):
         """
@@ -219,13 +214,13 @@ class TestPerformanceMonitoring:
         integration_target = 30.0
         performance_target = 120.0
 
-        assert performance_target > integration_target, (
-            "Performance tests should have higher threshold than integration"
-        )
+        assert (
+            performance_target > integration_target
+        ), "Performance tests should have higher threshold than integration"
 
-        assert performance_target / integration_target == 4.0, (
-            "Performance tests allow 4x the time of integration tests"
-        )
+        assert (
+            performance_target / integration_target == 4.0
+        ), "Performance tests allow 4x the time of integration tests"
 
 
 class TestDatasetSizeGuidelines:

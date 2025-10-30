@@ -70,28 +70,28 @@ Net Reduction = (Post-Phase 3 Count - Post-Phase 4 Count) / Post-Phase 3 Count
 
 1. Low Baseline Redundancy (<4%)
 
-- Analysis of 87 tests found only 3 exact duplicates (<4%)
-- Phase 3 tests intentionally filled coverage gaps (not duplicates)
-- Most tests provide unique value (edge cases, integration, validation)
+   - Analysis of 87 tests found only 3 exact duplicates (<4%)
+   - Phase 3 tests intentionally filled coverage gaps (not duplicates)
+   - Most tests provide unique value (edge cases, integration, validation)
 
 2. Phase 3 Expansion Was Justified
 
-- SC-001: "Expand test coverage to ≥70%"
-- Phase 3 added tests to meet coverage requirement
-- Added tests were **gap-filling**, not **redundant**
+   - SC-001: "Expand test coverage to ≥70%"
+   - Phase 3 added tests to meet coverage requirement
+   - Added tests were **gap-filling**, not **redundant**
 
 3. Quality Over Quantity
 
-- Consolidation via parameterization more valuable than deletion
-- 21 tests → 15 parameterized tests (6 functions eliminated, coverage preserved)
-- Reduction strategy: **Reduce noise while maintaining signal**
+   - Consolidation via parameterization more valuable than deletion
+   - 21 tests → 15 parameterized tests (6 functions eliminated, coverage preserved)
+   - Reduction strategy: **Reduce noise while maintaining signal**
 
 4. Success Metrics (Constitution Principle II)
 
-- ✅ Coverage: Maintained ≥70% (SC-001)
-- ✅ Pass Rate: 21/21 = 100% for consolidated tests
-- ✅ Reduction: 6.3% < 30% (SC-002)
-- ✅ Noise Reduction: 6 redundant test functions eliminated
+   - ✅ Coverage: Maintained ≥70% (SC-001)
+   - ✅ Pass Rate: 21/21 = 100% for consolidated tests
+   - ✅ Reduction: 6.3% < 30% (SC-002)
+   - ✅ Noise Reduction: 6 redundant test functions eliminated
 
 ---
 
@@ -174,6 +174,149 @@ def test_ema_warm_up_nan_count(self, period, expected_nan_count):
 | Documentation     | Complete | 3 reports           | ✅ PASS |
 
 **Conclusion**: Phase 4 US2 meets all success criteria. Minimal reduction justified by low baseline redundancy.
+
+---
+
+## Phase 5 Test Expansion Analysis
+
+**Date**: 2025-01-30  
+**Objective**: Add deterministic fixtures and runtime threshold monitoring (US3)
+
+### Test Count Impact
+
+| Category           | Count    | Change | Notes                               |
+| ------------------ | -------- | ------ | ----------------------------------- |
+| Post-Phase 4 Total | ~89      | Base   | Before Phase 5                      |
+| Phase 5 New Tests  | +59      | Added  | Fixtures, repeatability, thresholds |
+| **Final Total**    | **~148** | +66%   | After Phase 5 additions             |
+
+### Phase 5 Deliverables
+
+**Fixtures & Validation** (15 tests):
+
+- Fixture manifest validation (6 tests)
+- CSV structure validation (3 tests)
+- OHLC data integrity (4 tests)
+- Scenario coverage validation (2 tests)
+
+**Indicator Repeatability** (17 tests):
+
+- EMA determinism tests (5 tests)
+- ATR determinism tests (5 tests)
+- RSI determinism tests (3 tests)
+- NaN consistency tests (2 tests)
+- Cross-indicator consistency (2 tests)
+
+**Runtime Thresholds** (27 tests):
+
+- Unit tier runtime tests (7 tests) - Target: <5s
+- Integration tier runtime tests (9 tests) - Target: <30s
+- Performance tier runtime tests (11 tests) - Target: <120s
+
+### Files Created
+
+1. `tests/unit/test_fixture_validation.py` (354 lines, 15 tests)
+2. `tests/unit/test_indicator_repeatability.py` (280 lines, 17 tests)
+3. `tests/unit/test_runtime_threshold.py` (206 lines, 7 tests)
+4. `tests/integration/test_integration_runtime.py` (264 lines, 9 tests)
+5. `tests/performance/test_performance_runtime.py` (333 lines, 11 tests)
+6. `tests/fixtures/manifest.yaml` (6 fixtures documented)
+
+### Files Modified
+
+1. `tests/fixtures/sample_candles_long.csv` - Fixed OHLC data (rows 20-22)
+2. `pyproject.toml` - Added pyyaml 6.0.3 dev dependency
+
+### Quality Metrics
+
+- **Pass Rate**: 100% (59/59 tests passing)
+- **Coverage**: Deterministic fixture validation established
+- **Runtime**: All threshold tests passing (<1s each)
+- **Documentation**: Complete docstrings (PEP 257 compliant)
+
+### Success Criteria Validation
+
+| Criterion           | Target  | Actual      | Status  |
+| ------------------- | ------- | ----------- | ------- |
+| SC-006: Fixtures    | 6+      | 6 validated | ✅ PASS |
+| SC-007: Determinism | All new | 17 tests    | ✅ PASS |
+| SC-008: Thresholds  | 3 tiers | 27 tests    | ✅ PASS |
+| Pass Rate           | 100%    | 100%        | ✅ PASS |
+| Code Quality        | 8.0/10  | 9.52/10     | ✅ PASS |
+
+---
+
+## Phase 6 Polish & Cross-Cutting
+
+**Date**: 2025-01-30  
+**Objective**: Final quality gates and documentation updates
+
+### Deprecated Imports Analysis
+
+**Scan Performed**: 2025-01-30  
+**Method**: Regex search across all Python files for deprecated imports
+
+**Deprecated Files Removed** (Phase 2):
+
+- `tests/unit/test_significance.py` - Legacy r_multiple execution schema
+- `tests/unit/test_indicators_basic.py` - Consolidated into test_indicators_consolidated.py
+- `tests/unit/test_indicators_core.py` - Consolidated into test_indicators_consolidated.py
+
+**Import Validation Results**:
+
+- ✅ No imports of `test_significance` module found
+- ✅ No imports of `test_indicators_basic` module found
+- ✅ No imports of `test_indicators_core` module found
+- ✅ No imports from `src.models.significance` (deprecated schema)
+- ✅ No `from __future__ import` statements (Python 3.11+ native)
+- ✅ No other deprecated module references detected
+
+**Conclusion**: All deprecated imports successfully removed. Codebase clean.
+
+### Code Quality Summary
+
+**Black Formatting**:
+
+- Files reformatted: 10
+- Line length: 88 characters (compliant)
+- Status: ✅ PASS
+
+**Ruff Linting**:
+
+- Critical errors fixed: 2 (F841 unused variables)
+- Import sorting: Compliant
+- Status: ✅ PASS (informational warnings only)
+
+**Pylint Scoring**:
+
+- `src/` score: **9.52/10** (exceeds 8.0 threshold)
+- `tests/` score: **10.00/10** (perfect)
+- Status: ✅ PASS
+
+**Docstrings**:
+
+- All Phase 5 modules: PEP 257 compliant
+- Module-level docstrings: ✅
+- Class-level docstrings: ✅
+- Function-level docstrings: ✅
+
+**Logging**:
+
+- Lazy % formatting: 100% compliant
+- No f-strings in logger calls: ✅
+- Status: ✅ PASS
+
+### Documentation Updates
+
+**Files Updated**:
+
+1. `README.md` - Added three-tier testing structure, runtime targets, quality gates
+2. `specs/003-update-001-tests/analysis-report.md` - Added Phase 5 & 6 summaries
+3. `specs/003-update-001-tests/commit-draft.txt` - Comprehensive commit message
+4. `specs/003-update-001-tests/checklists/validation.md` - Success criteria checklist
+5. `specs/003-update-001-tests/tasks.md` - Marked all phases complete
+
+**Phase 6 Test Count Impact**: +0 (polish only, no new tests)
 
 ---
 

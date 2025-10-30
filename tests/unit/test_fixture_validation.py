@@ -80,9 +80,9 @@ class TestFixtureManifest:
         for fixture in manifest["fixtures"]:
             fixture_id = fixture.get("id", "UNKNOWN")
             missing = required_fields - set(fixture.keys())
-            assert not missing, (
-                f"Fixture '{fixture_id}' missing required fields: {missing}"
-            )
+            assert (
+                not missing
+            ), f"Fixture '{fixture_id}' missing required fields: {missing}"
 
     def test_all_manifest_files_exist(self):
         """
@@ -97,15 +97,15 @@ class TestFixtureManifest:
             filename = fixture["filename"]
             filepath = FIXTURES_DIR / filename
 
-            assert filepath.exists(), (
-                f"Fixture '{fixture_id}' references missing file: {filename}"
-            )
+            assert (
+                filepath.exists()
+            ), f"Fixture '{fixture_id}' references missing file: {filename}"
 
 
 class TestFixtureFileStructure:
     """Validate fixture CSV files have correct structure."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def manifest_fixtures(self) -> list[dict[str, Any]]:
         """Load all fixture definitions from manifest."""
         manifest = load_manifest()
@@ -151,14 +151,12 @@ class TestFixtureFileStructure:
 
             # Must have base columns
             missing_base = required_columns_base - headers
-            assert not missing_base, (
-                f"Fixture {fixture['filename']} missing columns: {missing_base}"
-            )
+            assert (
+                not missing_base
+            ), f"Fixture {fixture['filename']} missing columns: {missing_base}"
 
             # Must have at least one timestamp column
-            has_timestamp = (
-                "timestamp" in headers or "timestamp_utc" in headers
-            )
+            has_timestamp = "timestamp" in headers or "timestamp_utc" in headers
             assert has_timestamp, (
                 f"Fixture {fixture['filename']} missing timestamp column "
                 f"(needs 'timestamp' or 'timestamp_utc')"
@@ -179,9 +177,10 @@ class TestFixtureFileStructure:
                 with open(filepath, encoding="utf-8") as f:
                     content = f.read().strip()
                 # Allow header-only or completely empty
-                assert content in ("", "timestamp_utc,open,high,low,close,volume"), (
-                    f"Empty fixture {fixture['filename']} should be empty or header-only"
-                )
+                assert content in (
+                    "",
+                    "timestamp_utc,open,high,low,close,volume",
+                ), f"Empty fixture {fixture['filename']} should be empty or header-only"
                 continue
 
             with open(filepath, encoding="utf-8") as f:
@@ -197,7 +196,7 @@ class TestFixtureFileStructure:
 class TestFixtureDataValidity:
     """Validate fixture data values are correct and consistent."""
 
-    @pytest.fixture
+    @pytest.fixture()
     def manifest_fixtures(self) -> list[dict[str, Any]]:
         """Load all fixture definitions from manifest."""
         manifest = load_manifest()
@@ -250,23 +249,23 @@ class TestFixtureDataValidity:
                     close = float(row["close"])
 
                     # High must be highest
-                    assert high >= low, (
-                        f"Fixture {fixture['filename']} row {i}: high < low"
-                    )
-                    assert high >= open_price, (
-                        f"Fixture {fixture['filename']} row {i}: high < open"
-                    )
-                    assert high >= close, (
-                        f"Fixture {fixture['filename']} row {i}: high < close"
-                    )
+                    assert (
+                        high >= low
+                    ), f"Fixture {fixture['filename']} row {i}: high < low"
+                    assert (
+                        high >= open_price
+                    ), f"Fixture {fixture['filename']} row {i}: high < open"
+                    assert (
+                        high >= close
+                    ), f"Fixture {fixture['filename']} row {i}: high < close"
 
                     # Low must be lowest
-                    assert low <= open_price, (
-                        f"Fixture {fixture['filename']} row {i}: low > open"
-                    )
-                    assert low <= close, (
-                        f"Fixture {fixture['filename']} row {i}: low > close"
-                    )
+                    assert (
+                        low <= open_price
+                    ), f"Fixture {fixture['filename']} row {i}: low > open"
+                    assert (
+                        low <= close
+                    ), f"Fixture {fixture['filename']} row {i}: low > close"
 
     def test_volume_column_is_optional(self, manifest_fixtures):
         """
@@ -311,9 +310,9 @@ class TestFixtureScenarioCoverage:
         manifest = load_manifest()
         scenario_types = {f["scenario_type"] for f in manifest["fixtures"]}
 
-        assert "trend" in scenario_types or "uptrend" in scenario_types, (
-            "Missing uptrend/trend fixture for bullish signal testing"
-        )
+        assert (
+            "trend" in scenario_types or "uptrend" in scenario_types
+        ), "Missing uptrend/trend fixture for bullish signal testing"
 
     def test_has_downtrend_fixture(self):
         """
@@ -324,9 +323,9 @@ class TestFixtureScenarioCoverage:
         manifest = load_manifest()
         scenario_types = {f["scenario_type"] for f in manifest["fixtures"]}
 
-        assert "downtrend" in scenario_types, (
-            "Missing downtrend fixture for bearish signal testing"
-        )
+        assert (
+            "downtrend" in scenario_types
+        ), "Missing downtrend fixture for bearish signal testing"
 
     def test_has_flat_fixture(self):
         """
@@ -337,9 +336,9 @@ class TestFixtureScenarioCoverage:
         manifest = load_manifest()
         scenario_types = {f["scenario_type"] for f in manifest["fixtures"]}
 
-        assert "flat" in scenario_types, (
-            "Missing flat fixture for false-signal prevention testing"
-        )
+        assert (
+            "flat" in scenario_types
+        ), "Missing flat fixture for false-signal prevention testing"
 
     def test_has_spike_outlier_fixture(self):
         """
@@ -350,9 +349,9 @@ class TestFixtureScenarioCoverage:
         manifest = load_manifest()
         scenario_types = {f["scenario_type"] for f in manifest["fixtures"]}
 
-        assert "spike" in scenario_types, (
-            "Missing spike/outlier fixture for ATR/volatility testing"
-        )
+        assert (
+            "spike" in scenario_types
+        ), "Missing spike/outlier fixture for ATR/volatility testing"
 
     def test_has_minimum_fixtures(self):
         """
@@ -361,6 +360,6 @@ class TestFixtureScenarioCoverage:
         Then should have at least 5 fixtures for comprehensive testing.
         """
         manifest = load_manifest()
-        assert len(manifest["fixtures"]) >= 5, (
-            f"Expected at least 5 fixtures, found {len(manifest['fixtures'])}"
-        )
+        assert (
+            len(manifest["fixtures"]) >= 5
+        ), f"Expected at least 5 fixtures, found {len(manifest['fixtures'])}"

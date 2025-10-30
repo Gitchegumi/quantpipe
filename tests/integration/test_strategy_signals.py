@@ -185,7 +185,9 @@ def long_setup_candles():
             ema50=ema50_arr[i],
             rsi=rsi_arr[i],
             atr=atr_arr[i],
-            stoch_rsi=float(stoch_rsi_arr[i]) if not np.isnan(stoch_rsi_arr[i]) else None,
+            stoch_rsi=float(stoch_rsi_arr[i])
+            if not np.isnan(stoch_rsi_arr[i])
+            else None,
         )
         candles.append(candle)
 
@@ -311,7 +313,9 @@ def short_setup_candles():
             ema50=ema50_arr[i],
             rsi=rsi_arr[i],
             atr=atr_arr[i],
-            stoch_rsi=float(stoch_rsi_arr[i]) if not np.isnan(stoch_rsi_arr[i]) else None,
+            stoch_rsi=float(stoch_rsi_arr[i])
+            if not np.isnan(stoch_rsi_arr[i])
+            else None,
         )
         candles.append(candle)
 
@@ -432,7 +436,9 @@ class TestLongSignalGeneration:
                 ema50=ema50_arr[i],
                 rsi=rsi_arr[i],
                 atr=atr_arr[i],
-                stoch_rsi=float(stoch_rsi_arr[i]) if not np.isnan(stoch_rsi_arr[i]) else None,
+                stoch_rsi=float(stoch_rsi_arr[i])
+                if not np.isnan(stoch_rsi_arr[i])
+                else None,
             )
             candles.append(candle)
 
@@ -555,7 +561,9 @@ class TestShortSignalGeneration:
                 ema50=ema50_arr[i],
                 rsi=rsi_arr[i],
                 atr=atr_arr[i],
-                stoch_rsi=float(stoch_rsi_arr[i]) if not np.isnan(stoch_rsi_arr[i]) else None,
+                stoch_rsi=float(stoch_rsi_arr[i])
+                if not np.isnan(stoch_rsi_arr[i])
+                else None,
             )
             candles.append(candle)
 

@@ -7,7 +7,7 @@ while maintaining comprehensive coverage.
 
 Test categories:
 - EMA warm-up periods and calculations
-- ATR warm-up periods and true range calculations  
+- ATR warm-up periods and true range calculations
 - RSI calculation and bounds
 - Indicator edge cases (empty arrays, insufficient data, validation)
 - Indicator integration (crossovers, volatility response, determinism)
@@ -101,7 +101,9 @@ class TestEMAWarmUp:
         # EMA should increase monotonically with uptrend
         valid_ema = result[49:]
         for i in range(1, len(valid_ema)):
-            assert valid_ema[i] >= valid_ema[i - 1], f"EMA should increase at index {49+i}"
+            assert (
+                valid_ema[i] >= valid_ema[i - 1]
+            ), f"EMA should increase at index {49+i}"
 
 
 class TestATRWarmUp:
@@ -112,7 +114,7 @@ class TestATRWarmUp:
         Test ATR(14) produces exactly 13 NaN values during warm-up.
 
         From test_indicators_core.py::test_atr14_warm_up_nan_count (T020b).
-        
+
         ATR uses EMA for smoothing, which has (period-1) NaN values.
         """
         size = 50
@@ -130,7 +132,9 @@ class TestATRWarmUp:
 
         # First valid ATR should be at index 13 (period-1)
         assert np.isnan(result[12]), "Index 12 should still be NaN"
-        assert not np.isnan(result[13]), f"ATR({period}) should have valid value at index {period-1}"
+        assert not np.isnan(
+            result[13]
+        ), f"ATR({period}) should have valid value at index {period-1}"
 
     def test_atr_values_positive_after_warmup(self):
         """
@@ -141,28 +145,76 @@ class TestATRWarmUp:
         # Create fixture with known True Range
         high = np.array(
             [
-                1.10020, 1.10040, 1.10030, 1.10050, 1.10045,
-                1.10060, 1.10055, 1.10070, 1.10065, 1.10080,
-                1.10075, 1.10090, 1.10085, 1.10100, 1.10095,
-                1.10110, 1.10105, 1.10120, 1.10115, 1.10130,
+                1.10020,
+                1.10040,
+                1.10030,
+                1.10050,
+                1.10045,
+                1.10060,
+                1.10055,
+                1.10070,
+                1.10065,
+                1.10080,
+                1.10075,
+                1.10090,
+                1.10085,
+                1.10100,
+                1.10095,
+                1.10110,
+                1.10105,
+                1.10120,
+                1.10115,
+                1.10130,
             ],
             dtype=np.float64,
         )
         low = np.array(
             [
-                1.10000, 1.10020, 1.10010, 1.10030, 1.10025,
-                1.10040, 1.10035, 1.10050, 1.10045, 1.10060,
-                1.10055, 1.10070, 1.10065, 1.10080, 1.10075,
-                1.10090, 1.10085, 1.10100, 1.10095, 1.10110,
+                1.10000,
+                1.10020,
+                1.10010,
+                1.10030,
+                1.10025,
+                1.10040,
+                1.10035,
+                1.10050,
+                1.10045,
+                1.10060,
+                1.10055,
+                1.10070,
+                1.10065,
+                1.10080,
+                1.10075,
+                1.10090,
+                1.10085,
+                1.10100,
+                1.10095,
+                1.10110,
             ],
             dtype=np.float64,
         )
         close = np.array(
             [
-                1.10010, 1.10030, 1.10020, 1.10040, 1.10035,
-                1.10050, 1.10045, 1.10060, 1.10055, 1.10070,
-                1.10065, 1.10080, 1.10075, 1.10090, 1.10085,
-                1.10100, 1.10095, 1.10110, 1.10105, 1.10120,
+                1.10010,
+                1.10030,
+                1.10020,
+                1.10040,
+                1.10035,
+                1.10050,
+                1.10045,
+                1.10060,
+                1.10055,
+                1.10070,
+                1.10065,
+                1.10080,
+                1.10075,
+                1.10090,
+                1.10085,
+                1.10100,
+                1.10095,
+                1.10110,
+                1.10105,
+                1.10120,
             ],
             dtype=np.float64,
         )
@@ -175,7 +227,9 @@ class TestATRWarmUp:
 
         # Verify all subsequent values are valid and positive
         valid_atr = result[13:]
-        assert not np.any(np.isnan(valid_atr)), "All ATR values after index 13 should be valid"
+        assert not np.any(
+            np.isnan(valid_atr)
+        ), "All ATR values after index 13 should be valid"
         assert np.all(valid_atr > 0), "All ATR values should be positive"
         assert np.all(valid_atr < 0.001), "ATR values should be reasonable (< 100 pips)"
 
@@ -191,7 +245,9 @@ class TestIndicatorEdgeCases:
             ("rsi", {"period": 14}, "insufficient", "all_nan"),
         ],
     )
-    def test_indicator_edge_cases(self, indicator, params, array_type, expected_behavior):
+    def test_indicator_edge_cases(
+        self, indicator, params, array_type, expected_behavior
+    ):
         """
         Test indicators handle edge case inputs correctly.
 
@@ -199,7 +255,7 @@ class TestIndicatorEdgeCases:
         - test_ema_insufficient_data
         - test_ema_single_value
         - test_rsi_insufficient_data
-        
+
         Note: Empty array test removed - indicators now raise ValueError on empty input.
         """
         # Create test arrays based on array_type
@@ -236,7 +292,9 @@ class TestIndicatorEdgeCases:
         low = np.array([9.0], dtype=np.float64)
         close = np.array([9.5, 10.5], dtype=np.float64)
 
-        with pytest.raises(ValueError, match="High, low, and close arrays must have the same length"):
+        with pytest.raises(
+            ValueError, match="High, low, and close arrays must have the same length"
+        ):
             atr(high, low, close, period=2)
 
     def test_rsi_bounds(self):
@@ -288,7 +346,7 @@ class TestInputValidation:
         - test_nan_values
         - test_inf_values
         - test_invalid_period
-        
+
         From test_indicators_basic.py::TestValidateIndicatorInputs.
         """
         with pytest.raises(ValueError, match=error_match):
@@ -379,7 +437,9 @@ class TestIndicatorIntegration:
         ema20_run1 = ema(prices, 20)
         ema20_run2 = ema(prices, 20)
 
-        assert np.array_equal(ema20_run1, ema20_run2, equal_nan=True), "EMA should be deterministic"
+        assert np.array_equal(
+            ema20_run1, ema20_run2, equal_nan=True
+        ), "EMA should be deterministic"
 
         # Calculate ATR twice
         high = prices + 0.0001
@@ -389,7 +449,9 @@ class TestIndicatorIntegration:
         atr_run1 = atr(high, low, close, 14)
         atr_run2 = atr(high, low, close, 14)
 
-        assert np.array_equal(atr_run1, atr_run2, equal_nan=True), "ATR should be deterministic"
+        assert np.array_equal(
+            atr_run1, atr_run2, equal_nan=True
+        ), "ATR should be deterministic"
 
 
 class TestRSICalculation:
@@ -429,6 +491,6 @@ class TestRSICalculation:
         assert np.isnan(result[:period]).all()
 
         # RSI should be in expected range
-        assert expected_range[0] <= result[-1] <= expected_range[1], (
-            f"RSI for {price_type} should be in range {expected_range}, got {result[-1]}"
-        )
+        assert (
+            expected_range[0] <= result[-1] <= expected_range[1]
+        ), f"RSI for {price_type} should be in range {expected_range}, got {result[-1]}"
