@@ -23,8 +23,9 @@ Fields:
 - close (float)
 - volume (optional float)
   Constraints:
-- Must be strictly ordered by timestamp ascending.
-- Length must meet minimum lookback for indicators under test or warm-up logic applied.
+- Must be strictly ordered by timestamp ascending (fixture dependency for indicators).
+- Columns MUST appear in order: timestamp, open, high, low, close, (optional volume) to simplify parsing.
+- Length must meet minimum lookback for indicators under test OR warm-up logic applied; deterministic fixture scope is 10–300 rows (see `glossary.md`).
 
 ### Risk Parameters
 
@@ -58,6 +59,7 @@ Fields:
 - All fixtures must avoid missing OHLC values; tests assert non-null rows.
 - Risk sizing tests assert resulting position size > 0 and <= account_balance \* risk_fraction.
 - Indicator tests assert EMA warm-up produces expected first stable value after lookback period.
+  - Fixture validation tests assert column ordering and row count within supported range.
 
 ## State Transitions
 

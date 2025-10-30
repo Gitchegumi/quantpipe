@@ -34,8 +34,8 @@
 
 ### Flakiness Detection Approach
 
-- **Decision**: Run affected tests 3 times locally (scripted loop) when modifying logic to confirm stability before commit; performance tier may be run once due to cost.
-- **Rationale**: Quick manual loop is lightweight; avoids introducing dependency on external flakiness tools.
+- **Decision**: Run affected tests 3 times locally (scripted loop) when modifying logic to confirm stability before commit; performance tier may be run once due to cost. A test is classified as flaky if it fails ≥1 time in 3 consecutive runs under identical inputs or exhibits runtime variance >±20% of its tier budget without code changes.
+- **Rationale**: Quick manual loop is lightweight; avoids introducing dependency on external flakiness tools while providing objective classification threshold.
 - **Alternatives**: CI rerun integration (rejected: slower feedback), statistical timing harness (rejected: overkill).
 
 ### Naming Conventions
@@ -55,6 +55,16 @@
 - **Decision**: Explicit seeding (e.g., `random.seed(42)`/numpy seed) in any test introducing randomness; avoid randomness where feasible.
 - **Rationale**: Ensures repeatable outcomes.
 - **Alternatives**: No seeding (rejected: flakiness risk).
+
+### Threshold Interpretation Clarification
+
+- **Decision**: Tier time budgets (<5s unit, <30s integration, <120s performance) apply to cumulative marker run time, not individual test functions.
+- **Tolerance**: ±20% permitted for transient CI variance (e.g., network jitter, VM warm-up) but persistent breaches trigger investigation.
+- **Measurement**: Wall-clock measurement via `time.perf_counter()` around full `pytest -m <tier>` invocation.
+
+### Glossary Reference
+
+Formal definitions for deterministic, redundant, flaky, warm-up, fixture manifest, tier runtime maintained in `glossary.md` (eliminates ambiguity in FR-003, FR-004, FR-009, FR-011).
 
 ## Open Items Resolved
 

@@ -1,0 +1,28 @@
+fixtures:
+  - id: trend_v1
+    filename: fixture_trend_example.csv
+    scenario_type: trend
+    row_count: 10
+    checksum: "DE5E2EB75DC13541E1126A4D1E0CF1E2312C263F73C5782506543E9A06E6280B"
+    seed: 42
+    indicators_covered: [EMA20, EMA50, ATR14]
+    created: 2025-10-30T00:00:00Z
+    notes: "Upward drift with minor pullbacks"
+  - id: flat_v1
+    filename: fixture_flat_prices.csv
+    scenario_type: flat
+    row_count: 10
+    checksum: "E6D22BE1B908F72D482DEF4CFE91B26931E1094E4164CFF3A45651935205327D"
+    seed: 42
+    indicators_covered: [EMA20, EMA50]
+    created: 2025-10-30T00:00:00Z
+    notes: "Near-zero volatility for false-signal prevention"
+  - id: spike_v1
+    filename: fixture_spike_outlier.csv
+    scenario_type: spike
+    row_count: 10
+    checksum: "51D7872B6DFB40ED9B16A778A07DDE3B53CEB1F60CB690FAAE4357DC0B4CD07B"
+    seed: 99
+    indicators_covered: [ATR14]
+    created: 2025-10-30T00:00:00Z
+    notes: "Single large spike candle then stabilization"

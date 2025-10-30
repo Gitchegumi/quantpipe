@@ -6,10 +6,24 @@ including parameter configurations, temporary file paths, and sample data.
 """
 
 from pathlib import Path
+import random
+import numpy as np
 
 import pytest
 
 from src.config.parameters import StrategyParameters
+
+SEED = 42
+
+def _apply_global_seed():
+    """Apply global deterministic seed for tests.
+
+    Ensures repeatable outcomes for any test relying on random or numpy generation.
+    """
+    random.seed(SEED)
+    np.random.seed(SEED)
+
+_apply_global_seed()
 
 
 @pytest.fixture()

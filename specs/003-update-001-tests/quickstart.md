@@ -15,7 +15,7 @@ Realign and stabilize 001 strategy tests with deterministic fixtures and tiered 
    - `poetry run black src/ tests/`
    - `poetry run ruff check src/ tests/`
    - `poetry run pylint src/ --score=yes`
-7. Confirm runtime targets: unit <5s, integration <30s, performance <120s.
+7. Confirm runtime targets: unit <5s, integration <30s, performance <120s (suite cumulative). Allow ±20% tolerance for transient CI variance; consistent excess requires optimization or classification as flaky.
 8. Document removed tests in commit body.
 
 ## Markers
@@ -32,7 +32,7 @@ def test_indicator_ema_warmup_behavior(...):
 
 ## Fixture Design
 
-Use minimal OHLC CSVs in `tests/fixtures/` (10–300 rows). Provide edge case sets (flat, spike, trend).
+Use minimal OHLC CSVs in `tests/fixtures/` (10–300 rows). Provide edge case sets (flat, spike, trend). Columns MUST be ordered: timestamp, open, high, low, close, (optional volume). See `fixture-manifest.md` for required metadata fields.
 
 ## Stability Check
 
@@ -42,6 +42,8 @@ Loop test subset locally:
 1..3 | ForEach-Object { poetry run pytest -m unit }
 ```
 
+Interpretation: Any failure in these 3 runs OR runtime > tier budget + 20% flags the relevant test(s) for flakiness triage.
+
 ## Next
 
-Proceed to implementation tasks once redundant tests identified.
+Proceed to implementation tasks once redundant tests identified and glossary definitions accepted.

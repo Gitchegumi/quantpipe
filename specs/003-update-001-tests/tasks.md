@@ -4,15 +4,15 @@
 
 ## Phase 1: Setup (formerly Phase 0)
 
-- [ ] T001 Ensure Poetry environment installed (`poetry install`) at project root
-- [ ] T002 Create/verify `pytest.ini` with marker registrations in project root
-- [ ] T003 Create `tests/fixtures/` directory structure if absent
-- [ ] T004 Add initial deterministic fixture CSV `tests/fixtures/fixture_trend_example.csv`
-- [ ] T005 Add initial deterministic fixture CSV `tests/fixtures/fixture_flat_prices.csv`
-- [ ] T006 Add initial deterministic fixture CSV `tests/fixtures/fixture_spike_outlier.csv`
-- [ ] T006a Add fixture manifest `tests/fixtures/manifest.yaml` (source, symbol, timeframe, checksum, preprocessing summary)
-- [ ] T007 Add README note for fixtures in `tests/fixtures/README.md`
-- [ ] T008 Add seed helper `tests/conftest.py` (verify deterministic seeding) update
+- [x] T001 Ensure Poetry environment installed (`poetry install`) at project root
+- [x] T002 Create/verify `pytest.ini` with marker registrations in project root
+- [x] T003 Create `tests/fixtures/` directory structure if absent
+- [x] T004 Add initial deterministic fixture CSV `tests/fixtures/fixture_trend_example.csv`
+- [x] T005 Add initial deterministic fixture CSV `tests/fixtures/fixture_flat_prices.csv`
+- [x] T006 Add initial deterministic fixture CSV `tests/fixtures/fixture_spike_outlier.csv`
+- [x] T006a Add fixture manifest `tests/fixtures/manifest.yaml` (source, symbol, timeframe, checksum, preprocessing summary)
+- [x] T007 Add README note for fixtures in `tests/fixtures/README.md`
+- [x] T008 Add seed helper `tests/conftest.py` (verify deterministic seeding) update
 
 ## Phase 2: Tiering & Refactor (Foundational)
 
