@@ -84,6 +84,7 @@ Independent Test Criteria: Unit tier completes <5s with fixtures only; integrati
 User Story Order: US1 → US2 → US3 (priority-based). US1 provides baseline deterministic correctness; US2 reduces noise; US3 optimizes fixtures and timing.
 
 Key Dependencies:
+
 - T009 precedes all US1 tasks (directory realignment).
 - T011–T013 marker introduction precedes runtime assertion tasks (T040–T042).
 - Fixture creation (T004–T006) precedes indicator/signal tests (T020–T022).
