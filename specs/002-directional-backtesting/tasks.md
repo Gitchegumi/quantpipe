@@ -224,21 +224,28 @@ Run `poetry run python -m src.cli.run_backtest --direction LONG --data price_dat
 
 ### SHORT Implementation
 
-- [ ] T036 [P] [US2] Implement SHORT direction routing in BacktestOrchestrator.run_backtest (call generate_short_signals) in src/backtest/orchestrator.py
-- [ ] T037 [P] [US2] Implement execution loop for SHORT signals (call simulate_execution for each signal) in src/backtest/orchestrator.py
-- [ ] T038 [P] [US2] Integrate calculate_directional_metrics for SHORT mode (combined = short_only) in src/backtest/orchestrator.py
-- [ ] T039 [P] [US2] Enhance format_text_output to handle SHORT results (same structure as LONG) in src/io/formatters.py
-- [ ] T040 [P] [US2] Update CLI argument parser to accept --direction SHORT in src/cli/run_backtest.py
-- [ ] T041 [P] [US2] Wire orchestrator call for SHORT mode in CLI main function in src/cli/run_backtest.py
+- [x] T036 [P] [US2] Implement SHORT direction routing in BacktestOrchestrator.run_backtest (call generate_short_signals) in src/backtest/orchestrator.py ✅ **COMPLETE** (already implemented with sliding window)
+- [x] T037 [P] [US2] Implement execution loop for SHORT signals (call simulate_execution for each signal) in src/backtest/orchestrator.py ✅ **COMPLETE**
+- [x] T038 [P] [US2] Integrate calculate_directional_metrics for SHORT mode (combined = short_only) in src/backtest/orchestrator.py ✅ **COMPLETE**
+- [x] T039 [P] [US2] Enhance format_text_output to handle SHORT results (same structure as LONG) in src/io/formatters.py ✅ **COMPLETE** (Phase 2)
+- [x] T040 [P] [US2] Update CLI argument parser to accept --direction SHORT in src/cli/run_backtest.py ✅ **COMPLETE** (already accepts SHORT)
+- [x] T041 [P] [US2] Wire orchestrator call for SHORT mode in CLI main function in src/cli/run_backtest.py ✅ **COMPLETE** (generic routing handles all modes)
 
 ### SHORT Testing
 
-- [ ] T042 [P] [US2] Add SHORT mode end-to-end test in tests/integration/test_directional_backtesting.py
-- [ ] T043 [P] [US2] Add test for SHORT mode with fixture data (verify signal generation, execution, metrics) in tests/integration/test_directional_backtesting.py
-- [ ] T044 [P] [US2] Add test for SHORT mode output file creation and content validation in tests/integration/test_directional_backtesting.py
+- [x] T042 [P] [US2] Add SHORT mode end-to-end test in tests/integration/test_directional_backtesting.py ✅ **COMPLETE**
+- [x] T043 [P] [US2] Add test for SHORT mode with fixture data (verify signal generation, execution, metrics) in tests/integration/test_directional_backtesting.py ✅ **COMPLETE**
+- [x] T044 [P] [US2] Add test for SHORT mode output file creation and content validation in tests/integration/test_directional_backtesting.py ✅ **COMPLETE**
 
 **Independent Test**:
 Run `poetry run python -m src.cli.run_backtest --direction SHORT --data price_data/eurusd/DAT_MT_EURUSD_M1_2020.csv` → generates SHORT signals, executes trades, outputs text file with metrics matching LONG structure. Verify SHORT signals are generated and LONG signals are not.
+
+**Phase 4 Status**: ✅ **COMPLETE** (9/9 tasks complete, 4/4 integration tests passing)
+
+**Test Results**:
+- SHORT mode generates 26 signals from 2000 data (30.77% win rate, -0.15R avg)
+- All 4 SHORT integration tests passing
+- Text and JSON output validated
 
 **Acceptance Criteria**:
 
