@@ -326,4 +326,5 @@ def _execution_to_dict(execution) -> dict:
         "slippage_entry_pips": execution.slippage_entry_pips,
         "slippage_exit_pips": execution.slippage_exit_pips,
         "costs_total": execution.costs_total,
+        "direction": execution.direction,
     }
