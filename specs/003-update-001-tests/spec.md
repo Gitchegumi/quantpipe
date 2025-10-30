@@ -5,6 +5,12 @@
 **Status**: Draft
 **Input**: User description: "Update all 001 tests so that they work for the current code base. Either update the existing tests, or remove tests that are no longer relevant."
 
+## Clarifications
+
+### Session 2025-10-30
+
+- Q: Define performance test tiering approach → A: Three tiers: Unit (<5s), Integration (<30s), Performance (<120s)
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
@@ -94,6 +100,7 @@ Add or adjust fixtures so indicator and signal tests rely on controlled sample d
 - **FR-008**: Performance or timing-sensitive tests MUST complete within an acceptable threshold (<5 seconds for fixture-based unit subset).
 - **FR-009**: Any flaky test identified MUST be stabilized via fixture adjustment or logic correction before feature completion.
 - **FR-010**: Test names and docstrings MUST clearly state purpose and covered behavior for maintainability.
+- **FR-011**: The suite MUST categorize tests into three execution tiers: Unit (<5s), Integration (<30s), Performance (<120s); each tier documented and enforceable via naming or markers.
 
 No clarification markers required; defaults chosen based on existing strategy conventions.
 
@@ -114,9 +121,11 @@ No clarification markers required; defaults chosen based on existing strategy co
 
 - **SC-001**: 100% of retained 001 tests pass on first run of CI after update.
 - **SC-002**: Total count of 001 tests decreases only where redundancy/obsolescence is documented (net reduction <=30% unless justified).
-- **SC-003**: Deterministic subset (unit-level tests excluding integration) completes in <5 seconds on standard CI hardware.
+- **SC-003**: Unit tier (deterministic subset) completes in <5 seconds on standard CI hardware.
 - **SC-004**: Zero flaky reruns required across three consecutive CI runs post-change.
 - **SC-005**: Each functional requirement FR-001 through FR-010 has at least one direct test case asserting its behavior.
+- **SC-006**: Integration tier completes in <30 seconds on standard CI hardware.
+- **SC-007**: Performance tier (if present) completes in <120 seconds and is isolatable from default fast test run.
 
 ## Assumptions
 
