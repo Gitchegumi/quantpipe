@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Feature 004: Time Series Dataset Preparation (2025-10-30)
+
+- **Dataset Building Infrastructure** (Phase 1-2: T001-T014)
+  - Added `src/io/dataset_builder.py` with complete dataset orchestration
+  - Implements symbol discovery, schema validation, merge/sort with deduplication
+  - Deterministic 80/20 temporal partitioning (test/validation splits)
+  - Gap and overlap detection with appropriate logging levels
+  - Added `src/models/metadata.py` with MetadataRecord and BuildSummary models
+  - Comprehensive metadata tracking for reproducibility
+
+- **Single-Symbol Dataset CLI** (Phase 3: T015-T021)
+  - Added `src/cli/build_dataset.py` CLI for dataset generation
+  - Support for `--symbol <name>` to build specific symbol datasets
+  - Unit tests for partition logic in `tests/unit/test_dataset_split.py`
+  - Unit tests for metadata generation in `tests/unit/test_metadata_generation.py`
+  - Integration tests in `tests/integration/test_single_symbol_build.py`
+  - Updated quickstart documentation with usage examples
+
+- **Multi-Symbol Processing** (Phase 4: T022-T027)
+  - Extended CLI with `--all` flag for batch processing all symbols
+  - Added `--force` flag for rebuild capability
+  - Multi-symbol orchestration in `build_all_symbols()`
+  - Integration tests in `tests/integration/test_multi_symbol_build.py`
+  - Performance tests in `tests/performance/test_large_build_timing.py`
+  - Verified <2 min for 1M rows (actual: 7.22s - 16x faster)
+  - Summary validation tests in `tests/unit/test_summary_generation.py`
+
+- **Backtest Integration** (Phase 5: T028-T034)
+  - Added `src/io/partition_loader.py` for partition-aware data loading
+  - Extended `src/models/directional.py` with PartitionMetrics and SplitModeResult
+  - Added split-mode formatters in `src/io/formatters.py`
+  - Partition existence guards and helpful error messages
+  - Added `src/cli/run_split_backtest.py` for test/validation backtesting
+  - Integration tests in `tests/integration/test_backtest_split_mode.py`
+  - Updated README with partition-based workflow documentation
+
+- **Quality & Performance** (Final Phase: T035-T041)
+  - Verified complete docstrings and type hints across all modules
+  - Rich table formatting for build summaries (already implemented)
+  - Added partition metadata documentation to `src/backtest/reproducibility.py`
+  - Quality gates: Black ✓, Pylint 9.56/10 ✓, pytest 390 passing ✓
+  - Performance benchmarks added to README (1M rows in <10s)
+  - Created `tests/unit/test_gap_warning_levels.py` verifying logging behavior
+  - Fixed `test_flakiness_smoke.py` hang with pytest markers
+
+- **Utilities**
+  - Added `scripts/convert_mt_format.py` for MetaTrader CSV conversion
+  - Converts headerless MT format to standard timestamp+OHLCV format
+  - Batch processing support for entire directories
+
+- **Testing**
+  - 78 tests passing for feature-004 functionality
+  - Performance validated: 8.6M rows processed in 54 seconds
+  - Memory efficient: ~200MB for 1M rows, no chunking needed
+
 ### Added - Phase 6: Polish & Cross-Cutting (2025-10-29)
 
 - **Statistical Significance Testing** (T055)

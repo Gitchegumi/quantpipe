@@ -94,7 +94,9 @@ class TestMetadataGeneration:
         end = datetime(2020, 1, 1, tzinfo=timezone.utc)  # Before start!
         validation_start = datetime(2020, 1, 1, 12, 0, tzinfo=timezone.utc)
 
-        with pytest.raises(ValueError, match="end_timestamp must be >= start_timestamp"):
+        with pytest.raises(
+            ValueError, match="end_timestamp must be >= start_timestamp"
+        ):
             build_metadata(
                 symbol="eurusd",
                 total_rows=600,
@@ -114,7 +116,9 @@ class TestMetadataGeneration:
         end = datetime(2020, 1, 2, tzinfo=timezone.utc)
         validation_start = datetime(2020, 1, 3, tzinfo=timezone.utc)  # After end!
 
-        with pytest.raises(ValueError, match="validation_start_timestamp must be between"):
+        with pytest.raises(
+            ValueError, match="validation_start_timestamp must be between"
+        ):
             build_metadata(
                 symbol="eurusd",
                 total_rows=600,

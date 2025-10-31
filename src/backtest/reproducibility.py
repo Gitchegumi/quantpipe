@@ -12,7 +12,54 @@ The service accumulates:
 - Candle processing order
 - Random seed (if applicable)
 - Software version
+
+**Partition Metadata Integration (Feature 004-timeseries-dataset):**
+
+When using partition-based backtesting (test/validation splits), reproducibility
+tracking should reference the partition metadata file to ensure consistent data:
+
+1. **Metadata Reference**: Instead of raw file manifests, reference the partition
+   metadata.json which contains:
+   - Exact row counts (total_rows, test_rows, validation_rows)
+   - Timestamp ranges (start_timestamp, end_timestamp, validation_start_timestamp)
+   - Build timestamp and source files
+   - Gap/overlap counts
+
+2. **Partition-Aware Tracking**: For split-mode backtests, create separate
+   reproducibility trackers for test and validation partitions:
+
+   ```python
+   # Test partition tracker
+   test_tracker = ReproducibilityTracker(
+       parameters_hash=params_hash,
+       manifest_ref="price_data/processed/eurusd/metadata.json#test",
+       version="0.1.0"
+   )
+
+   # Validation partition tracker
+   val_tracker = ReproducibilityTracker(
+       parameters_hash=params_hash,
+       manifest_ref="price_data/processed/eurusd/metadata.json#validation",
+       version="0.1.0"
+   )
+   ```
+
+3. **Benefits**:
+   - Ensures exact same partition boundaries across runs
+   - Prevents accidental data contamination (test/validation mixing)
+   - Enables verification that validation metrics came from held-out data
+   - Documents which dataset version was used (via build_timestamp)
+
+4. **Verification**: When comparing backtest runs, verify:
+   - Same partition metadata (by hash or timestamp)
+   - Same strategy parameters
+   - Same software version
+   → Identical results guaranteed (SC-004)
+
+Implementation: T037
 """
+
+# pylint: disable=line-too-long
 
 import hashlib
 import logging

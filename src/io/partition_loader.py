@@ -122,7 +122,9 @@ def load_partition(
         logger.error(msg)
         raise FileNotFoundError(msg)
 
-    logger.info("Loading %s partition for symbol %s from %s", partition, symbol, partition_csv)
+    logger.info(
+        "Loading %s partition for symbol %s from %s", partition, symbol, partition_csv
+    )
 
     # Use existing ingestion pipeline
     candles = list(

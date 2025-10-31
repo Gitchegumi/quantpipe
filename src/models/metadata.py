@@ -98,7 +98,11 @@ class MetadataRecord(BaseModel):
                 f"({self.validation_rows}) must equal total_rows ({self.total_rows})"
             )
 
-        if not self.start_timestamp <= self.validation_start_timestamp <= self.end_timestamp:
+        if (
+            not self.start_timestamp
+            <= self.validation_start_timestamp
+            <= self.end_timestamp
+        ):
             raise ValueError(
                 "validation_start_timestamp must be between start and end timestamps"
             )
@@ -137,7 +141,10 @@ class BuildSummary(BaseModel):
 
     def model_post_init(self, __context) -> None:
         """Validate row count consistency."""
-        if self.total_test_rows + self.total_validation_rows != self.total_rows_processed:
+        if (
+            self.total_test_rows + self.total_validation_rows
+            != self.total_rows_processed
+        ):
             raise ValueError(
                 f"total_test_rows ({self.total_test_rows}) + "
                 f"total_validation_rows ({self.total_validation_rows}) must equal "

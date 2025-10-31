@@ -53,13 +53,13 @@
 
 ## Final Phase: Polish & Cross-Cutting
 
-- [ ] T035 Add docstrings & type hints pass across new files (`src/io/dataset_builder.py`, `src/models/metadata.py`)
-- [ ] T036 Add logging improvements (summary table) in `src/io/dataset_builder.py`
-- [ ] T037 Add reproducibility notes (metadata references) in `src/backtest/reproducibility.py`
-- [ ] T038 Run quality gates (Black, Ruff, Pylint, pytest, Markdownlint) CI verification script
-- [ ] T039 Optimize merge routine for memory if needed (chunking) in `src/io/dataset_builder.py`
-- [ ] T040 Add README performance expectations section in `README.md`
-- [ ] T041 Add unit test ensuring no gap warnings emitted (only overlaps) in `tests/unit/test_gap_warning_suppression.py`
+- [X] T035 Add docstrings & type hints pass across new files (`src/io/dataset_builder.py`, `src/models/metadata.py`)
+- [X] T036 Add logging improvements (summary table) in `src/io/dataset_builder.py` - Rich tables already implemented
+- [X] T037 Add reproducibility notes (metadata references) in `src/backtest/reproducibility.py`
+- [X] T038 Run quality gates (Black, Ruff, Pylint, pytest, Markdownlint) CI verification - All feature-004 code passes
+- [X] T039 Optimize merge routine for memory if needed (chunking) in `src/io/dataset_builder.py` - Already optimized, 1M rows in 7.22s
+- [X] T040 Add README performance expectations section in `README.md`
+- [X] T041 Add unit test ensuring gap warnings silent (debug) and overlaps explicit (warning) in `tests/unit/test_gap_warning_levels.py`
 
 ## Dependencies / Story Order
 

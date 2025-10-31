@@ -371,13 +371,15 @@ def format_split_mode_text(result: SplitModeResult) -> str:
     test_metrics = result.test_partition.metrics
     lines.extend(_format_metrics_section(test_metrics))
 
-    lines.extend([
-        "",
-        "=" * 80,
-        "VALIDATION PARTITION METRICS",
-        "=" * 80,
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "=" * 80,
+            "VALIDATION PARTITION METRICS",
+            "=" * 80,
+            "",
+        ]
+    )
 
     # Format validation partition metrics
     val_metrics = result.validation_partition.metrics
@@ -400,17 +402,21 @@ def _format_metrics_section(metrics) -> list[str]:
             "-" * 80,
         ]
         lines.extend(_format_single_metrics(metrics.combined))
-        lines.extend([
-            "",
-            "LONG-ONLY METRICS",
-            "-" * 80,
-        ])
+        lines.extend(
+            [
+                "",
+                "LONG-ONLY METRICS",
+                "-" * 80,
+            ]
+        )
         lines.extend(_format_single_metrics(metrics.long_only))
-        lines.extend([
-            "",
-            "SHORT-ONLY METRICS",
-            "-" * 80,
-        ])
+        lines.extend(
+            [
+                "",
+                "SHORT-ONLY METRICS",
+                "-" * 80,
+            ]
+        )
         lines.extend(_format_single_metrics(metrics.short_only))
     elif isinstance(metrics, MetricsSummary):
         lines = _format_single_metrics(metrics)
@@ -497,4 +503,3 @@ def _serialize_single_metrics(metrics) -> dict:
         "latency_p95_ms": metrics.latency_p95_ms,
         "latency_mean_ms": metrics.latency_mean_ms,
     }
-

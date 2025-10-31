@@ -124,10 +124,10 @@ class TestPartitionLogic:
     @staticmethod
     def _create_sample_df(n_rows: int) -> pd.DataFrame:
         """Create sample DataFrame with chronological timestamps.
-        
+
         Args:
             n_rows: Number of rows to create
-            
+
         Returns:
             DataFrame with timestamp and OHLCV columns
         """
