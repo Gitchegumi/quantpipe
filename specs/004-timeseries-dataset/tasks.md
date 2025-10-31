@@ -43,13 +43,13 @@
 
 ## Phase 5: User Story 3 (P3) Backtest Integration
 
-- [ ] T028 [US3] Refactor backtest data loading to add partition-aware loader in `src/backtest/orchestrator.py`
-- [ ] T029 [US3] Modify backtest metrics ingestion to separate test vs validation metrics in `src/backtest/metrics_ingest.py`
-- [ ] T030 [US3] Add validation metrics output structure in `src/backtest/metrics.py`
-- [ ] T031 [US3] Implement guard/warning when partitions missing in `src/backtest/orchestrator.py`
-- [ ] T032 [US3] Add CLI/backtest mode flag `--mode split` in `src/cli/backtest.py`
-- [ ] T033 [US3] Implement integration test backtest using partitions in `tests/integration/test_backtest_split_mode.py`
-- [ ] T034 [US3] Update README with partition-based backtest description in `README.md`
+- [X] T028 [US3] Refactor backtest data loading to add partition-aware loader in `src/io/partition_loader.py`
+- [X] T029 [US3] Modify backtest metrics ingestion to separate test vs validation metrics in `src/models/directional.py`
+- [X] T030 [US3] Add validation metrics output structure in `src/models/directional.py` and `src/io/formatters.py`
+- [X] T031 [US3] Implement guard/warning when partitions missing in `src/io/partition_loader.py`
+- [X] T032 [US3] Add CLI split-mode backtest script in `src/cli/run_split_backtest.py`
+- [X] T033 [US3] Implement integration test backtest using partitions in `tests/integration/test_backtest_split_mode.py`
+- [X] T034 [US3] Update README with partition-based backtest description in `README.md`
 
 ## Final Phase: Polish & Cross-Cutting
 
