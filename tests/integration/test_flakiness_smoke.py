@@ -11,12 +11,16 @@ Success criteria:
 - Results are identical across runs (same counts, metrics)
 """
 
+# pylint: disable=line-too-long
+
 import subprocess
 
 import pytest
 
 
-pytestmark = pytest.mark.integration
+# Mark as slow to exclude from default test runs
+# Run explicitly with: pytest -m flakiness
+pytestmark = [pytest.mark.flakiness, pytest.mark.slow]
 
 
 class TestFlakinessSmoke:

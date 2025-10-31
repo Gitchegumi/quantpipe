@@ -1,0 +1,17 @@
+{
+  "symbol": "eurusd",
+  "total_rows": 600,
+  "test_rows": 480,
+  "validation_rows": 120,
+  "start_timestamp": "2020-01-01T00:00:00Z",
+  "end_timestamp": "2020-01-01T09:59:00Z",
+  "validation_start_timestamp": "2020-01-01T08:00:00Z",
+  "gap_count": 0,
+  "overlap_count": 0,
+  "canonical_timezone": "UTC",
+  "build_timestamp": "2025-10-30T18:28:57.604552Z",
+  "schema_version": "v1",
+  "source_files": [
+    "tests\\fixtures\\raw\\eurusd\\eurusd_test.csv"
+  ]
+}

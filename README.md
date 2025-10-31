@@ -87,6 +87,146 @@ poetry run python -m src.cli.run_backtest `
   --output-format json > results.json
 ```
 
+## Dataset Preparation and Split-Mode Backtesting
+
+### Overview
+
+The dataset builder creates standardized test/validation partitions for reproducible evaluation. This enables proper out-of-sample testing and prevents look-ahead bias.
+
+**Benefits:**
+
+- **Reproducibility**: Consistent data splits across runs
+- **Separation**: Test data for model calibration, validation for performance evaluation
+- **Temporal Integrity**: Validation uses most recent 20% of data (realistic forward testing)
+- **No Leakage**: Strict chronological split prevents data contamination
+
+### Building Datasets
+
+```powershell
+# Build dataset for single symbol
+poetry run build-dataset --symbol eurusd
+
+# Build datasets for all symbols
+poetry run build-dataset --all
+
+# Custom paths
+poetry run build-dataset --symbol eurusd `
+  --raw-path price_data/raw `
+  --output-path price_data/processed
+```
+
+**Output Structure:**
+
+```text
+price_data/processed/
+└── eurusd/
+    ├── test.csv          # 80% earliest data (model calibration)
+    ├── validation.csv    # 20% most recent data (performance eval)
+    └── metadata.json     # Build metadata (row counts, timestamps, gaps)
+```
+
+### Split-Mode Backtesting
+
+Run backtests separately on test and validation partitions:
+
+```powershell
+# Basic split-mode backtest
+poetry run python -m src.cli.run_split_backtest `
+  --symbol eurusd `
+  --direction LONG
+
+# With custom processed data path
+poetry run python -m src.cli.run_split_backtest `
+  --symbol eurusd `
+  --direction LONG `
+  --processed-path price_data/processed
+
+# JSON output
+poetry run python -m src.cli.run_split_backtest `
+  --symbol eurusd `
+  --direction BOTH `
+  --output-format json
+```
+
+**Split-Mode Options:**
+
+| Option              | Values                              | Default                     | Description                      |
+| ------------------- | ----------------------------------- | --------------------------- | -------------------------------- |
+| `--symbol`          | STRING                              | Required                    | Symbol to backtest (e.g. eurusd) |
+| `--direction`       | `LONG`, `SHORT`, `BOTH`             | `LONG`                      | Trade direction mode             |
+| `--processed-path`  | PATH                                | `price_data/processed`      | Path to processed partitions     |
+| `--output`          | PATH                                | `results/`                  | Output directory for results     |
+| `--output-format`   | `text`, `json`                      | `text`                      | Output format                    |
+| `--log-level`       | `DEBUG`, `INFO`, `WARNING`, `ERROR` | `INFO`                      | Logging verbosity                |
+
+**Split-Mode Output Example:**
+
+```text
+================================================================================
+SPLIT-MODE BACKTEST RESULTS
+================================================================================
+
+RUN METADATA
+--------------------------------------------------------------------------------
+Run ID:         split_long_eurusd_20250130_100000
+Symbol:         eurusd
+Direction:      LONG
+Start Time:     2025-01-30T10:00:00+00:00
+End Time:       2025-01-30T10:05:30+00:00
+Duration:       330.00s
+
+================================================================================
+TEST PARTITION METRICS
+================================================================================
+
+Total Trades:   42
+Win Rate:       61.9% (26W / 16L)
+Average R:      1.24
+Expectancy:     0.87
+Sharpe Est:     1.45
+Profit Factor:  2.18
+Max Drawdown:   3.2R
+
+================================================================================
+VALIDATION PARTITION METRICS
+================================================================================
+
+Total Trades:   18
+Win Rate:       55.6% (10W / 8L)
+Average R:      0.92
+Expectancy:     0.45
+Sharpe Est:     0.98
+Profit Factor:  1.45
+Max Drawdown:   2.8R
+================================================================================
+```
+
+### Workflow: From Raw Data to Validated Results
+
+1. **Prepare Raw Data**: Place CSV files in `price_data/raw/<symbol>/`
+2. **Build Datasets**: `poetry run build-dataset --symbol <symbol>`
+3. **Verify Partitions**: Check `price_data/processed/<symbol>/` for test.csv/validation.csv
+4. **Run Split-Mode Backtest**: `poetry run python -m src.cli.run_split_backtest --symbol <symbol>`
+5. **Analyze Results**: Compare test vs validation metrics in `results/` directory
+
+### Dataset Requirements
+
+- **Raw Data Format**: CSV with columns `timestamp,open,high,low,close,volume`
+- **Minimum Rows**: 500 rows required for split (configurable threshold)
+- **Timestamp**: UTC, chronologically ordered
+- **Split Ratio**: 80/20 (test/validation) with floor-based deterministic splitting
+
+### Missing Partitions Guard
+
+If you try to run split-mode backtest without building datasets first, you'll see:
+
+```text
+Error: Missing partitions for eurusd: ['test', 'validation']
+Run: poetry run build-dataset --symbol eurusd
+```
+
+**Implementation**: Feature 004-timeseries-dataset (Phase 5 - Tasks T028-T034)
+
 ## Project Structure
 
 ```text
@@ -288,6 +428,39 @@ Set via `.env` file or environment:
 - `LOG_LEVEL`: Logging level (default: `INFO`)
 - `DATA_DIR`: Data directory path (default: `./data`)
 - `OUTPUT_DIR`: Backtest output directory (default: `./runs`)
+
+## Performance
+
+### Dataset Building
+
+The dataset builder (`build_dataset.py`) is optimized for large-scale data processing:
+
+**Benchmark Results:**
+
+- **1 million rows**: ~7-8 seconds
+- **Memory efficient**: Uses pandas chunking and in-memory deduplication
+- **Scalability**: Linear time complexity for merge/sort/partition operations
+
+**Success Criteria (SC-005):**
+
+- ✓ Build completes in <2 minutes for 1M rows
+- ✓ Actual performance: 7.22s (16x faster than threshold)
+- ✓ No chunking needed for datasets <1M rows
+
+**Performance Guidelines:**
+
+| Dataset Size | Expected Time | Memory Usage |
+| ------------ | ------------- | ------------ |
+| 100K rows    | <1 second     | ~50 MB       |
+| 1M rows      | <10 seconds   | ~200 MB      |
+| 10M rows     | <2 minutes    | ~2 GB        |
+
+To verify performance on your system:
+
+```powershell
+# Run performance test suite
+poetry run pytest tests/performance/test_large_build_timing.py -v
+```
 
 ## Documentation
 

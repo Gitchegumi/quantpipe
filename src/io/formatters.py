@@ -3,13 +3,14 @@ Output formatters for directional backtesting results.
 
 This module provides functions to format backtest results into human-readable
 text and JSON formats, including filename generation with timestamps.
+Supports both single-mode and split-mode (test/validation) outputs.
 """
 
 import json
 import logging
 from datetime import datetime
 
-from src.models.directional import BacktestResult
+from src.models.directional import BacktestResult, SplitModeResult
 from src.models.enums import DirectionMode, OutputFormat
 
 
@@ -328,4 +329,177 @@ def _execution_to_dict(execution) -> dict:
         "slippage_exit_pips": execution.slippage_exit_pips,
         "costs_total": execution.costs_total,
         "direction": execution.direction,
+    }
+
+
+def format_split_mode_text(result: SplitModeResult) -> str:
+    """
+    Format split-mode backtest result as human-readable text.
+
+    Produces a structured text report showing test and validation metrics
+    side-by-side for reproducible evaluation.
+
+    Args:
+        result: Split-mode backtest result containing test/validation metrics.
+
+    Returns:
+        Formatted text string.
+
+    Implementation: T030
+    """
+    lines = [
+        "=" * 80,
+        "SPLIT-MODE BACKTEST RESULTS",
+        "=" * 80,
+        "",
+        "RUN METADATA",
+        "-" * 80,
+        f"Run ID:         {result.run_id}",
+        f"Symbol:         {result.symbol}",
+        f"Direction:      {result.direction_mode}",
+        f"Start Time:     {result.start_time.isoformat()}",
+        f"End Time:       {result.end_time.isoformat()}",
+        f"Duration:       {(result.end_time - result.start_time).total_seconds():.2f}s",
+        "",
+        "=" * 80,
+        "TEST PARTITION METRICS",
+        "=" * 80,
+        "",
+    ]
+
+    # Format test partition metrics
+    test_metrics = result.test_partition.metrics
+    lines.extend(_format_metrics_section(test_metrics))
+
+    lines.extend(
+        [
+            "",
+            "=" * 80,
+            "VALIDATION PARTITION METRICS",
+            "=" * 80,
+            "",
+        ]
+    )
+
+    # Format validation partition metrics
+    val_metrics = result.validation_partition.metrics
+    lines.extend(_format_metrics_section(val_metrics))
+
+    lines.append("=" * 80)
+
+    return "\n".join(lines)
+
+
+def _format_metrics_section(metrics) -> list[str]:
+    """Helper to format a MetricsSummary or DirectionalMetrics section."""
+    from src.models.directional import DirectionalMetrics
+    from src.models.core import MetricsSummary
+
+    if isinstance(metrics, DirectionalMetrics):
+        # Directional metrics (BOTH mode)
+        lines = [
+            "COMBINED METRICS",
+            "-" * 80,
+        ]
+        lines.extend(_format_single_metrics(metrics.combined))
+        lines.extend(
+            [
+                "",
+                "LONG-ONLY METRICS",
+                "-" * 80,
+            ]
+        )
+        lines.extend(_format_single_metrics(metrics.long_only))
+        lines.extend(
+            [
+                "",
+                "SHORT-ONLY METRICS",
+                "-" * 80,
+            ]
+        )
+        lines.extend(_format_single_metrics(metrics.short_only))
+    elif isinstance(metrics, MetricsSummary):
+        lines = _format_single_metrics(metrics)
+    else:
+        lines = [f"Unknown metrics type: {type(metrics)}"]
+
+    return lines
+
+
+def _format_single_metrics(metrics) -> list[str]:
+    """Helper to format a single MetricsSummary."""
+    return [
+        f"Total Trades:   {metrics.trade_count}",
+        f"Win Rate:       {metrics.win_rate:.2%} ({metrics.win_count}W / {metrics.loss_count}L)",
+        f"Average R:      {metrics.avg_r:.2f}",
+        f"Expectancy:     {metrics.expectancy:.2f}",
+        f"Sharpe Est:     {metrics.sharpe_estimate:.2f}",
+        f"Profit Factor:  {metrics.profit_factor:.2f}",
+        f"Max Drawdown:   {metrics.max_drawdown_r:.2f}R",
+    ]
+
+
+def format_split_mode_json(result: SplitModeResult) -> str:
+    """
+    Format split-mode backtest result as JSON.
+
+    Produces machine-readable JSON output with test and validation metrics.
+
+    Args:
+        result: Split-mode backtest result containing test/validation metrics.
+
+    Returns:
+        JSON string.
+
+    Implementation: T030
+    """
+    from src.models.directional import DirectionalMetrics
+
+    def serialize_metrics(metrics):
+        """Serialize MetricsSummary or DirectionalMetrics to dict."""
+        if isinstance(metrics, DirectionalMetrics):
+            return {
+                "type": "DirectionalMetrics",
+                "long_only": _serialize_single_metrics(metrics.long_only),
+                "short_only": _serialize_single_metrics(metrics.short_only),
+                "combined": _serialize_single_metrics(metrics.combined),
+            }
+        else:
+            return _serialize_single_metrics(metrics)
+
+    output = {
+        "run_id": result.run_id,
+        "symbol": result.symbol,
+        "direction_mode": result.direction_mode,
+        "start_time": result.start_time.isoformat(),
+        "end_time": result.end_time.isoformat(),
+        "test_partition": {
+            "partition": result.test_partition.partition,
+            "metrics": serialize_metrics(result.test_partition.metrics),
+        },
+        "validation_partition": {
+            "partition": result.validation_partition.partition,
+            "metrics": serialize_metrics(result.validation_partition.metrics),
+        },
+    }
+
+    return json.dumps(output, indent=2)
+
+
+def _serialize_single_metrics(metrics) -> dict:
+    """Helper to serialize a single MetricsSummary to dict."""
+    return {
+        "trade_count": metrics.trade_count,
+        "win_count": metrics.win_count,
+        "loss_count": metrics.loss_count,
+        "win_rate": metrics.win_rate,
+        "avg_win_r": metrics.avg_win_r,
+        "avg_loss_r": metrics.avg_loss_r,
+        "avg_r": metrics.avg_r,
+        "expectancy": metrics.expectancy,
+        "sharpe_estimate": metrics.sharpe_estimate,
+        "profit_factor": metrics.profit_factor,
+        "max_drawdown_r": metrics.max_drawdown_r,
+        "latency_p95_ms": metrics.latency_p95_ms,
+        "latency_mean_ms": metrics.latency_mean_ms,
     }

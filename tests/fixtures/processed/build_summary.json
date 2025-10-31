@@ -1,0 +1,12 @@
+{
+  "build_timestamp": "2025-10-30T18:28:57.594337Z",
+  "build_completed_at": "2025-10-30T18:28:57.611146Z",
+  "symbols_processed": [
+    "eurusd"
+  ],
+  "symbols_skipped": [],
+  "total_rows_processed": 600,
+  "total_test_rows": 480,
+  "total_validation_rows": 120,
+  "duration_seconds": 0.016809
+}

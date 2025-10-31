@@ -2,13 +2,18 @@
 Data models for directional backtesting system.
 
 This module extends core.py with directional-specific models for
-conflict tracking, directional metrics, and backtest results.
+conflict tracking, directional metrics, backtest results, and
+partition-aware metrics for split-mode evaluation.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 
 from .core import MetricsSummary, TradeSignal
+
+
+PartitionType = Literal["test", "validation"]
 
 
 @dataclass(frozen=True)
@@ -95,6 +100,95 @@ class DirectionalMetrics:
     long_only: MetricsSummary
     short_only: MetricsSummary
     combined: MetricsSummary
+
+
+@dataclass(frozen=True)
+class PartitionMetrics:
+    """
+    Performance metrics annotated with partition type.
+
+    Wraps MetricsSummary or DirectionalMetrics with partition identifier
+    to distinguish test vs validation results in split-mode backtesting.
+
+    Attributes:
+        partition: Partition type ('test' or 'validation').
+        metrics: Performance metrics for this partition.
+
+    Examples:
+        >>> test_metrics = MetricsSummary(
+        ...     trade_count=100,
+        ...     win_rate=0.55,
+        ...     avg_r=1.2,
+        ...     sharpe_estimate=1.1,
+        ...     max_drawdown_r=5.0,
+        ...     max_drawdown_pct=0.10
+        ... )
+        >>> partition_result = PartitionMetrics(
+        ...     partition='test',
+        ...     metrics=test_metrics
+        ... )
+        >>> partition_result.partition
+        'test'
+        >>> partition_result.metrics.trade_count
+        100
+
+    Implementation: T030
+    """
+
+    partition: PartitionType
+    metrics: MetricsSummary | DirectionalMetrics
+
+
+@dataclass(frozen=True)
+class SplitModeResult:
+    """
+    Complete backtest result for split-mode execution.
+
+    Contains separate results for test and validation partitions, enabling
+    reproducible evaluation with distinct training/validation phases.
+
+    Attributes:
+        run_id: Unique identifier for this split-mode backtest run.
+        symbol: Symbol identifier (e.g., 'eurusd').
+        direction_mode: Direction mode used (LONG, SHORT, or BOTH).
+        start_time: Backtest start timestamp (UTC).
+        end_time: Backtest completion timestamp (UTC).
+        test_partition: Test partition metrics and metadata.
+        validation_partition: Validation partition metrics and metadata.
+
+    Examples:
+        >>> from datetime import datetime, timezone
+        >>> from src.models.enums import DirectionMode
+        >>> test_result = PartitionMetrics(
+        ...     partition='test',
+        ...     metrics=test_metrics
+        ... )
+        >>> val_result = PartitionMetrics(
+        ...     partition='validation',
+        ...     metrics=val_metrics
+        ... )
+        >>> split_result = SplitModeResult(
+        ...     run_id="20250130_split_LONG_eurusd",
+        ...     symbol="eurusd",
+        ...     direction_mode=DirectionMode.LONG,
+        ...     start_time=datetime(2025, 1, 30, 10, 0, tzinfo=timezone.utc),
+        ...     end_time=datetime(2025, 1, 30, 10, 5, tzinfo=timezone.utc),
+        ...     test_partition=test_result,
+        ...     validation_partition=val_result
+        ... )
+        >>> split_result.test_partition.partition
+        'test'
+
+    Implementation: T030
+    """
+
+    run_id: str
+    symbol: str
+    direction_mode: str  # DirectionMode value (stored as string for JSON)
+    start_time: datetime
+    end_time: datetime
+    test_partition: PartitionMetrics
+    validation_partition: PartitionMetrics
 
 
 @dataclass(frozen=True)

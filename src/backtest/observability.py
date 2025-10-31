@@ -3,6 +3,17 @@ Observability reporter for backtest monitoring and diagnostics.
 
 Provides real-time progress reporting, performance metrics logging, and
 diagnostic information during backtest execution.
+
+Logging Standards (Constitution Principle X):
+    - MUST use lazy % formatting: logger.info("Processing %d items", count)
+    - PROHIBITED: F-strings in logging: logger.info(f"Processing {count} items")
+    - All logging calls must pass arguments separately, not interpolated strings
+
+Example (Correct):
+    logger.info("Building dataset for symbol %s with %d rows", symbol, row_count)
+
+Example (Incorrect):
+    logger.info(f"Building dataset for symbol {symbol} with {row_count} rows")
 """
 
 import logging
