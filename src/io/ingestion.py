@@ -12,6 +12,8 @@ The ingestion process:
 4. Yields Candle objects one at a time
 """
 
+# pylint: disable=unused-variable
+
 import logging
 from collections.abc import Iterator
 from datetime import datetime, timedelta
@@ -120,6 +122,20 @@ def ingest_candles(
     # Read CSV
     try:
         df = pd.read_csv(csv_path)
+
+        # Accept both 'timestamp' and 'timestamp_utc' column names
+        timestamp_col = None
+        if "timestamp_utc" in df.columns:
+            timestamp_col = "timestamp_utc"
+        elif "timestamp" in df.columns:
+            timestamp_col = "timestamp"
+            # Rename to timestamp_utc for internal consistency
+            df = df.rename(columns={"timestamp": "timestamp_utc"})
+        else:
+            raise KeyError(
+                "No timestamp column found (expected 'timestamp' or 'timestamp_utc')"
+            )
+
         # Convert timestamp column to datetime if it's not already
         if not pd.api.types.is_datetime64_any_dtype(df["timestamp_utc"]):
             df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"])
@@ -185,7 +201,8 @@ def ingest_candles(
                 gap_minutes = actual_delta.total_seconds() / 60
                 if allow_gaps:
                     logger.warning(
-                        "Timestamp gap detected (allowing): expected %dm, actual %.1fm at %s",
+                        "Timestamp gap detected (allowing): \
+expected %dm, actual %.1fm at %s",
                         expected_timeframe_minutes,
                         gap_minutes,
                         current_timestamp,

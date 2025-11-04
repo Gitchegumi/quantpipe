@@ -72,14 +72,21 @@ def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
     """
     logger.info("Converting MetaTrader CSV format")
 
+    # Check if file is already in correct format by reading first line
+    first_line = csv_path.read_text(encoding="utf-8").split("\n")[0].lower()
+    if "timestamp" in first_line:
+        logger.info("File already in correct format, skipping conversion")
+        return csv_path
+
     # Read CSV (MetaTrader format: Date,Time,Open,High,Low,Close,Volume)
     df = pd.read_csv(
         csv_path,
         header=None,
         names=["date", "time", "open", "high", "low", "close", "volume"],
+        dtype=str,  # Read all as strings to avoid mixed type issues
     )
 
-    # Combine date and time into timestamp
+    # Combine date and time into timestamp (both are now strings)
     df["timestamp_utc"] = pd.to_datetime(
         df["date"] + " " + df["time"], format="%Y.%m.%d %H:%M"
     )
