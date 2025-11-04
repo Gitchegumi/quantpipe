@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Feature 005: Documentation Restructure (2025-11-03)
+
+- Separated end-user and contributor concerns:
+  - Trimmed `README.md` to overview, 3-command Quick Start, minimal CLI usage, and documentation links.
+  - Migrated environment setup, quality gates, test strategy, branching workflow, and logging rules into contributor guide (now `CONTRIBUTING.md`).
+- Introduced `docs/` directory for conceptual documentation:
+  - `docs/strategies.md` (strategy summaries & spec pointers)
+  - `docs/backtesting.md` (dataset & metrics methodology)
+  - `docs/structure.md` (repository layout reference)
+- Added feature specification `specs/005-docs-restructure/spec.md` capturing requirements & success metrics.
+- Ensured internal links updated and redundant sections removed from README.
+- Added this CHANGELOG entry documenting rationale and scope.
+
 ### Added - Feature 004: Time Series Dataset Preparation (2025-10-30)
 
 - **Dataset Building Infrastructure** (Phase 1-2: T001-T014)

@@ -1,0 +1,108 @@
+# Backtesting & Dataset Methodology
+
+This document explains how datasets are prepared and how the backtesting framework evaluates strategies.
+
+## Goals
+
+* Deterministic, reproducible results
+* Clear separation between calibration ("test") and evaluation ("validation")
+* Transparent risk and performance metrics
+
+## Data Preparation Workflow
+
+1. Place raw symbol data under `price_data/raw/<symbol>/` (CSV files).
+2. Run dataset builder to normalize, sort, and partition:
+
+   ```powershell
+   poetry run build-dataset --symbol eurusd
+   ```
+
+3. Generated structure:
+
+   ```text
+   price_data/processed/<symbol>/
+     test.csv         # Earliest 80%
+     validation.csv   # Most recent 20%
+     metadata.json    # Row counts, time span, integrity info
+   ```
+
+### Partition Logic
+
+* 80/20 chronological split (floor-based index boundary)
+* Prevents look-ahead leakage
+* Validation partition always represents most recent market conditions
+
+### Integrity Checks
+
+| Check | Description |
+|-------|-------------|
+| Chronology | Timestamps strictly increasing |
+| Column Presence | `timestamp,open,high,low,close,volume` required |
+| Gaps | Logged if missing intervals detected |
+| Row Counts | Stored in metadata for reproducibility audits |
+
+## Backtest Modes
+
+| Mode | Command | Purpose |
+|------|---------|---------|
+| Single run | `src.cli.run_backtest` | Run on any CSV file |
+| Split-mode | `src.cli.run_split_backtest` | Automatically evaluate test & validation partitions |
+
+### Example Split Run
+
+```powershell
+poetry run python -m src.cli.run_split_backtest --symbol eurusd --direction LONG
+```
+
+## Execution Model
+
+* Event-loop processes candles sequentially
+* Strategy produces signals (enter/hold/exit)
+* Risk module sizes position & applies ATR-based stops
+* Metrics aggregator records trade + equity statistics
+
+## Metrics (Glossary)
+
+| Metric | Meaning | Notes |
+|--------|---------|-------|
+| Trades | Count of closed trades | Excludes open positions at end |
+| Win Rate | Wins / Trades (%) | Rounded to 1 decimal |
+| Average R | Mean R-multiple per trade | R = (PnL / initial risk) |
+| Expectancy | Average R including losers | Indicator of edge |
+| Max Drawdown (R) | Peak-to-trough in R units | Risk-centric perspective |
+| Profit Factor | Gross wins / gross losses | >1 suggests positive edge |
+| Sharpe Est | Approx risk-adjusted return | Simplified estimator |
+
+## Determinism & Reproducibility
+
+| Aspect | Mechanism |
+|--------|-----------|
+| Data | Fixed processed partitions |
+| Parameters | Pydantic model with explicit defaults |
+| Outputs | Structured text + optional JSON |
+| Repeatability | Identical input yields identical metrics |
+
+## Result Outputs
+
+* Text summary (default) prints core metrics
+* JSON (via `--output-format json`) enables downstream parsing & aggregation
+
+## Extending Metrics
+
+When adding a new metric:
+
+1. Add calculation in `src/backtest/metrics.py`
+2. Include in JSON serialization (if general purpose)
+3. Update this glossary table
+
+## Common Pitfalls
+
+| Pitfall | Avoidance |
+|---------|-----------|
+| Using raw data directly | Always run dataset builder first |
+| Mixed timezone data | Normalize to UTC before ingestion |
+| Overlapping partitions | Chronological split prevents this |
+| Silent parameter drift | Centralize parameter changes in config models |
+
+---
+For strategy-specific logic see `docs/strategies.md`.
