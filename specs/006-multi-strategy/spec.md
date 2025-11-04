@@ -64,6 +64,18 @@ An operator uses CLI flags to specify an explicit subset of registered strategie
 - Empty strategy selection list with aggregation requested (error: must select ≥1 strategy).
 - Large number (≥20) strategies in run (performance target; results should complete within success criteria limits).
 
+## Business Outcomes (Non-Technical Summary)
+
+The feature enables:
+
+1. Portfolio Perspective: View combined performance across multiple strategies to support allocation and diversification decisions.
+2. Risk Transparency: Separate local breaches vs rare global halts provide clearer operational risk signals.
+3. Faster Strategy Iteration: Developers register new strategies without codebase rewiring, accelerating experimentation.
+4. Audit & Reproducibility: Deterministic runs with manifest linkage and stability targets improve trust and reviewability.
+5. Operational Efficiency: Single multi-strategy execution reduces repetitive single-strategy runs and manual aggregation.
+
+These outcomes center on user decision-making and process speed rather than internal implementation mechanics.
+
 ## Requirements _(mandatory)_
 
 ### Functional Requirements
@@ -89,8 +101,8 @@ An operator uses CLI flags to specify an explicit subset of registered strategie
 - **FR-019**: System MUST handle strategies producing zero trades without error.
 - **FR-020**: System MUST fail fast with clear messaging if no valid strategies are selected.
 - **FR-021**: System MUST restrict global abort conditions to: (a) configured global portfolio drawdown breach; or (b) unrecoverable system error (e.g., data corruption, required input integrity failure). Single strategy exceptions halt only that strategy while others continue.
-- **FR-022**: System MUST emit a structured aggregated metrics record (JSON artifact + one structured log line) containing defined fields: strategies_count, instruments_count, runtime_seconds, aggregate_pnl, max_drawdown_pct, volatility_annualized (stub), net_exposure_by_instrument, weights_applied, global_drawdown_limit, global_abort_triggered, risk_breaches, deterministic_run_id, manifest_hash_ref, correlation_status.
-- **FR-023**: System MUST include a manifest hash reference (manifest_hash_ref) in the aggregated metrics artifact linking portfolio output to RunManifest for reproducibility.
+- **FR-022**: System MUST produce an aggregated portfolio metrics artifact capturing combined performance, exposure, weighting applied, risk breach summary, and reproducibility linkage—format and exact field naming are implementation details governed by design docs (not mandated by the specification).
+- **FR-023**: System MUST provide a reproducibility linkage between aggregated portfolio metrics and the original run manifest (conceptual reference, not prescribing hashing algorithm details here).
 
 ### Key Entities _(include if feature involves data)_
 
@@ -115,8 +127,8 @@ An operator uses CLI flags to specify an explicit subset of registered strategie
 - **SC-008**: Deterministic repeatability: repeated runs with identical inputs produce byte-identical per-strategy and aggregate metric summaries (excluding timestamps) in 3 consecutive test executions.
 - **SC-009**: Strategy listing CLI returns registered strategies in <2 seconds for ≤50 strategies.
 - **SC-010**: Aggregation logic resolves overlapping instrument exposures according to clarified rule producing consistent net exposure totals across test scenarios.
-- **SC-011**: Reliability: ≥99% successful multi-strategy batch runs (excluding intentional global drawdown aborts) over a rolling set of 100 test executions.
-- **SC-012**: Memory growth heuristic: Peak memory usage increases ≤10% per additional strategy versus single-strategy baseline (informational; failures logged but not gating release).
+- **SC-011**: Reliability: High multi-strategy completion rate (target encoded in design; excludes intentional global drawdown aborts) demonstrating orchestration stability.
+- **SC-012**: Memory growth awareness: Incremental memory impact per additional strategy remains within a defined informational threshold (tracked, not a release blocker).
 
 ### Assumptions
 
@@ -136,7 +148,7 @@ All prior clarification markers (FR-013, FR-014, FR-015) previously resolved wit
 
 ### Additional Clarifications (2025-11-03 Extension)
 
-- Weight validation: Provided weights must match number of selected strategies and sum to 1.0 within tolerance 1e-6; otherwise system applies equal-weight fallback and logs a warning (FR-014, FR-022).
+- Weight validation: Provided weights must match number of selected strategies and sum to 100%; otherwise the system applies an equal-weight fallback and records a warning (FR-014, FR-022).
 - Correlation metrics deferred: Field `correlation_status` set to 'deferred' until future phase adds correlation matrix computation (FR-022).
 - Structured metrics emission: A single JSON line logged on completion plus persisted aggregated artifact must contain all fields defined in FR-022; volatility_annualized may be placeholder (stub) initially.
 - Negative global abort scenario: Breach of a single per-strategy risk limit MUST NOT trigger global abort; only global drawdown or unrecoverable system error qualifies (FR-021).
@@ -169,23 +181,17 @@ All prior clarification markers (FR-013, FR-014, FR-015) previously resolved wit
 - Machine learning ensemble logic.
 - Real-time correlation/diversification analytics (deferred placeholder only).
 
-## Structured Metrics Schema (Reference for FR-022)
+## Aggregated Portfolio Metrics (Conceptual)
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| strategies_count | int | Number of executed strategies |
-| instruments_count | int | Distinct instruments across all strategies |
-| runtime_seconds | float | Wall-clock runtime from first start to aggregation completion |
-| aggregate_pnl | float | Weighted portfolio PnL (base currency) |
-| max_drawdown_pct | float | Maximum portfolio drawdown percentage |
-| volatility_annualized | float | Annualized return volatility (stub initial implementation) |
-| net_exposure_by_instrument | object | Mapping instrument -> net exposure value |
-| weights_applied | array[float] | Final normalized weights used |
-| global_drawdown_limit | float or null | Configured global drawdown threshold if provided |
-| global_abort_triggered | bool | True if global abort conditions fired |
-| risk_breaches | array[string] | Strategy identifiers with local risk breaches |
-| deterministic_run_id | string | Stable hash linking inputs & manifest |
-| manifest_hash_ref | string | RunManifest reference hash for reproducibility linkage |
-| correlation_status | string | 'deferred' until correlation implemented |
+The aggregated portfolio metrics artifact expresses a combined view of strategy performance, exposure, weighting applied, risk events, and reproducibility linkage. Exact field names, data types, and logging format are implementation details handled in design documents and tests—not mandated by this specification. Correlation analytics are explicitly deferred and replaced with a placeholder indicator.
 
-Initial volatility and exposure computations may be simplified; accuracy improvements are future scope.
+Volatility and certain portfolio-level statistics may begin as simplified placeholders, with enhancement planned in later phases.
+
+## Non-Functional Requirements (Conceptual)
+
+1. Performance: Aggregated portfolio metrics become available promptly after strategies finish (baseline target captured in planning docs).
+2. Scalability: Adding strategies increases runtime within an acceptable proportional range (defined in design; informs capacity expectations).
+3. Reliability: Multi-strategy runs demonstrate high completion rates excluding intentional risk-based halts.
+4. Determinism: Re-running the same set of strategies on the same data yields consistent outputs supporting audit and comparison.
+5. Resource Awareness: Memory impact growth is monitored to inform future optimization decisions.
+6. Transparency: Risk events and weighting decisions are clearly represented for user interpretation.
