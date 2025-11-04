@@ -292,3 +292,67 @@ def calculate_directional_metrics(
         return DirectionalMetrics(
             long_only=long_metrics, short_only=short_metrics, combined=combined
         )
+
+
+def compute_portfolio_metrics(
+    aggregated_pnl: float,
+    max_drawdown: float,
+    runtime_seconds: float,
+    strategies_count: int,
+    instruments_count: int,
+) -> dict:
+    """
+    Compute portfolio-level performance metrics for multi-strategy runs.
+
+    Calculates portfolio statistics from aggregated results per FR-022.
+    Volatility computation is stubbed initially (returns 0.0).
+
+    Args:
+        aggregated_pnl: Weighted portfolio PnL.
+        max_drawdown: Maximum drawdown percentage (0.0-1.0).
+        runtime_seconds: Wall-clock runtime.
+        strategies_count: Number of strategies executed.
+        instruments_count: Distinct instruments traded.
+
+    Returns:
+        Dictionary with portfolio metrics:
+            - aggregate_pnl: Total weighted PnL
+            - max_drawdown_pct: Maximum portfolio drawdown
+            - volatility_annualized: Annualized volatility (stub: 0.0)
+            - runtime_seconds: Execution time
+            - strategies_count: Strategy count
+            - instruments_count: Instrument count
+
+    Examples:
+        >>> metrics = compute_portfolio_metrics(
+        ...     aggregated_pnl=1250.0,
+        ...     max_drawdown=0.08,
+        ...     runtime_seconds=12.5,
+        ...     strategies_count=2,
+        ...     instruments_count=1
+        ... )
+        >>> metrics["aggregate_pnl"]
+        1250.0
+        >>> metrics["max_drawdown_pct"]
+        0.08
+    """
+    # Stub volatility (future: compute from PnL time series)
+    volatility_annualized = 0.0
+
+    portfolio_metrics = {
+        "aggregate_pnl": aggregated_pnl,
+        "max_drawdown_pct": max_drawdown,
+        "volatility_annualized": volatility_annualized,
+        "runtime_seconds": runtime_seconds,
+        "strategies_count": strategies_count,
+        "instruments_count": instruments_count,
+    }
+
+    logger.info(
+        "Portfolio metrics: pnl=%.4f drawdown=%.4f strategies=%d",
+        aggregated_pnl,
+        max_drawdown,
+        strategies_count,
+    )
+
+    return portfolio_metrics

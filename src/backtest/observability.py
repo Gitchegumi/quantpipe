@@ -270,3 +270,113 @@ def report_backtest_run(backtest_run: BacktestRun) -> None:
 
     console.print(meta_table)
     console.print()
+
+
+# ============================================================================
+# Multi-Strategy Observability (T030)
+# ============================================================================
+
+
+def log_multi_strategy_start(
+    run_id: str,
+    deterministic_run_id: str,
+    strategies: list[str],
+    weights: list[float],
+) -> None:
+    """
+    Log structured event for multi-strategy backtest start.
+
+    Args:
+        run_id: User-provided run identifier.
+        deterministic_run_id: Computed deterministic hash ID.
+        strategies: List of strategy names.
+        weights: Normalized strategy weights.
+
+    Examples:
+        >>> log_multi_strategy_start(
+        ...     "test_run_001",
+        ...     "abc123def456",
+        ...     ["alpha", "beta"],
+        ...     [0.6, 0.4]
+        ... )  # doctest: +SKIP
+    """
+    logger.info(
+        "Multi-strategy backtest started: run_id=%s det_id=%s strategies=%s weights=%s",
+        run_id,
+        deterministic_run_id,
+        ",".join(strategies),
+        ",".join(f"{w:.4f}" for w in weights),
+    )
+
+
+def log_multi_strategy_completion(
+    run_id: str,
+    runtime_seconds: float,
+    strategies_count: int,
+    weighted_pnl: float,
+    global_abort_triggered: bool,
+    risk_breaches: list[str],
+) -> None:
+    """
+    Log structured event for multi-strategy backtest completion.
+
+    Args:
+        run_id: Run identifier.
+        runtime_seconds: Wall-clock runtime.
+        strategies_count: Number of strategies executed.
+        weighted_pnl: Aggregated weighted PnL.
+        global_abort_triggered: Whether global abort occurred.
+        risk_breaches: List of strategies with risk breaches.
+
+    Examples:
+        >>> log_multi_strategy_completion(
+        ...     "test_run_001",
+        ...     12.5,
+        ...     2,
+        ...     1250.0,
+        ...     False,
+        ...     []
+        ... )  # doctest: +SKIP
+    """
+    logger.info(
+        "Multi-strategy backtest completed: run_id=%s runtime=%.2fs "
+        "strategies=%d pnl=%.4f abort=%s breaches=%d",
+        run_id,
+        runtime_seconds,
+        strategies_count,
+        weighted_pnl,
+        global_abort_triggered,
+        len(risk_breaches),
+    )
+
+    if risk_breaches:
+        logger.warning(
+            "Risk breaches detected: run_id=%s strategies=%s",
+            run_id,
+            ",".join(risk_breaches),
+        )
+
+
+def log_structured_metrics(metrics_dict: dict[str, Any]) -> None:
+    """
+    Log structured metrics as JSON for downstream processing.
+
+    Emits a single structured log line containing all portfolio metrics
+    per FR-022 research decision.
+
+    Args:
+        metrics_dict: Dictionary with portfolio-level metrics.
+
+    Examples:
+        >>> import json
+        >>> metrics = {
+        ...     "strategies_count": 2,
+        ...     "aggregate_pnl": 1250.0,
+        ...     "max_drawdown_pct": 0.08,
+        ...     "deterministic_run_id": "abc123"
+        ... }
+        >>> log_structured_metrics(metrics)  # doctest: +SKIP
+    """
+    import json
+
+    logger.info("Structured metrics: %s", json.dumps(metrics_dict, sort_keys=True))
