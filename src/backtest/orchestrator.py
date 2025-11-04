@@ -5,6 +5,7 @@ This module coordinates the execution of backtests across different direction mo
 (LONG, SHORT, BOTH), managing signal generation, conflict resolution, execution
 simulation, and metrics aggregation.
 """
+# pylint: disable=broad-exception-caught, unused-variable
 
 import logging
 from collections.abc import Sequence
@@ -434,6 +435,245 @@ class BacktestOrchestrator:
             executions=executions if not self.dry_run else None,
             conflicts=conflicts,
             dry_run=self.dry_run,
+        )
+
+    # ------------------------------------------------------------------
+    # Multi-Strategy Execution (T022, T029)
+    # ------------------------------------------------------------------
+    def run_multi_strategy_full(
+        self,
+        strategies: Sequence[tuple[str, callable]],
+        candles_by_strategy: dict[str, Sequence[Candle]],
+        weights: Sequence[float],
+        run_id: str,
+        global_drawdown_limit: float | None = None,
+        data_manifest_refs: Sequence[str] | None = None,
+        config_params: dict | None = None,
+        seed: int = 0,
+    ) -> dict:
+        """
+        Execute multiple strategies with full isolation, risk management, and metrics.
+
+        Implements FR-001 through FR-023 with:
+        - Per-strategy state isolation (FR-003)
+        - Layered risk controls (FR-015, FR-021)
+        - Deterministic run IDs (FR-018, SC-008)
+        - Structured metrics (FR-022)
+        - Manifest generation (FR-023)
+
+        Args:
+            strategies: Sequence of (name, callable) pairs.
+            candles_by_strategy: Mapping strategy name -> candle sequence.
+            weights: Strategy weights (normalized via parse_and_normalize_weights).
+            run_id: Identifier for this run.
+            global_drawdown_limit: Optional portfolio drawdown threshold (0.0-1.0).
+            data_manifest_refs: List of data manifest file paths.
+            config_params: Optional configuration parameters dict.
+            seed: Random seed for reproducibility.
+
+        Returns:
+            Dictionary with keys:
+                - run_manifest: RunManifest instance
+                - structured_metrics: StructuredMetrics instance
+                - per_strategy_results: List of strategy result dicts
+                - portfolio_summary: Aggregated portfolio metrics
+                - deterministic_run_id: Stable run identifier
+                - manifest_hash: Manifest reference hash
+
+        Examples:
+            >>> def dummy_strategy(candles):
+            ...     return {"pnl": 100.0, "max_drawdown": 0.05}
+            >>> orchestrator = BacktestOrchestrator(DirectionMode.LONG)
+            >>> result = orchestrator.run_multi_strategy_full(
+            ...     strategies=[("alpha", dummy_strategy)],
+            ...     candles_by_strategy={"alpha": []},
+            ...     weights=[1.0],
+            ...     run_id="test_001"
+            ... )  # doctest: +SKIP
+        """
+        import time
+        from .state_isolation import StateIsolationManager
+        from .aggregation import PortfolioAggregator
+        from .risk_global import evaluate_portfolio_drawdown, should_abort_portfolio
+        from .risk_strategy import check_strategy_risk_breach, should_halt_on_breach
+        from .reproducibility import generate_deterministic_run_id
+        from .manifest_writer import compute_manifest_hash
+        from ..models.run_manifest import RunManifest
+        from ..models.risk_limits import RiskLimits
+        from .metrics_schema import StructuredMetrics
+        from ..strategy.weights import parse_and_normalize_weights
+
+        start_time = datetime.now(UTC)
+        runtime_start = time.time()
+
+        strategy_names = [name for name, _ in strategies]
+        normalized_weights = parse_and_normalize_weights(weights, len(strategies))
+
+        # Generate deterministic run ID (T029)
+        deterministic_run_id = generate_deterministic_run_id(
+            strategies=strategy_names,
+            weights=normalized_weights,
+            data_manifest_refs=list(data_manifest_refs or []),
+            config_params=config_params,
+            seed=seed,
+        )
+
+        logger.info(
+            "Starting multi-strategy run: run_id=%s det_id=%s strategies=%d",
+            run_id,
+            deterministic_run_id,
+            len(strategies),
+        )
+
+        # Initialize state isolation
+        state_manager = StateIsolationManager()
+        results: list[dict] = []
+        risk_breaches: list[str] = []
+        global_abort_triggered = False
+        portfolio_peak_pnl = 0.0
+        portfolio_current_pnl = 0.0
+
+        # Execute each strategy with isolation
+        for (name, func), weight in zip(strategies, normalized_weights):
+            state = state_manager.get_or_create(name)
+
+            # Skip if strategy already halted
+            if state.is_halted:
+                logger.info("Skipping halted strategy: name=%s", name)
+                continue
+
+            # Get candles for this strategy
+            strat_candles = candles_by_strategy.get(name, [])
+            if not strat_candles:
+                logger.warning("No candles for strategy: name=%s", name)
+
+            # Execute strategy
+            try:
+                output = func(strat_candles)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Strategy execution failed: name=%s error=%s", name, exc)
+                output = {"name": name, "pnl": 0.0, "error": str(exc)}
+
+            # Ensure required fields
+            if "name" not in output:
+                output["name"] = name
+            if "pnl" not in output:
+                output["pnl"] = 0.0
+
+            # Update state
+            pnl = float(output.get("pnl", 0.0))
+            state.update_pnl(pnl, datetime.now(UTC))
+
+            # Check per-strategy risk limits (using default limits for now)
+            default_limits = RiskLimits(max_drawdown_pct=1.0)  # Permissive default
+            is_breach, breach_reason = check_strategy_risk_breach(state, default_limits)
+
+            if is_breach:
+                risk_breaches.append(name)
+                if should_halt_on_breach(state, default_limits, is_breach):
+                    state.halt(breach_reason, datetime.now(UTC))
+
+            results.append(output)
+
+            # Update portfolio PnL (weighted)
+            portfolio_current_pnl += pnl * weight
+            if portfolio_current_pnl > portfolio_peak_pnl:
+                portfolio_peak_pnl = portfolio_current_pnl
+
+            logger.debug(
+                "Strategy completed: name=%s pnl=%.4f weighted=%.4f",
+                name,
+                pnl,
+                pnl * weight,
+            )
+
+            # Check global abort conditions after each strategy
+            portfolio_dd, dd_breach = evaluate_portfolio_drawdown(
+                portfolio_current_pnl, portfolio_peak_pnl, global_drawdown_limit
+            )
+            should_abort, abort_reason = should_abort_portfolio(
+                portfolio_dd, global_drawdown_limit, data_integrity_ok=True
+            )
+
+            if should_abort:
+                global_abort_triggered = True
+                logger.warning(
+                    "Global abort triggered: reason=%s", abort_reason
+                )
+                break
+
+        runtime_seconds = time.time() - runtime_start
+        end_time = datetime.now(UTC)
+
+        # Aggregate results
+        aggregator = PortfolioAggregator()
+        portfolio_summary = aggregator.aggregate(results, normalized_weights)
+
+        # Build RunManifest
+        run_manifest = RunManifest(
+            run_id=run_id,
+            strategies=strategy_names,
+            strategy_versions=["1.0.0"] * len(strategies),  # Stub versions
+            weights=normalized_weights,
+            global_drawdown_limit=global_drawdown_limit,
+            data_manifest_refs=list(data_manifest_refs or []),
+            start_time=start_time,
+            end_time=end_time,
+            correlation_status="deferred",
+            deterministic_run_id=deterministic_run_id,
+            global_abort_triggered=global_abort_triggered,
+            risk_breaches=risk_breaches,
+        )
+
+        # Compute manifest hash
+        manifest_hash = compute_manifest_hash(run_manifest)
+
+        # Build structured metrics
+        structured_metrics = StructuredMetrics(
+            strategies_count=len(strategies),
+            instruments_count=portfolio_summary["instruments_count"],
+            runtime_seconds=runtime_seconds,
+            aggregate_pnl=portfolio_summary["weighted_pnl"],
+            max_drawdown_pct=portfolio_summary["max_drawdown"],
+            net_exposure_by_instrument=portfolio_summary["net_exposure_by_instrument"],
+            weights_applied=normalized_weights,
+            global_drawdown_limit=global_drawdown_limit,
+            global_abort_triggered=global_abort_triggered,
+            risk_breaches=risk_breaches,
+            deterministic_run_id=deterministic_run_id,
+            manifest_hash_ref=manifest_hash,
+        )
+
+        logger.info(
+            "Multi-strategy run complete: run_id=%s pnl=%.4f abort=%s",
+            run_id,
+            portfolio_summary["weighted_pnl"],
+            global_abort_triggered,
+        )
+
+        return {
+            "run_manifest": run_manifest,
+            "structured_metrics": structured_metrics,
+            "per_strategy_results": results,
+            "portfolio_summary": portfolio_summary,
+            "deterministic_run_id": deterministic_run_id,
+            "manifest_hash": manifest_hash,
+        }
+
+    # Preserve old skeleton for backwards compatibility
+    def run_multi_strategy(
+        self,
+        strategies: Sequence[tuple[str, callable]],
+        candles_by_strategy: dict[str, Sequence[Candle]],
+        weights: Sequence[float],
+        run_id: str,
+    ) -> dict:
+        """Legacy skeleton method - use run_multi_strategy_full for new code."""
+        return self.run_multi_strategy_full(
+            strategies=strategies,
+            candles_by_strategy=candles_by_strategy,
+            weights=weights,
+            run_id=run_id,
         )
 
 

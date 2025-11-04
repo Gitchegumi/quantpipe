@@ -36,6 +36,8 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
+# pylint: disable=fixme
+
 import argparse
 import logging
 import sys
@@ -72,14 +74,21 @@ def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
     """
     logger.info("Converting MetaTrader CSV format")
 
+    # Check if file is already in correct format by reading first line
+    first_line = csv_path.read_text(encoding="utf-8").split("\n")[0].lower()
+    if "timestamp" in first_line:
+        logger.info("File already in correct format, skipping conversion")
+        return csv_path
+
     # Read CSV (MetaTrader format: Date,Time,Open,High,Low,Close,Volume)
     df = pd.read_csv(
         csv_path,
         header=None,
         names=["date", "time", "open", "high", "low", "close", "volume"],
+        dtype=str,  # Read all as strings to avoid mixed type issues
     )
 
-    # Combine date and time into timestamp
+    # Combine date and time into timestamp (both are now strings)
     df["timestamp_utc"] = pd.to_datetime(
         df["date"] + " " + df["time"], format="%Y.%m.%d %H:%M"
     )
@@ -117,7 +126,7 @@ def main():
     parser.add_argument(
         "--data",
         type=Path,
-        required=True,
+        required=False,  # Not required for --list-strategies or --register-strategy
         help="Path to CSV price data file (MetaTrader format or standard format)",
     )
 
@@ -168,15 +177,170 @@ def main():
         help="Generate signals without execution (signal-only mode)",
     )
 
+    # Multi-strategy support (Phase 4: US2)
+    parser.add_argument(
+        "--list-strategies",
+        action="store_true",
+        help="List all registered strategies and exit (no backtest run)",
+    )
+
+    parser.add_argument(
+        "--register-strategy",
+        type=str,
+        metavar="NAME",
+        help="Register a new strategy by name (requires --strategy-module)",
+    )
+
+    parser.add_argument(
+        "--strategy-module",
+        type=str,
+        help="Python module path for strategy (e.g., src.strategy.my_strategy)",
+    )
+
+    parser.add_argument(
+        "--strategy-tags",
+        type=str,
+        nargs="*",
+        default=[],
+        help="Tags for strategy registration (space-separated)",
+    )
+
+    parser.add_argument(
+        "--strategy-version",
+        type=str,
+        help="Version string for strategy registration (e.g., 1.0.0)",
+    )
+
+    # Multi-strategy selection (Phase 5: US3)
+    parser.add_argument(
+        "--strategies",
+        type=str,
+        nargs="+",
+        help="Multiple strategy names for multi-strategy run \
+(e.g., --strategies alpha beta gamma)",
+    )
+
+    parser.add_argument(
+        "--weights",
+        type=float,
+        nargs="+",
+        help="Strategy weights (must match --strategies order and sum to ~1.0, e.g., \
+--weights 0.5 0.3 0.2)",
+    )
+
+    parser.add_argument(
+        "--aggregate",
+        action="store_true",
+        help="Enable aggregated portfolio metrics output \
+(default: True for multi-strategy)",
+    )
+
+    parser.add_argument(
+        "--no-aggregate",
+        action="store_true",
+        help="Disable aggregation, produce only per-strategy outputs",
+    )
+
     args = parser.parse_args()
 
+    # Setup logging early for --list-strategies and --register-strategy
+    setup_logging(level=args.log_level)
+
+    # Handle --list-strategies (FR-017: List strategies without running backtest)
+    if args.list_strategies:
+        from ..strategy.registry import StrategyRegistry
+
+        registry = StrategyRegistry()
+        # TODO: Load registered strategies from persistent config/file
+        # For now, show empty registry or built-in strategies
+        strategies = registry.list()
+
+        if not strategies:
+            print("No strategies registered.")
+            print("\nUse --register-strategy to add a new strategy.")
+        else:
+            print(f"Registered Strategies ({len(strategies)}):")
+            print("-" * 60)
+            for strat in strategies:
+                tags_str = ", ".join(strat.tags) if strat.tags else "none"
+                version_str = strat.version or "unversioned"
+                print(f"  {strat.name}")
+                print(f"    Tags: {tags_str}")
+                print(f"    Version: {version_str}")
+                print()
+        return 0
+
+    # Handle --register-strategy (FR-001: Strategy registration)
+    if args.register_strategy:
+        if not args.strategy_module:
+            print("Error: --strategy-module required for registration", file=sys.stderr)
+            sys.exit(1)
+
+        from ..strategy.registry import StrategyRegistry
+        import importlib
+
+        registry = StrategyRegistry()
+
+        try:
+            # Import strategy module
+            module = importlib.import_module(args.strategy_module)
+
+            # Look for strategy callable (convention: 'run' or 'execute')
+            if hasattr(module, "run"):
+                func = module.run
+            elif hasattr(module, "execute"):
+                func = module.execute
+            else:
+                print(
+                    f"Error: Module '{args.strategy_module}' \
+must expose 'run' or 'execute' function",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            # Register strategy
+            registry.register(
+                name=args.register_strategy,
+                func=func,
+                tags=args.strategy_tags,
+                version=args.strategy_version,
+            )
+
+            print(f"Successfully registered strategy: {args.register_strategy}")
+            print(f"  Module: {args.strategy_module}")
+            print(
+                f"  Tags: {', '.join(args.strategy_tags) \
+if args.strategy_tags else 'none'}"
+            )
+            print(f"  Version: {args.strategy_version or 'unversioned'}")
+            print(
+                "\nNote: Registration is in-memory only. \
+Persistent storage not yet implemented."
+            )
+
+            return 0
+
+        except ImportError as exc:
+            print(
+                f"Error: Failed to import module '{args.strategy_module}': {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except ValueError as exc:
+            print(f"Error: Registration failed: {exc}", file=sys.stderr)
+            sys.exit(1)
+
     # Validate data file exists
-    if not args.data.exists():
+    # (required for backtest runs, not for listing/registration)
+    if args.data is None:
+        # Data file required for backtest runs
+        if not args.list_strategies and not args.register_strategy:
+            print("Error: --data required for backtest runs", file=sys.stderr)
+            sys.exit(1)
+    elif not args.data.exists():
         print(f"Error: Data file not found: {args.data}", file=sys.stderr)
         sys.exit(1)
 
-    # Setup logging
-    setup_logging(level=args.log_level)
     logger.info("Starting directional backtest")
     logger.info("Direction: %s", args.direction)
     logger.info("Strategy: %s", ", ".join(args.strategy))
@@ -212,6 +376,7 @@ def main():
             stoch_rsi_period=parameters.rsi_length,
             expected_timeframe_minutes=1,
             allow_gaps=True,
+            show_progress=True,  # Show progress bar for CLI usage
         )
     )
     logger.info("Loaded %d candles", len(candles))
