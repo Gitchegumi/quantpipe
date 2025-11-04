@@ -22,6 +22,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    TaskProgressColumn,
+)
 
 from ..indicators.basic import atr, ema, rsi
 from ..models.core import Candle
@@ -80,6 +87,7 @@ def ingest_candles(
     stoch_rsi_period: int = 14,
     expected_timeframe_minutes: int = 5,
     allow_gaps: bool = False,
+    show_progress: bool = False,
 ) -> Iterator[Candle]:
     """
     Load candles from CSV and yield Candle objects with computed indicators.
@@ -100,6 +108,7 @@ def ingest_candles(
         stoch_rsi_period: Stochastic RSI period (default 14).
         expected_timeframe_minutes: Expected candle interval in minutes (default 5).
         allow_gaps: If True, log gaps but don't raise errors (default False).
+        show_progress: If True, display progress bar during ingestion (default False).
 
     Yields:
         Candle objects with computed indicators.
@@ -190,6 +199,24 @@ def ingest_candles(
     # Validate timestamp continuity and yield candles
     expected_delta = timedelta(minutes=expected_timeframe_minutes)
     prev_timestamp: datetime | None = None
+    total_candles = len(df)
+    gap_count = 0
+
+    # Create progress bar if requested
+    if show_progress:
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("• {task.fields[gaps]} gaps"),
+        )
+        progress.start()
+        task = progress.add_task(
+            f"Ingesting {total_candles:,} candles",
+            total=total_candles,
+            gaps=0,
+        )
 
     for idx, row in df.iterrows():
         current_timestamp = row["timestamp_utc"]
@@ -199,8 +226,10 @@ def ingest_candles(
             actual_delta = current_timestamp - prev_timestamp
             if actual_delta > expected_delta:
                 gap_minutes = actual_delta.total_seconds() / 60
+                gap_count += 1
                 if allow_gaps:
-                    logger.warning(
+                    # Gaps are expected in forex data - log at DEBUG level (silent)
+                    logger.debug(
                         "Timestamp gap detected (allowing): \
 expected %dm, actual %.1fm at %s",
                         expected_timeframe_minutes,
@@ -208,6 +237,8 @@ expected %dm, actual %.1fm at %s",
                         current_timestamp,
                     )
                 else:
+                    if show_progress:
+                        progress.stop()
                     raise DataIntegrityError(
                         "Timestamp gap detected",
                         context={
@@ -233,7 +264,17 @@ expected %dm, actual %.1fm at %s",
             stoch_rsi=float(stoch_rsi_values[idx]),
         )
 
+        if show_progress:
+            progress.update(task, advance=1, gaps=gap_count)
+
         yield candle
         prev_timestamp = current_timestamp
 
-    logger.info("Ingestion complete: %d candles processed from %s", len(df), csv_path)
+    if show_progress:
+        progress.stop()
+
+    logger.info(
+        "Ingestion complete: %d candles processed, %d gaps detected",
+        total_candles,
+        gap_count,
+    )

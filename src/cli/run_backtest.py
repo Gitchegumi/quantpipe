@@ -374,6 +374,7 @@ Persistent storage not yet implemented."
             stoch_rsi_period=parameters.rsi_length,
             expected_timeframe_minutes=1,
             allow_gaps=True,
+            show_progress=True,  # Show progress bar for CLI usage
         )
     )
     logger.info("Loaded %d candles", len(candles))
