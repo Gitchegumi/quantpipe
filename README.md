@@ -46,7 +46,7 @@ poetry run python -m src.cli.run_backtest --data price_data/processed/eurusd/tes
 | Deeper strategy rationale      | `docs/strategies.md`               |
 | Backtesting & dataset workflow | `docs/backtesting.md`              |
 | Repository layout overview     | `docs/structure.md`                |
-| Contributing / dev setup       | `CONTRIBUTIONS.md`                 |
+| Contributing / dev setup       | `CONTRIBUTING.md`                  |
 | Full original specification    | `specs/001-trend-pullback/spec.md` |
 | Additional feature specs       | `specs/` directory                 |
 
@@ -64,4 +64,4 @@ Proprietary – All Rights Reserved.
 
 ## Governance
 
-See `CONTRIBUTIONS.md` for quality gates and contribution workflow. Architectural principles live in `.specify/memory/constitution.md`.
+See `CONTRIBUTING.md` for quality gates and contribution workflow. Architectural principles live in `.specify/memory/constitution.md`.

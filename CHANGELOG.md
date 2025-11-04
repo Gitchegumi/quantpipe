@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Separated end-user and contributor concerns:
   - Trimmed `README.md` to overview, 3-command Quick Start, minimal CLI usage, and documentation links.
-  - Migrated environment setup, quality gates, test strategy, branching workflow, and logging rules into new `CONTRIBUTIONS.md`.
+  - Migrated environment setup, quality gates, test strategy, branching workflow, and logging rules into contributor guide (now `CONTRIBUTING.md`).
 - Introduced `docs/` directory for conceptual documentation:
   - `docs/strategies.md` (strategy summaries & spec pointers)
   - `docs/backtesting.md` (dataset & metrics methodology)

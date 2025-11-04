@@ -44,4 +44,4 @@ docs/                Human-facing conceptual documentation (you are here)
 | Specs & research | `specs/<NNN-name>/` |
 
 ---
-For contribution workflow see `CONTRIBUTIONS.md`.
+For contribution workflow see `CONTRIBUTING.md`.
