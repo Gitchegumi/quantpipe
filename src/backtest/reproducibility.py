@@ -62,8 +62,10 @@ Implementation: T037
 # pylint: disable=line-too-long
 
 import hashlib
+import json
 import logging
 from datetime import datetime
+from typing import Any, Sequence
 
 
 logger = logging.getLogger(__name__)
@@ -240,3 +242,59 @@ class ReproducibilityTracker:
             )
 
         return matches
+
+
+def generate_deterministic_run_id(
+    strategies: Sequence[str],
+    weights: Sequence[float],
+    data_manifest_refs: Sequence[str],
+    config_params: dict[str, Any] | None = None,
+    seed: int = 0,
+) -> str:
+    """
+    Generate a deterministic SHA-256 based run identifier for multi-strategy runs.
+
+    Combines strategy names, weights, data manifest references, optional
+    configuration parameters, and a seed into a stable hash. Ensures
+    identical inputs yield identical IDs across runs (FR-018, SC-008).
+
+    Args:
+        strategies: Ordered list of strategy names.
+        weights: Ordered list of strategy weights.
+        data_manifest_refs: List of data manifest file paths/checksums.
+        config_params: Optional dict of global configuration parameters.
+        seed: Random seed for reproducibility (default 0).
+
+    Returns:
+        Lowercase hexadecimal SHA-256 hash (truncated to 16 characters).
+
+    Examples:
+        >>> generate_deterministic_run_id(
+        ...     strategies=["alpha", "beta"],
+        ...     weights=[0.6, 0.4],
+        ...     data_manifest_refs=["data/manifests/eurusd.json"]
+        ... )  # doctest: +ELLIPSIS
+        '...'
+        >>> id1 = generate_deterministic_run_id(["alpha"], [1.0], ["data.json"])
+        >>> id2 = generate_deterministic_run_id(["alpha"], [1.0], ["data.json"])
+        >>> id1 == id2
+        True
+    """
+    # Build canonical representation
+    payload = {
+        "strategies": list(strategies),
+        "weights": [float(w) for w in weights],
+        "data_manifest_refs": list(data_manifest_refs),
+        "config_params": config_params or {},
+        "seed": seed,
+    }
+
+    # Serialize to stable JSON (sorted keys)
+    canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+    # Hash with SHA-256
+    hash_obj = hashlib.sha256(canonical_json.encode("utf-8"))
+    full_hash = hash_obj.hexdigest()
+
+    # Truncate to 16 characters for readability
+    return full_hash[:16]

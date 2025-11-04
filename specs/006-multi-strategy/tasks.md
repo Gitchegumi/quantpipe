@@ -32,19 +32,19 @@ Independent Test Increments:
 
 ## Phase 2: Foundational
 
-- [ ] T009 Implement StrategyRegistry class in `src/strategy/registry.py` (register, list, get)
-- [ ] T010 [P] Implement StrategyConfig validation model in `src/models/strategy_config.py`
-- [ ] T011 Implement RiskLimits model with validation in `src/models/risk_limits.py`
-- [ ] T012 [P] Implement RunManifest data structure in `src/models/run_manifest.py`
-- [ ] T013 Implement deterministic_run_id generator in `src/backtest/reproducibility.py`
-- [ ] T014 [P] Implement weights parsing & normalization in `src/strategy/weights.py`
-- [ ] T015 Implement abort criteria evaluator in `src/backtest/abort.py`
-- [ ] T016 Add structured metrics fields definition in `src/backtest/metrics_schema.py`
-- [ ] T017 [P] Write unit tests for registry operations in `tests/unit/registry/test_registry.py`
-- [ ] T018 Write unit tests for weights parsing in `tests/unit/strategy/test_weights.py`
-- [ ] T019 [P] Write unit tests for deterministic_run_id in `tests/unit/backtest/test_reproducibility.py`
-- [ ] T020 Write unit tests for abort criteria evaluator in `tests/unit/backtest/test_abort.py`
-- [ ] T021 Implement validation pre-run function in `src/backtest/validation.py` (unknown strategies fail fast)
+- [x] T009 Implement StrategyRegistry class in `src/strategy/registry.py` (register, list, get)
+- [x] T010 [P] Implement StrategyConfig validation model in `src/models/strategy_config.py`
+- [x] T011 Implement RiskLimits model with validation in `src/models/risk_limits.py`
+- [x] T012 [P] Implement RunManifest data structure in `src/models/run_manifest.py`
+- [x] T013 Implement deterministic_run_id generator in `src/backtest/reproducibility.py`
+- [x] T014 [P] Implement weights parsing & normalization in `src/strategy/weights.py`
+- [x] T015 Implement abort criteria evaluator in `src/backtest/abort.py`
+- [x] T016 Add structured metrics fields definition in `src/backtest/metrics_schema.py`
+- [x] T017 [P] Write unit tests for registry operations in `tests/unit/registry/test_registry.py`
+- [x] T018 Write unit tests for weights parsing in `tests/unit/strategy/test_weights.py`
+- [x] T019 [P] Write unit tests for deterministic_run_id in `tests/unit/backtest/test_reproducibility.py`
+- [x] T020 Write unit tests for abort criteria evaluator in `tests/unit/backtest/test_abort.py`
+- [x] T021 Implement validation pre-run function in `src/backtest/validation.py` (unknown strategies fail fast)
 
 ## Phase 3: User Story 1 (Run Multiple Strategies Together)
 
