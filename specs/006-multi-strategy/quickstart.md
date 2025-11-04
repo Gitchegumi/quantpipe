@@ -132,8 +132,15 @@ poetry run pylint src/ --score=yes
 markdownlint-cli2 "**/*.md" "!poetry.lock"
 ```
 
-## 8. Next Steps
+## 8. Next Steps & Future Enhancements
 
-- Add correlation matrix (future extension)
-- Implement dynamic weighting
-- Expand aggregation metrics (e.g., diversification score)
+### Deferred Features
+
+**Correlation Analysis (FR-022)**: Strategy correlation matrix and diversification metrics are deferred to a future phase. Current implementation includes a `correlation_status: 'deferred'` placeholder in aggregated metrics. See `spec.md` for detailed rationale.
+
+### Roadmap
+
+- Add correlation matrix computation and inter-strategy correlation tracking
+- Implement dynamic weighting algorithms (adaptive, volatility-based)
+- Expand aggregation metrics (e.g., diversification score, tail risk)
+- Add persistent strategy registry storage

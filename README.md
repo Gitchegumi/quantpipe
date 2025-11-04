@@ -33,6 +33,29 @@ If you have only raw data, first build processed partitions (see Backtesting doc
 | `--output-format` | `text` `json`         | `text`     | Output format                                         |
 | `--dry-run`       | (flag)                | off        | Emit signals only (no execution)                      |
 
+### Multi-Strategy Support
+
+Run multiple strategies simultaneously with weighted portfolio aggregation:
+
+```powershell
+# Register and list strategies
+poetry run python -m src.cli.run_backtest --register-strategy alpha --strategy-module my_strategies.alpha
+poetry run python -m src.cli.run_backtest --list-strategies
+
+# Execute specific strategies with custom weights
+poetry run python -m src.cli.run_backtest `
+--data price_data/processed/eurusd/test.csv `
+--strategies alpha beta `
+--weights 0.6 0.4
+
+# Equal-weight fallback (no weights specified)
+poetry run python -m src.cli.run_backtest `
+--data price_data/processed/eurusd/test.csv `
+--strategies alpha beta gamma
+```
+
+See `specs/006-multi-strategy/spec.md` for details on strategy registration, filtering, and risk management.
+
 Example (signals only):
 
 ```powershell

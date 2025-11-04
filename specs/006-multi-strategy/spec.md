@@ -181,6 +181,24 @@ All prior clarification markers (FR-013, FR-014, FR-015) previously resolved wit
 - Machine learning ensemble logic.
 - Real-time correlation/diversification analytics (deferred placeholder only).
 
+### Correlation Analysis Deferral (FR-022)
+
+**Rationale**: Computing pairwise strategy correlations requires significant additional complexity:
+
+- Return series alignment across different signal frequencies
+- Statistical significance testing for correlation coefficients
+- Handling of sparse or non-overlapping trade windows
+- Visualization and interpretation tooling
+
+**Current Implementation**: Aggregated metrics include `correlation_status: 'deferred'` placeholder field to signal this future enhancement without blocking MVP delivery.
+
+**Future Phase Requirements**:
+
+- Compute Pearson/Spearman correlation matrix for strategy returns
+- Include correlation metrics in portfolio aggregation output
+- Add diversification score based on correlation structure
+- Document correlation assumptions and limitations
+
 ## Aggregated Portfolio Metrics (Conceptual)
 
 The aggregated portfolio metrics artifact expresses a combined view of strategy performance, exposure, weighting applied, risk events, and reproducibility linkage. Exact field names, data types, and logging format are implementation details handled in design documents and tests—not mandated by this specification. Correlation analytics are explicitly deferred and replaced with a placeholder indicator.
