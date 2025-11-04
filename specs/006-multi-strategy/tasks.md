@@ -21,14 +21,14 @@ Independent Test Increments:
 
 ## Phase 1: Setup
 
-- [ ] T001 Initialize multi-strategy directory structure (no code changes) confirm existing `src/strategy`, `src/backtest`, `tests/` present
-- [ ] T002 Add placeholder module for registry in `src/strategy/registry.py`
-- [ ] T003 Add placeholder aggregation module in `src/backtest/aggregation.py`
-- [ ] T004 Create run manifest placeholder in `src/models/run_manifest.py`
-- [ ] T005 Create weights parsing helper stub in `src/strategy/weights.py`
-- [ ] T006 Add markdownlint spacing fixes to new docs (plan.md, research.md, data-model.md, quickstart.md)
-- [ ] T007 Add initial tests folder scaffolds `tests/unit/registry/`, `tests/integration/multistrategy/`, `tests/performance/` (ensure **init**.py)
-- [ ] T008 Add logging setup confirmation for multi-strategy to `src/cli/logging_setup.py`
+- [x] T001 Initialize multi-strategy directory structure (no code changes) confirm existing `src/strategy`, `src/backtest`, `tests/` present
+- [x] T002 Add placeholder module for registry in `src/strategy/registry.py`
+- [x] T003 Add placeholder aggregation module in `src/backtest/aggregation.py`
+- [x] T004 Create run manifest placeholder in `src/models/run_manifest.py`
+- [x] T005 Create weights parsing helper stub in `src/strategy/weights.py`
+- [x] T006 Add markdownlint spacing fixes to new docs (plan.md, research.md, data-model.md, quickstart.md)
+- [x] T007 Add initial tests folder scaffolds `tests/unit/registry/`, `tests/integration/multistrategy/`, `tests/performance/` (ensure **init**.py)
+- [x] T008 Add logging setup confirmation for multi-strategy to `src/cli/logging_setup.py`
 
 ## Phase 2: Foundational
 
