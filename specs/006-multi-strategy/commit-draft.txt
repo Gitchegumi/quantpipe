@@ -42,6 +42,14 @@ and comprehensive validation/observability.
 - Pylint quality gate script (≥8.0/10 threshold)
 - Reliability test harness (5 tests, 100% pass rate over 10 runs)
 
+### Bug Fixes & UX Improvements
+- CSV preprocessing format detection (skip conversion if already processed)
+- Column name flexibility (accept both 'timestamp' and 'timestamp_utc')
+- Gap warning silence (DEBUG level per spec 004, not WARNING)
+- Rich progress bar for ingestion (shows candle count and gaps detected)
+- Removed duplicate test_reproducibility.py from tests/unit/
+- Mixed type handling in MetaTrader CSV parsing (dtype=str)
+
 ## Test Coverage
 
 **Total Tests: 161 passing**
@@ -104,6 +112,12 @@ poetry run python -m src.cli.run_backtest `
 poetry run python -m src.cli.run_backtest `
   --data price_data/processed/eurusd/test.csv `
   --strategies alpha beta
+
+# Run with progress bar (default for CLI)
+poetry run python -m src.cli.run_backtest `
+  --data price_data/processed/eurusd/test.csv `
+  --direction BOTH
+# Output: Ingesting 6,922,364 candles ------------------------------ 100% • 327142 gaps
 ```
 
 ## Quality Metrics
@@ -114,10 +128,34 @@ poetry run python -m src.cli.run_backtest `
 - **Logging Standards**: 100% compliance (no f-strings in logging)
 - **Reliability**: 100% success rate over 10 iterations  
 - **Contract Validation**: 18/18 OpenAPI schema tests passing
+- **Large Dataset Validation**: Successfully processed 6.9M candles with progress tracking
 
 ## Breaking Changes
 
 None. Feature is additive and fully backward compatible with existing single-strategy CLI.
+
+## Bug Fixes
+
+**CSV Preprocessing Issues**:
+- Fixed TypeError when concatenating mixed-type date/time columns in MetaTrader CSV parsing
+- Added format detection to skip conversion for already-processed CSV files
+- Added dtype=str to prevent mixed type warnings during MetaTrader CSV ingestion
+
+**Column Name Compatibility**:
+- Updated ingestion to accept both 'timestamp' (standard) and 'timestamp_utc' column names
+- Automatic column renaming for internal consistency
+
+**Logging Improvements**:
+- Changed gap warnings from WARNING to DEBUG level (per spec 004-timeseries-dataset)
+- Gaps are expected in forex data and should be silent by default
+- Added rich progress bar with spinner, percentage, and gap counter
+- Progress enabled for CLI (show_progress=True), disabled for tests (show_progress=False)
+- Removed duplicate test_reproducibility.py file causing pytest import errors
+
+**User Experience**:
+- Before: 327,142 individual gap warning messages flooding terminal
+- After: Clean progress bar showing "Ingesting 6,922,364 candles ------ 100% • 327142 gaps"
+- Final summary: "Ingestion complete: 6922364 candles processed, 327142 gaps detected"
 
 ## Documentation
 
@@ -147,6 +185,8 @@ Default behavior remains single-strategy execution for backward compatibility.
 - 1375933: Phase 4 CLI registration & config override (T037-T044)
 - 7dc4a4a: Phase 5 selection/filtering & validation (T045-T052)
 - 84fe4c8: Final Phase polish & quality (T053-T059)
+- 8485017: Fix CSV preprocessing and column name issues
+- ec6d0a2: Add progress bar and silence gap warnings
 
 ## Reviewers
 
