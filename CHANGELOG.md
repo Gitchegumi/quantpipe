@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Feature 006: Multi-Strategy Backtesting Framework (2025-11-04)
+
+- **Multi-Strategy Execution & Aggregation**
+  - Strategy registry with tags/version metadata support
+  - Weighted portfolio aggregation with configurable strategy weights
+  - Per-strategy risk limit configuration and enforcement
+  - Portfolio-level global abort on drawdown breaches
+  - Net exposure aggregation by instrument
+  - Deterministic run IDs and manifest hashing for reproducibility
+
+- **CLI Enhancements**
+  - `--register-strategy` flag for strategy registration
+  - `--list-strategies` flag to display registered strategies
+  - `--strategies` flag for multi-strategy selection
+  - `--weights` flag for custom strategy weighting
+  - `--aggregate/--no-aggregate` flags for portfolio aggregation control
+  - Strategy filtering by names and tags with set operations
+
+- **Configuration System**
+  - Configuration override system (`merge_config`, `apply_strategy_overrides`)
+  - Per-strategy parameter customization
+  - Risk limit extraction from configuration
+  - Validation early: unknown strategies rejected before execution
+
+- **Observability & Quality**
+  - OpenAPI contract validation (18 tests)
+  - Logging standards enforcement (W1203 compliance, 8 tests)
+  - Pylint quality gate script (≥8.0/10 threshold)
+  - Reliability test harness (100% pass rate over 10 iterations)
+  - Rich progress bar for data ingestion with gap counter
+  - Correlation analysis deferral documented (FR-022)
+
+- **Test Coverage**
+  - 161 tests passing (45 unit + 65 integration + 20 performance + 18 contract + 13 other)
+  - Determinism validation (8 tests)
+  - Multi-strategy baseline execution tests
+  - Weights validation and fallback tests
+  - Strategy filtering and selection tests
+
+### Fixed - Feature 006: CSV Processing & User Experience (2025-11-04)
+
+- **CSV Preprocessing Issues**
+  - Fixed TypeError when concatenating mixed-type date/time columns in MetaTrader CSV
+  - Added format detection to skip conversion for already-processed CSV files
+  - Added `dtype=str` to prevent mixed type warnings during ingestion
+  - Removed duplicate `test_reproducibility.py` file causing pytest import errors
+
+- **Column Name Compatibility**
+  - Updated ingestion to accept both 'timestamp' and 'timestamp_utc' column names
+  - Automatic column renaming for internal consistency
+  - Better error messages when timestamp column is missing
+
+- **Logging & Progress**
+  - Changed gap warnings from WARNING to DEBUG level (per spec 004-timeseries-dataset)
+  - Added rich progress bar showing candle count and gaps detected
+  - Progress enabled for CLI (`show_progress=True`), disabled for tests (`show_progress=False`)
+  - Reduced terminal clutter: 327K warnings → single progress line + summary
+  - Output example: `Ingesting 6,922,364 candles ------------------------------ 100% • 327142 gaps`
+
 ### Changed - Feature 005: Documentation Restructure (2025-11-03)
 
 - Separated end-user and contributor concerns:
