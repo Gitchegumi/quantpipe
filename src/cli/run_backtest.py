@@ -36,6 +36,8 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
+# pylint: disable=fixme
+
 import argparse
 import logging
 import sys
