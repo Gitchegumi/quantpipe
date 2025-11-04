@@ -202,6 +202,36 @@ def main():
         help="Version string for strategy registration (e.g., 1.0.0)",
     )
 
+    # Multi-strategy selection (Phase 5: US3)
+    parser.add_argument(
+        "--strategies",
+        type=str,
+        nargs="+",
+        help="Multiple strategy names for multi-strategy run \
+(e.g., --strategies alpha beta gamma)",
+    )
+
+    parser.add_argument(
+        "--weights",
+        type=float,
+        nargs="+",
+        help="Strategy weights (must match --strategies order and sum to ~1.0, e.g., \
+--weights 0.5 0.3 0.2)",
+    )
+
+    parser.add_argument(
+        "--aggregate",
+        action="store_true",
+        help="Enable aggregated portfolio metrics output \
+(default: True for multi-strategy)",
+    )
+
+    parser.add_argument(
+        "--no-aggregate",
+        action="store_true",
+        help="Disable aggregation, produce only per-strategy outputs",
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -291,7 +321,7 @@ Persistent storage not yet implemented."
             print(f"Error: Registration failed: {exc}", file=sys.stderr)
             sys.exit(1)
 
-    # Validate data file exists 
+    # Validate data file exists
     # (required for backtest runs, not for listing/registration)
     if args.data is None:
         # Data file required for backtest runs

@@ -77,14 +77,14 @@ Independent Test Increments:
 
 ## Phase 5: User Story 3 (Strategy Selection & Filtering)
 
-- [ ] T045 [US3] Implement strategy filtering by tags & ids in `src/strategy/registry.py`
-- [ ] T046 [P] [US3] Implement CLI parsing for --strategies and --weights in `src/cli/run_backtest.py`
-- [ ] T047 [US3] Implement unknown strategy error handling path in `src/backtest/validation.py`
-- [ ] T048 [P] [US3] Add aggregation toggle flags (--aggregate / --no-aggregate) in `src/cli/run_backtest.py`
-- [ ] T049 [US3] Unit test filtering logic in `tests/unit/registry/test_filtering.py`
-- [ ] T050 [P] [US3] Integration test multi-strategy selection subset `tests/integration/multistrategy/test_selection_subset.py`
-- [ ] T051 [US3] Integration test unknown strategy error path `tests/integration/multistrategy/test_unknown_strategy.py`
-- [ ] T052 [US3] Integration test weights fallback equal-weight `tests/integration/multistrategy/test_weights_fallback.py`
+- [x] T045 [US3] Implement strategy filtering by tags & ids in `src/strategy/registry.py`
+- [x] T046 [P] [US3] Implement CLI parsing for --strategies and --weights in `src/cli/run_backtest.py`
+- [x] T047 [US3] Implement unknown strategy error handling path in `src/backtest/validation.py`
+- [x] T048 [P] [US3] Add aggregation toggle flags (--aggregate / --no-aggregate) in `src/cli/run_backtest.py`
+- [x] T049 [US3] Unit test filtering logic in `tests/unit/registry/test_filtering.py`
+- [x] T050 [P] [US3] Integration test multi-strategy selection subset `tests/integration/multistrategy/test_selection_subset.py`
+- [x] T051 [US3] Integration test unknown strategy error path `tests/integration/multistrategy/test_unknown_strategy.py`
+- [x] T052 [US3] Integration test weights fallback equal-weight `tests/integration/multistrategy/test_weights_fallback.py`
 
 ## Final Phase: Polish & Cross-Cutting
 
