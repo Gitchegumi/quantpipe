@@ -207,7 +207,8 @@ class BacktestResult:
         data_start_date: First candle timestamp in dataset (UTC).
         data_end_date: Last candle timestamp in dataset (UTC).
         total_candles: Number of candles processed.
-        metrics: Performance metrics (MetricsSummary for LONG/SHORT, DirectionalMetrics for BOTH).
+        metrics: Performance metrics \
+            (MetricsSummary for LONG/SHORT, DirectionalMetrics for BOTH).
         signals: Optional list of all generated signals (None in dry-run mode).
         executions: Optional list of all completed trades (None in dry-run mode).
         conflicts: List of conflict events (BOTH mode only; empty for LONG/SHORT).

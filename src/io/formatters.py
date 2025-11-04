@@ -430,7 +430,8 @@ def _format_single_metrics(metrics) -> list[str]:
     """Helper to format a single MetricsSummary."""
     return [
         f"Total Trades:   {metrics.trade_count}",
-        f"Win Rate:       {metrics.win_rate:.2%} ({metrics.win_count}W / {metrics.loss_count}L)",
+        f"Win Rate:       {metrics.win_rate:.2%} \
+            ({metrics.win_count}W / {metrics.loss_count}L)",
         f"Average R:      {metrics.avg_r:.2f}",
         f"Expectancy:     {metrics.expectancy:.2f}",
         f"Sharpe Est:     {metrics.sharpe_estimate:.2f}",

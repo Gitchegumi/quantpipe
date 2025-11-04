@@ -4,8 +4,8 @@ Feature: 004-timeseries-dataset
 Task: T019 - Test metadata correctness
 """
 
-import pytest
 from datetime import datetime, timezone
+import pytest
 
 from src.io.dataset_builder import build_metadata
 from src.models.metadata import MetadataRecord

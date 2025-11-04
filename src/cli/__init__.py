@@ -31,13 +31,16 @@ run_backtest.py
 
     Examples:
         # Run both directions
-        poetry run python -m src.cli.run_backtest --data data.csv --manifest manifest.yaml
+        poetry run python -m src.cli.run_backtest \
+            --data data.csv --manifest manifest.yaml
 
         # Long signals only
-        poetry run python -m src.cli.run_backtest --data data.csv --manifest manifest.yaml --direction long
+        poetry run python -m src.cli.run_backtest \
+            --data data.csv --manifest manifest.yaml --direction long
 
         # Dry run (signals only, no execution)
-        poetry run python -m src.cli.run_backtest --data data.csv --manifest manifest.yaml --dry-run
+        poetry run python -m src.cli.run_backtest \
+            --data data.csv --manifest manifest.yaml --dry-run
 
 build_dataset.py (PLACEHOLDER - Feature 004)
     Build time series dataset with test/validation splits
@@ -73,7 +76,8 @@ Quick Start:
    - Manifest YAML with data provenance metadata
 
 3. Run backtest:
-   poetry run python -m src.cli.run_backtest --data price_data/EURUSD_15m.csv --manifest price_data/manifest.yaml
+   poetry run python -m src.cli.run_backtest \
+    --data price_data/EURUSD_15m.csv --manifest price_data/manifest.yaml
 
 4. Review output:
    - Metrics printed to console
