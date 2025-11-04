@@ -48,21 +48,21 @@ Independent Test Increments:
 
 ## Phase 3: User Story 1 (Run Multiple Strategies Together)
 
-- [ ] T022 [US1] Extend orchestrator for multi-strategy loop in `src/backtest/orchestrator.py`
-- [ ] T023 [P] [US1] Implement per-strategy state isolation container in `src/backtest/state_isolation.py`
-- [ ] T024 [US1] Implement aggregation logic (net exposures, PnL combine) in `src/backtest/aggregation.py`
-- [ ] T025 [P] [US1] Implement portfolio metrics computation in `src/backtest/metrics.py`
-- [ ] T026 [US1] Implement global drawdown evaluation in `src/backtest/risk_global.py`
-- [ ] T027 [US1] Implement per-strategy risk breach handling in `src/backtest/risk_strategy.py`
-- [ ] T028 [P] [US1] Implement manifest writer in `src/backtest/manifest_writer.py`
-- [ ] T029 [US1] Integrate reproducibility hash creation in orchestrator
-- [ ] T030 [US1] Integrate structured logging events in `src/backtest/observability.py`
-- [ ] T031 [US1] Write integration test: multi-strategy run baseline `tests/integration/multistrategy/test_run_baseline.py`
-- [ ] T032 [P] [US1] Write integration test: net exposure aggregation `tests/integration/multistrategy/test_net_exposure.py`
-- [ ] T033 [US1] Write integration test: risk breach isolation `tests/integration/multistrategy/test_risk_breach.py`
-- [ ] T034 [P] [US1] Write integration test: global drawdown abort `tests/integration/multistrategy/test_global_abort.py`
-- [ ] T035 [US1] Write performance scaling test (strategy count) `tests/performance/test_scaling.py`
-- [ ] T036 [US1] Write determinism repeatability test `tests/integration/multistrategy/test_determinism.py`
+- [x] T022 [US1] Extend orchestrator for multi-strategy loop in `src/backtest/orchestrator.py`
+- [x] T023 [P] [US1] Implement per-strategy state isolation container in `src/backtest/state_isolation.py`
+- [x] T024 [US1] Implement aggregation logic (net exposures, PnL combine) in `src/backtest/aggregation.py`
+- [x] T025 [P] [US1] Implement portfolio metrics computation in `src/backtest/metrics.py`
+- [x] T026 [US1] Implement global drawdown evaluation in `src/backtest/risk_global.py`
+- [x] T027 [US1] Implement per-strategy risk breach handling in `src/backtest/risk_strategy.py`
+- [x] T028 [P] [US1] Implement manifest writer in `src/backtest/manifest_writer.py`
+- [x] T029 [US1] Integrate reproducibility hash creation in orchestrator
+- [x] T030 [US1] Integrate structured logging events in `src/backtest/observability.py`
+- [x] T031 [US1] Write integration test: multi-strategy run baseline `tests/integration/multistrategy/test_run_baseline.py`
+- [x] T032 [P] [US1] Write integration test: net exposure aggregation `tests/integration/multistrategy/test_net_exposure.py`
+- [x] T033 [US1] Write integration test: risk breach isolation `tests/integration/multistrategy/test_risk_breach.py`
+- [x] T034 [P] [US1] Write integration test: global drawdown abort `tests/integration/multistrategy/test_global_abort.py`
+- [x] T035 [US1] Write performance scaling test (strategy count) `tests/performance/test_scaling.py`
+- [x] T036 [US1] Write determinism repeatability test `tests/integration/multistrategy/test_determinism.py`
 
 ## Phase 4: User Story 2 (Strategy Registration & Configuration)
 

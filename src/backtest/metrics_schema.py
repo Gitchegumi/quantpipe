@@ -58,7 +58,7 @@ class StructuredMetrics(BaseModel):
         ..., ge=1, description="Number of strategies executed"
     )
     instruments_count: int = Field(
-        ..., ge=1, description="Distinct instruments across strategies"
+        ..., ge=0, description="Distinct instruments across strategies"
     )
     runtime_seconds: float = Field(..., ge=0.0, description="Wall-clock runtime")
     aggregate_pnl: float = Field(..., description="Weighted portfolio PnL")
