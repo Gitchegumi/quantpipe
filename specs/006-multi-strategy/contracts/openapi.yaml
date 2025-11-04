@@ -1,0 +1,255 @@
+openapi: 3.1.0
+info:
+  title: Multi-Strategy Backtesting API (Conceptual)
+  version: 0.1.0
+  description: Conceptual REST contract representing CLI operations for multi-strategy support.
+servers:
+  - url: http://localhost:8000
+paths:
+  /strategies:
+    get:
+      summary: List registered strategies
+      operationId: listStrategies
+      responses:
+        '200':
+          description: Registered strategies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Strategy'
+  /strategies/{id}:
+    get:
+      summary: Get strategy details
+      operationId: getStrategy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Strategy detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Strategy'
+        '404':
+          description: Not found
+    post:
+      summary: Register or update a strategy
+      operationId: registerStrategy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrategyConfig'
+      responses:
+        '201':
+          description: Strategy registered
+        '400':
+          description: Validation error
+  /backtests:
+    post:
+      summary: Run multi-strategy backtest
+      operationId: runBacktest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BacktestRequest'
+      responses:
+        '202':
+          description: Backtest accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunManifest'
+        '400':
+          description: Validation error
+  /backtests/{runId}:
+    get:
+      summary: Get aggregated portfolio results
+      operationId: getAggregateResults
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Aggregate results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioAggregate'
+        '404':
+          description: Not found
+components:
+  schemas:
+    Strategy:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        default_parameters:
+          type: object
+        default_risk_limits:
+          $ref: '#/components/schemas/RiskLimits'
+    StrategyConfig:
+      type: object
+      properties:
+        strategy_id:
+          type: string
+        parameters:
+          type: object
+        risk_limits:
+          $ref: '#/components/schemas/RiskLimits'
+        weight:
+          type: number
+        overrides_source:
+          type: string
+    RiskLimits:
+      type: object
+      properties:
+        max_position_size:
+          type: number
+        daily_loss_limit:
+          type: number
+        global_drawdown_limit:
+          type: number
+        max_trade_notional:
+          type: number
+    BacktestRequest:
+      type: object
+      required: [strategies, dataset_ref]
+      properties:
+        strategies:
+          type: array
+          items:
+            $ref: '#/components/schemas/StrategyConfig'
+        dataset_ref:
+          type: string
+        aggregate:
+          type: boolean
+        weights:
+          type: object
+          additionalProperties:
+            type: number
+        global_drawdown_limit:
+          type: number
+    StrategyMetrics:
+      type: object
+      properties:
+        total_trades:
+          type: integer
+        gross_pnl:
+          type: number
+        net_pnl:
+          type: number
+        max_drawdown:
+          type: number
+        volatility:
+          type: number
+        win_rate:
+          type: number
+        average_trade_pnl:
+          type: number
+    RiskEvent:
+      type: object
+      properties:
+        event_type:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        detail:
+          type: string
+    StrategyResult:
+      type: object
+      properties:
+        strategy_id:
+          type: string
+        metrics:
+          $ref: '#/components/schemas/StrategyMetrics'
+        halted:
+          type: boolean
+        halt_reason:
+          type: string
+        risk_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskEvent'
+    PortfolioAggregate:
+      type: object
+      properties:
+        strategies_count:
+          type: integer
+        weights_applied:
+          type: object
+          additionalProperties:
+            type: number
+        aggregate_pnl:
+          type: number
+        aggregate_drawdown:
+          type: number
+        aggregate_volatility:
+          type: number
+        net_exposure_by_instrument:
+          type: object
+          additionalProperties:
+            type: number
+        total_trades:
+          type: integer
+        global_abort_triggered:
+          type: boolean
+        risk_breaches:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskEvent'
+        deterministic_run_id:
+          type: string
+    RunManifest:
+      type: object
+      properties:
+        run_id:
+          type: string
+        timestamp_start:
+          type: string
+          format: date-time
+        timestamp_end:
+          type: string
+          format: date-time
+        strategies:
+          type: array
+          items:
+            $ref: '#/components/schemas/StrategyConfig'
+        weights_mode:
+          type: string
+        global_drawdown_limit:
+          type: number
+        data_manifest_ref:
+          type: string
+        correlation_status:
+          type: string
+        deterministic_run_id:
+          type: string
+        version_hash:
+          type: string

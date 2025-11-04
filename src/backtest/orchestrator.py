@@ -5,6 +5,7 @@ This module coordinates the execution of backtests across different direction mo
 (LONG, SHORT, BOTH), managing signal generation, conflict resolution, execution
 simulation, and metrics aggregation.
 """
+# pylint: disable=broad-exception-caught
 
 import logging
 from collections.abc import Sequence
@@ -435,6 +436,70 @@ class BacktestOrchestrator:
             conflicts=conflicts,
             dry_run=self.dry_run,
         )
+
+    # ------------------------------------------------------------------
+    # Multi-Strategy (Initial Skeleton)
+    # ------------------------------------------------------------------
+    def run_multi_strategy(
+        self,
+        strategies: Sequence[tuple[str, callable]],
+        candles_by_strategy: dict[str, Sequence[Candle]],
+        weights: Sequence[float],
+        run_id: str,
+    ) -> dict:
+        """Execute multiple strategies and aggregate simple weighted PnL.
+
+        This is a temporary skeleton to allow early integration tests while
+        full registry, isolation, and aggregation logic are implemented.
+
+        Args:
+            strategies: Sequence of (name, callable) pairs. Callable must accept
+                a sequence of Candle objects and return a mapping containing at
+                least key 'pnl'.
+            candles_by_strategy: Mapping strategy name -> candle sequence.
+            weights: Proposed strategy weights (may be normalized/fallback).
+            run_id: Identifier for this multi-strategy run.
+
+        Returns:
+            Dictionary with raw per-strategy results and simple aggregation
+            summary (keys: results, portfolio).
+        """
+        from .aggregation import PortfolioAggregator  # local import to avoid cycles
+
+        logger.info(
+            "Starting multi-strategy run run_id=%s strategies=%d",
+            run_id, len(strategies)
+        )
+        results: list[dict] = []
+        for name, func in strategies:
+            strat_candles = candles_by_strategy.get(name, [])
+            if not strat_candles:
+                logger.warning("No candles provided for strategy name=%s", name)
+            try:
+                output = func(strat_candles)
+            except Exception as exc:  # noqa: BLE001 broad for skeleton
+                logger.error("Strategy execution failed name=%s error=%s", name, exc)
+                output = {"name": name, "pnl": 0.0, "error": str(exc)}
+            if "name" not in output:
+                output["name"] = name
+            if "pnl" not in output:
+                output["pnl"] = 0.0
+            results.append(output)
+            logger.debug(
+                "Strategy completed name=%s pnl=%.4f",
+                name,
+                float(output.get("pnl", 0.0))
+            )
+
+        aggregator = PortfolioAggregator()
+        portfolio_summary = aggregator.aggregate(results, list(weights))
+        portfolio_summary["run_id"] = run_id
+        portfolio_summary["strategies"] = [r["name"] for r in results]
+        logger.info(
+            "Multi-strategy run complete run_id=%s weighted_pnl=%.4f",
+            run_id, portfolio_summary.get("weighted_pnl", 0.0)
+        )
+        return {"results": results, "portfolio": portfolio_summary}
 
 
 def merge_signals(
