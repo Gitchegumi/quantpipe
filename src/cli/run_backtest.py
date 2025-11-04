@@ -36,7 +36,7 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
-# pylint: disable=fixme
+# pylint: disable=fixme, line-too-long
 
 import argparse
 import logging
@@ -309,8 +309,7 @@ must expose 'run' or 'execute' function",
             print(f"Successfully registered strategy: {args.register_strategy}")
             print(f"  Module: {args.strategy_module}")
             print(
-                f"  Tags: {', '.join(args.strategy_tags) \
-if args.strategy_tags else 'none'}"
+                f"  Tags: {', '.join(args.strategy_tags) if args.strategy_tags else 'none'}"
             )
             print(f"  Version: {args.strategy_version or 'unversioned'}")
             print(
