@@ -88,16 +88,16 @@ Independent Test Increments:
 
 ## Final Phase: Polish & Cross-Cutting
 
-- [ ] T053 Add README update referencing multi-strategy feature `README.md`
-- [ ] T054 [P] Add correlation placeholder note in `spec.md` and `quickstart.md`
-- [ ] T055 Add OpenAPI examples tests in `tests/contract/test_openapi_examples.py`
-- [ ] T056 [P] Add logging standards verification (no f-string) `tests/unit/backtest/test_logging_standards.py`
-- [ ] T057 Add markdownlint spacing fixes for all feature docs (spec, plan, research, data-model, quickstart)
-- [ ] T058 [P] Add Pylint score check script enhancement `scripts/ci/check_quality.py`
-- [ ] T059 Add reliability batch test harness `tests/performance/test_reliability.py`
+- [x] T053 Add README update referencing multi-strategy feature `README.md`
+- [x] T054 [P] Add correlation placeholder note in `spec.md` and `quickstart.md`
+- [x] T055 Add OpenAPI examples tests in `tests/contract/test_openapi_examples.py`
+- [x] T056 [P] Add logging standards verification (no f-string) `tests/unit/backtest/test_logging_standards.py`
+- [x] T057 Add markdownlint spacing fixes for all feature docs (spec, plan, research, data-model, quickstart)
+- [x] T058 [P] Add Pylint score check script enhancement `scripts/ci/check_quality.py`
+- [x] T059 Add reliability batch test harness `tests/performance/test_reliability.py`
 - [ ] T060 [P] Add manifest hash validation test `tests/unit/backtest/test_manifest_hash.py`
 - [ ] T061 Final pass determinism & performance thresholds validation `tests/performance/test_final_validation.py`
-- [ ] T062 Prepare conventional commit draft `specs/006-multi-strategy/commit-draft.txt`
+- [x] T062 Prepare conventional commit draft `specs/006-multi-strategy/commit-draft.txt`
 
 ### Added Coverage & Validation Extensions
 
