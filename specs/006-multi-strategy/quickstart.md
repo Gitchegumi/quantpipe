@@ -2,27 +2,70 @@
 
 This guide shows how to register strategies, run a multi-strategy backtest, and inspect aggregated portfolio results.
 
-## 1. Register / Extend Strategies
+## 1. Register Strategies (CLI)
 
-Strategies are modules under `src/strategy/`. Each must expose an interface (e.g., `generate_signals`, `apply_risk`, `finalize`). Add new strategy, then update registry configuration.
+### List Registered Strategies
 
-Example (conceptual):
+View all currently registered strategies:
+
+```powershell
+poetry run python -m src.cli.run_backtest --list-strategies
+```
+
+Output example:
+
+```text
+Registered Strategies (2):
+------------------------------------------------------------
+  trend_pullback
+    Tags: trend, pullback
+    Version: 1.0.0
+
+  momentum_core
+    Tags: momentum
+    Version: 1.2.0
+```
+
+### Register a New Strategy
+
+Register a strategy from a Python module:
+
+```powershell
+poetry run python -m src.cli.run_backtest \
+  --register-strategy my_strategy \
+  --strategy-module src.strategy.my_strategy \
+  --strategy-tags trend experimental \
+  --strategy-version 0.1.0
+```
+
+**Note**: Current implementation uses in-memory registry. Persistent storage will be added in future release.
+
+### Strategy Module Requirements
+
+Your strategy module must expose a `run()` or `execute()` function:
 
 ```python
 # src/strategy/my_strategy.py
-class MyStrategy(StrategyBase):
-    id = "my_strategy"
-    def generate_signals(self, data_slice):
-        ...
+
+def run(candles):
+    """
+    Execute strategy logic and return result dict.
+    
+    Args:
+        candles: List of candle data with indicators.
+    
+    Returns:
+        Dictionary with keys: pnl, max_drawdown, exposure
+    """
+    # Strategy logic here
+    return {
+        "pnl": 150.0,
+        "max_drawdown": 0.08,
+        "exposure": {"EURUSD": 0.02},
+    }
 ```
 
-## 2. List Available Strategies (CLI)
-
-```powershell
-poetry run python -m trading_strategies.cli.run_backtest --list-strategies
-```
-
-## 3. Run Multi-Strategy Backtest
+## 2. Run Multi-Strategy Backtest
 
 ```powershell
 poetry run python -m trading_strategies.cli.run_backtest --strategies trend_pullback momentum_core mean_revert \
@@ -37,6 +80,27 @@ Flags:
 - `--aggregate` enable aggregated portfolio metrics output
 - `--no-aggregate` produce only per-strategy outputs
 - `--global-drawdown` portfolio drawdown threshold (fraction of starting equity)
+
+## 3. Configuration Overrides
+
+Override default strategy parameters per-strategy:
+
+```python
+# In orchestrator call or config file
+user_overrides = {
+    "trend_pullback": {"ema_fast": 12, "ema_slow": 50},
+    "momentum_core": {"rsi_length": 10},
+}
+
+from src.strategy.config_override import apply_strategy_overrides
+
+# Apply overrides for specific strategy
+config = apply_strategy_overrides(
+    strategy_name="trend_pullback",
+    base_config=default_params,
+    user_overrides=user_overrides
+)
+```
 
 ## 4. Outputs
 

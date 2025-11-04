@@ -5,10 +5,15 @@ when a strategy should be halted due to local breaches (FR-003, FR-015).
 
 Per FR-021, single strategy breaches do NOT trigger global abort—they only
 halt that specific strategy while others continue.
+
+Integration with StrategyConfig (T040):
+- Supports extracting RiskLimits from StrategyConfig.risk_limits dict
+- Provides backward compatibility with direct RiskLimits instances
 """
 
 import logging
 from src.models.risk_limits import RiskLimits
+from src.models.strategy_config import StrategyConfig
 from src.backtest.state_isolation import StrategyState
 
 logger = logging.getLogger(__name__)
@@ -118,4 +123,43 @@ def should_halt_on_breach(
     return False
 
 
-__all__ = ["check_strategy_risk_breach", "should_halt_on_breach"]
+def extract_risk_limits_from_config(
+    config: StrategyConfig,
+    default_limits: RiskLimits | None = None,
+) -> RiskLimits:
+    """
+    Extract RiskLimits from StrategyConfig.risk_limits dict.
+
+    Args:
+        config: StrategyConfig instance with optional risk_limits dict.
+        default_limits: Fallback RiskLimits if config.risk_limits is None.
+
+    Returns:
+        RiskLimits instance constructed from config or default.
+
+    Examples:
+        >>> from src.models.strategy_config import StrategyConfig
+        >>> from src.models.risk_limits import RiskLimits
+        >>> config = StrategyConfig(
+        ...     name="alpha",
+        ...     risk_limits={"max_drawdown_pct": 0.12, "stop_on_breach": True}
+        ... )
+        >>> limits = extract_risk_limits_from_config(config)
+        >>> limits.max_drawdown_pct
+        0.12
+    """
+    if config.risk_limits is None:
+        if default_limits is None:
+            # Use permissive defaults
+            return RiskLimits(max_drawdown_pct=1.0, stop_on_breach=True)
+        return default_limits
+
+    # Construct RiskLimits from dict
+    return RiskLimits(**config.risk_limits)
+
+
+__all__ = [
+    "check_strategy_risk_breach",
+    "should_halt_on_breach",
+    "extract_risk_limits_from_config",
+]

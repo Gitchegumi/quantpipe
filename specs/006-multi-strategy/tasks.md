@@ -66,14 +66,14 @@ Independent Test Increments:
 
 ## Phase 4: User Story 2 (Strategy Registration & Configuration)
 
-- [ ] T037 [US2] Add registration CLI command in `src/cli/run_backtest.py` (mode: --register-strategy)
-- [ ] T038 [P] [US2] Add strategy listing CLI flag in `src/cli/run_backtest.py` (--list-strategies)
-- [ ] T039 [US2] Implement configuration override merge logic in `src/strategy/config_override.py`
-- [ ] T040 [P] [US2] Add risk limit enforcement hook integration in `src/backtest/risk_strategy.py`
-- [ ] T041 [US2] Unit test registration and listing in `tests/unit/registry/test_cli_listing.py`
-- [ ] T042 [P] [US2] Unit test configuration overrides in `tests/unit/strategy/test_config_override.py`
-- [ ] T043 [US2] Integration test single-strategy run with overrides `tests/integration/multistrategy/test_single_override.py`
-- [ ] T044 [US2] Add documentation section to `quickstart.md` for strategy registration
+- [x] T037 [US2] Add registration CLI command in `src/cli/run_backtest.py` (mode: --register-strategy)
+- [x] T038 [P] [US2] Add strategy listing CLI flag in `src/cli/run_backtest.py` (--list-strategies)
+- [x] T039 [US2] Implement configuration override merge logic in `src/strategy/config_override.py`
+- [x] T040 [P] [US2] Add risk limit enforcement hook integration in `src/backtest/risk_strategy.py`
+- [x] T041 [US2] Unit test registration and listing in `tests/unit/registry/test_cli_listing.py`
+- [x] T042 [P] [US2] Unit test configuration overrides in `tests/unit/strategy/test_config_override.py`
+- [x] T043 [US2] Integration test single-strategy run with overrides `tests/integration/multistrategy/test_single_override.py`
+- [x] T044 [US2] Add documentation section to `quickstart.md` for strategy registration
 
 ## Phase 5: User Story 3 (Strategy Selection & Filtering)
 
