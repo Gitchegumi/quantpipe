@@ -43,6 +43,7 @@ import json
 import logging
 import math
 import sys
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -231,6 +232,39 @@ def main():
         help="Generate signals without execution (signal-only mode)",
     )
 
+    # Performance optimization flags (Phase 4: US2)
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Enable performance profiling with cProfile hotspot extraction (US2)",
+    )
+
+    parser.add_argument(
+        "--benchmark-out",
+        type=Path,
+        help="Path to write benchmark JSON artifact (default: results/benchmarks/<timestamp>.json)",
+    )
+
+    # Parallel execution flags (Phase 7: T059)
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        help="Maximum number of parallel workers (default: auto-detect, capped to logical cores)",
+    )
+
+    # Partial dataset iteration flags (Phase 5: US3)
+    parser.add_argument(
+        "--data-frac",
+        type=float,
+        help="Fraction of dataset to process (0.0-1.0). Prompts interactively if omitted. Default: 1.0 (US3)",
+    )
+
+    parser.add_argument(
+        "--portion",
+        type=int,
+        help="Which portion to select when using --data-frac < 1.0 (1-based index). Example: --data-frac 0.25 --portion 2 selects second quartile (US3)",
+    )
+
     # Multi-strategy support (Phase 4: US2)
     parser.add_argument(
         "--list-strategies",
@@ -401,8 +435,100 @@ Persistent storage not yet implemented."
     logger.info("Data: %s", args.data)
     logger.info("Dry-run: %s", args.dry_run)
 
+    # Fraction and portion validation/prompting (Phase 5: US3, FR-002, FR-012, FR-015)
+    data_frac = args.data_frac
+    portion = args.portion
+
+    # Interactive prompt if --data-frac not provided
+    if data_frac is None:
+        prompt_attempt = 0
+        max_attempts = 2
+        while prompt_attempt < max_attempts:
+            try:
+                user_input = input(
+                    "Enter dataset fraction to process (0.0-1.0, press Enter for 1.0): "
+                ).strip()
+                if not user_input:
+                    data_frac = 1.0
+                    logger.info("Using default fraction: 1.0 (full dataset)")
+                    break
+                data_frac = float(user_input)
+                if data_frac <= 0 or data_frac > 1.0:
+                    print(
+                        f"Invalid fraction: {data_frac}. Must be between 0.0 (exclusive) and 1.0 (inclusive)."
+                    )
+                    prompt_attempt += 1
+                    continue
+                break
+            except ValueError:
+                print(f"Invalid input: '{user_input}'. Please enter a numeric value.")
+                prompt_attempt += 1
+
+        if prompt_attempt >= max_attempts:
+            print(
+                f"Error: Failed to get valid fraction after {max_attempts} attempts. Aborting.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    else:
+        # Validate command-line fraction
+        if data_frac <= 0 or data_frac > 1.0:
+            print(
+                f"Error: --data-frac must be between 0.0 (exclusive) and 1.0 (inclusive). Got: {data_frac}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    # Portion validation and interactive prompt (if fraction < 1.0)
+    if data_frac < 1.0 and portion is None:
+        # Calculate max portions
+        max_portions = int(1.0 / data_frac)
+        try:
+            user_input = input(
+                f"Enter portion index (1-{max_portions}, press Enter for 1): "
+            ).strip()
+            if not user_input:
+                portion = 1
+                logger.info("Using default portion: 1 (first portion)")
+            else:
+                portion = int(user_input)
+                if portion < 1 or portion > max_portions:
+                    print(
+                        f"Error: Portion must be between 1 and {max_portions}. Got: {portion}",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+        except ValueError:
+            print(
+                f"Error: Invalid portion input '{user_input}'. Must be an integer.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    elif data_frac < 1.0 and portion is not None:
+        # Validate command-line portion
+        max_portions = int(1.0 / data_frac)
+        if portion < 1 or portion > max_portions:
+            print(
+                f"Error: --portion must be between 1 and {max_portions} for fraction {data_frac}. Got: {portion}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    elif data_frac == 1.0:
+        portion = 1  # Full dataset, single portion
+
+    logger.info("Dataset fraction: %.2f", data_frac)
+    if data_frac < 1.0:
+        logger.info("Portion selected: %d", portion)
+
     # Create output directory
     args.output.mkdir(parents=True, exist_ok=True)
+
+    # Initialize profiler if profiling enabled
+    profiler = None
+    if args.profile:
+        from ..backtest.profiling import ProfilingContext
+
+        profiler = ProfilingContext()
 
     # Convert MetaTrader CSV if needed
     logger.info("Preprocessing CSV data")
@@ -417,63 +543,149 @@ Persistent storage not yet implemented."
         parameters.atr_stop_mult,
     )
 
-    # Ingest candles
-    logger.info("Ingesting candles from %s", converted_csv)
-    candles = list(
-        ingest_candles(
-            csv_path=converted_csv,
-            ema_fast=parameters.ema_fast,
-            ema_slow=parameters.ema_slow,
-            atr_period=parameters.atr_length,
-            rsi_period=parameters.rsi_length,
-            stoch_rsi_period=parameters.rsi_length,
-            expected_timeframe_minutes=1,
-            allow_gaps=True,
-            show_progress=True,  # Show progress bar for CLI usage
+    # Execute backtest with optional profiling context
+    profiling_ctx = profiler if profiler else nullcontext()
+    with profiling_ctx:
+        # Ingest candles with phase timing
+        if profiler:
+            profiler.start_phase("ingest")
+
+        logger.info("Ingesting candles from %s", converted_csv)
+        candles = list(
+            ingest_candles(
+                csv_path=converted_csv,
+                ema_fast=parameters.ema_fast,
+                ema_slow=parameters.ema_slow,
+                atr_period=parameters.atr_length,
+                rsi_period=parameters.rsi_length,
+                stoch_rsi_period=parameters.rsi_length,
+                expected_timeframe_minutes=1,
+                allow_gaps=True,
+                show_progress=True,  # Show progress bar for CLI usage
+            )
         )
-    )
-    logger.info("Loaded %d candles", len(candles))
+        logger.info("Loaded %d candles", len(candles))
 
-    # Create orchestrator
-    direction_mode = DirectionMode[args.direction]
-    orchestrator = BacktestOrchestrator(
-        direction_mode=direction_mode, dry_run=args.dry_run
-    )
+        if profiler:
+            profiler.end_phase("ingest")
 
-    # Run backtest
-    # TODO: Future enhancement - loop over multiple pairs and strategies:
-    # for pair in args.pair:
-    #     for strategy in args.strategy:
-    #         result = run_strategy_on_pair(pair, strategy, candles)
-    # For now, use first pair/strategy from lists
-    pair = args.pair[0]
-    strategy = args.strategy[0]  # Currently only trend-pullback supported
+        # Slice dataset if fraction < 1.0 (Phase 5: US3, FR-002, SC-003)
+        if data_frac < 1.0:
+            from ..backtest.chunking import slice_dataset
 
-    run_id = f"{args.direction.lower()}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-    logger.info(
-        "Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy
-    )
+            total_candles = len(candles)
+            logger.info(
+                "Slicing dataset: fraction=%.2f, portion=%d, total_candles=%d",
+                data_frac,
+                portion,
+                total_candles,
+            )
 
-    # Build signal parameters from strategy config
-    signal_params = {
-        "ema_fast": parameters.ema_fast,
-        "ema_slow": parameters.ema_slow,
-        "atr_stop_mult": parameters.atr_stop_mult,
-        "target_r_mult": parameters.target_r_mult,
-        "cooldown_candles": parameters.cooldown_candles,
-        "rsi_length": parameters.rsi_length,
-    }
+            candles = slice_dataset(candles, fraction=data_frac, portion=portion)
+            logger.info("Sliced to %d candles (%.1f%%)", len(candles), 100 * len(candles) / total_candles)
 
-    result = orchestrator.run_backtest(
-        candles=candles,
-        pair=pair,
-        run_id=run_id,
-        **signal_params,
-    )
+        # Create orchestrator
+        direction_mode = DirectionMode[args.direction]
 
-    logger.info("Backtest complete: %s", result.run_id)
+        # Set default benchmark output path if profiling enabled
+        benchmark_path = args.benchmark_out
+        if args.profile and not benchmark_path:
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+            benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
 
-    # Format output
+        orchestrator = BacktestOrchestrator(
+            direction_mode=direction_mode,
+            dry_run=args.dry_run,
+            enable_profiling=args.profile,
+        )
+
+        # Attach profiler to orchestrator if profiling enabled
+        if profiler:
+            orchestrator.profiler = profiler
+
+        # Run backtest
+        # TODO: Future enhancement - loop over multiple pairs and strategies:
+        # for pair in args.pair:
+        #     for strategy in args.strategy:
+        #         result = run_strategy_on_pair(pair, strategy, candles)
+        # For now, use first pair/strategy from lists
+        pair = args.pair[0]
+        strategy = args.strategy[0]  # Currently only trend-pullback supported
+
+        run_id = f"{args.direction.lower()}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+        logger.info(
+            "Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy
+        )
+
+        # Build signal parameters from strategy config
+        signal_params = {
+            "ema_fast": parameters.ema_fast,
+            "ema_slow": parameters.ema_slow,
+            "atr_stop_mult": parameters.atr_stop_mult,
+            "target_r_mult": parameters.target_r_mult,
+            "cooldown_candles": parameters.cooldown_candles,
+            "rsi_length": parameters.rsi_length,
+        }
+
+        result = orchestrator.run_backtest(
+            candles=candles,
+            pair=pair,
+            run_id=run_id,
+            **signal_params,
+        )
+
+        logger.info("Backtest complete: %s", result.run_id)
+
+        # Write benchmark artifact if profiling enabled
+        if args.profile and benchmark_path:
+            from ..backtest.profiling import write_benchmark_record
+            import tracemalloc
+
+            # Get phase times from orchestrator if available
+            phase_times = {}
+            hotspots = []
+            if profiler:
+                phase_times = profiler.get_phase_times()
+                hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
+
+            # Calculate metrics
+            dataset_rows = len(candles)
+            trades_simulated = 0
+            if result.metrics:
+                if hasattr(result.metrics, "combined"):
+                    trades_simulated = result.metrics.combined.trade_count
+                elif hasattr(result.metrics, "trade_count"):
+                    trades_simulated = result.metrics.trade_count
+
+            wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
+
+            # Memory metrics (approximate if tracemalloc not used)
+            memory_peak_mb = 0.0
+            memory_ratio = 1.0
+            if tracemalloc.is_tracing():
+                _, peak = tracemalloc.get_traced_memory()
+                memory_peak_mb = peak / (1024 * 1024)
+                # Estimate raw dataset size (rough approximation)
+                raw_bytes = dataset_rows * 8 * 6  # 8 bytes per float, 6 columns (OHLC+V+T)
+                memory_ratio = peak / raw_bytes if raw_bytes > 0 else 1.0
+
+            # Create benchmark directory
+            benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+
+            write_benchmark_record(
+                output_path=benchmark_path,
+                dataset_rows=dataset_rows,
+                trades_simulated=trades_simulated,
+                phase_times=phase_times,
+                wall_clock_total=wall_clock_total,
+                memory_peak_mb=memory_peak_mb,
+                memory_ratio=memory_ratio,
+                hotspots=hotspots,  # Include cProfile hotspots
+                fraction=data_frac,  # Phase 5: US3, FR-002
+            )
+            logger.info("Benchmark artifact written to %s", benchmark_path)
+
+    # Format output (outside profiling context)
     output_format = (
         OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
     )

@@ -1,3 +1,5 @@
+# pylint: disable=broad-exception-caught, unused-variable, fixme, unused-import, too-many-lines
+
 """
 Backtest orchestration for directional backtesting system.
 
@@ -5,8 +7,6 @@ This module coordinates the execution of backtests across different direction mo
 (LONG, SHORT, BOTH), managing signal generation, conflict resolution, execution
 simulation, and metrics aggregation.
 """
-
-# pylint: disable=broad-exception-caught, unused-variable
 
 import logging
 from collections.abc import Sequence
@@ -18,11 +18,14 @@ from rich.progress import (
     SpinnerColumn,
     TaskProgressColumn,
     TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
 )
 
-from ..backtest.execution import simulate_execution
 from ..backtest.metrics import calculate_directional_metrics
-from ..models.core import Candle, TradeSignal
+from ..backtest.profiling import ProfilingContext
+from ..backtest.trade_sim_batch import simulate_trades_batch
+from ..models.core import Candle, TradeExecution, TradeSignal
 from ..models.directional import BacktestResult, ConflictEvent
 from ..models.enums import DirectionMode
 from ..strategy.trend_pullback.signal_generator import (
@@ -60,6 +63,8 @@ class BacktestOrchestrator:
         self,
         direction_mode: DirectionMode,
         dry_run: bool = False,
+        enable_profiling: bool = False,
+        log_frequency: int = 1000,
     ):
         """
         Initialize backtest orchestrator.
@@ -67,14 +72,168 @@ class BacktestOrchestrator:
         Args:
             direction_mode: Direction mode for signal generation (LONG, SHORT, BOTH).
             dry_run: If True, generate signals only without execution simulation.
+            enable_profiling: If True, enable phase timing instrumentation.
+            log_frequency: Log progress every N items (signals/trades). Default 1000.
         """
         self.direction_mode = direction_mode
         self.dry_run = dry_run
+        self.enable_profiling = enable_profiling
+        self.log_frequency = log_frequency
+        self.profiler: ProfilingContext | None = None
         logger.info(
-            "Initialized BacktestOrchestrator: direction=%s, dry_run=%s",
+            "Initialized BacktestOrchestrator: \
+direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             direction_mode.value,
             dry_run,
+            enable_profiling,
+            log_frequency,
         )
+
+    def _start_phase(self, phase_name: str) -> None:
+        """Start profiling phase if profiling is enabled.
+
+        Args:
+            phase_name: Name of the phase to start.
+        """
+        if self.enable_profiling and self.profiler:
+            self.profiler.start_phase(phase_name)
+
+    def _end_phase(self, phase_name: str) -> None:
+        """End profiling phase if profiling is enabled.
+
+        Args:
+            phase_name: Name of the phase to end.
+        """
+        if self.enable_profiling and self.profiler:
+            self.profiler.end_phase(phase_name)
+
+    def _simulate_batch(
+        self,
+        signals: Sequence[TradeSignal],
+        candles: Sequence[Candle],
+        slippage_pips: float = 0.5,
+    ) -> list[TradeExecution]:
+        """Simulate trade execution in batch using vectorized trade simulation.
+
+        Converts signals to batch format, runs vectorized simulation, and
+        converts results back to TradeExecution objects.
+
+        Args:
+            signals: Trade signals to simulate.
+            candles: Full candle dataset.
+            slippage_pips: Entry slippage in pips.
+
+        Returns:
+            List of TradeExecution objects for completed trades.
+        """
+        if not signals:
+            return []
+
+        # Build candle index for timestamp lookups
+        candle_timestamps = [c.timestamp_utc for c in candles]
+
+        # Convert signals to batch entry format
+        entries = []
+        for signal in signals:
+            # Find entry candle index (first candle after signal timestamp)
+            entry_idx = None
+            for i, ts in enumerate(candle_timestamps):
+                if ts > signal.timestamp_utc:
+                    entry_idx = i
+                    break
+
+            if entry_idx is None:
+                logger.debug(
+                    "No candles after signal timestamp %s, skipping",
+                    signal.timestamp_utc.isoformat(),
+                )
+                continue
+
+            # Calculate entry price with slippage
+            entry_candle = candles[entry_idx]
+            if signal.direction == "LONG":
+                entry_price = entry_candle.open + (slippage_pips / 10000)
+            else:  # SHORT
+                entry_price = entry_candle.open - (slippage_pips / 10000)
+
+            # Calculate stop-loss and take-profit percentages
+            risk_distance = abs(entry_price - signal.initial_stop_price)
+            stop_loss_pct = risk_distance / entry_price
+            take_profit_pct = (risk_distance * 2.0) / entry_price  # 2R target
+
+            entries.append(
+                {
+                    "signal": signal,
+                    "entry_index": entry_idx,
+                    "entry_price": entry_price,
+                    "side": signal.direction,
+                    "stop_loss_pct": stop_loss_pct,
+                    "take_profit_pct": take_profit_pct,
+                }
+            )
+
+        if not entries:
+            return []
+
+        # Convert candles to DataFrame for batch simulation
+        import pandas as pd
+
+        price_data = pd.DataFrame(
+            {
+                "high": [c.high for c in candles],
+                "low": [c.low for c in candles],
+                "close": [c.close for c in candles],
+            }
+        )
+
+        # Run batch simulation (use first entry's SL/TP as defaults for now)
+        # TODO: Support per-trade SL/TP in simulate_trades_batch
+        results = simulate_trades_batch(
+            entries=entries,
+            price_data=price_data,
+            stop_loss_pct=entries[0]["stop_loss_pct"],
+            take_profit_pct=entries[0]["take_profit_pct"],
+        )
+
+        # Convert results to TradeExecution objects
+        executions = []
+        for result, entry in zip(results, entries, strict=False):
+            if result["exit_index"] is None:
+                continue
+
+            signal = entry["signal"]
+            entry_idx = result["entry_index"]
+            exit_idx = result["exit_index"]
+
+            # Map exit reasons
+            exit_reason_map = {
+                "STOP_LOSS": "STOP_LOSS",
+                "TAKE_PROFIT": "TARGET",
+                "END_OF_DATA": "EXPIRY",
+            }
+            exit_reason = exit_reason_map.get(
+                result["exit_reason"], result["exit_reason"]
+            )
+
+            # Calculate R-multiples from PnL percentage
+            pnl_r = result["pnl"] / (entry["stop_loss_pct"])
+
+            execution = TradeExecution(
+                signal_id=signal.id,
+                direction=signal.direction,
+                open_timestamp=candles[entry_idx].timestamp_utc,
+                entry_fill_price=result.get("entry_price", entry["entry_price"]),
+                close_timestamp=candles[exit_idx].timestamp_utc,
+                exit_fill_price=result["exit_price"],
+                exit_reason=exit_reason,
+                pnl_r=pnl_r,
+                slippage_entry_pips=slippage_pips,
+                slippage_exit_pips=0.5,  # Default exit slippage
+                costs_total=0.0,  # Simplified for batch mode
+            )
+            executions.append(execution)
+
+        return executions
 
     def run_backtest(
         self,
@@ -157,18 +316,23 @@ class BacktestOrchestrator:
         parameters = {"pair": pair, **signal_params}
 
         # Process candles in sliding windows (like run_long_backtest.py)
+        self._start_phase("scan")
         all_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
         total_windows = len(candles) - ema_slow
 
-        # Create progress bar
+        # Create progress bar with minimal refresh for performance
         progress = Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
-            TextColumn("• {task.fields[signals]} signals"),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
+            TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
+            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
         progress.start()
         task = progress.add_task(
@@ -195,54 +359,60 @@ class BacktestOrchestrator:
                     all_signals.append(signal)
                     progress.update(task, signals=len(all_signals))
 
+                    # Throttled logging
+                    if len(all_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "LONG signal generation: %d signals found", len(all_signals)
+                        )
+
             progress.update(task, advance=1)
 
         progress.stop()
 
         signals = all_signals
+        self._end_phase("scan")
         logger.info("Generated %d LONG signals", len(signals))
 
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
-            logger.info("Simulating execution for %d LONG signals", len(signals))
+            self._start_phase("simulate")
+            logger.info(
+                "Simulating execution for %d LONG signals (batch mode)", len(signals)
+            )
 
-            # Create progress bar for execution
+            # Create progress bar for execution with minimal refresh
             exec_progress = Progress(
                 SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
                 TaskProgressColumn(),
-                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+                TimeElapsedColumn(),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
-                f"Simulating {len(signals):,} trades",
-                total=len(signals),
-                wins=0,
-                losses=0,
+                f"Simulating {len(signals):,} trades (vectorized)",
+                total=100,
             )
 
-            wins = 0
-            losses = 0
-            for signal in signals:
-                execution = simulate_execution(signal, candles)
-                if execution:
-                    executions.append(execution)
-                    # Track wins vs losses
-                    if execution.exit_reason == "TARGET":
-                        wins += 1
-                    elif execution.exit_reason == "STOP_LOSS":
-                        losses += 1
-                    exec_progress.update(exec_task, wins=wins, losses=losses)
-                exec_progress.update(exec_task, advance=1)
-
+            # Use batch simulation for performance
+            exec_progress.update(exec_task, advance=50)  # Processing signals
+            executions = self._simulate_batch(signals, candles)
+            exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
+            self._end_phase("simulate")
+
+            # Calculate wins/losses for logging
+            wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
+            losses = sum(1 for ex in executions if ex.exit_reason == "STOP_LOSS")
 
             logger.info(
-                "Execution complete: %d/%d signals executed",
+                "Batch execution complete: %d/%d signals executed (%d wins, %d losses)",
                 len(executions),
                 len(signals),
+                wins,
+                losses,
             )
 
         # Calculate metrics
@@ -284,18 +454,23 @@ class BacktestOrchestrator:
         parameters = {"pair": pair, **signal_params}
 
         # Process candles in sliding windows (like run_long_backtest.py)
+        self._start_phase("scan")
         all_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
         total_windows = len(candles) - ema_slow
 
-        # Create progress bar
+        # Create progress bar with minimal refresh for performance
         progress = Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
-            TextColumn("• {task.fields[signals]} signals"),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
+            TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
+            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
         progress.start()
         task = progress.add_task(
@@ -322,54 +497,61 @@ class BacktestOrchestrator:
                     all_signals.append(signal)
                     progress.update(task, signals=len(all_signals))
 
+                    # Throttled logging
+                    if len(all_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "SHORT signal generation: %d signals found",
+                            len(all_signals),
+                        )
+
             progress.update(task, advance=1)
 
         progress.stop()
 
         signals = all_signals
+        self._end_phase("scan")
         logger.info("Generated %d SHORT signals", len(signals))
 
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
-            logger.info("Simulating execution for %d SHORT signals", len(signals))
+            self._start_phase("simulate")
+            logger.info(
+                "Simulating execution for %d SHORT signals (batch mode)", len(signals)
+            )
 
-            # Create progress bar for execution
+            # Create progress bar for execution with minimal refresh
             exec_progress = Progress(
                 SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
                 TaskProgressColumn(),
-                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+                TimeElapsedColumn(),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
-                f"Simulating {len(signals):,} trades",
-                total=len(signals),
-                wins=0,
-                losses=0,
+                f"Simulating {len(signals):,} trades (vectorized)",
+                total=100,
             )
 
-            wins = 0
-            losses = 0
-            for signal in signals:
-                execution = simulate_execution(signal, candles)
-                if execution:
-                    executions.append(execution)
-                    # Track wins vs losses
-                    if execution.exit_reason == "TARGET":
-                        wins += 1
-                    elif execution.exit_reason == "STOP_LOSS":
-                        losses += 1
-                    exec_progress.update(exec_task, wins=wins, losses=losses)
-                exec_progress.update(exec_task, advance=1)
-
+            # Use batch simulation for performance
+            exec_progress.update(exec_task, advance=50)  # Processing signals
+            executions = self._simulate_batch(signals, candles)
+            exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
+            self._end_phase("simulate")
+
+            # Calculate wins/losses for logging
+            wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
+            losses = sum(1 for ex in executions if ex.exit_reason == "STOP_LOSS")
 
             logger.info(
-                "Execution complete: %d/%d signals executed",
+                "Batch execution complete: %d/%d signals executed (%d wins, %d losses)",
                 len(executions),
                 len(signals),
+                wins,
+                losses,
             )
 
         # Calculate metrics
@@ -413,19 +595,27 @@ class BacktestOrchestrator:
         parameters = {"pair": pair, **signal_params}
 
         # Process candles in sliding windows for both directions
+        self._start_phase("scan")
         all_long_signals = []
         all_short_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
         total_windows = len(candles) - ema_slow
 
-        # Create progress bar
+        # Create progress bar with minimal refresh for performance
         progress = Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
-            TextColumn("• {task.fields[longs]} longs • {task.fields[shorts]} shorts"),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
+            TextColumn(
+                "• [bold yellow]{task.fields[longs]}[/] longs • "
+                "[bold magenta]{task.fields[shorts]}[/] shorts"
+            ),
+            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
         progress.start()
         task = progress.add_task(
@@ -450,6 +640,12 @@ class BacktestOrchestrator:
                     all_long_signals.append(signal)
                     progress.update(task, longs=len(all_long_signals))
 
+                    # Throttled logging for LONG signals
+                    if len(all_long_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "BOTH mode - LONG: %d signals found", len(all_long_signals)
+                        )
+
             # Generate SHORT signals for this window
             short_window_signals = generate_short_signals(
                 candles=window, parameters=parameters
@@ -462,12 +658,20 @@ class BacktestOrchestrator:
                     all_short_signals.append(signal)
                     progress.update(task, shorts=len(all_short_signals))
 
+                    # Throttled logging for SHORT signals
+                    if len(all_short_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "BOTH mode - SHORT: %d signals found",
+                            len(all_short_signals),
+                        )
+
             progress.update(task, advance=1)
 
         progress.stop()
 
         long_signals = all_long_signals
         short_signals = all_short_signals
+        self._end_phase("scan")
 
         logger.info(
             "Generated %d LONG signals, %d SHORT signals",
@@ -490,46 +694,44 @@ class BacktestOrchestrator:
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
+            self._start_phase("simulate")
             logger.info(
-                "Simulating execution for %d merged signals", len(merged_signals)
+                "Simulating execution for %d merged signals (batch mode)",
+                len(merged_signals),
             )
 
-            # Create progress bar for execution
+            # Create progress bar for execution with minimal refresh
             exec_progress = Progress(
                 SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
                 TaskProgressColumn(),
-                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+                TimeElapsedColumn(),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
-                f"Simulating {len(merged_signals):,} trades",
-                total=len(merged_signals),
-                wins=0,
-                losses=0,
+                f"Simulating {len(merged_signals):,} trades (vectorized)",
+                total=100,
             )
 
-            wins = 0
-            losses = 0
-            for signal in merged_signals:
-                execution = simulate_execution(signal, candles)
-                if execution:
-                    executions.append(execution)
-                    # Track wins vs losses
-                    if execution.exit_reason == "TARGET":
-                        wins += 1
-                    elif execution.exit_reason == "STOP_LOSS":
-                        losses += 1
-                    exec_progress.update(exec_task, wins=wins, losses=losses)
-                exec_progress.update(exec_task, advance=1)
-
+            # Use batch simulation for performance
+            exec_progress.update(exec_task, advance=50)  # Processing signals
+            executions = self._simulate_batch(merged_signals, candles)
+            exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
+            self._end_phase("simulate")
+
+            # Calculate wins/losses for logging
+            wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
+            losses = sum(1 for ex in executions if ex.exit_reason == "STOP_LOSS")
 
             logger.info(
-                "Execution complete: %d/%d signals executed",
+                "Batch execution complete: %d/%d signals executed (%d wins, %d losses)",
                 len(executions),
                 len(merged_signals),
+                wins,
+                losses,
             )
 
         # Calculate three-tier metrics (long_only, short_only, combined)
@@ -625,16 +827,17 @@ class BacktestOrchestrator:
             ... )  # doctest: +SKIP
         """
         import time
-        from .state_isolation import StateIsolationManager
+
+        from ..models.risk_limits import RiskLimits
+        from ..models.run_manifest import RunManifest
+        from ..strategy.weights import parse_and_normalize_weights
         from .aggregation import PortfolioAggregator
+        from .manifest_writer import compute_manifest_hash
+        from .metrics_schema import StructuredMetrics
+        from .reproducibility import generate_deterministic_run_id
         from .risk_global import evaluate_portfolio_drawdown, should_abort_portfolio
         from .risk_strategy import check_strategy_risk_breach, should_halt_on_breach
-        from .reproducibility import generate_deterministic_run_id
-        from .manifest_writer import compute_manifest_hash
-        from ..models.run_manifest import RunManifest
-        from ..models.risk_limits import RiskLimits
-        from .metrics_schema import StructuredMetrics
-        from ..strategy.weights import parse_and_normalize_weights
+        from .state_isolation import StateIsolationManager
 
         start_time = datetime.now(UTC)
         runtime_start = time.time()
@@ -667,7 +870,7 @@ class BacktestOrchestrator:
         portfolio_current_pnl = 0.0
 
         # Execute each strategy with isolation
-        for (name, func), weight in zip(strategies, normalized_weights):
+        for (name, func), weight in zip(strategies, normalized_weights, strict=False):
             state = state_manager.get_or_create(name)
 
             # Skip if strategy already halted

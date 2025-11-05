@@ -28,6 +28,8 @@ from rich.progress import (
     TextColumn,
     BarColumn,
     TaskProgressColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
 )
 
 from ..indicators.basic import atr, ema, rsi
@@ -216,6 +218,9 @@ def ingest_candles(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
             TextColumn(f"• {{task.fields[gaps]}} {gap_label}"),
         )
         progress.start()

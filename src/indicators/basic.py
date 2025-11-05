@@ -182,9 +182,10 @@ def rsi(prices: NDArray[np.float64], period: int = 14) -> NDArray[np.float64]:
     # Calculate RS and RSI
     rsi_values = np.full_like(prices, np.nan, dtype=np.float64)
 
-    # Avoid division by zero
+    # Avoid division by zero - suppress the warning since we handle it with np.where
     valid_mask = avg_losses != 0
-    rs = np.where(valid_mask, avg_gains / avg_losses, 100.0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        rs = np.where(valid_mask, avg_gains / avg_losses, 100.0)
 
     # RSI = 100 - (100 / (1 + RS))
     rsi_values = 100.0 - (100.0 / (1.0 + rs))

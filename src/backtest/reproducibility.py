@@ -298,3 +298,41 @@ def generate_deterministic_run_id(
 
     # Truncate to 16 characters for readability
     return full_hash[:16]
+
+
+def set_deterministic_seed(seed: int = 42) -> None:
+    """Set global random seeds for deterministic execution.
+
+    Configures random number generators and environment variables to ensure
+    reproducible results across runs. Required for FR-009 deterministic mode.
+
+    Args:
+        seed: Integer seed value (default: 42).
+
+    Side effects:
+        - Sets Python random.seed()
+        - Sets numpy random seed
+        - Sets PYTHONHASHSEED environment variable
+
+    Note:
+        Call this function at the start of deterministic backtest runs before
+        any random operations or indicator computations.
+    """
+    import random
+    import os
+
+    # Set Python's built-in random seed
+    random.seed(seed)
+
+    # Set numpy random seed
+    try:
+        import numpy as np
+
+        np.random.seed(seed)
+    except ImportError:
+        logger.warning("NumPy not available; skipping numpy seed setting")
+
+    # Set environment variable for hash randomization
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+    logger.info("Deterministic seed set to %d", seed)
