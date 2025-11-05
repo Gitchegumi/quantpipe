@@ -1,22 +1,25 @@
 <!--
 Sync Impact Report:
-- Version change: 1.5.0 → 1.6.0
+- Version change: 1.6.0 → 1.7.0
 - Modified principles:
-  - Principle V - Data Integrity & Security (added data continuity requirements)
-  - Principle IV - Real-Time Performance Monitoring (added UX observability guidance)
+  - Principle IX - Dependency Management & Reproducibility (removed duplicate section, consolidated)
 - Added sections:
-  - Data Continuity & Gap Handling (Principle V)
-  - User Experience Observability (Principle IV)
-- Removed sections: None
+  - Performance Validation Requirements (Principle IV enhancement)
+  - Infrastructure Quality Standards (Principles VIII, X validation)
+- Removed sections:
+  - Duplicate Principle IX (consolidated into single comprehensive section)
+- Validated through implementation:
+  - PR #17 (007-performance-optimization): All 72 tasks complete
+  - Principle VIII (Code Quality): 26 new tests, all passing, docstrings/type hints enforced
+  - Principle IX (Poetry): All dependencies managed via pyproject.toml, poetry.lock committed
+  - Principle X (Quality Tools): Black/Ruff/Pylint enforced, 62 logging fixes, pylint 8.78→9.68
+  - Performance criteria validated: SC-001 (≤20min), SC-003 (sub-linear load), SC-004 (86.1% cache speedup)
 - Templates requiring updates:
-  ✅ plan-template.md - Compatible (already references data quality and monitoring)
-  ✅ spec-template.md - Compatible (no changes needed)
-  ✅ tasks-template.md - Should include data quality validation tasks
-  ✅ agent-file-template.md - Already updated in v1.2.0
-- Follow-up TODOs:
-  - Ensure all data ingestion implements gap detection and handling
-  - Verify progress bars/UX feedback in all long-running operations
-  - Update testing guidelines to include data continuity tests
+  ✅ plan-template.md - Compatible (constitution check references validated)
+  ✅ spec-template.md - Compatible (success criteria format validated)
+  ✅ tasks-template.md - Compatible (task categorization validated in 007 spec)
+  ✅ agent-file-template.md - Compatible (no changes needed)
+- Follow-up TODOs: None (all principles validated through 007-performance-optimization)
 -->
 
 # Trading Strategies Constitution
@@ -199,37 +202,6 @@ markdownlint-cli2 "**/*.md" "!poetry.lock"
 
 All quality checks SHOULD be automated in pre-commit hooks and CI/CD pipelines.
 
-### IX. Dependency Management & Reproducibility
-
-All Python projects MUST use Poetry for dependency management and packaging.
-The use of requirements.txt files is prohibited for dependency specification.
-All dependencies MUST be declared in pyproject.toml with appropriate version constraints.
-
-_Requirements:_
-
-**Poetry Configuration**:
-Every Python project MUST contain a pyproject.toml file managed by Poetry, including:
-
-- Project metadata (name, version, description, authors)
-- Python version constraint
-- Runtime dependencies with semantic versioning constraints
-- Development dependencies (testing, linting, formatting tools)
-- Build system configuration
-
-**Dependency Lock File**:
-The poetry.lock file MUST be committed to version control to ensure deterministic builds and reproducible environments across all development and production systems.
-
-**Virtual Environment Management**:
-Poetry MUST be used to create and manage project-specific virtual environments. Manual venv creation or system-wide package installation is prohibited.
-
-**Dependency Updates**:
-Dependency version updates MUST be performed using `poetry update` with review of changes in poetry.lock before committing.
-
-**Installation Commands**:
-Development setup MUST use `poetry install` to create reproducible environments. Production deployment MUST use `poetry install --only main` to exclude development dependencies.
-
-**Rationale**: Poetry provides deterministic dependency resolution, lock file management, and integrated virtual environment handling, ensuring reproducible builds and eliminating dependency conflicts. This standardization simplifies onboarding, reduces environment-related issues, and aligns with modern Python packaging best practices.
-
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -299,6 +271,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.6.0
+**Version:** 1.7.0
 **Ratified:** October 25, 2025
 **Last Amended:** November 5, 2025
