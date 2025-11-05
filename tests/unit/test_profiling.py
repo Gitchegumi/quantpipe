@@ -198,6 +198,40 @@ class TestBenchmarkRecord:
         assert record["parallel_efficiency"] == 0.85
         assert record["custom_field"] == "test_value"
 
+    def test_benchmark_parallel_efficiency_support(self, tmp_path):
+        """T038: Benchmark writer supports parallel_efficiency and phase_times."""
+        output_file = tmp_path / "parallel_benchmark.json"
+
+        # Write record with phase_times and parallel_efficiency
+        phase_times = {"ingest": 5.0, "scan": 10.0, "simulate": 8.0}
+        parallel_efficiency = 0.92
+
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=5000,
+            trades_simulated=250,
+            phase_times=phase_times,
+            wall_clock_total=23.0,
+            memory_peak_mb=512.0,
+            memory_ratio=1.5,
+            parallel_efficiency=parallel_efficiency,
+        )
+
+        with open(output_file, "r", encoding="utf-8") as f:
+            record = json.load(f)
+
+        # Verify phase_times preserved
+        assert "phase_times" in record
+        assert record["phase_times"] == phase_times
+        assert record["phase_times"]["ingest"] == 5.0
+        assert record["phase_times"]["scan"] == 10.0
+        assert record["phase_times"]["simulate"] == 8.0
+
+        # Verify parallel_efficiency preserved
+        assert "parallel_efficiency" in record
+        assert record["parallel_efficiency"] == parallel_efficiency
+        assert record["parallel_efficiency"] == 0.92
+
     def test_benchmark_empty_phase_times(self, tmp_path):
         """Benchmark record handles empty phase_times dict."""
         output_file = tmp_path / "empty_phases.json"

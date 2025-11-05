@@ -6,7 +6,11 @@ Tests FR-009 deterministic mode, SC-006 fidelity tolerances, and edge cases
 
 # pylint: disable=unused-import, fixme
 
+import json
+import tempfile
+from pathlib import Path
 import pytest
+from src.backtest.profiling import ProfilingContext, write_benchmark_record
 
 
 class TestFullRunDeterministic:
@@ -34,10 +38,72 @@ class TestFullRunDeterministic:
 
     def test_profiling_artifact_presence(self):
         """Profiling artifact generated when enabled (US2, T036)."""
-        # TODO: Run backtest with --profile flag
-        # - Verify profiling artifact exists
-        # - Verify contains phase_times dict
-        # - Verify contains hotspot list
+        with tempfile.TemporaryDirectory() as tmpdir:
+            benchmark_path = Path(tmpdir) / "test_benchmark.json"
+            
+            # Simulate a profiling run with ProfilingContext
+            with ProfilingContext(enable_cprofile=True) as profiler:
+                profiler.start_phase("ingest")
+                # Simulate some work
+                _ = sum(i ** 2 for i in range(100))
+                profiler.end_phase("ingest")
+                
+                profiler.start_phase("scan")
+                _ = [str(i) for i in range(100)]
+                profiler.end_phase("scan")
+                
+                profiler.start_phase("simulate")
+                _ = {i: i ** 2 for i in range(50)}
+                profiler.end_phase("simulate")
+            
+            # Get phase times and hotspots
+            phase_times = profiler.get_phase_times()
+            hotspots = profiler.get_hotspots(n=10)
+            
+            # Write benchmark artifact
+            write_benchmark_record(
+                output_path=benchmark_path,
+                dataset_rows=1000,
+                trades_simulated=50,
+                phase_times=phase_times,
+                wall_clock_total=sum(phase_times.values()),
+                memory_peak_mb=128.0,
+                memory_ratio=1.2,
+                hotspots=hotspots,
+            )
+            
+            # Verify artifact exists
+            assert benchmark_path.exists(), "Benchmark artifact not created"
+            
+            # Verify artifact contents
+            with open(benchmark_path, "r", encoding="utf-8") as f:
+                artifact = json.load(f)
+            
+            # Verify required fields
+            assert "phase_times" in artifact, "Missing phase_times field"
+            assert "hotspots" in artifact, "Missing hotspots field"
+            assert "dataset_rows" in artifact
+            assert "trades_simulated" in artifact
+            assert "wall_clock_total" in artifact
+            
+            # Verify phase times structure
+            assert isinstance(artifact["phase_times"], dict)
+            assert "ingest" in artifact["phase_times"]
+            assert "scan" in artifact["phase_times"]
+            assert "simulate" in artifact["phase_times"]
+            
+            # Verify hotspots structure
+            assert isinstance(artifact["hotspots"], list)
+            # Should have at least some hotspots from the work we did
+            assert len(artifact["hotspots"]) >= 1
+            
+            if artifact["hotspots"]:
+                hotspot = artifact["hotspots"][0]
+                assert "function" in hotspot
+                assert "filename" in hotspot
+                assert "ncalls" in hotspot
+                assert "tottime" in hotspot
+                assert "cumtime" in hotspot
 
     def test_edge_case_same_bar_exit(self):
         """Trade entering and exiting same bar records duration == 1 (Edge Case)."""

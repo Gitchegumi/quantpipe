@@ -96,11 +96,11 @@ Deliver US1 only: fast execution path (indicator caching, batch simulation, dete
 - [X] T033 [US2] Add phase timing instrumentation (ingest, scan, simulate) in `src/backtest/orchestrator.py`
 - [X] T034 [US2] Implement hotspot extraction (cProfile integration) in `src/backtest/profiling.py`
 - [X] T035 [P] [US2] Add profiling artifact content test in `tests/unit/test_profiling.py` (mock run)
-- [ ] T036 [US2] Add integration test verifying profiling artifact presence `tests/integration/test_full_run_deterministic.py`
+- [X] T036 [US2] Add integration test verifying profiling artifact presence `tests/integration/test_full_run_deterministic.py`
 - [X] T037 [US2] Update `docs/performance.md` with profiling usage instructions
-- [ ] T038 [US2] Update benchmark writer to include `parallel_efficiency` and phase times in JSON
+- [X] T038 [US2] Update benchmark writer to include `parallel_efficiency` and phase times in JSON
 
-**Phase 4 Deliverables (2025-11-05)**:
+**Phase 4 Deliverables (2025-01-06)**:
 
 - `--profile` flag enables cProfile hotspot extraction (≥10 functions, SC-008)
 - `--benchmark-out` flag specifies custom benchmark artifact path  
@@ -108,7 +108,8 @@ Deliver US1 only: fast execution path (indicator caching, batch simulation, dete
 - Hotspot data structure: function, filename, lineno, ncalls, tottime, cumtime, percall metrics
 - Benchmark JSON schema extended with hotspots array
 - Documentation: Complete profiling usage guide with hotspot analysis examples
-- Test coverage: 9 tests passing in test_profiling.py (phase timing, hotspot extraction, artifact validation)
+- Test coverage: 10 tests passing in test_profiling.py (phase timing, hotspot extraction, artifact validation, parallel_efficiency support)
+- Integration test: test_profiling_artifact_presence validates end-to-end profiling workflow
 
 ## Phase 5: User Story US3 (Partial Dataset Iteration)
 

@@ -147,10 +147,28 @@ def write_benchmark_record(
         dataset_rows: Number of dataset rows processed.
         trades_simulated: Number of trades simulated.
         phase_times: Dictionary of phase name -> duration (seconds).
+                     Common phases: "ingest", "scan", "simulate".
         wall_clock_total: Total wall-clock time (seconds).
         memory_peak_mb: Peak memory usage in MB.
         memory_ratio: peak_bytes / raw_dataset_bytes.
-        **kwargs: Additional metadata fields (e.g., fraction, parallel_efficiency).
+        **kwargs: Additional metadata fields. Common fields:
+                 - fraction (float): Dataset fraction used (0.0-1.0)
+                 - parallel_efficiency (float): Parallel speedup / num_workers (0.0-1.0)
+                 - hotspots (List[Dict]): cProfile hotspot data
+                 - custom fields as needed
+    
+    Examples:
+        >>> write_benchmark_record(
+        ...     output_path=Path("benchmark.json"),
+        ...     dataset_rows=1000000,
+        ...     trades_simulated=500,
+        ...     phase_times={"ingest": 10.0, "scan": 30.0, "simulate": 15.0},
+        ...     wall_clock_total=55.0,
+        ...     memory_peak_mb=512.0,
+        ...     memory_ratio=1.3,
+        ...     parallel_efficiency=0.85,
+        ...     fraction=0.5,
+        ... )
     """
     record = {
         "dataset_rows": dataset_rows,
