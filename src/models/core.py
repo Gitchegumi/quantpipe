@@ -31,6 +31,7 @@ class Candle:
         atr: Average True Range indicator value.
         rsi: Relative Strength Index (14-period default).
         stoch_rsi: Optional Stochastic RSI value for additional confirmation.
+        is_gap: True if this candle was synthetically created to fill a timestamp gap.
 
     Examples:
         >>> from datetime import datetime, timezone
@@ -61,6 +62,7 @@ class Candle:
     atr: float
     rsi: float
     stoch_rsi: float | None = None
+    is_gap: bool = False
 
 
 @dataclass(frozen=True)

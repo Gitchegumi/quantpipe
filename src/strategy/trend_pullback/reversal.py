@@ -76,7 +76,7 @@ def detect_reversal(
         has_reversal = False
 
     if has_reversal:
-        logger.info(
+        logger.debug(
             "Reversal detected: direction=%s, timestamp=%s",
             pullback_state.direction,
             recent_candles[-1].timestamp_utc.isoformat(),

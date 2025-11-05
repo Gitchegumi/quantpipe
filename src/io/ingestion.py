@@ -87,13 +87,16 @@ def ingest_candles(
     stoch_rsi_period: int = 14,
     expected_timeframe_minutes: int = 5,
     allow_gaps: bool = False,
+    fill_gaps: bool = True,
     show_progress: bool = False,
 ) -> Iterator[Candle]:
     """
     Load candles from CSV and yield Candle objects with computed indicators.
 
     Reads OHLCV data, computes technical indicators, validates timestamp
-    continuity, and yields fully-enriched Candle objects.
+    continuity, and yields fully-enriched Candle objects. When fill_gaps=True,
+    creates synthetic candles to fill timestamp gaps by carrying forward the
+    previous close price.
 
     CSV Format:
         timestamp_utc, open, high, low, close, volume
@@ -108,6 +111,7 @@ def ingest_candles(
         stoch_rsi_period: Stochastic RSI period (default 14).
         expected_timeframe_minutes: Expected candle interval in minutes (default 5).
         allow_gaps: If True, log gaps but don't raise errors (default False).
+        fill_gaps: If True, create synthetic candles to fill gaps (default True).
         show_progress: If True, display progress bar during ingestion (default False).
 
     Yields:
@@ -199,17 +203,20 @@ def ingest_candles(
     # Validate timestamp continuity and yield candles
     expected_delta = timedelta(minutes=expected_timeframe_minutes)
     prev_timestamp: datetime | None = None
+    prev_candle: Candle | None = None
     total_candles = len(df)
     gap_count = 0
+    filled_count = 0
 
     # Create progress bar if requested
     if show_progress:
+        gap_label = "filled" if fill_gaps else "gaps"
         progress = Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
-            TextColumn("• {task.fields[gaps]} gaps"),
+            TextColumn(f"• {{task.fields[gaps]}} {gap_label}"),
         )
         progress.start()
         task = progress.add_task(
@@ -222,12 +229,56 @@ def ingest_candles(
         current_timestamp = row["timestamp_utc"]
 
         # Check for timestamp gaps (FR-019)
-        if prev_timestamp is not None:
+        if prev_timestamp is not None and prev_candle is not None:
             actual_delta = current_timestamp - prev_timestamp
             if actual_delta > expected_delta:
                 gap_minutes = actual_delta.total_seconds() / 60
                 gap_count += 1
-                if allow_gaps:
+
+                if fill_gaps:
+                    # Fill the gap with synthetic candles
+                    num_missing = int(
+                        (actual_delta - expected_delta).total_seconds()
+                        / 60
+                        / expected_timeframe_minutes
+                    )
+                    filled_count += num_missing
+
+                    # Create synthetic candles carrying forward the previous close
+                    fill_timestamp = prev_timestamp
+                    for _ in range(num_missing):
+                        fill_timestamp = fill_timestamp + expected_delta
+
+                        # Create synthetic candle with previous close price
+                        # All prices = previous close, volume = 0, indicators = NaN
+                        gap_candle = Candle(
+                            timestamp_utc=fill_timestamp,
+                            open=prev_candle.close,
+                            high=prev_candle.close,
+                            low=prev_candle.close,
+                            close=prev_candle.close,
+                            volume=0.0,
+                            ema20=np.nan,
+                            ema50=np.nan,
+                            atr=np.nan,
+                            rsi=np.nan,
+                            stoch_rsi=None,
+                            is_gap=True,
+                        )
+
+                        if show_progress:
+                            progress.update(task, gaps=filled_count)
+
+                        yield gap_candle
+
+                    logger.debug(
+                        "Filled %d candles for gap: expected %dm, actual %.1fm at %s",
+                        num_missing,
+                        expected_timeframe_minutes,
+                        gap_minutes,
+                        current_timestamp,
+                    )
+                elif allow_gaps:
                     # Gaps are expected in forex data - log at DEBUG level (silent)
                     logger.debug(
                         "Timestamp gap detected (allowing): \
@@ -262,19 +313,30 @@ expected %dm, actual %.1fm at %s",
             atr=float(atr_values[idx]),
             rsi=float(rsi_values[idx]),
             stoch_rsi=float(stoch_rsi_values[idx]),
+            is_gap=False,
         )
 
         if show_progress:
-            progress.update(task, advance=1, gaps=gap_count)
+            progress.update(
+                task, advance=1, gaps=filled_count if fill_gaps else gap_count
+            )
 
         yield candle
         prev_timestamp = current_timestamp
+        prev_candle = candle
 
     if show_progress:
         progress.stop()
 
-    logger.info(
-        "Ingestion complete: %d candles processed, %d gaps detected",
-        total_candles,
-        gap_count,
-    )
+    if fill_gaps:
+        logger.info(
+            "Ingestion complete: %d candles processed, %d gaps filled",
+            total_candles,
+            filled_count,
+        )
+    else:
+        logger.info(
+            "Ingestion complete: %d candles processed, %d gaps detected",
+            total_candles,
+            gap_count,
+        )

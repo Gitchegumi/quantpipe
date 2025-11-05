@@ -163,7 +163,7 @@ def generate_long_signals(
         timestamp_utc=latest_candle.timestamp_utc,
     )
 
-    logger.info(
+    logger.debug(
         "Long signal generated: id=%s..., entry=%.5f, stop=%.5f, timestamp=%s",
         signal_id[:16],
         entry_price,
@@ -317,7 +317,7 @@ def generate_short_signals(
         timestamp_utc=latest_candle.timestamp_utc,
     )
 
-    logger.info(
+    logger.debug(
         "Short signal generated: id=%s..., entry=%.5f, stop=%.5f, timestamp=%s",
         signal_id[:16],
         entry_price,

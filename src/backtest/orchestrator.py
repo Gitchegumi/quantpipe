@@ -5,11 +5,20 @@ This module coordinates the execution of backtests across different direction mo
 (LONG, SHORT, BOTH), managing signal generation, conflict resolution, execution
 simulation, and metrics aggregation.
 """
+
 # pylint: disable=broad-exception-caught, unused-variable
 
 import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
+
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+)
 
 from ..backtest.execution import simulate_execution
 from ..backtest.metrics import calculate_directional_metrics
@@ -151,11 +160,21 @@ class BacktestOrchestrator:
         all_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
+        total_windows = len(candles) - ema_slow
 
-        logger.info(
-            "Processing %d candles with sliding window (size=%d)",
-            len(candles),
-            window_size,
+        # Create progress bar
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("• {task.fields[signals]} signals"),
+        )
+        progress.start()
+        task = progress.add_task(
+            f"Scanning {total_windows:,} windows for LONG signals",
+            total=total_windows,
+            signals=0,
         )
 
         for i in range(ema_slow, len(candles)):
@@ -174,7 +193,11 @@ class BacktestOrchestrator:
                     s.timestamp_utc == signal.timestamp_utc for s in all_signals
                 ):
                     all_signals.append(signal)
-                    logger.debug("New signal at %s", signal.timestamp_utc)
+                    progress.update(task, signals=len(all_signals))
+
+            progress.update(task, advance=1)
+
+        progress.stop()
 
         signals = all_signals
         logger.info("Generated %d LONG signals", len(signals))
@@ -183,12 +206,39 @@ class BacktestOrchestrator:
         executions = []
         if not self.dry_run:
             logger.info("Simulating execution for %d LONG signals", len(signals))
-            for idx, signal in enumerate(signals, 1):
+
+            # Create progress bar for execution
+            exec_progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+            )
+            exec_progress.start()
+            exec_task = exec_progress.add_task(
+                f"Simulating {len(signals):,} trades",
+                total=len(signals),
+                wins=0,
+                losses=0,
+            )
+
+            wins = 0
+            losses = 0
+            for signal in signals:
                 execution = simulate_execution(signal, candles)
                 if execution:
                     executions.append(execution)
-                if idx % 10 == 0:
-                    logger.debug("Processed %d/%d signals", idx, len(signals))
+                    # Track wins vs losses
+                    if execution.exit_reason == "TARGET":
+                        wins += 1
+                    elif execution.exit_reason == "STOP_LOSS":
+                        losses += 1
+                    exec_progress.update(exec_task, wins=wins, losses=losses)
+                exec_progress.update(exec_task, advance=1)
+
+            exec_progress.stop()
+
             logger.info(
                 "Execution complete: %d/%d signals executed",
                 len(executions),
@@ -237,11 +287,21 @@ class BacktestOrchestrator:
         all_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
+        total_windows = len(candles) - ema_slow
 
-        logger.info(
-            "Processing %d candles with sliding window (size=%d)",
-            len(candles),
-            window_size,
+        # Create progress bar
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("• {task.fields[signals]} signals"),
+        )
+        progress.start()
+        task = progress.add_task(
+            f"Scanning {total_windows:,} windows for SHORT signals",
+            total=total_windows,
+            signals=0,
         )
 
         for i in range(ema_slow, len(candles)):
@@ -260,7 +320,11 @@ class BacktestOrchestrator:
                     s.timestamp_utc == signal.timestamp_utc for s in all_signals
                 ):
                     all_signals.append(signal)
-                    logger.debug("New signal at %s", signal.timestamp_utc)
+                    progress.update(task, signals=len(all_signals))
+
+            progress.update(task, advance=1)
+
+        progress.stop()
 
         signals = all_signals
         logger.info("Generated %d SHORT signals", len(signals))
@@ -269,12 +333,39 @@ class BacktestOrchestrator:
         executions = []
         if not self.dry_run:
             logger.info("Simulating execution for %d SHORT signals", len(signals))
-            for idx, signal in enumerate(signals, 1):
+
+            # Create progress bar for execution
+            exec_progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+            )
+            exec_progress.start()
+            exec_task = exec_progress.add_task(
+                f"Simulating {len(signals):,} trades",
+                total=len(signals),
+                wins=0,
+                losses=0,
+            )
+
+            wins = 0
+            losses = 0
+            for signal in signals:
                 execution = simulate_execution(signal, candles)
                 if execution:
                     executions.append(execution)
-                if idx % 10 == 0:
-                    logger.debug("Processed %d/%d signals", idx, len(signals))
+                    # Track wins vs losses
+                    if execution.exit_reason == "TARGET":
+                        wins += 1
+                    elif execution.exit_reason == "STOP_LOSS":
+                        losses += 1
+                    exec_progress.update(exec_task, wins=wins, losses=losses)
+                exec_progress.update(exec_task, advance=1)
+
+            exec_progress.stop()
+
             logger.info(
                 "Execution complete: %d/%d signals executed",
                 len(executions),
@@ -326,11 +417,22 @@ class BacktestOrchestrator:
         all_short_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
+        total_windows = len(candles) - ema_slow
 
-        logger.info(
-            "Processing %d candles with sliding window (size=%d) for BOTH directions",
-            len(candles),
-            window_size,
+        # Create progress bar
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("• {task.fields[longs]} longs • {task.fields[shorts]} shorts"),
+        )
+        progress.start()
+        task = progress.add_task(
+            f"Scanning {total_windows:,} windows for BOTH signals",
+            total=total_windows,
+            longs=0,
+            shorts=0,
         )
 
         for i in range(ema_slow, len(candles)):
@@ -346,7 +448,7 @@ class BacktestOrchestrator:
                     s.timestamp_utc == signal.timestamp_utc for s in all_long_signals
                 ):
                     all_long_signals.append(signal)
-                    logger.debug("New LONG signal at %s", signal.timestamp_utc)
+                    progress.update(task, longs=len(all_long_signals))
 
             # Generate SHORT signals for this window
             short_window_signals = generate_short_signals(
@@ -358,7 +460,11 @@ class BacktestOrchestrator:
                     s.timestamp_utc == signal.timestamp_utc for s in all_short_signals
                 ):
                     all_short_signals.append(signal)
-                    logger.debug("New SHORT signal at %s", signal.timestamp_utc)
+                    progress.update(task, shorts=len(all_short_signals))
+
+            progress.update(task, advance=1)
+
+        progress.stop()
 
         long_signals = all_long_signals
         short_signals = all_short_signals
@@ -387,12 +493,39 @@ class BacktestOrchestrator:
             logger.info(
                 "Simulating execution for %d merged signals", len(merged_signals)
             )
-            for idx, signal in enumerate(merged_signals, 1):
+
+            # Create progress bar for execution
+            exec_progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+            )
+            exec_progress.start()
+            exec_task = exec_progress.add_task(
+                f"Simulating {len(merged_signals):,} trades",
+                total=len(merged_signals),
+                wins=0,
+                losses=0,
+            )
+
+            wins = 0
+            losses = 0
+            for signal in merged_signals:
                 execution = simulate_execution(signal, candles)
                 if execution:
                     executions.append(execution)
-                if idx % 10 == 0:
-                    logger.debug("Processed %d/%d signals", idx, len(merged_signals))
+                    # Track wins vs losses
+                    if execution.exit_reason == "TARGET":
+                        wins += 1
+                    elif execution.exit_reason == "STOP_LOSS":
+                        losses += 1
+                    exec_progress.update(exec_task, wins=wins, losses=losses)
+                exec_progress.update(exec_task, advance=1)
+
+            exec_progress.stop()
+
             logger.info(
                 "Execution complete: %d/%d signals executed",
                 len(executions),
@@ -597,9 +730,7 @@ class BacktestOrchestrator:
 
             if should_abort:
                 global_abort_triggered = True
-                logger.warning(
-                    "Global abort triggered: reason=%s", abort_reason
-                )
+                logger.warning("Global abort triggered: reason=%s", abort_reason)
                 break
 
         runtime_seconds = time.time() - runtime_start

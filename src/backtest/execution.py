@@ -6,6 +6,8 @@ fills, slippage, and the precedence rule for exit modes (fixed R target with
 trailing stop timeout fallback per FR-026).
 """
 
+# pylint: disable=unused-argument, line-too-long
+
 import logging
 from collections.abc import Sequence
 
@@ -183,7 +185,7 @@ def simulate_execution(
                 costs_total=total_costs,
             )
 
-            logger.info(
+            logger.debug(
                 "Trade closed: signal_id=%s..., exit_reason=%s, pnl_r=%.2fR, duration=%d candles",
                 signal.id[:16],
                 exit_reason,
