@@ -4,6 +4,8 @@ Simple CLI command to run long-only backtest.
 Minimal implementation for MVP testing.
 """
 
+# pylint: disable=broad-exception-caught
+
 import logging
 import sys
 from datetime import datetime

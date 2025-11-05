@@ -16,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.integration
-
 from src.io.manifest import load_manifest
 from src.models.exceptions import DataIntegrityError
+
+pytestmark = pytest.mark.integration
 
 
 def test_manifest_file_not_found(tmp_path: Path):
@@ -122,9 +122,8 @@ def test_manifest_checksum_mismatch(tmp_path: Path):
     # Create test data file
     data_file = tmp_path / "test_data.csv"
     data_file.write_text("timestamp_utc,open,high,low,close,volume\n")
-    data_file.write_text(
-        "2024-01-01 00:00:00,1.1000,1.1010,1.0990,1.1005,1000\n", mode="a"
-    )
+    with data_file.open(mode="a") as f:
+        f.write("2024-01-01 00:00:00,1.1000,1.1010,1.0990,1.1005,1000\n")
 
     # Create manifest with incorrect checksum
     manifest_path = tmp_path / "manifest.json"
@@ -227,17 +226,21 @@ def test_manifest_date_range_inverted(tmp_path: Path):
     """
     manifest_path = tmp_path / "inverted_dates.json"
 
+    # Create dummy data file so manifest can reference it
+    data_file = tmp_path / "test.csv"
+    data_file.write_text("timestamp_utc,open,high,low,close,volume\n")
+
     # Note: This is intentionally invalid but manifest.py may not validate it
     invalid_manifest = {
         "pair": "EURUSD",
         "timeframe": "1m",
-        "date_range_start": "2024-12-31T23:59:59Z",  # After end
-        "date_range_end": "2024-01-01T00:00:00Z",  # Before start
+        "start_date": "2024-12-31",  # After end
+        "end_date": "2024-01-01",  # Before start
         "source_provider": "TestProvider",
         "checksum": "abc123",
         "preprocessing_notes": "None",
         "total_candles": 1000,
-        "file_path": "/data/test.csv",
+        "file_path": str(data_file),
     }
 
     manifest_path.write_text(json.dumps(invalid_manifest))
@@ -261,9 +264,8 @@ def test_manifest_successful_load(tmp_path: Path):
     # Create valid data file
     data_file = tmp_path / "valid_data.csv"
     data_file.write_text("timestamp_utc,open,high,low,close,volume\n")
-    data_file.write_text(
-        "2024-01-01 00:00:00,1.1000,1.1010,1.0990,1.1005,1000\n", mode="a"
-    )
+    with data_file.open(mode="a") as f:
+        f.write("2024-01-01 00:00:00,1.1000,1.1010,1.0990,1.1005,1000\n")
 
     import hashlib
 
@@ -273,8 +275,8 @@ def test_manifest_successful_load(tmp_path: Path):
     manifest_data = {
         "pair": "EURUSD",
         "timeframe": "1m",
-        "date_range_start": "2024-01-01T00:00:00Z",
-        "date_range_end": "2024-01-01T00:01:00Z",
+        "start_date": "2024-01-01",
+        "end_date": "2024-01-01",
         "source_provider": "TestProvider",
         "checksum": checksum,
         "preprocessing_notes": "UTC normalization applied",

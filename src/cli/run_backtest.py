@@ -39,13 +39,16 @@ Usage:
 # pylint: disable=fixme, line-too-long
 
 import argparse
+import json
 import logging
+import math
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 
+from ..backtest.metrics import MetricsSummary
 from ..backtest.orchestrator import BacktestOrchestrator
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
@@ -55,10 +58,61 @@ from ..io.formatters import (
     generate_output_filename,
 )
 from ..io.ingestion import ingest_candles
+from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
 
 
 logger = logging.getLogger(__name__)
+
+
+def format_backtest_results_as_json(
+    run_metadata: BacktestRun, metrics: MetricsSummary
+) -> str:
+    """
+    Format backtest run metadata and metrics as JSON.
+
+    Args:
+        run_metadata: BacktestRun object with run information.
+        metrics: MetricsSummary object with backtest metrics.
+
+    Returns:
+        JSON string with formatted results.
+    """
+
+    def _serialize_value(value):
+        """Convert NaN/Inf to None for JSON serialization."""
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return None
+        return value
+
+    data = {
+        "run_metadata": {
+            "run_id": run_metadata.run_id,
+            "parameters_hash": run_metadata.parameters_hash,
+            "manifest_ref": run_metadata.manifest_ref,
+            "start_time": run_metadata.start_time.isoformat(),
+            "end_time": run_metadata.end_time.isoformat(),
+            "total_candles_processed": run_metadata.total_candles_processed,
+            "reproducibility_hash": run_metadata.reproducibility_hash,
+        },
+        "metrics": {
+            "trade_count": metrics.trade_count,
+            "win_count": metrics.win_count,
+            "loss_count": metrics.loss_count,
+            "win_rate": _serialize_value(metrics.win_rate),
+            "avg_win_r": _serialize_value(metrics.avg_win_r),
+            "avg_loss_r": _serialize_value(metrics.avg_loss_r),
+            "avg_r": _serialize_value(metrics.avg_r),
+            "expectancy": _serialize_value(metrics.expectancy),
+            "sharpe_estimate": _serialize_value(metrics.sharpe_estimate),
+            "profit_factor": _serialize_value(metrics.profit_factor),
+            "max_drawdown_r": _serialize_value(metrics.max_drawdown_r),
+            "latency_p95_ms": _serialize_value(metrics.latency_p95_ms),
+            "latency_mean_ms": _serialize_value(metrics.latency_mean_ms),
+        },
+    }
+
+    return json.dumps(data, indent=2)
 
 
 def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
