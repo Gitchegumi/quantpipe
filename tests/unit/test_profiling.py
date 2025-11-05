@@ -18,16 +18,16 @@ class TestProfilingContext:
     def test_phase_timing(self):
         """Context manager records phase durations."""
         import time
-        
+
         with ProfilingContext(enable_cprofile=False) as profiler:
             profiler.start_phase("phase1")
             time.sleep(0.01)  # Small delay
             profiler.end_phase("phase1")
-            
+
             profiler.start_phase("phase2")
             time.sleep(0.01)
             profiler.end_phase("phase2")
-        
+
         times = profiler.get_phase_times()
         assert "phase1" in times
         assert "phase2" in times
@@ -41,7 +41,7 @@ class TestProfilingContext:
             # Starting new phase should end previous
             profiler.start_phase("inner")
             profiler.end_phase("inner")
-        
+
         times = profiler.get_phase_times()
         assert "outer" in times or "inner" in times
 
@@ -50,13 +50,13 @@ class TestProfilingContext:
         with ProfilingContext(enable_cprofile=True) as profiler:
             profiler.start_phase("compute")
             # Do some work
-            _ = sum(i ** 2 for i in range(1000))
+            _ = sum(i**2 for i in range(1000))
             profiler.end_phase("compute")
-        
+
         hotspots = profiler.get_hotspots(n=5)
         assert isinstance(hotspots, list)
         assert len(hotspots) <= 5
-        
+
         # Validate hotspot structure
         if hotspots:
             hotspot = hotspots[0]
@@ -79,7 +79,7 @@ class TestProfilingContext:
                 _ = abs(i)
                 _ = max(i, 0)
             profiler.end_phase("work")
-        
+
         hotspots = profiler.get_hotspots(n=10)
         # Should have at least some hotspots (may not reach 10 for simple code)
         assert isinstance(hotspots, list)
@@ -255,7 +255,7 @@ class TestBenchmarkRecord:
     def test_profiling_artifact_with_hotspots(self, tmp_path):
         """Benchmark record includes hotspot data from profiling run (T035)."""
         output_file = tmp_path / "profiling_artifact.json"
-        
+
         # Simulate hotspot data structure
         mock_hotspots = [
             {
@@ -279,7 +279,7 @@ class TestBenchmarkRecord:
                 "percall_cum": 0.0011356,
             },
         ]
-        
+
         write_benchmark_record(
             output_path=output_file,
             dataset_rows=100000,
@@ -290,15 +290,15 @@ class TestBenchmarkRecord:
             memory_ratio=1.3,
             hotspots=mock_hotspots,
         )
-        
+
         with open(output_file, "r", encoding="utf-8") as f:
             record = json.load(f)
-        
+
         # Verify hotspots are included
         assert "hotspots" in record
         assert isinstance(record["hotspots"], list)
         assert len(record["hotspots"]) == 2
-        
+
         # Verify hotspot structure
         hotspot = record["hotspots"][0]
         assert hotspot["function"] == "simulate_trades_batch"

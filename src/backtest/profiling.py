@@ -25,14 +25,14 @@ class ProfilingContext:
             profiler.start_phase("ingest")
             # ... data loading ...
             profiler.end_phase("ingest")
-            
+
             # Get hotspots
             hotspots = profiler.get_hotspots(n=10)
     """
 
     def __init__(self, enable_cprofile: bool = True):
         """Initialize profiling context.
-        
+
         Args:
             enable_cprofile: If True, enable cProfile hotspot extraction.
         """
@@ -89,10 +89,10 @@ class ProfilingContext:
 
     def get_hotspots(self, n: int = 10) -> List[Dict[str, Any]]:
         """Extract top N hotspots from cProfile data.
-        
+
         Args:
             n: Number of top hotspots to return (default 10).
-            
+
         Returns:
             List of dictionaries with hotspot data:
                 - function: Function name
@@ -106,27 +106,29 @@ class ProfilingContext:
         """
         if not self._profiler:
             return []
-        
+
         # Create stats object
         stats = pstats.Stats(self._profiler)
         stats.strip_dirs()
-        stats.sort_stats('cumulative')
-        
+        stats.sort_stats("cumulative")
+
         # Extract hotspot data
         hotspots = []
         for func, (_, nc, tt, ct, _) in list(stats.stats.items())[:n]:
             filename, lineno, func_name = func
-            hotspots.append({
-                "function": func_name,
-                "filename": filename,
-                "lineno": lineno,
-                "ncalls": nc,
-                "tottime": tt,
-                "cumtime": ct,
-                "percall_tot": tt / nc if nc > 0 else 0.0,
-                "percall_cum": ct / nc if nc > 0 else 0.0,
-            })
-        
+            hotspots.append(
+                {
+                    "function": func_name,
+                    "filename": filename,
+                    "lineno": lineno,
+                    "ncalls": nc,
+                    "tottime": tt,
+                    "cumtime": ct,
+                    "percall_tot": tt / nc if nc > 0 else 0.0,
+                    "percall_cum": ct / nc if nc > 0 else 0.0,
+                }
+            )
+
         return hotspots
 
 
@@ -156,7 +158,7 @@ def write_benchmark_record(
                  - parallel_efficiency (float): Parallel speedup / num_workers (0.0-1.0)
                  - hotspots (List[Dict]): cProfile hotspot data
                  - custom fields as needed
-    
+
     Examples:
         >>> write_benchmark_record(
         ...     output_path=Path("benchmark.json"),

@@ -43,6 +43,7 @@ import json
 import logging
 import math
 import sys
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -421,8 +422,8 @@ Persistent storage not yet implemented."
     profiler = None
     if args.profile:
         from ..backtest.profiling import ProfilingContext
+
         profiler = ProfilingContext()
-        profiler.__enter__()  # Start profiling context
 
     # Convert MetaTrader CSV if needed
     logger.info("Preprocessing CSV data")
@@ -437,131 +438,133 @@ Persistent storage not yet implemented."
         parameters.atr_stop_mult,
     )
 
-    # Ingest candles with phase timing
-    if profiler:
-        profiler.start_phase("ingest")
-    
-    logger.info("Ingesting candles from %s", converted_csv)
-    candles = list(
-        ingest_candles(
-            csv_path=converted_csv,
-            ema_fast=parameters.ema_fast,
-            ema_slow=parameters.ema_slow,
-            atr_period=parameters.atr_length,
-            rsi_period=parameters.rsi_length,
-            stoch_rsi_period=parameters.rsi_length,
-            expected_timeframe_minutes=1,
-            allow_gaps=True,
-            show_progress=True,  # Show progress bar for CLI usage
-        )
-    )
-    logger.info("Loaded %d candles", len(candles))
-    
-    if profiler:
-        profiler.end_phase("ingest")
-
-    # Create orchestrator
-    direction_mode = DirectionMode[args.direction]
-    
-    # Set default benchmark output path if profiling enabled
-    benchmark_path = args.benchmark_out
-    if args.profile and not benchmark_path:
-        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
-    
-    orchestrator = BacktestOrchestrator(
-        direction_mode=direction_mode,
-        dry_run=args.dry_run,
-        enable_profiling=args.profile,
-    )
-    
-    # Attach profiler to orchestrator if profiling enabled
-    if profiler:
-        orchestrator.profiler = profiler
-
-    # Run backtest
-    # TODO: Future enhancement - loop over multiple pairs and strategies:
-    # for pair in args.pair:
-    #     for strategy in args.strategy:
-    #         result = run_strategy_on_pair(pair, strategy, candles)
-    # For now, use first pair/strategy from lists
-    pair = args.pair[0]
-    strategy = args.strategy[0]  # Currently only trend-pullback supported
-
-    run_id = f"{args.direction.lower()}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-    logger.info(
-        "Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy
-    )
-
-    # Build signal parameters from strategy config
-    signal_params = {
-        "ema_fast": parameters.ema_fast,
-        "ema_slow": parameters.ema_slow,
-        "atr_stop_mult": parameters.atr_stop_mult,
-        "target_r_mult": parameters.target_r_mult,
-        "cooldown_candles": parameters.cooldown_candles,
-        "rsi_length": parameters.rsi_length,
-    }
-
-    result = orchestrator.run_backtest(
-        candles=candles,
-        pair=pair,
-        run_id=run_id,
-        **signal_params,
-    )
-
-    logger.info("Backtest complete: %s", result.run_id)
-
-    # Write benchmark artifact if profiling enabled
-    if args.profile and benchmark_path:
-        from ..backtest.profiling import write_benchmark_record
-        import tracemalloc
-        
-        # Get phase times from orchestrator if available
-        phase_times = {}
-        hotspots = []
+    # Execute backtest with optional profiling context
+    profiling_ctx = profiler if profiler else nullcontext()
+    with profiling_ctx:
+        # Ingest candles with phase timing
         if profiler:
-            phase_times = profiler.get_phase_times()
-            hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
-            profiler.__exit__(None, None, None)  # Stop profiling context
-        
-        # Calculate metrics
-        dataset_rows = len(candles)
-        trades_simulated = 0
-        if result.metrics:
-            if hasattr(result.metrics, 'combined'):
-                trades_simulated = result.metrics.combined.trade_count
-            elif hasattr(result.metrics, 'trade_count'):
-                trades_simulated = result.metrics.trade_count
-        
-        wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
-        
-        # Memory metrics (approximate if tracemalloc not used)
-        memory_peak_mb = 0.0
-        memory_ratio = 1.0
-        if tracemalloc.is_tracing():
-            _, peak = tracemalloc.get_traced_memory()
-            memory_peak_mb = peak / (1024 * 1024)
-            # Estimate raw dataset size (rough approximation)
-            raw_bytes = dataset_rows * 8 * 6  # 8 bytes per float, 6 columns (OHLC+V+T)
-            memory_ratio = peak / raw_bytes if raw_bytes > 0 else 1.0
-        
-        # Create benchmark directory
-        benchmark_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        write_benchmark_record(
-            output_path=benchmark_path,
-            dataset_rows=dataset_rows,
-            trades_simulated=trades_simulated,
-            phase_times=phase_times,
-            wall_clock_total=wall_clock_total,
-            memory_peak_mb=memory_peak_mb,
-            memory_ratio=memory_ratio,
-            hotspots=hotspots,  # Include cProfile hotspots
-        )
-        logger.info("Benchmark artifact written to %s", benchmark_path)
+            profiler.start_phase("ingest")
 
-    # Format output
+        logger.info("Ingesting candles from %s", converted_csv)
+        candles = list(
+            ingest_candles(
+                csv_path=converted_csv,
+                ema_fast=parameters.ema_fast,
+                ema_slow=parameters.ema_slow,
+                atr_period=parameters.atr_length,
+                rsi_period=parameters.rsi_length,
+                stoch_rsi_period=parameters.rsi_length,
+                expected_timeframe_minutes=1,
+                allow_gaps=True,
+                show_progress=True,  # Show progress bar for CLI usage
+            )
+        )
+        logger.info("Loaded %d candles", len(candles))
+
+        if profiler:
+            profiler.end_phase("ingest")
+
+        # Create orchestrator
+        direction_mode = DirectionMode[args.direction]
+
+        # Set default benchmark output path if profiling enabled
+        benchmark_path = args.benchmark_out
+        if args.profile and not benchmark_path:
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+            benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
+
+        orchestrator = BacktestOrchestrator(
+            direction_mode=direction_mode,
+            dry_run=args.dry_run,
+            enable_profiling=args.profile,
+        )
+
+        # Attach profiler to orchestrator if profiling enabled
+        if profiler:
+            orchestrator.profiler = profiler
+
+        # Run backtest
+        # TODO: Future enhancement - loop over multiple pairs and strategies:
+        # for pair in args.pair:
+        #     for strategy in args.strategy:
+        #         result = run_strategy_on_pair(pair, strategy, candles)
+        # For now, use first pair/strategy from lists
+        pair = args.pair[0]
+        strategy = args.strategy[0]  # Currently only trend-pullback supported
+
+        run_id = f"{args.direction.lower()}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+        logger.info(
+            "Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy
+        )
+
+        # Build signal parameters from strategy config
+        signal_params = {
+            "ema_fast": parameters.ema_fast,
+            "ema_slow": parameters.ema_slow,
+            "atr_stop_mult": parameters.atr_stop_mult,
+            "target_r_mult": parameters.target_r_mult,
+            "cooldown_candles": parameters.cooldown_candles,
+            "rsi_length": parameters.rsi_length,
+        }
+
+        result = orchestrator.run_backtest(
+            candles=candles,
+            pair=pair,
+            run_id=run_id,
+            **signal_params,
+        )
+
+        logger.info("Backtest complete: %s", result.run_id)
+
+        # Write benchmark artifact if profiling enabled
+        if args.profile and benchmark_path:
+            from ..backtest.profiling import write_benchmark_record
+            import tracemalloc
+
+            # Get phase times from orchestrator if available
+            phase_times = {}
+            hotspots = []
+            if profiler:
+                phase_times = profiler.get_phase_times()
+                hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
+
+            # Calculate metrics
+            dataset_rows = len(candles)
+            trades_simulated = 0
+            if result.metrics:
+                if hasattr(result.metrics, "combined"):
+                    trades_simulated = result.metrics.combined.trade_count
+                elif hasattr(result.metrics, "trade_count"):
+                    trades_simulated = result.metrics.trade_count
+
+            wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
+
+            # Memory metrics (approximate if tracemalloc not used)
+            memory_peak_mb = 0.0
+            memory_ratio = 1.0
+            if tracemalloc.is_tracing():
+                _, peak = tracemalloc.get_traced_memory()
+                memory_peak_mb = peak / (1024 * 1024)
+                # Estimate raw dataset size (rough approximation)
+                raw_bytes = dataset_rows * 8 * 6  # 8 bytes per float, 6 columns (OHLC+V+T)
+                memory_ratio = peak / raw_bytes if raw_bytes > 0 else 1.0
+
+            # Create benchmark directory
+            benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+
+            write_benchmark_record(
+                output_path=benchmark_path,
+                dataset_rows=dataset_rows,
+                trades_simulated=trades_simulated,
+                phase_times=phase_times,
+                wall_clock_total=wall_clock_total,
+                memory_peak_mb=memory_peak_mb,
+                memory_ratio=memory_ratio,
+                hotspots=hotspots,  # Include cProfile hotspots
+            )
+            logger.info("Benchmark artifact written to %s", benchmark_path)
+
+    # Format output (outside profiling context)
     output_format = (
         OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
     )
