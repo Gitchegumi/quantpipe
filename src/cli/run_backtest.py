@@ -245,6 +245,13 @@ def main():
         help="Path to write benchmark JSON artifact (default: results/benchmarks/<timestamp>.json)",
     )
 
+    # Parallel execution flags (Phase 7: T059)
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        help="Maximum number of parallel workers (default: auto-detect, capped to logical cores)",
+    )
+
     # Partial dataset iteration flags (Phase 5: US3)
     parser.add_argument(
         "--data-frac",
