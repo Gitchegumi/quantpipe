@@ -161,32 +161,32 @@ Deliver US1 only: fast execution path (indicator caching, batch simulation, dete
 
 ## Phase 7: Remediation Additions (Post-Analysis)
 
-- [ ] T057 [P] Implement typed column-limited loader (`src/backtest/loader.py`) + unit test `tests/unit/test_loader.py` (FR-003, SC-003)
-- [ ] T058 Implement streaming/batched intermediate writer (`src/backtest/stream_writer.py`) + integration memory test (FR-007)
+- [x] T057 [P] Implement typed column-limited loader (`src/backtest/loader.py`) + unit test `tests/unit/test_loader.py` (FR-003, SC-003)
+- [x] T058 Implement streaming/batched intermediate writer (`src/backtest/stream_writer.py`) + integration memory test (FR-007)
 - [x] T059 Implement `--max-workers` flag & cap logic in `src/cli/run_backtest.py` + warning emission (FR-008a, SC-012)
-- [ ] T060 Add performance test for load + slice timing `tests/performance/test_load_slice_speed.py` (SC-003)
-- [ ] T061 Add caching performance test `tests/performance/test_indicator_cache_speed.py` (SC-004)
+- [x] T060 Add performance test for load + slice timing `tests/performance/test_load_slice_speed.py` (SC-003)
+- [x] T061 Add caching performance test `tests/performance/test_indicator_cache_speed.py` (SC-004)
 - [x] T062 Implement fidelity tolerance comparison utility `src/backtest/fidelity.py` + test `tests/unit/test_fidelity.py` (FR-006, SC-006)
-- [ ] T063 Add logging style & docstring/type hint audit script `scripts/ci/check_logging_and_docs.py` (FR-017 / Constitution)
-- [ ] T064 Deterministic dual-run reproducibility test additions to `tests/integration/test_full_run_deterministic.py` (FR-009, SC-006)
+- [x] T063 Add logging style & docstring/type hint audit script `scripts/ci/check_logging_and_docs.py` (FR-017 / Constitution)
+- [x] T064 Deterministic dual-run reproducibility test additions to `tests/integration/test_full_run_deterministic.py` (FR-009, SC-006)
 - [x] T065 Add interactive fraction prompt test `tests/integration/test_fraction_prompt.py` (SC-010, FR-015)
 - [x] T066 Embed pass/fail success criteria flags in benchmark writer (`src/backtest/profiling.py`) + schema test update (FR-014)
 - [x] T067 Add hotspot count ≥10 assertion in profiling test (`tests/unit/test_profiling.py`) (FR-016, SC-008)
 - [x] T068 Add worker cap single warning test `tests/integration/test_parallel_efficiency.py` (FR-008a, SC-012)
-- [ ] T069 Add large overlap runtime threshold assertion in `tests/integration/test_full_run_deterministic.py` (Edge Case, SC-001)
-- [ ] T070 Housekeeping: remove event-driven stub if not scheduled (revisit T048) or annotate future scope
+- [x] T069 Add large overlap runtime threshold assertion in `tests/integration/test_full_run_deterministic.py` (Edge Case, SC-001)
+- [x] T070 Housekeeping: remove event-driven stub if not scheduled (revisit T048) or annotate future scope
 - [x] T071 Extend benchmark aggregator to enforce regression thresholds (`scripts/ci/aggregate_benchmarks.py`) (CI Gate)
-- [ ] T072 Implement portion selection logic & tests in `tests/integration/test_full_run_fraction.py` (FR-002 enhancement)
+- [x] T072 Implement portion selection logic & tests in `tests/integration/test_full_run_fraction.py` (FR-002 enhancement)
 
 ## Updated Task Counts (Post-Analysis)
 
-- Total Tasks: 71
+- Total Tasks: 72 (all complete)
 - Setup Phase: 4
 - Foundational Phase: 15 (+ loader to remediation)
 - US1 Phase: 12 (+ remediation tasks impacting US1: T058,T061,T062,T064,T069)
 - US2 Phase: 8 (+ remediation tasks impacting US2: T066,T067,T068)
 - US3 Phase: 7 (+ remediation tasks impacting US3: T065,T072)
-- Polish Phase: 9 (removed T049) + Remediation Phase: 16
+- Polish Phase: 9 (removed T049) + Remediation Phase: 16 (all complete)
 
 ## Parallelizable Tasks Count (Updated)
 
