@@ -7,8 +7,7 @@ validation (FR-016, SC-008: ≥10), a/fail flag embedding (FR-014).
 # pylint: disable=unused-import, fixme
 
 import json
-from pathlib import Path
-import pytest
+
 from src.backtest.profiling import ProfilingContext, write_benchmark_record
 
 
@@ -104,7 +103,7 @@ class TestBenchmarkRecord:
         )
 
         assert output_file.exists()
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         assert record["dataset_rows"] == 1000
@@ -128,7 +127,7 @@ class TestBenchmarkRecord:
         )
 
         # Load and validate schema
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         # Required fields
@@ -146,13 +145,13 @@ class TestBenchmarkRecord:
         ), "trades_simulated must be int"
         assert isinstance(record["phase_times"], dict), "phase_times must be dict"
         assert isinstance(
-            record["wall_clock_total"], (int, float)
+            record["wall_clock_total"], int | float
         ), "wall_clock_total must be numeric"
         assert isinstance(
-            record["memory_peak_mb"], (int, float)
+            record["memory_peak_mb"], int | float
         ), "memory_peak_mb must be numeric"
         assert isinstance(
-            record["memory_ratio"], (int, float)
+            record["memory_ratio"], int | float
         ), "memory_ratio must be numeric"
 
         # Phase times structure validation
@@ -161,7 +160,7 @@ class TestBenchmarkRecord:
                 phase_name, str
             ), f"Phase name {phase_name} must be string"
             assert isinstance(
-                duration, (int, float)
+                duration, int | float
             ), f"Phase duration {duration} must be numeric"
             assert duration >= 0, f"Phase duration {duration} must be non-negative"
 
@@ -190,7 +189,7 @@ class TestBenchmarkRecord:
             custom_field="test_value",
         )
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         # Verify optional fields preserved
@@ -217,7 +216,7 @@ class TestBenchmarkRecord:
             parallel_efficiency=parallel_efficiency,
         )
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         # Verify phase_times preserved
@@ -246,7 +245,7 @@ class TestBenchmarkRecord:
             memory_ratio=1.0,
         )
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         assert record["phase_times"] == {}
@@ -291,7 +290,7 @@ class TestBenchmarkRecord:
             hotspots=mock_hotspots,
         )
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         # Verify hotspots are included
@@ -309,7 +308,6 @@ class TestBenchmarkRecord:
 
     def test_memory_threshold_not_exceeded(self, tmp_path):
         """Memory ratio below threshold does not flag warning (T044, FR-013)."""
-        from src.backtest.profiling import check_memory_threshold
 
         output_file = tmp_path / "memory_ok.json"
 
@@ -324,7 +322,7 @@ class TestBenchmarkRecord:
             memory_ratio=1.2,  # Below threshold
         )
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         # Verify threshold check passed
@@ -334,7 +332,6 @@ class TestBenchmarkRecord:
 
     def test_memory_threshold_exceeded(self, tmp_path):
         """Memory ratio above threshold flags warning (T044, FR-013, SC-009)."""
-        from src.backtest.profiling import check_memory_threshold
 
         output_file = tmp_path / "memory_exceeded.json"
 
@@ -349,7 +346,7 @@ class TestBenchmarkRecord:
             memory_ratio=1.8,  # Above threshold
         )
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             record = json.load(f)
 
         # Verify threshold check failed
@@ -369,6 +366,163 @@ class TestBenchmarkRecord:
         assert check_memory_threshold(1.6, threshold=1.5) is True
         assert check_memory_threshold(2.0, threshold=1.5) is True
 
+    def test_success_criteria_flags_all_pass(self, tmp_path):
+        """T066: Benchmark record embeds pass/fail flags for success criteria (FR-014)."""
+        output_file = tmp_path / "criteria_pass.json"
+
+        # All criteria passing
+        mock_hotspots = [{"function": f"func_{i}"} for i in range(15)]
+
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=6922364,
+            trades_simulated=17724,
+            phase_times={"ingest": 60.0, "scan": 300.0, "simulate": 180.0},
+            wall_clock_total=600.0,  # 10 min < 20 min (SC-001 pass)
+            memory_peak_mb=1024.0,
+            memory_ratio=1.3,  # < 1.5 (SC-009 pass)
+            parallel_efficiency=0.85,  # > 0.70 (SC-011 pass)
+            hotspots=mock_hotspots,  # 15 >= 10 (SC-008 pass)
+        )
+
+        with open(output_file, encoding="utf-8") as f:
+            record = json.load(f)
+
+        # Verify FR-014 flags present
+        assert "success_criteria_passed" in record
+        assert "runtime_passed" in record
+        assert "memory_passed" in record
+        assert "hotspot_count_passed" in record
+        assert "parallel_efficiency_passed" in record
+
+        # Verify all passed
+        assert record["success_criteria_passed"] is True
+        assert record["runtime_passed"] is True  # SC-001
+        assert record["memory_passed"] is True  # SC-009
+        assert record["hotspot_count_passed"] is True  # SC-008
+        assert record["parallel_efficiency_passed"] is True  # SC-011
+
+    def test_success_criteria_flags_runtime_fail(self, tmp_path):
+        """T066: Runtime exceeding 20min threshold fails SC-001."""
+        output_file = tmp_path / "criteria_runtime_fail.json"
+
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=6922364,
+            trades_simulated=17724,
+            phase_times={"scan": 900.0, "simulate": 600.0},
+            wall_clock_total=1500.0,  # 25 min > 20 min (SC-001 fail)
+            memory_peak_mb=1024.0,
+            memory_ratio=1.2,
+        )
+
+        with open(output_file, encoding="utf-8") as f:
+            record = json.load(f)
+
+        assert record["runtime_passed"] is False  # Failed SC-001
+        assert record["memory_passed"] is True  # Passed SC-009
+        assert record["success_criteria_passed"] is False  # Overall fail
+
+    def test_success_criteria_flags_memory_fail(self, tmp_path):
+        """T066: Memory ratio exceeding 1.5× threshold fails SC-009."""
+        output_file = tmp_path / "criteria_memory_fail.json"
+
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=1000000,
+            trades_simulated=5000,
+            phase_times={"scan": 120.0},
+            wall_clock_total=180.0,  # < 20 min (pass)
+            memory_peak_mb=2048.0,
+            memory_ratio=1.8,  # > 1.5 (SC-009 fail)
+        )
+
+        with open(output_file, encoding="utf-8") as f:
+            record = json.load(f)
+
+        assert record["runtime_passed"] is True
+        assert record["memory_passed"] is False  # Failed SC-009
+        assert record["success_criteria_passed"] is False
+
+    def test_success_criteria_flags_hotspot_fail(self, tmp_path):
+        """T066: Hotspot count <10 fails SC-008."""
+        output_file = tmp_path / "criteria_hotspot_fail.json"
+
+        # Only 5 hotspots (< 10)
+        mock_hotspots = [{"function": f"func_{i}"} for i in range(5)]
+
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=1000000,
+            trades_simulated=5000,
+            phase_times={"scan": 120.0},
+            wall_clock_total=180.0,
+            memory_peak_mb=1024.0,
+            memory_ratio=1.2,
+            hotspots=mock_hotspots,  # 5 < 10 (SC-008 fail)
+        )
+
+        with open(output_file, encoding="utf-8") as f:
+            record = json.load(f)
+
+        assert record["runtime_passed"] is True
+        assert record["memory_passed"] is True
+        assert record["hotspot_count_passed"] is False  # Failed SC-008
+        assert record["success_criteria_passed"] is False
+
+    def test_success_criteria_flags_parallel_efficiency_fail(self, tmp_path):
+        """T066: Parallel efficiency <70% fails SC-011."""
+        output_file = tmp_path / "criteria_parallel_fail.json"
+
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=1000000,
+            trades_simulated=5000,
+            phase_times={"scan": 120.0},
+            wall_clock_total=180.0,
+            memory_peak_mb=1024.0,
+            memory_ratio=1.2,
+            parallel_efficiency=0.55,  # < 0.70 (SC-011 fail)
+        )
+
+        with open(output_file, encoding="utf-8") as f:
+            record = json.load(f)
+
+        assert record["runtime_passed"] is True
+        assert record["memory_passed"] is True
+        assert record["parallel_efficiency_passed"] is False  # Failed SC-011
+        assert record["success_criteria_passed"] is False
+
+    def test_success_criteria_flags_optional_none(self, tmp_path):
+        """T066: Optional criteria (hotspots, parallel_efficiency) gracefully None."""
+        output_file = tmp_path / "criteria_optional_none.json"
+
+        # No hotspots or parallel_efficiency provided
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=1000000,
+            trades_simulated=5000,
+            phase_times={"scan": 120.0},
+            wall_clock_total=180.0,
+            memory_peak_mb=1024.0,
+            memory_ratio=1.2,
+            # hotspots not provided
+            # parallel_efficiency not provided
+        )
+
+        with open(output_file, encoding="utf-8") as f:
+            record = json.load(f)
+
+        # Core criteria evaluated
+        assert record["runtime_passed"] is True
+        assert record["memory_passed"] is True
+
+        # Optional criteria None when not provided
+        assert record["hotspot_count_passed"] is None
+        assert record["parallel_efficiency_passed"] is None
+
+        # Overall success passes if all non-None criteria pass
+        assert record["success_criteria_passed"] is True
+
     # TODO: Add tests for:
-    # - Pass/fail criteria flags (FR-014)
     # - Hotspot count field ≥10 (FR-016, SC-008)

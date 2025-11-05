@@ -9,12 +9,12 @@ Success criteria: SC-007 (100% runs), SC-008 (≥10 hotspots), SC-009 (memory ra
 
 # pylint: disable=unused-import
 
-from typing import Dict, Any, Optional, List
-import json
-import time
 import cProfile
+import json
 import pstats
+import time
 from pathlib import Path
+from typing import Any
 
 
 class ProfilingContext:
@@ -36,11 +36,11 @@ class ProfilingContext:
         Args:
             enable_cprofile: If True, enable cProfile hotspot extraction.
         """
-        self._phase_times: Dict[str, float] = {}
-        self._current_phase: Optional[str] = None
-        self._phase_start: Optional[float] = None
+        self._phase_times: dict[str, float] = {}
+        self._current_phase: str | None = None
+        self._phase_start: float | None = None
         self._enable_cprofile = enable_cprofile
-        self._profiler: Optional[cProfile.Profile] = None
+        self._profiler: cProfile.Profile | None = None
 
     def __enter__(self):
         """Enter profiling context and start cProfile if enabled."""
@@ -79,7 +79,7 @@ class ProfilingContext:
             self._current_phase = None
             self._phase_start = None
 
-    def get_phase_times(self) -> Dict[str, float]:
+    def get_phase_times(self) -> dict[str, float]:
         """Retrieve recorded phase timings.
 
         Returns:
@@ -87,7 +87,7 @@ class ProfilingContext:
         """
         return self._phase_times.copy()
 
-    def get_hotspots(self, n: int = 10) -> List[Dict[str, Any]]:
+    def get_hotspots(self, n: int = 10) -> list[dict[str, Any]]:
         """Extract top N hotspots from cProfile data.
 
         Args:
@@ -170,7 +170,7 @@ def write_benchmark_record(
     output_path: Path,
     dataset_rows: int,
     trades_simulated: int,
-    phase_times: Dict[str, float],
+    phase_times: dict[str, float],
     wall_clock_total: float,
     memory_peak_mb: float,
     memory_ratio: float,
@@ -205,6 +205,13 @@ def write_benchmark_record(
         ...     parallel_efficiency=0.85,
         ...     fraction=0.5,
         ... )
+
+    Notes:
+        - FR-014: Embeds pass/fail flags for each success criterion
+        - SC-001: Runtime ≤ 1200s (20 minutes) for full dataset
+        - SC-009: Memory ratio ≤ 1.5× raw dataset footprint
+        - SC-008: Hotspot count ≥ 10 profiling entries
+        - SC-011: Parallel efficiency ≥ 0.70 (70%)
     """
     # Check memory threshold and add flag (FR-013, SC-009)
     import logging
@@ -212,6 +219,31 @@ def write_benchmark_record(
     logger = logging.getLogger(__name__)
     memory_threshold_exceeded = check_memory_threshold(
         memory_ratio, threshold=1.5, logger=logger
+    )
+
+    # FR-014: Compute pass/fail flags for success criteria
+    runtime_passed = wall_clock_total <= 1200.0  # SC-001: ≤20 minutes
+    memory_passed = memory_ratio <= 1.5  # SC-009: ≤1.5× footprint
+
+    # SC-008: Hotspot count ≥10 (if hotspots provided)
+    hotspots = kwargs.get("hotspots", [])
+    hotspot_count_passed = len(hotspots) >= 10 if hotspots else None
+
+    # SC-011: Parallel efficiency ≥70% (if parallel_efficiency provided)
+    parallel_efficiency = kwargs.get("parallel_efficiency")
+    parallel_efficiency_passed = (
+        parallel_efficiency >= 0.70 if parallel_efficiency is not None else None
+    )
+
+    # Overall success: all non-None criteria must pass
+    criteria_results = [
+        runtime_passed,
+        memory_passed,
+        hotspot_count_passed,
+        parallel_efficiency_passed,
+    ]
+    success_criteria_passed = all(
+        result for result in criteria_results if result is not None
     )
 
     record = {
@@ -222,6 +254,12 @@ def write_benchmark_record(
         "memory_peak_mb": memory_peak_mb,
         "memory_ratio": memory_ratio,
         "memory_threshold_exceeded": memory_threshold_exceeded,  # FR-013
+        # FR-014: Success criteria pass/fail flags
+        "success_criteria_passed": success_criteria_passed,
+        "runtime_passed": runtime_passed,  # SC-001
+        "memory_passed": memory_passed,  # SC-009
+        "hotspot_count_passed": hotspot_count_passed,  # SC-008
+        "parallel_efficiency_passed": parallel_efficiency_passed,  # SC-011
         **kwargs,
     }
 
