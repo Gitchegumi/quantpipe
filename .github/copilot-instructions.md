@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - File system (CSV inputs; processed outputs as CSV + JSON metadata) (004-timeseries-dataset)
 - Python 3.11 (per project standards) + Poetry-managed; numpy, pandas (data & metrics), pydantic (config validation), rich/logging (structured logs), pytest (tests). No new external runtime services. (006-multi-strategy)
 - File-based artifacts (CSV/JSON) for outputs; in-memory state during runs. (006-multi-strategy)
+- Python 3.11 (confirmed by constitution) + numpy, pandas, pydantic, rich (existing). Optional: numba (JIT) [NEEDS CLARIFICATION: adopt as hard dependency or optional fallback?]. (007-performance-optimization)
+- File-based time series (CSV current). Parquet/Arrow considered Phase 2 optimization [NEEDS CLARIFICATION: introduce pyarrow now or defer?]. (007-performance-optimization)
 
 - Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests) (001-trend-pullback)
 - Poetry (mandatory package manager for dependency management and virtual environments)
@@ -68,9 +70,9 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - Line length ≤88 characters (Black standard)
 
 ## Recent Changes
+- 007-performance-optimization: Added Python 3.11 (confirmed by constitution) + numpy, pandas, pydantic, rich (existing). Optional: numba (JIT) [NEEDS CLARIFICATION: adopt as hard dependency or optional fallback?].
 - 006-multi-strategy: Added Python 3.11 (per project standards) + Poetry-managed; numpy, pandas (data & metrics), pydantic (config validation), rich/logging (structured logs), pytest (tests). No new external runtime services.
 - 004-timeseries-dataset: Added Python 3.11 (per project guidelines) + numpy, pandas, pydantic, rich (logging/output), pytest (tests) – no new deps planned
-- 003-update-001-tests: Added Python 3.11 + pytest (for tests), numpy, pandas (used in indicator calculations), pydantic (configs), rich/logging (structured output), Black/Ruff/Pylint (quality gates)
 
 
 <!-- MANUAL ADDITIONS START -->
