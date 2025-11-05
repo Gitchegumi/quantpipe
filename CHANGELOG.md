@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Gap Filling & Progress Visualization (2025-11-05)
+
+- **Gap Filling During Ingestion**
+  - Automatic gap filling in `ingest_candles()` with synthetic candles
+  - Synthetic candles carry forward previous close price for OHLC
+  - All technical indicators set to NaN to prevent false signals
+  - Added `is_gap: bool` field to Candle model for transparency
+  - Enabled by default with `fill_gaps=True` parameter
+  - Backward compatible with `fill_gaps=False` option
+  - Example: 6.9M rows + 3.9M filled gaps = 10.8M continuous candles
+
+- **Progress Bars with Running Tallies**
+  - Signal scanning progress shows live signal counts
+    - LONG mode: "• X signals"
+    - SHORT mode: "• X signals"
+    - BOTH mode: "• X longs • Y shorts"
+  - Execution progress shows win/loss tally
+    - Tracks TARGET_REACHED vs STOP_LOSS exit reasons
+    - All three modes: "• X wins • Y losses"
+  - Gap filling progress shows filled count instead of gaps
+    - Before: "• 327,142 gaps" (alarming)
+    - After: "• 327,142 filled" (informative)
+
+- **Documentation Updates**
+  - Fixed `build-dataset` command syntax in `docs/backtesting.md`
+  - Added MetaTrader CSV format conversion instructions
+  - Documented data preparation workflow with conversion step
+  - Example usage for `scripts/convert_mt_format.py`
+
+### Changed - Gap Filling & Progress Visualization (2025-11-05)
+
+- **Logging Level Adjustments**
+  - Changed reversal detection logs from INFO to DEBUG (`reversal.py`)
+  - Changed signal generation logs from INFO to DEBUG (`signal_generator.py`)
+  - Changed trade execution logs from INFO to DEBUG (`execution.py`)
+  - Reduces console clutter: hundreds of INFO messages → silent + progress bars
+
+- **Output UX Improvements**
+  - Replaced verbose logging with visual progress indicators
+  - Running tallies provide real-time feedback during long operations
+  - Gap filling integrated seamlessly into ingestion progress bar
+
 ### Added - Feature 006: Multi-Strategy Backtesting Framework (2025-11-04)
 
 - **Multi-Strategy Execution & Aggregation**
