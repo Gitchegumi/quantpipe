@@ -91,11 +91,70 @@ poetry run python -m src.cli.run_backtest \
   --benchmark-out ./results/benchmarks/my_run.json
 ```
 
-### Phase 5: User Story US3 (Dataset Fractions) - Pending
+### Phase 5: User Story US3 (Partial Dataset Iteration) ✅ COMPLETE
 
-- Dataset fraction flag (--data-frac 0.0-1.0)
-- Portion selection (first/middle/last, --portion)
-- Load + slice timing validation (≤60s for 10M rows)
+**Status**: Implemented (2025-01-06)
+
+**Optimizations Implemented**:
+
+1. **Dataset Fraction Slicing** (FR-002, SC-003)
+   - `--data-frac` flag specifies fraction of dataset to process (0.0-1.0)
+   - Interactive prompt with default=1.0 (full dataset)
+   - Slicing occurs before indicator computation to minimize waste
+   - Implementation: `src/backtest/chunking.py`
+
+2. **Portion Selection** (FR-002)
+   - `--portion` flag selects specific slice when fraction < 1.0
+   - Example: `--data-frac 0.25 --portion 2` selects second quartile
+   - Enables testing different dataset regions without reprocessing
+   - Useful for temporal validation (early vs late periods)
+
+3. **Fraction Validation** (FR-012, SC-010)
+   - Validates fraction: 0.0 < fraction ≤ 1.0
+   - Interactive prompt with ≤2 attempts before aborting
+   - Clear error messages for invalid inputs (zero, negative, >1.0)
+
+4. **Memory Threshold Monitoring** (FR-013, SC-009)
+   - Tracks memory_ratio = peak_bytes / raw_dataset_bytes
+   - Threshold: 1.5× raw dataset footprint
+   - Warning emitted if exceeded, flag in benchmark JSON
+   - Implementation: `check_memory_threshold()` in `profiling.py`
+
+**Usage**:
+
+```bash
+# Interactive prompt for fraction (press Enter for default=1.0)
+poetry run python -m src.cli.run_backtest \
+  --data ./price_data/processed/eurusd/test/eurusd_test.csv \
+  --direction BOTH
+
+# Quick validation: Process first 25% of dataset
+poetry run python -m src.cli.run_backtest \
+  --data ./price_data/processed/eurusd/test/eurusd_test.csv \
+  --direction BOTH \
+  --data-frac 0.25
+
+# Test second quartile specifically
+poetry run python -m src.cli.run_backtest \
+  --data ./price_data/processed/eurusd/test/eurusd_test.csv \
+  --direction BOTH \
+  --data-frac 0.25 \
+  --portion 2
+
+# Half dataset (first half)
+poetry run python -m src.cli.run_backtest \
+  --data ./price_data/processed/eurusd/test/eurusd_test.csv \
+  --direction BOTH \
+  --data-frac 0.5 \
+  --portion 1
+```
+
+**Test Coverage**:
+
+- Unit tests: 19 tests in `tests/unit/test_chunking.py`
+- Integration tests: 5 tests in `tests/integration/test_full_run_fraction.py`
+- Memory threshold: 3 tests in `tests/unit/test_profiling.py`
+- Performance validation: Slicing 1M items <0.1s (proxy for SC-003)
 
 ## Before/After Timing
 
@@ -165,6 +224,8 @@ Benchmark records are stored in `results/benchmarks/` as JSON files with schema:
   "wall_clock_total": 960.8,
   "memory_peak_mb": 2048.0,
   "memory_ratio": 1.42,
+  "memory_threshold_exceeded": false,
+  "fraction": 1.0,
   "hotspots": [
     {
       "function": "simulate_trades_batch",
@@ -190,8 +251,10 @@ Benchmark records are stored in `results/benchmarks/` as JSON files with schema:
   - `simulate`: Trade execution simulation
 - `wall_clock_total`: Total elapsed time (sum of phases)
 - `memory_peak_mb`: Peak memory usage in megabytes
-- `memory_ratio`: Peak memory / raw dataset size (target ≤1.5×)
-- `hotspots`: List of top 10 function hotspots (when `--profile` enabled)
+- `memory_ratio`: Peak memory / raw dataset size (target ≤1.5×, SC-009)
+- `memory_threshold_exceeded`: Boolean flag if ratio >1.5× (FR-013)
+- `fraction`: Dataset fraction used (1.0 = full, 0.25 = 25%, Phase 5)
+- `hotspots`: List of top ≥10 function hotspots (when `--profile` enabled, SC-008)
   - `function`: Function name
   - `filename`: Source file
   - `lineno`: Line number

@@ -132,6 +132,40 @@ class ProfilingContext:
         return hotspots
 
 
+def check_memory_threshold(
+    memory_ratio: float, threshold: float = 1.5, logger=None
+) -> bool:
+    """Check if memory usage exceeds threshold and emit warning.
+
+    Args:
+        memory_ratio: Actual memory ratio (peak_bytes / raw_dataset_bytes).
+        threshold: Maximum allowed ratio (default: 1.5 for SC-009).
+        logger: Optional logger for warning emission.
+
+    Returns:
+        True if threshold exceeded, False otherwise.
+
+    Examples:
+        >>> check_memory_threshold(1.2, threshold=1.5)  # OK
+        False
+        >>> check_memory_threshold(1.8, threshold=1.5)  # Exceeds
+        True
+
+    Notes:
+        - FR-013: Memory footprint should be flagged if >threshold
+        - SC-009: Default threshold is 1.5× raw dataset footprint
+        - Warning emitted once to logger if provided
+    """
+    exceeded = memory_ratio > threshold
+    if exceeded and logger:
+        logger.warning(
+            "Memory threshold exceeded: ratio=%.2f > threshold=%.2f (SC-009)",
+            memory_ratio,
+            threshold,
+        )
+    return exceeded
+
+
 def write_benchmark_record(
     output_path: Path,
     dataset_rows: int,
@@ -172,6 +206,14 @@ def write_benchmark_record(
         ...     fraction=0.5,
         ... )
     """
+    # Check memory threshold and add flag (FR-013, SC-009)
+    import logging
+
+    logger = logging.getLogger(__name__)
+    memory_threshold_exceeded = check_memory_threshold(
+        memory_ratio, threshold=1.5, logger=logger
+    )
+
     record = {
         "dataset_rows": dataset_rows,
         "trades_simulated": trades_simulated,
@@ -179,6 +221,7 @@ def write_benchmark_record(
         "wall_clock_total": wall_clock_total,
         "memory_peak_mb": memory_peak_mb,
         "memory_ratio": memory_ratio,
+        "memory_threshold_exceeded": memory_threshold_exceeded,  # FR-013
         **kwargs,
     }
 

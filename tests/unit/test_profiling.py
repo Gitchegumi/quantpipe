@@ -307,6 +307,68 @@ class TestBenchmarkRecord:
         assert "filename" in hotspot
         assert "lineno" in hotspot
 
+    def test_memory_threshold_not_exceeded(self, tmp_path):
+        """Memory ratio below threshold does not flag warning (T044, FR-013)."""
+        from src.backtest.profiling import check_memory_threshold
+
+        output_file = tmp_path / "memory_ok.json"
+
+        # Memory ratio = 1.2 (below 1.5 threshold)
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=1000,
+            trades_simulated=50,
+            phase_times={"scan": 10.0},
+            wall_clock_total=10.0,
+            memory_peak_mb=256.0,
+            memory_ratio=1.2,  # Below threshold
+        )
+
+        with open(output_file, "r", encoding="utf-8") as f:
+            record = json.load(f)
+
+        # Verify threshold check passed
+        assert "memory_threshold_exceeded" in record
+        assert record["memory_threshold_exceeded"] is False
+        assert record["memory_ratio"] == 1.2
+
+    def test_memory_threshold_exceeded(self, tmp_path):
+        """Memory ratio above threshold flags warning (T044, FR-013, SC-009)."""
+        from src.backtest.profiling import check_memory_threshold
+
+        output_file = tmp_path / "memory_exceeded.json"
+
+        # Memory ratio = 1.8 (above 1.5 threshold)
+        write_benchmark_record(
+            output_path=output_file,
+            dataset_rows=1000,
+            trades_simulated=50,
+            phase_times={"scan": 10.0},
+            wall_clock_total=10.0,
+            memory_peak_mb=512.0,
+            memory_ratio=1.8,  # Above threshold
+        )
+
+        with open(output_file, "r", encoding="utf-8") as f:
+            record = json.load(f)
+
+        # Verify threshold check failed
+        assert "memory_threshold_exceeded" in record
+        assert record["memory_threshold_exceeded"] is True
+        assert record["memory_ratio"] == 1.8
+
+    def test_check_memory_threshold_function(self):
+        """check_memory_threshold returns correct boolean (T044)."""
+        from src.backtest.profiling import check_memory_threshold
+
+        # Below threshold
+        assert check_memory_threshold(1.2, threshold=1.5) is False
+        assert check_memory_threshold(1.5, threshold=1.5) is False  # Equal OK
+
+        # Above threshold
+        assert check_memory_threshold(1.6, threshold=1.5) is True
+        assert check_memory_threshold(2.0, threshold=1.5) is True
+
     # TODO: Add tests for:
     # - Pass/fail criteria flags (FR-014)
     # - Hotspot count field ≥10 (FR-016, SC-008)
