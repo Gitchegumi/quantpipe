@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Constitution Amendment v1.6.0 (2025-11-05)
+
+- **Principle IV Enhancement: User Experience Observability**
+  - Added requirement for visual progress feedback in long-running operations
+  - Mandated running tallies of key metrics in progress indicators
+  - Specified log verbosity guidelines (INFO/DEBUG) with visual progress replacing repetitive logs
+  - Rationale: Improves development workflow efficiency and troubleshooting capability
+
+- **Principle V Enhancement: Data Continuity & Gap Handling**
+  - Added data continuity validation requirements for time series
+  - Specified gap detection severity levels (DEBUG/WARNING)
+  - Defined gap filling strategy guidelines:
+    - Gaps must be clearly marked (e.g., `is_gap` flag)
+    - Synthetic data must not corrupt indicators (NaN when appropriate)
+    - Behavior must be configurable and documented
+    - Original data integrity preserved for audit
+  - Rationale: Ensures strategies process complete time series without false signals from gaps
+
+- **Constitution Governance**
+  - Version bumped from 1.5.0 → 1.6.0 (MINOR - added new guidance sections)
+  - Last Amended date updated to November 5, 2025
+  - Sync Impact Report documents template compatibility (all ✅)
+
 ### Added - Gap Filling & Progress Visualization (2025-11-05)
 
 - **Gap Filling During Ingestion**

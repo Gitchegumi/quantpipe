@@ -1,18 +1,22 @@
 <!--
 Sync Impact Report:
-- Version change: 1.4.0 → 1.5.0
-- Modified principles: Principle X - Code Quality Automation & Linting (added markdownlint requirement)
-- Added sections: Markdownlint quality tool in Principle X
+- Version change: 1.5.0 → 1.6.0
+- Modified principles:
+  - Principle V - Data Integrity & Security (added data continuity requirements)
+  - Principle IV - Real-Time Performance Monitoring (added UX observability guidance)
+- Added sections:
+  - Data Continuity & Gap Handling (Principle V)
+  - User Experience Observability (Principle IV)
 - Removed sections: None
 - Templates requiring updates:
-  ✅ plan-template.md - Compatible (already references code quality)
-  ✅ tasks-template.md - Should include markdownlint validation tasks
+  ✅ plan-template.md - Compatible (already references data quality and monitoring)
   ✅ spec-template.md - Compatible (no changes needed)
+  ✅ tasks-template.md - Should include data quality validation tasks
   ✅ agent-file-template.md - Already updated in v1.2.0
-- Follow-up TODOs: 
-  - Ensure all Markdown files pass markdownlint validation
-  - Configure markdownlint rules in .markdownlint.json or .markdownlintrc
-  - Add markdownlint to quality workflow
+- Follow-up TODOs:
+  - Ensure all data ingestion implements gap detection and handling
+  - Verify progress bars/UX feedback in all long-running operations
+  - Update testing guidelines to include data continuity tests
 -->
 
 # Trading Strategies Constitution
@@ -55,7 +59,13 @@ All active strategies MUST log execution metrics, performance statistics, and ri
 Monitoring MUST include automated alerts for performance degradation, risk limit breaches, or system anomalies.
 Performance data MUST be structured for analysis and strategy optimization.
 
-**Rationale**: FOREX markets operate 24/5; continuous monitoring ensures rapid response to changing conditions and maintains system health.
+#### User Experience Observability
+
+Long-running operations (backtests, data processing, signal generation) MUST provide visual progress feedback.
+Progress indicators SHOULD include running tallies of key metrics (signals generated, trades executed, win/loss ratios).
+Log verbosity MUST be adjustable: INFO for summaries, DEBUG for detailed traces, with visual progress replacing repetitive logging.
+
+**Rationale**: FOREX markets operate 24/5; continuous monitoring ensures rapid response to changing conditions and maintains system health. Clear UX feedback enables efficient development workflows and troubleshooting.
 
 ### V. Data Integrity & Security
 
@@ -63,7 +73,18 @@ Market data feeds MUST be validated for completeness, accuracy, and timeliness b
 All trading credentials, API keys, and sensitive configuration MUST be encrypted and access-controlled.
 Trading logs MUST maintain audit trails for regulatory compliance and performance analysis.
 
-**Rationale**: Trading decisions depend on accurate data; security breaches or data corruption can result in significant financial losses.
+#### Data Continuity & Gap Handling
+
+Time series data MUST be validated for timestamp continuity and completeness.
+Gap detection MUST report missing data intervals with appropriate severity (DEBUG for informational, WARNING for critical).
+Gap filling strategies (synthetic candles, forward-fill, interpolation) MAY be employed when:
+
+- Gaps are clearly marked (e.g., `is_gap` flag) to maintain transparency
+- Synthetic data does NOT corrupt technical indicators (e.g., set to NaN when appropriate)
+- Gap filling behavior is configurable and documented
+- Original data integrity is preserved for audit purposes
+
+**Rationale**: Trading decisions depend on accurate data; security breaches or data corruption can result in significant financial losses. Data continuity ensures strategies process complete time series without unexpected gaps that could trigger false signals.
 
 ### VI. Data Version Control and Provenance
 
@@ -278,6 +299,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.5.0
+**Version:** 1.6.0
 **Ratified:** October 25, 2025
-**Last Amended:** October 30, 2025
+**Last Amended:** November 5, 2025
