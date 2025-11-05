@@ -73,6 +73,7 @@ def run_simple_backtest(
     output_dir: Path,
     parameters: StrategyParameters | None = None,
     log_level: str = "INFO",
+    fill_gaps: bool = False,
 ) -> dict:
     """
     Run simplified long-only backtest.
@@ -82,6 +83,7 @@ def run_simple_backtest(
         output_dir: Output directory for results.
         parameters: Strategy parameters (defaults if None).
         log_level: Logging level.
+        fill_gaps: If True, fill gaps with synthetic candles (default False for tests).
 
     Returns:
         Dictionary with backtest results.
@@ -110,6 +112,7 @@ def run_simple_backtest(
             stoch_rsi_period=parameters.rsi_length,
             expected_timeframe_minutes=1,  # M1 data
             allow_gaps=True,  # FX data has natural gaps (weekends, low liquidity)
+            fill_gaps=fill_gaps,  # Disable for tests with non-continuous data
         )
     )
 
