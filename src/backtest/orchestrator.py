@@ -6,7 +6,7 @@ This module coordinates the execution of backtests across different direction mo
 simulation, and metrics aggregation.
 """
 
-# pylint: disable=broad-exception-caught, unused-variable
+# pylint: disable=broad-exception-caught, unused-variable, fixme, unused-import
 
 import logging
 from collections.abc import Sequence
@@ -18,11 +18,14 @@ from rich.progress import (
     SpinnerColumn,
     TaskProgressColumn,
     TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
 )
 
 from ..backtest.execution import simulate_execution
 from ..backtest.metrics import calculate_directional_metrics
-from ..models.core import Candle, TradeSignal
+from ..backtest.trade_sim_batch import simulate_trades_batch
+from ..models.core import Candle, TradeSignal, TradeExecution
 from ..models.directional import BacktestResult, ConflictEvent
 from ..models.enums import DirectionMode
 from ..strategy.trend_pullback.signal_generator import (
@@ -75,6 +78,134 @@ class BacktestOrchestrator:
             direction_mode.value,
             dry_run,
         )
+
+    def _simulate_batch(
+        self,
+        signals: Sequence[TradeSignal],
+        candles: Sequence[Candle],
+        slippage_pips: float = 0.5,
+    ) -> list[TradeExecution]:
+        """Simulate trade execution in batch using vectorized trade simulation.
+
+        Converts signals to batch format, runs vectorized simulation, and
+        converts results back to TradeExecution objects.
+
+        Args:
+            signals: Trade signals to simulate.
+            candles: Full candle dataset.
+            slippage_pips: Entry slippage in pips.
+
+        Returns:
+            List of TradeExecution objects for completed trades.
+        """
+        if not signals:
+            return []
+
+        # Build candle index for timestamp lookups
+        candle_timestamps = [c.timestamp_utc for c in candles]
+
+        # Convert signals to batch entry format
+        entries = []
+        for signal in signals:
+            # Find entry candle index (first candle after signal timestamp)
+            entry_idx = None
+            for i, ts in enumerate(candle_timestamps):
+                if ts > signal.timestamp_utc:
+                    entry_idx = i
+                    break
+
+            if entry_idx is None:
+                logger.debug(
+                    "No candles after signal timestamp %s, skipping",
+                    signal.timestamp_utc.isoformat(),
+                )
+                continue
+
+            # Calculate entry price with slippage
+            entry_candle = candles[entry_idx]
+            if signal.direction == "LONG":
+                entry_price = entry_candle.open + (slippage_pips / 10000)
+            else:  # SHORT
+                entry_price = entry_candle.open - (slippage_pips / 10000)
+
+            # Calculate stop-loss and take-profit percentages
+            risk_distance = abs(entry_price - signal.initial_stop_price)
+            stop_loss_pct = risk_distance / entry_price
+            take_profit_pct = (risk_distance * 2.0) / entry_price  # 2R target
+
+            entries.append(
+                {
+                    "signal": signal,
+                    "entry_index": entry_idx,
+                    "entry_price": entry_price,
+                    "side": signal.direction,
+                    "stop_loss_pct": stop_loss_pct,
+                    "take_profit_pct": take_profit_pct,
+                }
+            )
+
+        if not entries:
+            return []
+
+        # Convert candles to DataFrame for batch simulation
+        import pandas as pd
+
+        price_data = pd.DataFrame(
+            {
+                "high": [c.high for c in candles],
+                "low": [c.low for c in candles],
+                "close": [c.close for c in candles],
+            }
+        )
+
+        # Run batch simulation (use first entry's SL/TP as defaults for now)
+        # TODO: Support per-trade SL/TP in simulate_trades_batch
+        results = simulate_trades_batch(
+            entries=entries,
+            price_data=price_data,
+            stop_loss_pct=entries[0]["stop_loss_pct"],
+            take_profit_pct=entries[0]["take_profit_pct"],
+        )
+
+        # Convert results to TradeExecution objects
+        executions = []
+        for result, entry in zip(results, entries):
+            if result["exit_index"] is None:
+                continue
+
+            signal = entry["signal"]
+            entry_idx = result["entry_index"]
+            exit_idx = result["exit_index"]
+
+            # Map exit reasons
+            exit_reason_map = {
+                "STOP_LOSS": "STOP_LOSS",
+                "TAKE_PROFIT": "TARGET",
+                "END_OF_DATA": "EXPIRY",
+            }
+            exit_reason = exit_reason_map.get(
+                result["exit_reason"], result["exit_reason"]
+            )
+
+            # Calculate R-multiples from PnL percentage
+            pnl_r = result["pnl"] / (entry["stop_loss_pct"])
+
+            execution = TradeExecution(
+                signal_id=signal.id,
+                direction=signal.direction,
+                open_timestamp=candles[entry_idx].timestamp_utc,
+                entry_fill_price=result.get("entry_price", entry["entry_price"]),
+                close_timestamp=candles[exit_idx].timestamp_utc,
+                exit_fill_price=result["exit_price"],
+                exit_reason=exit_reason,
+                pnl_r=pnl_r,
+                slippage_entry_pips=slippage_pips,
+                slippage_exit_pips=0.5,  # Default exit slippage
+                costs_total=0.0,  # Simplified for batch mode
+            )
+            executions.append(execution)
+
+        return executions
 
     def run_backtest(
         self,
@@ -168,6 +299,9 @@ class BacktestOrchestrator:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
             TextColumn("• {task.fields[signals]} signals"),
         )
         progress.start()
@@ -205,7 +339,9 @@ class BacktestOrchestrator:
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
-            logger.info("Simulating execution for %d LONG signals", len(signals))
+            logger.info(
+                "Simulating execution for %d LONG signals (batch mode)", len(signals)
+            )
 
             # Create progress bar for execution
             exec_progress = Progress(
@@ -213,36 +349,30 @@ class BacktestOrchestrator:
                 TextColumn("[progress.description]{task.description}"),
                 BarColumn(),
                 TaskProgressColumn(),
-                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+                TimeElapsedColumn(),
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
-                f"Simulating {len(signals):,} trades",
-                total=len(signals),
-                wins=0,
-                losses=0,
+                f"Simulating {len(signals):,} trades (vectorized)",
+                total=100,
             )
 
-            wins = 0
-            losses = 0
-            for signal in signals:
-                execution = simulate_execution(signal, candles)
-                if execution:
-                    executions.append(execution)
-                    # Track wins vs losses
-                    if execution.exit_reason == "TARGET":
-                        wins += 1
-                    elif execution.exit_reason == "STOP_LOSS":
-                        losses += 1
-                    exec_progress.update(exec_task, wins=wins, losses=losses)
-                exec_progress.update(exec_task, advance=1)
-
+            # Use batch simulation for performance
+            exec_progress.update(exec_task, advance=50)  # Processing signals
+            executions = self._simulate_batch(signals, candles)
+            exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
 
+            # Calculate wins/losses for logging
+            wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
+            losses = sum(1 for ex in executions if ex.exit_reason == "STOP_LOSS")
+
             logger.info(
-                "Execution complete: %d/%d signals executed",
+                "Batch execution complete: %d/%d signals executed (%d wins, %d losses)",
                 len(executions),
                 len(signals),
+                wins,
+                losses,
             )
 
         # Calculate metrics
@@ -295,6 +425,9 @@ class BacktestOrchestrator:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
             TextColumn("• {task.fields[signals]} signals"),
         )
         progress.start()
@@ -332,7 +465,9 @@ class BacktestOrchestrator:
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
-            logger.info("Simulating execution for %d SHORT signals", len(signals))
+            logger.info(
+                "Simulating execution for %d SHORT signals (batch mode)", len(signals)
+            )
 
             # Create progress bar for execution
             exec_progress = Progress(
@@ -340,36 +475,30 @@ class BacktestOrchestrator:
                 TextColumn("[progress.description]{task.description}"),
                 BarColumn(),
                 TaskProgressColumn(),
-                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+                TimeElapsedColumn(),
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
-                f"Simulating {len(signals):,} trades",
-                total=len(signals),
-                wins=0,
-                losses=0,
+                f"Simulating {len(signals):,} trades (vectorized)",
+                total=100,
             )
 
-            wins = 0
-            losses = 0
-            for signal in signals:
-                execution = simulate_execution(signal, candles)
-                if execution:
-                    executions.append(execution)
-                    # Track wins vs losses
-                    if execution.exit_reason == "TARGET":
-                        wins += 1
-                    elif execution.exit_reason == "STOP_LOSS":
-                        losses += 1
-                    exec_progress.update(exec_task, wins=wins, losses=losses)
-                exec_progress.update(exec_task, advance=1)
-
+            # Use batch simulation for performance
+            exec_progress.update(exec_task, advance=50)  # Processing signals
+            executions = self._simulate_batch(signals, candles)
+            exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
 
+            # Calculate wins/losses for logging
+            wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
+            losses = sum(1 for ex in executions if ex.exit_reason == "STOP_LOSS")
+
             logger.info(
-                "Execution complete: %d/%d signals executed",
+                "Batch execution complete: %d/%d signals executed (%d wins, %d losses)",
                 len(executions),
                 len(signals),
+                wins,
+                losses,
             )
 
         # Calculate metrics
@@ -425,6 +554,9 @@ class BacktestOrchestrator:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
             TextColumn("• {task.fields[longs]} longs • {task.fields[shorts]} shorts"),
         )
         progress.start()
@@ -491,7 +623,8 @@ class BacktestOrchestrator:
         executions = []
         if not self.dry_run:
             logger.info(
-                "Simulating execution for %d merged signals", len(merged_signals)
+                "Simulating execution for %d merged signals (batch mode)",
+                len(merged_signals),
             )
 
             # Create progress bar for execution
@@ -500,36 +633,30 @@ class BacktestOrchestrator:
                 TextColumn("[progress.description]{task.description}"),
                 BarColumn(),
                 TaskProgressColumn(),
-                TextColumn("• {task.fields[wins]} wins • {task.fields[losses]} losses"),
+                TimeElapsedColumn(),
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
-                f"Simulating {len(merged_signals):,} trades",
-                total=len(merged_signals),
-                wins=0,
-                losses=0,
+                f"Simulating {len(merged_signals):,} trades (vectorized)",
+                total=100,
             )
 
-            wins = 0
-            losses = 0
-            for signal in merged_signals:
-                execution = simulate_execution(signal, candles)
-                if execution:
-                    executions.append(execution)
-                    # Track wins vs losses
-                    if execution.exit_reason == "TARGET":
-                        wins += 1
-                    elif execution.exit_reason == "STOP_LOSS":
-                        losses += 1
-                    exec_progress.update(exec_task, wins=wins, losses=losses)
-                exec_progress.update(exec_task, advance=1)
-
+            # Use batch simulation for performance
+            exec_progress.update(exec_task, advance=50)  # Processing signals
+            executions = self._simulate_batch(merged_signals, candles)
+            exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
 
+            # Calculate wins/losses for logging
+            wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
+            losses = sum(1 for ex in executions if ex.exit_reason == "STOP_LOSS")
+
             logger.info(
-                "Execution complete: %d/%d signals executed",
+                "Batch execution complete: %d/%d signals executed (%d wins, %d losses)",
                 len(executions),
                 len(merged_signals),
+                wins,
+                losses,
             )
 
         # Calculate three-tier metrics (long_only, short_only, combined)

@@ -9,7 +9,9 @@ Performance target: ≥80% reduction in repeated indicator compute time.
 
 # pylint: disable=unused-import
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
+import hashlib
+import json
 import pandas as pd
 
 
@@ -56,3 +58,65 @@ class IndicatorCache:
         """Clear all cached indicators."""
         self._cache.clear()
         self._param_signatures.clear()
+
+    def get_or_compute(
+        self,
+        key: str,
+        compute_fn: Callable[[], pd.Series],
+        params: Optional[Dict[str, Any]] = None,
+    ) -> pd.Series:
+        """Retrieve cached series or compute if missing (lazy evaluation).
+
+        This is the primary method for cache-aware indicator computation.
+
+        Args:
+            key: Unique identifier for the indicator series.
+            compute_fn: Function to compute the indicator if not cached.
+            params: Optional parameter dict to track for invalidation.
+
+        Returns:
+            Cached or freshly computed indicator series.
+        """
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+
+        # Cache miss: compute and store
+        series = compute_fn()
+        self.put(key, series)
+
+        if params:
+            param_sig = self._hash_params(params)
+            if param_sig not in self._param_signatures:
+                self._param_signatures.append(param_sig)
+
+        return series
+
+    @staticmethod
+    def _hash_params(params: Dict[str, Any]) -> str:
+        """Generate stable hash for parameter combination.
+
+        Args:
+            params: Dictionary of parameters.
+
+        Returns:
+            Hex digest of parameter hash.
+        """
+        canonical_json = json.dumps(params, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()[:16]
+
+    def cache_size(self) -> int:
+        """Return number of cached indicator series.
+
+        Returns:
+            Count of cached series.
+        """
+        return len(self._cache)
+
+    def param_count(self) -> int:
+        """Return number of unique parameter combinations tracked.
+
+        Returns:
+            Count of unique parameter signatures.
+        """
+        return len(self._param_signatures)
