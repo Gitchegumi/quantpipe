@@ -78,15 +78,14 @@ def long_setup_candles():
     Create deterministic candle sequence showing long entry setup.
 
     Pattern:
-    - Candles 0-49: Uptrend established (EMA20 > EMA50)
-    - Candles 50-69: Pullback (declining prices, RSI < 30)
-    - Candle 70: Bullish reversal (bullish engulfing)
-    - Candles 71-99: Continuation uptrend
+    - Candles 0-199: Strong uptrend established (EMA20 > EMA50)
+    - Candles 200-217: Pullback (declining prices, RSI < 30)
+    - Candles 218-220: Bullish reversal (bullish engulfing pattern at END)
 
     Returns:
-        List[Candle]: 100 candles with computed indicators.
+        List[Candle]: 221 candles with computed indicators.
     """
-    from datetime import UTC, datetime
+    from datetime import UTC, datetime, timedelta
 
     candles = []
     timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
@@ -97,11 +96,11 @@ def long_setup_candles():
     low_prices = []
     close_prices = []
 
-    # Phase 1: Uptrend (50 candles)
+    # Phase 1: Strong uptrend (200 candles) to maintain EMA20 > EMA50
     base_price = 1.10000
-    for i in range(50):
-        open_price = base_price + (i * 0.00010)
-        close_price = open_price + 0.00015
+    for i in range(200):
+        open_price = base_price + (i * 0.00020)
+        close_price = open_price + 0.00025
         high = close_price + 0.00005
         low = open_price - 0.00005
 
@@ -110,55 +109,62 @@ def long_setup_candles():
         low_prices.append(low)
         close_prices.append(close_price)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+        timestamp += timedelta(minutes=5)
 
-    # Phase 2: Pullback (20 candles)
+    # Phase 2: Moderate pullback (18 candles) to get RSI < 30
     peak_price = close_prices[-1]
-    for i in range(20):
-        open_price = peak_price - (i * 0.00020)
-        close_price = open_price - 0.00025
+    for i in range(18):
+        open_price = peak_price - (i * 0.00030)
+        close_price = open_price - 0.00035
         high = open_price + 0.00005
-        low = close_price - 0.00005
+        low = close_price - 0.00010
 
         open_prices.append(open_price)
         high_prices.append(high)
         low_prices.append(low)
         close_prices.append(close_price)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+        timestamp += timedelta(minutes=5)
 
-    # Phase 3: Reversal (1 bullish engulfing)
+    # Phase 3: Reversal pattern (3 candles) - setup for bullish engulfing
+    # Candle 1: small bearish (part of pullback)
     open_price = close_prices[-1]
-    close_price = open_price + 0.00080  # Large bullish candle
-    high = close_price + 0.00010
-    low = open_price - 0.00005
+    close_price = open_price - 0.00005
+    high = open_price + 0.00003
+    low = close_price - 0.00003
 
     open_prices.append(open_price)
     high_prices.append(high)
     low_prices.append(low)
     close_prices.append(close_price)
 
-    timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
+    timestamp += timedelta(minutes=5)
 
-    # Phase 4: Continuation (29 candles to reach 100)
-    for _ in range(29):
-        open_price = close_prices[-1]
-        close_price = open_price + 0.00010
-        high = close_price + 0.00005
-        low = open_price - 0.00003
+    # Candle 2: small bearish (setup for engulfing)
+    prev_open = close_prices[-1]
+    prev_close = prev_open - 0.00008  # Bearish
+    high = prev_open + 0.00002
+    low = prev_close - 0.00002
 
-        open_prices.append(open_price)
-        high_prices.append(high)
-        low_prices.append(low)
-        close_prices.append(close_price)
+    open_prices.append(prev_open)
+    high_prices.append(high)
+    low_prices.append(low)
+    close_prices.append(prev_close)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+    timestamp += timedelta(minutes=5)
+
+    # Candle 3: bullish engulfing (reversal signal)
+    curr_open = prev_close - 0.00005  # Open below previous close
+    curr_close = prev_open + 0.00010  # Close above previous open (engulfs)
+    high = curr_close + 0.00005
+    low = curr_open - 0.00003
+
+    open_prices.append(curr_open)
+    high_prices.append(high)
+    low_prices.append(low)
+    close_prices.append(curr_close)
+
+    timestamp += timedelta(minutes=5)
 
     # Convert to numpy arrays for indicator calculation
     open_arr = np.array(open_prices, dtype=np.float64)
@@ -173,15 +179,15 @@ def long_setup_candles():
     atr_arr = atr(high_arr, low_arr, close_arr, 14)
     stoch_rsi_arr = _compute_stochastic_rsi(rsi_arr, 14)
 
-    # Create Candle objects
+    # Create Candle objects - reset timestamp
     timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
-    for i in range(len(close_arr)):
+    for i, close_val in enumerate(close_arr):
         candle = Candle(
             timestamp_utc=timestamp,
             open=open_arr[i],
             high=high_arr[i],
             low=low_arr[i],
-            close=close_arr[i],
+            close=close_val,
             volume=1000,
             ema20=ema20_arr[i],
             ema50=ema50_arr[i],
@@ -193,9 +199,7 @@ def long_setup_candles():
         )
         candles.append(candle)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+        timestamp += timedelta(minutes=5)
 
     return candles
 
@@ -206,15 +210,14 @@ def short_setup_candles():
     Create deterministic candle sequence showing short entry setup.
 
     Pattern:
-    - Candles 0-49: Downtrend established (EMA20 < EMA50)
-    - Candles 50-69: Pullback rally (rising prices, RSI > 70)
-    - Candle 70: Bearish reversal (bearish engulfing)
-    - Candles 71-99: Continuation downtrend
+    - Candles 0-199: Strong downtrend established (EMA20 < EMA50)
+    - Candles 200-217: Pullback rally (rising prices, RSI > 70)
+    - Candles 218-220: Bearish reversal (bearish engulfing pattern at END)
 
     Returns:
-        List[Candle]: 100 candles with computed indicators.
+        List[Candle]: 221 candles with computed indicators.
     """
-    from datetime import UTC, datetime
+    from datetime import UTC, datetime, timedelta
 
     candles = []
     timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
@@ -225,11 +228,11 @@ def short_setup_candles():
     low_prices = []
     close_prices = []
 
-    # Phase 1: Downtrend (50 candles)
+    # Phase 1: Strong downtrend (200 candles) to maintain EMA20 < EMA50
     base_price = 1.10000
-    for i in range(50):
-        open_price = base_price - (i * 0.00010)
-        close_price = open_price - 0.00015
+    for i in range(200):
+        open_price = base_price - (i * 0.00020)
+        close_price = open_price - 0.00025
         high = open_price + 0.00005
         low = close_price - 0.00005
 
@@ -238,16 +241,14 @@ def short_setup_candles():
         low_prices.append(low)
         close_prices.append(close_price)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+        timestamp += timedelta(minutes=5)
 
-    # Phase 2: Pullback rally (20 candles)
+    # Phase 2: Moderate pullback rally (18 candles) to get RSI > 70
     trough_price = close_prices[-1]
-    for i in range(20):
-        open_price = trough_price + (i * 0.00020)
-        close_price = open_price + 0.00025
-        high = close_price + 0.00005
+    for i in range(18):
+        open_price = trough_price + (i * 0.00030)
+        close_price = open_price + 0.00035
+        high = close_price + 0.00010
         low = open_price - 0.00005
 
         open_prices.append(open_price)
@@ -255,38 +256,47 @@ def short_setup_candles():
         low_prices.append(low)
         close_prices.append(close_price)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+        timestamp += timedelta(minutes=5)
 
-    # Phase 3: Reversal (1 bearish engulfing)
+    # Phase 3: Reversal pattern (3 candles) - setup for bearish engulfing
+    # Candle 1: small bullish (part of pullback)
     open_price = close_prices[-1]
-    close_price = open_price - 0.00080  # Large bearish candle
-    high = open_price + 0.00005
-    low = close_price - 0.00010
+    close_price = open_price + 0.00005
+    high = close_price + 0.00003
+    low = open_price - 0.00003
 
     open_prices.append(open_price)
     high_prices.append(high)
     low_prices.append(low)
     close_prices.append(close_price)
 
-    timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
+    timestamp += timedelta(minutes=5)
 
-    # Phase 4: Continuation downtrend (29 candles to reach 100)
-    for _ in range(29):
-        open_price = close_prices[-1]
-        close_price = open_price - 0.00010
-        high = open_price + 0.00003
-        low = close_price - 0.00005
+    # Candle 2: small bullish (setup for engulfing)
+    prev_open = close_prices[-1]
+    prev_close = prev_open + 0.00008  # Bullish
+    high = prev_close + 0.00002
+    low = prev_open - 0.00002
 
-        open_prices.append(open_price)
-        high_prices.append(high)
-        low_prices.append(low)
-        close_prices.append(close_price)
+    open_prices.append(prev_open)
+    high_prices.append(high)
+    low_prices.append(low)
+    close_prices.append(prev_close)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+    timestamp += timedelta(minutes=5)
+
+    # Candle 3: bearish engulfing (reversal signal)
+    curr_open = prev_close + 0.00005  # Open above previous close
+    curr_close = prev_open - 0.00010  # Close below previous open (engulfs)
+    high = curr_open + 0.00003
+    low = curr_close - 0.00005
+
+    open_prices.append(curr_open)
+    high_prices.append(high)
+    low_prices.append(low)
+    close_prices.append(curr_close)
+
+    timestamp += timedelta(minutes=5)
 
     # Convert to numpy arrays for indicator calculation
     open_arr = np.array(open_prices, dtype=np.float64)
@@ -301,15 +311,15 @@ def short_setup_candles():
     atr_arr = atr(high_arr, low_arr, close_arr, 14)
     stoch_rsi_arr = _compute_stochastic_rsi(rsi_arr, 14)
 
-    # Create Candle objects
+    # Create Candle objects - reset timestamp
     timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
-    for i in range(len(close_arr)):
+    for i, close_val in enumerate(close_arr):
         candle = Candle(
             timestamp_utc=timestamp,
             open=open_arr[i],
             high=high_arr[i],
             low=low_arr[i],
-            close=close_arr[i],
+            close=close_val,
             volume=1000,
             ema20=ema20_arr[i],
             ema50=ema50_arr[i],
@@ -321,9 +331,7 @@ def short_setup_candles():
         )
         candles.append(candle)
 
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-        if timestamp.hour == 0:
-            timestamp = timestamp.replace(day=timestamp.day + 1)
+        timestamp += timedelta(minutes=5)
 
     return candles
 
@@ -426,13 +434,13 @@ class TestLongSignalGeneration:
 
         # Create candles
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
-        for i in range(len(close_arr)):
+        for i, close_val in enumerate(close_arr):
             candle = Candle(
                 timestamp_utc=timestamp,
                 open=open_arr[i],
                 high=high_arr[i],
                 low=low_arr[i],
-                close=close_arr[i],
+                close=close_val,
                 volume=1000,
                 ema20=ema20_arr[i],
                 ema50=ema50_arr[i],
@@ -551,13 +559,13 @@ class TestShortSignalGeneration:
 
         # Create candles
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
-        for i in range(len(close_arr)):
+        for i, close_val in enumerate(close_arr):
             candle = Candle(
                 timestamp_utc=timestamp,
                 open=open_arr[i],
                 high=high_arr[i],
                 low=low_arr[i],
-                close=close_arr[i],
+                close=close_val,
                 volume=1000,
                 ema20=ema20_arr[i],
                 ema50=ema50_arr[i],
