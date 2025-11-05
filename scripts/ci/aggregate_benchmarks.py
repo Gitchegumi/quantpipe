@@ -22,9 +22,12 @@ References:
     - docs/performance.md (benchmark JSON schema)
 """
 
+# pylint: disable=line-too-long
+
 import argparse
 import json
 import statistics
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -35,24 +38,49 @@ def load_benchmarks(pattern: str = "benchmark_*.json") -> list[dict[str, Any]]:
 
     Args:
         pattern: Glob pattern for benchmark files (default: benchmark_*.json)
+                Can be absolute path pattern or relative to results/ directory.
 
     Returns:
         List of benchmark dictionaries
     """
-    results_dir = Path("results")
-    if not results_dir.exists():
-        return []
+    # Check if pattern contains directory separators (absolute or relative path)
+    pattern_path = Path(pattern)
 
-    benchmarks = []
-    for filepath in results_dir.glob(pattern):
-        try:
-            with open(filepath, encoding="utf-8") as f:
-                data = json.load(f)
-                benchmarks.append(data)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: Failed to load {filepath}: {e}")
+    if pattern_path.is_absolute() or (
+        len(pattern_path.parts) > 1 and pattern_path.parts[0] != "results"
+    ):
+        # Absolute path or path with directory: glob from parent directory
+        parent_dir = pattern_path.parent
+        glob_pattern = pattern_path.name
 
-    return benchmarks
+        if not parent_dir.exists():
+            return []
+
+        benchmarks = []
+        for filepath in parent_dir.glob(glob_pattern):
+            try:
+                with open(filepath, encoding="utf-8") as f:
+                    data = json.load(f)
+                    benchmarks.append(data)
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Warning: Failed to load {filepath}: {e}")
+        return benchmarks
+    else:
+        # Relative pattern: use results/ directory
+        results_dir = Path("results")
+        if not results_dir.exists():
+            return []
+
+        benchmarks = []
+        for filepath in results_dir.glob(pattern):
+            try:
+                with open(filepath, encoding="utf-8") as f:
+                    data = json.load(f)
+                    benchmarks.append(data)
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Warning: Failed to load {filepath}: {e}")
+
+        return benchmarks
 
 
 def aggregate_phase_times(
@@ -71,11 +99,11 @@ def aggregate_phase_times(
     phase_data: dict[str, list[float]] = {}
 
     for benchmark in benchmarks:
-        for phase in benchmark.get("phase_times", []):
-            phase_name = phase.get("phase")
-            duration = phase.get("duration_seconds")
+        phase_times_dict = benchmark.get("phase_times", {})
 
-            if phase_name and duration is not None:
+        # phase_times is a dict: {"ingest": 1.5, "scan": 2.0, ...}
+        if isinstance(phase_times_dict, dict):
+            for phase_name, duration in phase_times_dict.items():
                 if phase_name not in phase_data:
                     phase_data[phase_name] = []
                 phase_data[phase_name].append(duration)
@@ -195,6 +223,23 @@ def main() -> None:
         default="results/benchmark_summary.json",
         help="Output file path (default: results/benchmark_summary.json)",
     )
+    parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Exit with error code if benchmarks fail success criteria (T071, FR-014)",
+    )
+    parser.add_argument(
+        "--runtime-threshold",
+        type=float,
+        default=1200.0,
+        help="Maximum runtime in seconds (default: 1200s = 20 min, SC-001)",
+    )
+    parser.add_argument(
+        "--memory-threshold",
+        type=float,
+        default=1.5,
+        help="Maximum memory ratio multiplier (default: 1.5, SC-009)",
+    )
 
     args = parser.parse_args()
 
@@ -210,6 +255,45 @@ def main() -> None:
 
     print(f"Benchmark summary written to {output_path}")
     print(f"Aggregated {summary.get('benchmark_count', 0)} benchmark files")
+
+    # T071: CI gate regression check (FR-014)
+    if args.fail_on_regression:
+        benchmarks = load_benchmarks(args.pattern)
+        failures = []
+
+        for benchmark in benchmarks:
+            # Check success_criteria_passed flag if present (new schema)
+            if "success_criteria_passed" in benchmark:
+                if not benchmark["success_criteria_passed"]:
+                    failures.append(
+                        f"Benchmark failed success criteria: "
+                        f"runtime_passed={benchmark.get('runtime_passed')}, "
+                        f"memory_passed={benchmark.get('memory_passed')}, "
+                        f"hotspot_count_passed={benchmark.get('hotspot_count_passed')}, "
+                        f"parallel_efficiency_passed={benchmark.get('parallel_efficiency_passed')}"
+                    )
+            else:
+                # Fallback: manual threshold checks for older schema
+                runtime = benchmark.get("wall_clock_total", 0)
+                memory_ratio = benchmark.get("memory_ratio", 0)
+
+                if runtime > args.runtime_threshold:
+                    failures.append(
+                        f"Runtime exceeds threshold: {runtime:.1f}s > {args.runtime_threshold}s (SC-001)"
+                    )
+
+                if memory_ratio > args.memory_threshold:
+                    failures.append(
+                        f"Memory ratio exceeds threshold: {memory_ratio:.2f}× > {args.memory_threshold}× (SC-009)"
+                    )
+
+        if failures:
+            print("\n[FAIL] BENCHMARK REGRESSION DETECTED:")
+            for failure in failures:
+                print(f"  - {failure}")
+            sys.exit(1)  # Fail CI pipeline
+        else:
+            print("\n[PASS] All benchmarks passed success criteria")
 
 
 if __name__ == "__main__":
