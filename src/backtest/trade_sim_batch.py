@@ -7,6 +7,8 @@ Performance target: ≥10× speedup vs baseline O(trades × bars) approach.
 Scaling target: optimized_sim_time ≤ 0.30 × baseline_sim_time.
 """
 
+# pylint: disable=unused-import, unused-argument, fixme
+
 from typing import List, Dict, Any, Optional
 import numpy as np
 import pandas as pd
