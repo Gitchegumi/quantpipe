@@ -22,11 +22,10 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from ..backtest.execution import simulate_execution
 from ..backtest.metrics import calculate_directional_metrics
 from ..backtest.profiling import ProfilingContext
 from ..backtest.trade_sim_batch import simulate_trades_batch
-from ..models.core import Candle, TradeSignal, TradeExecution
+from ..models.core import Candle, TradeExecution, TradeSignal
 from ..models.directional import BacktestResult, ConflictEvent
 from ..models.enums import DirectionMode
 from ..strategy.trend_pullback.signal_generator import (
@@ -198,7 +197,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
 
         # Convert results to TradeExecution objects
         executions = []
-        for result, entry in zip(results, entries):
+        for result, entry in zip(results, entries, strict=False):
             if result["exit_index"] is None:
                 continue
 
@@ -323,16 +322,17 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         window_size = 100
         total_windows = len(candles) - ema_slow
 
-        # Create progress bar
+        # Create progress bar with minimal refresh for performance
         progress = Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
             TimeElapsedColumn(),
             TextColumn("•"),
             TimeRemainingColumn(),
-            TextColumn("• {task.fields[signals]} signals"),
+            TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
+            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
         progress.start()
         task = progress.add_task(
@@ -381,13 +381,14 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
                 "Simulating execution for %d LONG signals (batch mode)", len(signals)
             )
 
-            # Create progress bar for execution
+            # Create progress bar for execution with minimal refresh
             exec_progress = Progress(
                 SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
                 TaskProgressColumn(),
                 TimeElapsedColumn(),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
@@ -459,16 +460,17 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         window_size = 100
         total_windows = len(candles) - ema_slow
 
-        # Create progress bar
+        # Create progress bar with minimal refresh for performance
         progress = Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
             TimeElapsedColumn(),
             TextColumn("•"),
             TimeRemainingColumn(),
-            TextColumn("• {task.fields[signals]} signals"),
+            TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
+            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
         progress.start()
         task = progress.add_task(
@@ -518,13 +520,14 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
                 "Simulating execution for %d SHORT signals (batch mode)", len(signals)
             )
 
-            # Create progress bar for execution
+            # Create progress bar for execution with minimal refresh
             exec_progress = Progress(
                 SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
                 TaskProgressColumn(),
                 TimeElapsedColumn(),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
@@ -599,16 +602,20 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         window_size = 100
         total_windows = len(candles) - ema_slow
 
-        # Create progress bar
+        # Create progress bar with minimal refresh for performance
         progress = Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
             TimeElapsedColumn(),
             TextColumn("•"),
             TimeRemainingColumn(),
-            TextColumn("• {task.fields[longs]} longs • {task.fields[shorts]} shorts"),
+            TextColumn(
+                "• [bold yellow]{task.fields[longs]}[/] longs • "
+                "[bold magenta]{task.fields[shorts]}[/] shorts"
+            ),
+            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
         progress.start()
         task = progress.add_task(
@@ -693,13 +700,14 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
                 len(merged_signals),
             )
 
-            # Create progress bar for execution
+            # Create progress bar for execution with minimal refresh
             exec_progress = Progress(
                 SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
                 TaskProgressColumn(),
                 TimeElapsedColumn(),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
             exec_progress.start()
             exec_task = exec_progress.add_task(
@@ -819,16 +827,17 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             ... )  # doctest: +SKIP
         """
         import time
-        from .state_isolation import StateIsolationManager
+
+        from ..models.risk_limits import RiskLimits
+        from ..models.run_manifest import RunManifest
+        from ..strategy.weights import parse_and_normalize_weights
         from .aggregation import PortfolioAggregator
+        from .manifest_writer import compute_manifest_hash
+        from .metrics_schema import StructuredMetrics
+        from .reproducibility import generate_deterministic_run_id
         from .risk_global import evaluate_portfolio_drawdown, should_abort_portfolio
         from .risk_strategy import check_strategy_risk_breach, should_halt_on_breach
-        from .reproducibility import generate_deterministic_run_id
-        from .manifest_writer import compute_manifest_hash
-        from ..models.run_manifest import RunManifest
-        from ..models.risk_limits import RiskLimits
-        from .metrics_schema import StructuredMetrics
-        from ..strategy.weights import parse_and_normalize_weights
+        from .state_isolation import StateIsolationManager
 
         start_time = datetime.now(UTC)
         runtime_start = time.time()
@@ -861,7 +870,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         portfolio_current_pnl = 0.0
 
         # Execute each strategy with isolation
-        for (name, func), weight in zip(strategies, normalized_weights):
+        for (name, func), weight in zip(strategies, normalized_weights, strict=False):
             state = state_manager.get_or_create(name)
 
             # Skip if strategy already halted
