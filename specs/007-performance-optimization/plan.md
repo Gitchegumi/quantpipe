@@ -138,3 +138,34 @@ Synthetic datasets: 1M, 5M, 10M bars. Metrics captured: load time, simulation ti
 ## Definition of Done (Planning Scope)
 
 Phase 0 & 1 artifacts created; constitutional gate re-check passes (no blocking violations); dependency decisions documented; tasks ready for generation.
+
+## Post-Analysis Additions (2025-11-05)
+
+Following specification refinement:
+
+- Added Functional Requirements: FR-008a (worker cap flag), FR-014 (benchmark pass/fail flags), FR-015 (interactive fraction prompt), FR-016 (hotspot count validation), FR-017 (non-functional: logging & documentation compliance).
+- Added Success Criteria: SC-011 (parallel efficiency formula), SC-012 (single worker cap warning).
+- Strengthened FR-003 (explicit dtypes) and FR-007 (streaming memory bound), FR-005 (scaling target ≤30% baseline simulation time).
+- Parquet ingestion remains deferred; previous task for parquet flag removed from tasks list.
+- Event-driven simulation stub (T048) retained as exploratory; may be dropped (T070) if not scheduled.
+- New remediation tasks (Phase 7) appended (T057–T072) to close coverage gaps: typed loader, streaming writer, reproducibility & caching performance tests, benchmark pass/fail embedding, hotspot count assertion, portion selection logic, CI regression gate.
+
+Implementation sequencing adjustments:
+
+1. Foundational now includes typed loader (T057) prior to cache/simulation integration.
+2. Streaming writer (T058) integrated before high-volume simulation to control memory.
+3. Benchmark writer extended (T066) to produce criterion pass/fail flags early for feedback loops.
+4. Parallel efficiency & worker cap logic (T059, T068) validated before widening optimization scope.
+5. CI regression gating (T071) ensures sustained performance and memory constraints.
+
+Quality Gates Integration:
+
+- Logging/docstring/type hint audit (T063) enforces constitution FR-017 prior to feature completion.
+- Hotspot completeness (T067) ensures SC-008 measurable integrity.
+
+Risk Mitigation Updates:
+
+- Memory duplication risk reduced via early streaming writer (T058).
+- Over-optimization controlled via explicit regression gate thresholds (T071).
+
+This plan section supplements earlier phases; no existing sequence invalidated—new tasks interleave while preserving modular rollout.
