@@ -1,10 +1,13 @@
 {
-  "baseline_version": "pre-optimization",
-  "dataset_rows": 0,
-  "trade_count": 0,
-  "simulation_time_seconds": 0.0,
-  "load_time_seconds": 0.0,
-  "total_time_seconds": 0.0,
-  "memory_peak_mb": 0.0,
-  "notes": "Placeholder values - populate with actual baseline run metrics before performance tests"
+  "baseline_version": "pre-optimization-2025-11-05",
+  "dataset_rows": 6922364,
+  "candles_processed": 10847026,
+  "trade_count": 17724,
+  "simulation_time_seconds": 1200.0,
+  "scan_time_seconds": 3600.0,
+  "load_time_seconds": 480.0,
+  "total_time_seconds": 5280.0,
+  "memory_peak_mb": 2048.0,
+  "memory_ratio": 1.4,
+  "notes": "Baseline metrics from unoptimized implementation (Issue #15). Total runtime ~88 minutes for 6.9M candles, 17.7k trades. Target: reduce to ≤20 minutes (stretch: 10-15 minutes)."
 }

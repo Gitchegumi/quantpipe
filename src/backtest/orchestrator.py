@@ -1,3 +1,5 @@
+# pylint: disable=broad-exception-caught, unused-variable, fixme, unused-import, too-many-lines
+
 """
 Backtest orchestration for directional backtesting system.
 
@@ -5,8 +7,6 @@ This module coordinates the execution of backtests across different direction mo
 (LONG, SHORT, BOTH), managing signal generation, conflict resolution, execution
 simulation, and metrics aggregation.
 """
-
-# pylint: disable=broad-exception-caught, unused-variable, fixme, unused-import
 
 import logging
 from collections.abc import Sequence
@@ -24,6 +24,7 @@ from rich.progress import (
 
 from ..backtest.execution import simulate_execution
 from ..backtest.metrics import calculate_directional_metrics
+from ..backtest.profiling import ProfilingContext
 from ..backtest.trade_sim_batch import simulate_trades_batch
 from ..models.core import Candle, TradeSignal, TradeExecution
 from ..models.directional import BacktestResult, ConflictEvent
@@ -63,6 +64,8 @@ class BacktestOrchestrator:
         self,
         direction_mode: DirectionMode,
         dry_run: bool = False,
+        enable_profiling: bool = False,
+        log_frequency: int = 1000,
     ):
         """
         Initialize backtest orchestrator.
@@ -70,14 +73,40 @@ class BacktestOrchestrator:
         Args:
             direction_mode: Direction mode for signal generation (LONG, SHORT, BOTH).
             dry_run: If True, generate signals only without execution simulation.
+            enable_profiling: If True, enable phase timing instrumentation.
+            log_frequency: Log progress every N items (signals/trades). Default 1000.
         """
         self.direction_mode = direction_mode
         self.dry_run = dry_run
+        self.enable_profiling = enable_profiling
+        self.log_frequency = log_frequency
+        self.profiler: ProfilingContext | None = None
         logger.info(
-            "Initialized BacktestOrchestrator: direction=%s, dry_run=%s",
+            "Initialized BacktestOrchestrator: \
+direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             direction_mode.value,
             dry_run,
+            enable_profiling,
+            log_frequency,
         )
+
+    def _start_phase(self, phase_name: str) -> None:
+        """Start profiling phase if profiling is enabled.
+
+        Args:
+            phase_name: Name of the phase to start.
+        """
+        if self.enable_profiling and self.profiler:
+            self.profiler.start_phase(phase_name)
+
+    def _end_phase(self, phase_name: str) -> None:
+        """End profiling phase if profiling is enabled.
+
+        Args:
+            phase_name: Name of the phase to end.
+        """
+        if self.enable_profiling and self.profiler:
+            self.profiler.end_phase(phase_name)
 
     def _simulate_batch(
         self,
@@ -288,6 +317,7 @@ class BacktestOrchestrator:
         parameters = {"pair": pair, **signal_params}
 
         # Process candles in sliding windows (like run_long_backtest.py)
+        self._start_phase("scan")
         all_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
@@ -329,16 +359,24 @@ class BacktestOrchestrator:
                     all_signals.append(signal)
                     progress.update(task, signals=len(all_signals))
 
+                    # Throttled logging
+                    if len(all_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "LONG signal generation: %d signals found", len(all_signals)
+                        )
+
             progress.update(task, advance=1)
 
         progress.stop()
 
         signals = all_signals
+        self._end_phase("scan")
         logger.info("Generated %d LONG signals", len(signals))
 
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
+            self._start_phase("simulate")
             logger.info(
                 "Simulating execution for %d LONG signals (batch mode)", len(signals)
             )
@@ -362,6 +400,7 @@ class BacktestOrchestrator:
             executions = self._simulate_batch(signals, candles)
             exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
+            self._end_phase("simulate")
 
             # Calculate wins/losses for logging
             wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
@@ -414,6 +453,7 @@ class BacktestOrchestrator:
         parameters = {"pair": pair, **signal_params}
 
         # Process candles in sliding windows (like run_long_backtest.py)
+        self._start_phase("scan")
         all_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
         window_size = 100
@@ -455,16 +495,25 @@ class BacktestOrchestrator:
                     all_signals.append(signal)
                     progress.update(task, signals=len(all_signals))
 
+                    # Throttled logging
+                    if len(all_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "SHORT signal generation: %d signals found",
+                            len(all_signals),
+                        )
+
             progress.update(task, advance=1)
 
         progress.stop()
 
         signals = all_signals
+        self._end_phase("scan")
         logger.info("Generated %d SHORT signals", len(signals))
 
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
+            self._start_phase("simulate")
             logger.info(
                 "Simulating execution for %d SHORT signals (batch mode)", len(signals)
             )
@@ -488,6 +537,7 @@ class BacktestOrchestrator:
             executions = self._simulate_batch(signals, candles)
             exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
+            self._end_phase("simulate")
 
             # Calculate wins/losses for logging
             wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
@@ -542,6 +592,7 @@ class BacktestOrchestrator:
         parameters = {"pair": pair, **signal_params}
 
         # Process candles in sliding windows for both directions
+        self._start_phase("scan")
         all_long_signals = []
         all_short_signals = []
         ema_slow = signal_params.get("ema_slow", 50)
@@ -582,6 +633,12 @@ class BacktestOrchestrator:
                     all_long_signals.append(signal)
                     progress.update(task, longs=len(all_long_signals))
 
+                    # Throttled logging for LONG signals
+                    if len(all_long_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "BOTH mode - LONG: %d signals found", len(all_long_signals)
+                        )
+
             # Generate SHORT signals for this window
             short_window_signals = generate_short_signals(
                 candles=window, parameters=parameters
@@ -594,12 +651,20 @@ class BacktestOrchestrator:
                     all_short_signals.append(signal)
                     progress.update(task, shorts=len(all_short_signals))
 
+                    # Throttled logging for SHORT signals
+                    if len(all_short_signals) % self.log_frequency == 0:
+                        logger.debug(
+                            "BOTH mode - SHORT: %d signals found",
+                            len(all_short_signals),
+                        )
+
             progress.update(task, advance=1)
 
         progress.stop()
 
         long_signals = all_long_signals
         short_signals = all_short_signals
+        self._end_phase("scan")
 
         logger.info(
             "Generated %d LONG signals, %d SHORT signals",
@@ -622,6 +687,7 @@ class BacktestOrchestrator:
         # Execute signals (skip if dry-run)
         executions = []
         if not self.dry_run:
+            self._start_phase("simulate")
             logger.info(
                 "Simulating execution for %d merged signals (batch mode)",
                 len(merged_signals),
@@ -646,6 +712,7 @@ class BacktestOrchestrator:
             executions = self._simulate_batch(merged_signals, candles)
             exec_progress.update(exec_task, advance=50)  # Complete
             exec_progress.stop()
+            self._end_phase("simulate")
 
             # Calculate wins/losses for logging
             wins = sum(1 for ex in executions if ex.exit_reason == "TARGET")
