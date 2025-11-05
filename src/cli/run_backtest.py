@@ -231,6 +231,19 @@ def main():
         help="Generate signals without execution (signal-only mode)",
     )
 
+    # Performance optimization flags (Phase 4: US2)
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Enable performance profiling with cProfile hotspot extraction (US2)",
+    )
+
+    parser.add_argument(
+        "--benchmark-out",
+        type=Path,
+        help="Path to write benchmark JSON artifact (default: results/benchmarks/<timestamp>.json)",
+    )
+
     # Multi-strategy support (Phase 4: US2)
     parser.add_argument(
         "--list-strategies",
@@ -404,6 +417,13 @@ Persistent storage not yet implemented."
     # Create output directory
     args.output.mkdir(parents=True, exist_ok=True)
 
+    # Initialize profiler if profiling enabled
+    profiler = None
+    if args.profile:
+        from ..backtest.profiling import ProfilingContext
+        profiler = ProfilingContext()
+        profiler.__enter__()  # Start profiling context
+
     # Convert MetaTrader CSV if needed
     logger.info("Preprocessing CSV data")
     converted_csv = preprocess_metatrader_csv(args.data, args.output)
@@ -417,7 +437,10 @@ Persistent storage not yet implemented."
         parameters.atr_stop_mult,
     )
 
-    # Ingest candles
+    # Ingest candles with phase timing
+    if profiler:
+        profiler.start_phase("ingest")
+    
     logger.info("Ingesting candles from %s", converted_csv)
     candles = list(
         ingest_candles(
@@ -433,12 +456,28 @@ Persistent storage not yet implemented."
         )
     )
     logger.info("Loaded %d candles", len(candles))
+    
+    if profiler:
+        profiler.end_phase("ingest")
 
     # Create orchestrator
     direction_mode = DirectionMode[args.direction]
+    
+    # Set default benchmark output path if profiling enabled
+    benchmark_path = args.benchmark_out
+    if args.profile and not benchmark_path:
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
+    
     orchestrator = BacktestOrchestrator(
-        direction_mode=direction_mode, dry_run=args.dry_run
+        direction_mode=direction_mode,
+        dry_run=args.dry_run,
+        enable_profiling=args.profile,
     )
+    
+    # Attach profiler to orchestrator if profiling enabled
+    if profiler:
+        orchestrator.profiler = profiler
 
     # Run backtest
     # TODO: Future enhancement - loop over multiple pairs and strategies:
@@ -472,6 +511,55 @@ Persistent storage not yet implemented."
     )
 
     logger.info("Backtest complete: %s", result.run_id)
+
+    # Write benchmark artifact if profiling enabled
+    if args.profile and benchmark_path:
+        from ..backtest.profiling import write_benchmark_record
+        import tracemalloc
+        
+        # Get phase times from orchestrator if available
+        phase_times = {}
+        hotspots = []
+        if profiler:
+            phase_times = profiler.get_phase_times()
+            hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
+            profiler.__exit__(None, None, None)  # Stop profiling context
+        
+        # Calculate metrics
+        dataset_rows = len(candles)
+        trades_simulated = 0
+        if result.metrics:
+            if hasattr(result.metrics, 'combined'):
+                trades_simulated = result.metrics.combined.trade_count
+            elif hasattr(result.metrics, 'trade_count'):
+                trades_simulated = result.metrics.trade_count
+        
+        wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
+        
+        # Memory metrics (approximate if tracemalloc not used)
+        memory_peak_mb = 0.0
+        memory_ratio = 1.0
+        if tracemalloc.is_tracing():
+            _, peak = tracemalloc.get_traced_memory()
+            memory_peak_mb = peak / (1024 * 1024)
+            # Estimate raw dataset size (rough approximation)
+            raw_bytes = dataset_rows * 8 * 6  # 8 bytes per float, 6 columns (OHLC+V+T)
+            memory_ratio = peak / raw_bytes if raw_bytes > 0 else 1.0
+        
+        # Create benchmark directory
+        benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        write_benchmark_record(
+            output_path=benchmark_path,
+            dataset_rows=dataset_rows,
+            trades_simulated=trades_simulated,
+            phase_times=phase_times,
+            wall_clock_total=wall_clock_total,
+            memory_peak_mb=memory_peak_mb,
+            memory_ratio=memory_ratio,
+            hotspots=hotspots,  # Include cProfile hotspots
+        )
+        logger.info("Benchmark artifact written to %s", benchmark_path)
 
     # Format output
     output_format = (

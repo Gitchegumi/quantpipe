@@ -9,36 +9,52 @@ Success criteria: SC-007 (100% runs), SC-008 (≥10 hotspots), SC-009 (memory ra
 
 # pylint: disable=unused-import
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import json
 import time
+import cProfile
+import pstats
 from pathlib import Path
 
 
 class ProfilingContext:
-    """Context manager for tracking phase timings.
+    """Context manager for tracking phase timings and cProfile hotspots.
 
     Usage:
         with ProfilingContext() as profiler:
             profiler.start_phase("ingest")
             # ... data loading ...
             profiler.end_phase("ingest")
+            
+            # Get hotspots
+            hotspots = profiler.get_hotspots(n=10)
     """
 
-    def __init__(self):
-        """Initialize profiling context."""
+    def __init__(self, enable_cprofile: bool = True):
+        """Initialize profiling context.
+        
+        Args:
+            enable_cprofile: If True, enable cProfile hotspot extraction.
+        """
         self._phase_times: Dict[str, float] = {}
         self._current_phase: Optional[str] = None
         self._phase_start: Optional[float] = None
+        self._enable_cprofile = enable_cprofile
+        self._profiler: Optional[cProfile.Profile] = None
 
     def __enter__(self):
-        """Enter profiling context."""
+        """Enter profiling context and start cProfile if enabled."""
+        if self._enable_cprofile:
+            self._profiler = cProfile.Profile()
+            self._profiler.enable()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit profiling context."""
+        """Exit profiling context and stop cProfile."""
         if self._current_phase:
             self.end_phase(self._current_phase)
+        if self._profiler:
+            self._profiler.disable()
 
     def start_phase(self, phase_name: str) -> None:
         """Start timing a phase.
@@ -70,6 +86,48 @@ class ProfilingContext:
             Dictionary mapping phase names to durations in seconds.
         """
         return self._phase_times.copy()
+
+    def get_hotspots(self, n: int = 10) -> List[Dict[str, Any]]:
+        """Extract top N hotspots from cProfile data.
+        
+        Args:
+            n: Number of top hotspots to return (default 10).
+            
+        Returns:
+            List of dictionaries with hotspot data:
+                - function: Function name
+                - filename: Source file
+                - lineno: Line number
+                - ncalls: Number of calls
+                - tottime: Total time in function (excluding subcalls)
+                - cumtime: Cumulative time (including subcalls)
+                - percall_tot: Time per call (tottime/ncalls)
+                - percall_cum: Time per call (cumtime/ncalls)
+        """
+        if not self._profiler:
+            return []
+        
+        # Create stats object
+        stats = pstats.Stats(self._profiler)
+        stats.strip_dirs()
+        stats.sort_stats('cumulative')
+        
+        # Extract hotspot data
+        hotspots = []
+        for func, (_, nc, tt, ct, _) in list(stats.stats.items())[:n]:
+            filename, lineno, func_name = func
+            hotspots.append({
+                "function": func_name,
+                "filename": filename,
+                "lineno": lineno,
+                "ncalls": nc,
+                "tottime": tt,
+                "cumtime": ct,
+                "percall_tot": tt / nc if nc > 0 else 0.0,
+                "percall_cum": ct / nc if nc > 0 else 0.0,
+            })
+        
+        return hotspots
 
 
 def write_benchmark_record(
