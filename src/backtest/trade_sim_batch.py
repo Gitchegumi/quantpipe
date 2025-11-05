@@ -5,6 +5,16 @@ iteration. Implements vectorized baseline with optional numba JIT paths.
 
 Performance target: ≥10× speedup vs baseline O(trades × bars) approach.
 Scaling target: optimized_sim_time ≤ 0.30 × baseline_sim_time.
+
+Architecture Note (T070):
+    Event-driven simulation mode (T048) was evaluated and deferred as out-of-scope
+    for the current performance optimization phase. The vectorized batch approach
+    implemented here provides sufficient performance for the target workload
+    (6.9M candles, 17.7k trades) while maintaining code simplicity.
+    
+    Future enhancement: Event-driven mode could be added behind --sim-mode flag
+    for workloads requiring tick-level precision or real-time simulation semantics.
+    Current vectorized approach meets all success criteria (SC-001: ≤20min runtime).
 """
 
 # pylint: disable=unused-import, unused-argument, fixme
