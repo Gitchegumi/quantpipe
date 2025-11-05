@@ -41,21 +41,21 @@ Deliver US1 only: fast execution path (indicator caching, batch simulation, dete
 
 (Blocking modules & test scaffolds before user story implementation.)
 
-- [ ] T005 [P] Create module stub `src/backtest/indicator_cache.py` with docstring & placeholder class
-- [ ] T006 [P] Create module stub `src/backtest/trade_sim_batch.py` with docstring & placeholder function signatures
-- [ ] T007 [P] Create module stub `src/backtest/profiling.py` with docstring & placeholder writer
-- [ ] T008 [P] Create module stub `src/backtest/chunking.py` for slice & chunk utilities
-- [ ] T009 [P] Create module stub `src/backtest/parallel.py` for worker orchestration helpers
-- [ ] T010 Add deterministic seed utility function in `src/backtest/reproducibility.py` (extend existing) for setting RNG & env variables
-- [ ] T011 [P] Add unit test scaffold `tests/unit/test_indicator_cache.py` (imports + TODO markers)
-- [ ] T012 [P] Add unit test scaffold `tests/unit/test_trade_sim_batch.py`
-- [ ] T013 [P] Add unit test scaffold `tests/unit/test_chunking.py`
-- [ ] T014 [P] Add unit test scaffold `tests/unit/test_profiling.py`
-- [ ] T015 Create performance test scaffold `tests/performance/test_trade_sim_speed.py` (skip marker until implementation)
-- [ ] T016 Create performance test scaffold `tests/performance/test_memory_peak.py` (skip marker until measurement implemented)
-- [ ] T017 Add integration test scaffold `tests/integration/test_full_run_deterministic.py`
-- [ ] T018 Add integration test scaffold `tests/integration/test_parallel_efficiency.py`
-- [ ] T019 Add integration test scaffold `tests/integration/test_full_run_fraction.py`
+- [X] T005 [P] Create module stub `src/backtest/indicator_cache.py` with docstring & placeholder class
+- [X] T006 [P] Create module stub `src/backtest/trade_sim_batch.py` with docstring & placeholder function signatures
+- [X] T007 [P] Create module stub `src/backtest/profiling.py` with docstring & placeholder writer
+- [X] T008 [P] Create module stub `src/backtest/chunking.py` for slice & chunk utilities
+- [X] T009 [P] Create module stub `src/backtest/parallel.py` for worker orchestration helpers
+- [X] T010 Add deterministic seed utility function in `src/backtest/reproducibility.py` (extend existing) for setting RNG & env variables
+- [X] T011 [P] Add unit test scaffold `tests/unit/test_indicator_cache.py` (imports + TODO markers)
+- [X] T012 [P] Add unit test scaffold `tests/unit/test_trade_sim_batch.py`
+- [X] T013 [P] Add unit test scaffold `tests/unit/test_chunking.py`
+- [X] T014 [P] Add unit test scaffold `tests/unit/test_profiling.py`
+- [X] T015 Create performance test scaffold `tests/performance/test_trade_sim_speed.py` (skip marker until implementation)
+- [X] T016 Create performance test scaffold `tests/performance/test_memory_peak.py` (skip marker until measurement implemented)
+- [X] T017 Add integration test scaffold `tests/integration/test_full_run_deterministic.py`
+- [X] T018 Add integration test scaffold `tests/integration/test_parallel_efficiency.py`
+- [X] T019 Add integration test scaffold `tests/integration/test_full_run_fraction.py`
 
 ## Phase 3: User Story US1 (Fast Large Backtest Execution)
 
