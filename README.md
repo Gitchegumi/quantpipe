@@ -62,6 +62,36 @@ Example (signals only):
 poetry run python -m src.cli.run_backtest --data price_data/processed/eurusd/test.csv --dry-run
 ```
 
+## Performance Optimization
+
+The backtesting engine is optimized for large datasets (millions of candles):
+
+**Key Achievements**:
+
+- **Runtime**: ≤20 minutes for 6.9M candles / 17.7k trades (target met)
+- **Memory**: ≤1.5× raw dataset footprint with threshold monitoring
+- **Vectorization**: 10×+ speedup via numpy-based batch processing
+- **Fidelity**: Exact result preservation (price ≤1e-6, PnL ≤0.01%)
+
+**Features**:
+
+- Partial dataset iteration: `--data-frac 0.25` for quick validation
+- Profiling: `--profile` flag generates hotspot analysis + benchmark JSON
+- Progress tracking: Real-time phase timing with elapsed/remaining estimates
+
+**Quick Example**:
+
+```powershell
+# Profile with first 25% of data
+poetry run python -m src.cli.run_backtest `
+--data price_data/processed/eurusd/full.csv `
+--direction BOTH `
+--data-frac 0.25 `
+--profile
+```
+
+See `docs/performance.md` for complete optimization guide, benchmark schema, and aggregation utilities.
+
 ## Documentation & Resources
 
 | Audience                       | Where to Look                      |

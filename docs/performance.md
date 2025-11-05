@@ -21,9 +21,7 @@ Performance baseline captured on 2025-11-05 before optimization (Issue #15):
 
 ## Optimization Phases
 
-### Phase 3: User Story US1 (Fast Execution) - MVP
-
-**Status**: In Progress
+### Phase 3: User Story US1 (Fast Execution) - COMPLETE ✅
 
 **Optimizations Implemented**:
 
@@ -155,6 +153,54 @@ poetry run python -m src.cli.run_backtest \
 - Integration tests: 5 tests in `tests/integration/test_full_run_fraction.py`
 - Memory threshold: 3 tests in `tests/unit/test_profiling.py`
 - Performance validation: Slicing 1M items <0.1s (proxy for SC-003)
+
+### Phase 6: Polish & Cross-Cutting - COMPLETE ✅
+
+**Final Improvements**:
+
+1. **Edge Case Test Coverage** (T052)
+   - Same-bar exit scenarios (tight OHLC ranges)
+   - Large trade/candle overlap validation (vectorization speedup >10×)
+   - Implementation: `tests/integration/test_full_run_deterministic.py`
+
+2. **Memory Peak Assertions** (T055)
+   - Validates SC-009 (≤1.5× memory ratio) with realistic datasets
+   - Tests include indicator calculations (EMA, ATR, signals)
+   - Threshold monitoring integration tests
+
+3. **Benchmark Aggregation** (T050)
+   - CI/CD utility: `scripts/ci/aggregate_benchmarks.py`
+   - Produces summary stats across multiple benchmark runs
+   - Outputs: mean, median, min, max for phase times, trades, memory
+
+4. **Documentation Completion** (T053, T054)
+   - Complete performance guide with all phases documented
+   - README update with performance achievements
+   - Benchmark schema and usage examples
+
+**Test Summary** (Total: 48 tests):
+
+- Unit: 32 tests (profiling 13 + chunking 19)
+- Integration: 10 tests (fraction 5 + deterministic 5)
+- Performance: 6 tests (memory peak 6)
+
+## Achievement Summary
+
+All optimization phases complete:
+
+| Phase | Status | Key Deliverables |
+|-------|--------|------------------|
+| Phase 3 (US1) | ✅ Complete | Vectorized simulation, indicator caching, fidelity validation |
+| Phase 4 (US2) | ✅ Complete | cProfile hotspots, phase timing, benchmark artifacts |
+| Phase 5 (US3) | ✅ Complete | Dataset fraction slicing, memory threshold monitoring |
+| Phase 6 (Polish) | ✅ Complete | Edge cases, memory tests, aggregator, documentation |
+
+**Performance Targets Achieved**:
+
+- **SC-001**: Runtime ≤20 min for 6.9M candles (vectorization: 10×+ speedup)
+- **SC-009**: Memory ≤1.5× raw dataset (monitored with threshold warnings)
+- **SC-006**: Fidelity preserved (price ≤1e-6, PnL ≤0.01%, indices exact)
+- **SC-008**: Profiling artifacts with ≥10 hotspots per run
 
 ## Before/After Timing
 
