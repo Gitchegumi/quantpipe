@@ -1,0 +1,10 @@
+{
+  "baseline_version": "pre-optimization",
+  "dataset_rows": 0,
+  "trade_count": 0,
+  "simulation_time_seconds": 0.0,
+  "load_time_seconds": 0.0,
+  "total_time_seconds": 0.0,
+  "memory_peak_mb": 0.0,
+  "notes": "Placeholder values - populate with actual baseline run metrics before performance tests"
+}

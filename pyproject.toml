@@ -14,6 +14,10 @@ pydantic = "^2.4.0"
 rich = "^13.6.0"
 jsonschema = "^4.25.1"
 
+# Optional performance dependencies (install manually if needed):
+# numba = "^0.58.0"  # JIT compilation for trade simulation speedup (10-50x gains)
+# pyarrow = "^14.0.0"  # Parquet/columnar IO (deferred to future phase)
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 hypothesis = "^6.88.0"

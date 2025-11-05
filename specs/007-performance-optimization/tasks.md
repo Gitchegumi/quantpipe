@@ -32,10 +32,10 @@ Deliver US1 only: fast execution path (indicator caching, batch simulation, dete
 
 (Repository already initialized; focus on environment and baseline capture.)
 
-- [ ] T001 Ensure optional dependencies section documented (no mandatory install) in `pyproject.toml` comment block
-- [ ] T002 Create benchmarks directory structure `results/benchmarks/` (add .gitkeep)
-- [ ] T003 Add baseline speed fixture file `tests/performance/baseline_metrics.json` (placeholder values for later update)
-- [ ] T004 Add README note for performance feature in `docs/performance.md` (initial header + baseline TODO)
+- [X] T001 Ensure optional dependencies section documented (no mandatory install) in `pyproject.toml` comment block
+- [X] T002 Create benchmarks directory structure `results/benchmarks/` (add .gitkeep)
+- [X] T003 Add baseline speed fixture file `tests/performance/baseline_metrics.json` (placeholder values for later update)
+- [X] T004 Add README note for performance feature in `docs/performance.md` (initial header + baseline TODO)
 
 ## Phase 2: Foundational
 
