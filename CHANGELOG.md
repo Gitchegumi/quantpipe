@@ -49,6 +49,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Running tallies provide real-time feedback during long operations
   - Gap filling integrated seamlessly into ingestion progress bar
 
+### Fixed - Gap Filling & Progress Visualization (2025-11-05)
+
+- **Test Compatibility**
+  - Added `fill_gaps` parameter to `run_simple_backtest()` (default False for tests)
+  - Updated `test_us2_short_signal.py` to disable gap filling
+  - Prevents synthetic candles from breaking test fixtures with non-continuous timestamps
+  - Issue: Gap filling added NaN-indicator candles in test data, preventing strategy conditions
+
 ### Added - Feature 006: Multi-Strategy Backtesting Framework (2025-11-04)
 
 - **Multi-Strategy Execution & Aggregation**
