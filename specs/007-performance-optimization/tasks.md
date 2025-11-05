@@ -111,15 +111,27 @@ Deliver US1 only: fast execution path (indicator caching, batch simulation, dete
 - Test coverage: 10 tests passing in test_profiling.py (phase timing, hotspot extraction, artifact validation, parallel_efficiency support)
 - Integration test: test_profiling_artifact_presence validates end-to-end profiling workflow
 
-## Phase 5: User Story US3 (Partial Dataset Iteration)
+## Phase 5: User Story US3 (Partial Dataset Iteration) ✅ COMPLETE
 
-- [ ] T039 [US3] Implement fraction flag parsing & validation in `src/cli/run_backtest.py`
-- [ ] T040 [US3] Implement dataset slicing logic pre-indicator compute in `src/backtest/chunking.py`
-- [ ] T041 [US3] Integrate slicing into orchestrator startup `src/backtest/orchestrator.py`
-- [ ] T042 [P] [US3] Add integration tests for fractions (0.25, 0.5, 1.0) in `tests/integration/test_full_run_fraction.py`
-- [ ] T043 [US3] Add benchmark JSON row count & fraction fields (update writer) in `src/backtest/profiling.py`
-- [ ] T044 [US3] Add memory threshold warning logic in `src/backtest/profiling.py`
-- [ ] T045 [P] [US3] Update `docs/performance.md` with fraction usage section
+- [X] T039 [US3] Implement fraction flag parsing & validation in `src/cli/run_backtest.py`
+- [X] T040 [US3] Implement dataset slicing logic pre-indicator compute in `src/backtest/chunking.py`
+- [X] T041 [US3] Integrate slicing into orchestrator startup `src/backtest/orchestrator.py`
+- [X] T042 [P] [US3] Add integration tests for fractions (0.25, 0.5, 1.0) in `tests/integration/test_full_run_fraction.py`
+- [X] T043 [US3] Add benchmark JSON row count & fraction fields (update writer) in `src/backtest/profiling.py`
+- [X] T044 [US3] Add memory threshold warning logic in `src/backtest/profiling.py`
+- [X] T045 [P] [US3] Update `docs/performance.md` with fraction usage section
+
+**Phase 5 Deliverables (2025-01-06)**:
+
+- `--data-frac` flag with interactive prompt (0.0-1.0 validation, default=1.0)
+- `--portion` flag for selecting specific slices (1-indexed)
+- Dataset slicing before indicator computation (FR-002)
+- List and DataFrame slicing support in chunking.py
+- Memory threshold monitoring (ratio >1.5× flagged, SC-009, FR-013)
+- Benchmark JSON extended with fraction and memory_threshold_exceeded fields
+- Documentation: Complete fraction usage guide with examples
+- Test coverage: 27 tests total (19 unit + 5 integration + 3 memory threshold)
+- Interactive validation: ≤2 attempts with clear error messages (SC-010)
 
 ## Phase 6: Polish & Cross-Cutting
 
