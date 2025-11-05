@@ -61,6 +61,11 @@ def slice_dataset_list(
 
     start_idx = (portion - 1) * slice_size
     end_idx = start_idx + slice_size
+
+    # Last portion extends to end (handles uneven division)
+    if portion == num_portions:
+        end_idx = total_rows
+
     return data[start_idx:end_idx]
 
 
