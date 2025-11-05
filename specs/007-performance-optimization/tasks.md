@@ -175,7 +175,7 @@ Deliver US1 only: fast execution path (indicator caching, batch simulation, dete
 - [x] T068 Add worker cap single warning test `tests/integration/test_parallel_efficiency.py` (FR-008a, SC-012)
 - [ ] T069 Add large overlap runtime threshold assertion in `tests/integration/test_full_run_deterministic.py` (Edge Case, SC-001)
 - [ ] T070 Housekeeping: remove event-driven stub if not scheduled (revisit T048) or annotate future scope
-- [ ] T071 Extend benchmark aggregator to enforce regression thresholds (`scripts/ci/aggregate_benchmarks.py`) (CI Gate)
+- [x] T071 Extend benchmark aggregator to enforce regression thresholds (`scripts/ci/aggregate_benchmarks.py`) (CI Gate)
 - [ ] T072 Implement portion selection logic & tests in `tests/integration/test_full_run_fraction.py` (FR-002 enhancement)
 
 ## Updated Task Counts (Post-Analysis)
