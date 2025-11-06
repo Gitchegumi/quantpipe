@@ -6,6 +6,7 @@ Spec Ref: specs/008-multi-symbol/spec.md (FR-001..FR-023, SC-001..SC-014)
 Design Docs: plan.md, research.md, data-model.md, contracts/portfolio-allocation.yaml, quickstart.md
 
 ## Dependency Graph (User Stories Order)
+
 1. US1 (Single Symbol) – baseline must stay intact (regression)
 2. US2 (Independent Multi-Symbol) – builds on US1 ingestion & orchestration
 3. US3 (Portfolio Multi-Symbol) – requires correlation + allocation + snapshots
@@ -14,6 +15,7 @@ Design Docs: plan.md, research.md, data-model.md, contracts/portfolio-allocation
 Graph (edges): US1 → US2 → US3; US1 → US4 (US4 can start after US1)
 
 Parallel Opportunities:
+
 - Correlation service (US3) and allocation engine (US3) can develop in parallel once entity models exist.
 - Independent mode loop (US2) can proceed while CLI selection flags (US4) are added.
 - Snapshot logger (US3) can proceed independently after correlation matrix shape finalized.
@@ -101,29 +103,35 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 - [ ] T059 Parallel execution feasibility prototype (deferred) placeholder task note only
 
 ## Implementation Strategy
+
 - Deliver MVP (US1 + US2) early to unlock multi-symbol independent evaluation.
 - Build portfolio primitives concurrently (correlation + allocation) before orchestration wiring.
 - Maintain strict deterministic behavior (seed any randomness; avoid non-deterministic iteration of dicts).
 - Use incremental tests to lock invariants (allocation sum, correlation window transitions, snapshot intervals).
 
 ## Test Criteria Summary by Story
+
 - US1: Single-symbol metrics unchanged; filename pattern intact.
 - US2: 3-symbol independent outputs produced; risk isolation works.
 - US3: Portfolio metrics (correlation matrix, diversification ratio, allocation correctness, snapshots) validated.
 - US4: CLI filtering & mode flags operate; unknown symbol abort; threshold overrides applied.
 
 ## Format Validation
+
 All tasks follow required pattern: `- [ ] TXXX [P]? [USn]? Description with file path`. Parallelizable tasks marked with `[P]`. Story tasks labeled with `[USn]`.
 
 ## Counts
+
 Total Tasks: 59
 Per Story: US1 (5), US2 (9), US3 (14), US4 (7) + Setup/Foundational/Polish tasks (24)
 Parallel Tasks: T009, T012, T018, T022, T027, T030, T032, T042
 
 ## Parallel Execution Examples
+
 - After foundational models (T005–T011): run T018 (independent runner) and T027 (correlation service) concurrently.
 - Snapshot logger (T030) can parallelize with allocation engine (T028).
 - Diversification metrics (T031) can follow correlation service but parallel with allocation precision tests.
 
 ## MVP Scope
+
 Complete tasks through Phase 4 (US2) excluding portfolio tasks (T027+). Provides multi-symbol independent capability and regression stability.
