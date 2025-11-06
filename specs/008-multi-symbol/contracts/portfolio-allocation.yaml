@@ -36,10 +36,12 @@ request:
     correlation_matrix:
       type: object
       description: Pairwise correlations keyed by lexicographic pair token (e.g., "EURUSD:GBPUSD"). Values in [-1,1]. Missing keys treated as 0.
-      additionalProperties:
-        type: number
-        minimum: -1
-        maximum: 1
+      patternProperties:
+        "^[A-Z]{6}:[A-Z]{6}$":
+          type: number
+          minimum: -1
+          maximum: 1
+      additionalProperties: false
     base_weights:
       type: object
       nullable: true

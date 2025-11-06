@@ -46,6 +46,8 @@ Fields:
 - `correlation_threshold_override: float | None` (0.0–1.0 inclusive)
 - `base_weight: float | None` (non-negative, used when base weights provided)
 - `enabled: bool` (default True)
+- `spread_pips: float | None` (symbol-specific spread in pips; overrides global default if provided; FR-008)
+- `commission_rate: float | None` (symbol-specific commission as fraction of trade value; overrides global default if provided; FR-008)
 
 ### `PortfolioConfig`
 

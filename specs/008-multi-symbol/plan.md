@@ -15,50 +15,19 @@ Technical approach: Extend existing directional backtest orchestrator to loop ov
 ## Technical Context
 
 **Language/Version**: Python 3.11
-**Primary Dependencies**: numpy, pandas, pydantic (config validation), rich (progress/logging), poetry (dependency mgmt). Potential optional: numba (JIT) – NEEDS CLARIFICATION (adopt now or phase later?)
+**Primary Dependencies**: numpy, pandas, pydantic (config validation), rich (progress/logging), poetry (dependency mgmt). Optional: numba (JIT) with feature flag per Decision 1.
 **Storage**: File-based CSV inputs; outputs as text/JSON + snapshot logs; no DB.
 **Testing**: pytest (unit, integration, performance); contract tests for filename pattern & symbol metadata (SC-014).
 **Target Platform**: Cross-platform Python (Windows dev; Linux CI). Backtests long-running; memory optimization considered.
 **Project Type**: Single Python project (strategy/backtest framework) – existing `src/` layout retained.
 **Performance Goals**: Portfolio mode (≤3x single-symbol runtime for 3+ symbols, SC-003); 10-symbol performance target ≤5 minutes for 1-year daily dataset (SC-011). Observability overhead <10% (SC-013).
-**Constraints**: Deterministic results (SC-009); zero logging f-string violations (Principle X); maintain lint + formatting compliance; correlation logic initialization with provisional window ≥20; memory usage scalable to 10 symbols with acceptable peak (<1.5× single-symbol baseline) – NEEDS CLARIFICATION (exact memory threshold).
-**Scale/Scope**: Phase 1: 2–3 symbols; Phase 2: up to 10 symbols; Future: >10 with potential parallelization – NEEDS CLARIFICATION (parallel execution strategy & scheduling).
+**Constraints**: Deterministic results (SC-009); zero logging f-string violations (Principle X); maintain lint + formatting compliance; correlation logic initialization with provisional window ≥20; memory usage ≤1.5× single-symbol baseline for 10 symbols measured via tracemalloc (SC-015).
+**Scale/Scope**: Phase 1: 2–3 symbols; Phase 2: up to 10 symbols; Future: >10 with potential parallelization.
 
 ### Entities & Components (from spec)
 
-- Currency Pair
-- Symbol Configuration
-- Portfolio Configuration
-- Correlation Matrix
-- Symbol Result
-- Portfolio Result
-- Portfolio Snapshot
 - Currency Pair, Symbol Configuration, Portfolio Configuration, Correlation Matrix, Symbol Result, Portfolio Result, Portfolio Snapshot.
-- New internal components to design: `PortfolioOrchestrator`, `CorrelationService`, `AllocationEngine`, `SnapshotLogger` – NEEDS CLARIFICATION (final module boundaries and naming).
-
-### Unknowns (NEEDS CLARIFICATION)
-
-List of current ambiguities requiring Phase 0 research resolution:
-
-- Optional numba adoption strategy (hard dependency vs graceful fallback)
-- Memory target thresholds for multi-symbol runs (define quantitative SC?)
-- Parallelization approach for independent mode (threading vs multiprocessing vs sequential) initial release
-- Resume/restart behavior (partial progress recovery) – currently out-of-scope? Decide explicit OUT-OF-SCOPE list
-- Failure isolation in portfolio mode beyond validation (runtime symbol halt impact on portfolio metrics?)
-- AllocationEngine strategy interfaces (risk-parity formula, capital rounding rules)
-- Snapshot log format (JSON lines vs plain text) – finalize schema
-- Correlation threshold configuration format (single float vs per-pair matrix overrides)
-- Symbol selection filters/tags (future: liquidity class, volatility tier) – confirm scope now
-
-1. Optional numba adoption strategy (hard dependency vs graceful fallback).
-2. Memory target thresholds for multi-symbol runs (define quantitative SC?).
-3. Parallelization approach for independent mode (threading vs multiprocessing vs sequential) initial release.
-4. Resume/restart behavior (partial progress recovery) – currently out-of-scope? Decide explicit OUT-OF-SCOPE list.
-5. Failure isolation in portfolio mode beyond validation (runtime symbol halt impact on portfolio metrics?).
-6. AllocationEngine strategy interfaces (risk-parity formula, capital rounding rules).
-7. Snapshot log format (JSON lines vs plain text) – finalize schema.
-8. Correlation threshold configuration format (single float vs per-pair matrix overrides).
-9. Symbol selection filters/tags (future: liquidity class, volatility tier) – confirm scope now.
+- New internal components to design: `PortfolioOrchestrator`, `CorrelationService`, `AllocationEngine`, `SnapshotLogger` (module boundaries defined in data-model.md and contracts/).
 
 ## Constitution Check (Initial Gate)
 
@@ -169,7 +138,7 @@ ios/ or android/
 
 ## Phase 0 Plan (Research Tasks)
 
-For each NEEDS CLARIFICATION item above create a research decision entry in `research.md`:
+All items resolved in `research.md` (Decisions 1-9):
 
 - NumPy vs numba acceleration trade-offs for correlation & allocation loops.
 - Memory footprint profiling targets (define baseline & acceptable multiplier).
@@ -179,16 +148,7 @@ For each NEEDS CLARIFICATION item above create a research decision entry in `res
 - AllocationEngine interface (inputs: symbol vols, correlations, weights; outputs: per-symbol size factors). Round strategy.
 - Snapshot schema (JSON lines vs structured text; choose JSON lines for machine parsing).
 - Correlation config format (single threshold + optional overrides map).
-- Tag/filter taxonomy deferral (explicitly out-of-scope for initial release).
-- NumPy vs numba acceleration trade-offs for correlation & allocation loops.
-- Memory footprint profiling targets (define baseline & acceptable multiplier).
-- Independent mode parallelism viability (I/O bound vs CPU bound; overhead vs speedup).
-- Explicit restart semantics (out-of-scope confirmation for v1; document assumptions).
-- Portfolio failure isolation rules (symbol halt → exclude from future correlation? decision needed).
-- AllocationEngine interface (inputs: symbol vols, correlations, weights; outputs: per-symbol size factors). Round strategy.
-- Snapshot schema (JSON lines vs structured text; choose JSON lines for machine parsing).
-- Correlation config format (single threshold + optional overrides map).
-- Tag/filter taxonomy deferral (explicitly out-of-scope for initial release).
+- Tag/filter taxonomy deferral (explicitly out-of-scope for initial release per Decision 9).
 
 ## Phase 1 (Design & Contracts) – Preview
 
