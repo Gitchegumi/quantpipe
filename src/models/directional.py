@@ -243,6 +243,8 @@ class BacktestResult:
     data_end_date: datetime
     total_candles: int
     metrics: MetricsSummary | DirectionalMetrics
+    pair: str | None = None  # Single symbol identifier (FR-023); None for multi-symbol future aggregation
+    symbols: list[str] | None = None  # Multi-symbol runs (portfolio/independent batch)
     signals: list[TradeSignal] | None = None
     executions: list | None = None  # TradeExecution list (avoid circular import)
     conflicts: list[ConflictEvent] = field(default_factory=list)

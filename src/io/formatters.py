@@ -18,13 +18,21 @@ logger = logging.getLogger(__name__)
 
 
 def generate_output_filename(
-    direction: DirectionMode, output_format: OutputFormat, timestamp: datetime
+    direction: DirectionMode,
+    output_format: OutputFormat,
+    timestamp: datetime,
+    symbol_tag: str | None = None,
 ) -> str:
     """
     Generate standardized filename for backtest output.
 
     Produces filenames in the format:
-    backtest_{direction}_{YYYYMMDD}_{HHMMSS}.{ext}
+    backtest_{direction}_{symbol|multi}_{YYYYMMDD}_{HHMMSS}.{ext}
+
+    If `symbol_tag` is provided it is used directly (expected lowercase, e.g. 'eurusd').
+    If `symbol_tag` is not provided the legacy format WITHOUT symbol is used for 
+    backward compatibility (will be deprecated). Callers implementing multi-symbol 
+    MUST pass 'multi' for aggregated runs.
 
     Args:
         direction: Direction mode of the backtest (LONG/SHORT/BOTH).
@@ -47,7 +55,11 @@ def generate_output_filename(
     time_str = timestamp.strftime("%H%M%S")
     ext = "json" if output_format == OutputFormat.JSON else "txt"
 
-    filename = f"backtest_{direction_str}_{date_str}_{time_str}.{ext}"
+    if symbol_tag:
+        filename = f"backtest_{direction_str}_{symbol_tag}_{date_str}_{time_str}.{ext}"
+    else:
+        # Legacy fallback (pre-FR-023) - no symbol component
+        filename = f"backtest_{direction_str}_{date_str}_{time_str}.{ext}"
     logger.debug("Generated filename: %s", filename)
 
     return filename
@@ -89,6 +101,12 @@ def format_text_output(result: BacktestResult) -> str:
     lines.append("-" * 60)
     lines.append(f"Run ID:           {result.run_id}")
     lines.append(f"Direction Mode:   {result.direction_mode}")
+    # Symbol(s) line (FR-023) - BacktestResult may have attribute 'pair' or 'symbols'
+    if hasattr(result, "symbols") and isinstance(getattr(result, "symbols"), list):
+        syms = getattr(result, "symbols")
+        lines.append(f"Symbols:         {', '.join(syms)}")
+    elif hasattr(result, "pair"):
+        lines.append(f"Symbol:          {getattr(result, 'pair')}")
     lines.append(f"Start Time:       {result.start_time.isoformat()}")
     lines.append(f"End Time:         {result.end_time.isoformat()}")
     duration = (result.end_time - result.start_time).total_seconds()

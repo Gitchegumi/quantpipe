@@ -36,7 +36,7 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
-# pylint: disable=fixme, line-too-long
+# pylint: disable=fixme, line-too-long, broad-exception-caught
 
 import argparse
 import json
@@ -431,6 +431,25 @@ Persistent storage not yet implemented."
     logger.info("Starting directional backtest")
     logger.info("Direction: %s", args.direction)
     logger.info("Strategy: %s", ", ".join(args.strategy))
+    # Optional pair inference if user did not explicitly override default and data path suggests a different pair
+    inferred_pair = None
+    try:
+        # Examine parts of path for 6-letter currency code (e.g., usdjpy)
+        for part in args.data.parts[::-1]:  # reverse for specificity (file/parent dirs first)
+            part_lower = part.lower()
+            if len(part_lower) == 6 and part_lower.isalpha():
+                inferred_pair = part_lower.upper()
+                break
+        if inferred_pair and len(args.pair) == 1 and args.pair[0].upper() != inferred_pair:
+            logger.info(
+                "Inferred pair '%s' from data path (overriding provided '%s'). Pass --pair to force a different symbol.",
+                inferred_pair,
+                args.pair[0].upper(),
+            )
+            args.pair[0] = inferred_pair  # mutate for subsequent usage
+    except Exception as ex:  # pragma: no cover - defensive
+        logger.warning("Pair inference failed: %s", ex)
+
     logger.info("Pair(s): %s", ", ".join(args.pair))
     logger.info("Data: %s", args.data)
     logger.info("Dry-run: %s", args.dry_run)
@@ -696,10 +715,18 @@ Persistent storage not yet implemented."
         output_content = format_text_output(result)
 
     # Generate output filename
+    # Derive symbol tag for filename (FR-023). Future multi-symbol logic will set 'multi'.
+    symbol_tag = None
+    if hasattr(result, "pair") and result.pair:
+        symbol_tag = result.pair.lower()
+    if hasattr(result, "symbols") and result.symbols and len(result.symbols) > 1:
+        symbol_tag = "multi"
+
     output_filename = generate_output_filename(
         direction=direction_mode,
         output_format=output_format,
         timestamp=result.start_time,
+        symbol_tag=symbol_tag,
     )
     output_path = args.output / output_filename
 
