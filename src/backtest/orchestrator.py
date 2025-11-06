@@ -129,20 +129,20 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         if not signals:
             return []
 
-        # Build candle index for timestamp lookups
+        # Build candle timestamp index for O(log n) lookups
+        import bisect
+
         candle_timestamps = [c.timestamp_utc for c in candles]
 
         # Convert signals to batch entry format
         entries = []
         for signal in signals:
-            # Find entry candle index (first candle after signal timestamp)
-            entry_idx = None
-            for i, ts in enumerate(candle_timestamps):
-                if ts > signal.timestamp_utc:
-                    entry_idx = i
-                    break
+            # Find entry candle index using binary search (O(log n) instead of O(n))
+            # bisect_right returns the insertion point, which is the first candle
+            # AFTER signal
+            entry_idx = bisect.bisect_right(candle_timestamps, signal.timestamp_utc)
 
-            if entry_idx is None:
+            if entry_idx >= len(candles):
                 logger.debug(
                     "No candles after signal timestamp %s, skipping",
                     signal.timestamp_utc.isoformat(),
