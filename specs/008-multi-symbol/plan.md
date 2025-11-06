@@ -77,6 +77,27 @@ List of current ambiguities requiring Phase 0 research resolution:
 
 Gate Outcome: PROCEED to Phase 0 with listed clarifications. Any PARTIAL items must be resolved (or explicitly deferred) in research.md.
 
+## Constitution Check (Post Phase 1 Update)
+
+Phase 1 design artifacts (research.md decisions, data-model.md, allocation contract, quickstart.md) have been delivered. Re-assess prior PARTIAL principles:
+
+| Principle                    | Status | Updated Notes (Post Phase 1)                                                                                                              |
+| ---------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| I Strategy-first             | PASS   | Single-symbol baseline preserved; multi-symbol layers additive.                                                                           |
+| II Risk Mgmt                 | PASS   | AllocationEngine contract defined; failure isolation rule formalized; portfolio kill-switch deferred (logged in research deferred list). |
+| III Backtesting & Validation | PASS   | Correlation window + provisional logic specified; portfolio synchronization rules documented; walk-forward remain deferred.              |
+| IV Real-Time Monitoring      | PASS   | Snapshot JSONL schema + trade logging requirements specified (FR-022); interval configurability documented.                              |
+| V Data Integrity             | PASS   | Multi-symbol overlap validation planned in `validation.py`; no mutation of source datasets introduced.                                   |
+| VI Data Provenance           | PASS   | Manifest will enumerate symbol datasets; structure unchanged; extension task scheduled (T033).                                           |
+| VII Parsimony                | PASS   | Advanced tagging, parallelization, risk-parity explicitly deferred; lean initial scope retained.                                         |
+| VIII Code Quality            | PASS   | All forthcoming modules required to include docstrings & type hints; tasks list encodes enforcement (T053).                              |
+| IX Dependency Mgmt           | PASS   | numba optional path defined with feature flag; no new mandatory deps introduced.                                                         |
+| X Quality Automation         | PASS   | Tests enumerated per story (allocation precision, correlation provisional window, snapshot interval, determinism).                      |
+
+Deferred items (remaining): portfolio drawdown kill-switch, walk-forward multi-symbol validation, advanced tagging, parallel execution prototype (T059), risk-parity allocation variant.
+
+Phase 1 Completion: COMPLETE. Proceed to Phase 2 (Foundational implementation tasks).
+
 ## Project Structure
 
 ### Documentation (this feature)
