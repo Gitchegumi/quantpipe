@@ -62,16 +62,16 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 
 ## Phase 5: User Story US3 (Portfolio Mode)
 
-- [ ] T027 [P] [US3] Implement correlation update service `src/backtest/portfolio/correlation_service.py`
-- [ ] T028 [US3] Implement allocation engine core `src/backtest/portfolio/allocation_engine.py` (largest remainder rounding)
+- [X] T027 [P] [US3] Implement correlation update service `src/backtest/portfolio/correlation_service.py`
+- [X] T028 [US3] Implement allocation engine core `src/backtest/portfolio/allocation_engine.py` (largest remainder rounding)
 - [ ] T029 [US3] Implement portfolio orchestrator `src/backtest/portfolio/orchestrator.py`
 - [ ] T030 [P] [US3] Implement snapshot logger `src/backtest/portfolio/snapshot_logger.py` (JSONL writing)
 - [ ] T031 [US3] Implement diversification metrics calculator `src/backtest/portfolio/diversification.py`
 - [ ] T032 [US3] Integrate correlation threshold overrides (Decision 8) in `correlation_service.py`
 - [ ] T033 [US3] Portfolio manifest generation in `src/io/manifest.py`
 - [ ] T034 [US3] Add integration test for portfolio run 3 symbols `tests/integration/test_portfolio_three_symbols.py`
-- [ ] T035 [US3] Add test ensuring correlation provisional window logic (≥20 then grow) `tests/unit/portfolio/test_correlation_provisional.py`
-- [ ] T036 [US3] Add test ensuring allocation sum precision `tests/unit/portfolio/test_allocation_precision.py`
+- [X] T035 [US3] Add test ensuring correlation provisional window logic (≥20 then grow) `tests/unit/portfolio/test_correlation_provisional.py`
+- [X] T036 [US3] Add test ensuring allocation sum precision `tests/unit/portfolio/test_allocation_precision.py`
 - [ ] T037 [US3] Add test verifying snapshot interval honored `tests/unit/portfolio/test_snapshot_interval.py`
 - [ ] T038 [US3] Add test verifying diversification ratio monotonic vs correlation changes `tests/unit/portfolio/test_diversification_ratio.py`
 - [ ] T039 [US3] Add test verifying failure isolation excludes symbol from further correlation `tests/unit/portfolio/test_failure_isolation.py`
