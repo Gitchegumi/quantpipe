@@ -439,6 +439,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             executions=executions if not self.dry_run else None,
             conflicts=[],
             dry_run=self.dry_run,
+            pair=pair,
         )
 
     def _run_short_backtest(
@@ -578,6 +579,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             executions=executions if not self.dry_run else None,
             conflicts=[],
             dry_run=self.dry_run,
+            pair=pair,
         )
 
     def _run_both_backtest(
@@ -770,6 +772,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             executions=executions if not self.dry_run else None,
             conflicts=conflicts,
             dry_run=self.dry_run,
+            pair=pair,
         )
 
     # ------------------------------------------------------------------

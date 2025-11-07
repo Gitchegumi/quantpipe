@@ -1,0 +1,123 @@
+# Portfolio Allocation Contract (Phase 1)
+# Date: 2025-11-06
+# Branch: 008-multi-symbol
+# Spec: FR-010, FR-022, Decisions 6,8
+# Format: YAML schema (tooling-agnostic)
+
+version: 1.0.0
+name: AllocationEngineContract
+summary: >-
+  Defines request/response schema for portfolio capital allocation across
+  multiple FX symbols considering volatility and correlations.
+
+request:
+  type: object
+  required:
+    - symbols
+    - volatility
+    - correlation_matrix
+    - capital
+  properties:
+    symbols:
+      type: array
+      description: Ordered list of symbol codes (e.g., ["EURUSD", "GBPUSD"]).
+      minItems: 1
+      items:
+        type: string
+        pattern: "^[A-Z]{6}$"
+    volatility:
+      type: object
+      description: Per-symbol volatility metric (ATR or stdev proxy) strictly > 0.
+      additionalProperties:
+        type: number
+        minimum: 0
+      constraints:
+        - "All symbols listed in 'symbols' MUST appear as keys."
+    correlation_matrix:
+      type: object
+      description: Pairwise correlations keyed by lexicographic pair token (e.g., "EURUSD:GBPUSD"). Values in [-1,1]. Missing keys treated as 0.
+      patternProperties:
+        "^[A-Z]{6}:[A-Z]{6}$":
+          type: number
+          minimum: -1
+          maximum: 1
+      additionalProperties: false
+    base_weights:
+      type: object
+      nullable: true
+      description: Optional raw weighting hints summing to ~1.0 (tolerance ±0.01) before risk/correlation adjustment.
+      additionalProperties:
+        type: number
+        minimum: 0
+      constraints:
+        - "If provided, all symbols MUST be present."
+        - "Sum(base_weights.values()) within [0.99, 1.01]."
+    capital:
+      type: number
+      minimum: 0
+      exclusiveMinimum: true
+      description: Total capital (monetary units) to allocate across symbols.
+    rounding_dp:
+      type: integer
+      default: 2
+      minimum: 0
+      description: Decimal places for final allocation rounding.
+
+response:
+  type: object
+  required:
+    - allocations
+    - diversification_ratio
+    - timestamp
+  properties:
+    allocations:
+      type: object
+      description: Per-symbol capital allocation after adjustment & rounding.
+      additionalProperties:
+        type: number
+        minimum: 0
+      constraints:
+        - "Keys MUST match request.symbols subset (excluding disabled symbols)."
+        - "Rounded sum equals request.capital (largest remainder correction)."
+    diversification_ratio:
+      type: number
+      minimum: 0
+      maximum: 1
+      description: Normalized diversification effectiveness metric (0=concentrated, 1=ideal).
+    correlation_penalty:
+      type: number
+      nullable: true
+      description: Aggregate penalty factor applied due to high correlations (optional Phase 1 field).
+    timestamp:
+      type: string
+      format: date-time
+      description: ISO8601 generation time.
+
+invariants:
+  - "For every symbol S: allocations[S] >= 0."
+  - "Sum(allocations.values()) == capital (post-rounding)."
+  - "If base_weights omitted: initial weights default to equal distribution."
+  - "Diversification ratio monotonically non-increasing as average correlation rises."
+
+error_modes:
+  - code: MISSING_SYMBOL_VOLATILITY
+    message: Volatility entry missing for one or more symbols.
+    recoverable: true
+    fallback: Equal weighting among available symbols.
+  - code: INVALID_BASE_WEIGHT_SUM
+    message: Provided base_weights sum outside tolerance.
+    recoverable: true
+    fallback: Normalize weights or revert to equal weights.
+  - code: NEGATIVE_ALLOCATION
+    message: Internal calculation produced negative allocation.
+    recoverable: false
+    fallback: Abort allocation cycle; log failure.
+  - code: CAPITAL_TOO_SMALL
+    message: Capital too small for minimum precision rounding.
+    recoverable: true
+    fallback: Allocate all capital to first symbol; set others to 0.
+
+notes:
+  - "Correlation keys lexicographically sorted: e.g., min(A,B)+ ':' + max(A,B)."
+  - "Largest remainder method: compute raw floats, round; adjust symbol with largest fractional remainder to fix sum drift."
+  - "Future: correlation_penalty may inform dynamic risk scaling (Phase 2)."

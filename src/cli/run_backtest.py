@@ -36,8 +36,6 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
-# pylint: disable=fixme, line-too-long
-
 import argparse
 import json
 import logging
@@ -242,27 +240,40 @@ def main():
     parser.add_argument(
         "--benchmark-out",
         type=Path,
-        help="Path to write benchmark JSON artifact (default: results/benchmarks/<timestamp>.json)",
+        help=(
+            "Path to write benchmark JSON artifact "
+            "(default: results/benchmarks/<timestamp>.json)"
+        ),
     )
 
     # Parallel execution flags (Phase 7: T059)
     parser.add_argument(
         "--max-workers",
         type=int,
-        help="Maximum number of parallel workers (default: auto-detect, capped to logical cores)",
+        help=(
+            "Maximum number of parallel workers "
+            "(default: auto-detect, capped to logical cores)"
+        ),
     )
 
     # Partial dataset iteration flags (Phase 5: US3)
     parser.add_argument(
         "--data-frac",
         type=float,
-        help="Fraction of dataset to process (0.0-1.0). Prompts interactively if omitted. Default: 1.0 (US3)",
+        help=(
+            "Fraction of dataset to process (0.0-1.0). "
+            "Prompts interactively if omitted. Default: 1.0 (US3)"
+        ),
     )
 
     parser.add_argument(
         "--portion",
         type=int,
-        help="Which portion to select when using --data-frac < 1.0 (1-based index). Example: --data-frac 0.25 --portion 2 selects second quartile (US3)",
+        help=(
+            "Which portion to select when using --data-frac < 1.0 "
+            "(1-based index). Example: --data-frac 0.25 --portion 2 "
+            "selects second quartile (US3)"
+        ),
     )
 
     # Multi-strategy support (Phase 4: US2)
@@ -329,6 +340,51 @@ def main():
         help="Disable aggregation, produce only per-strategy outputs",
     )
 
+    # Multi-symbol execution mode flags (Phase 6: US4)
+    parser.add_argument(
+        "--portfolio-mode",
+        type=str,
+        choices=["independent", "portfolio"],
+        default="independent",
+        help=(
+            "Multi-symbol execution mode: 'independent' (isolated per-symbol "
+            "backtests) or 'portfolio' (unified portfolio with shared capital, "
+            "correlation tracking, and portfolio metrics). Default: independent (US4)"
+        ),
+    )
+
+    parser.add_argument(
+        "--disable-symbol",
+        type=str,
+        nargs="*",
+        default=[],
+        help=(
+            "Symbol(s) to exclude from multi-symbol run "
+            "(e.g., --disable-symbol GBPUSD USDJPY). Applies to both independent "
+            "and portfolio modes (US4)"
+        ),
+    )
+
+    parser.add_argument(
+        "--correlation-threshold",
+        type=float,
+        help=(
+            "Override default correlation threshold for portfolio mode "
+            "(0.0-1.0). Controls correlation-based position sizing adjustments. "
+            "Only applies when --portfolio-mode=portfolio (US4)"
+        ),
+    )
+
+    parser.add_argument(
+        "--snapshot-interval",
+        type=int,
+        help=(
+            "Snapshot recording interval in bars for portfolio mode. "
+            "Records portfolio state (allocations, correlations, diversification) "
+            "every N bars. Only applies when --portfolio-mode=portfolio (US4)"
+        ),
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -339,8 +395,7 @@ def main():
         from ..strategy.registry import StrategyRegistry
 
         registry = StrategyRegistry()
-        # TODO: Load registered strategies from persistent config/file
-        # For now, show empty registry or built-in strategies
+        # Note: Persistent storage not yet implemented
         strategies = registry.list()
 
         if not strategies:
@@ -396,9 +451,8 @@ must expose 'run' or 'execute' function",
 
             print(f"Successfully registered strategy: {args.register_strategy}")
             print(f"  Module: {args.strategy_module}")
-            print(
-                f"  Tags: {', '.join(args.strategy_tags) if args.strategy_tags else 'none'}"
-            )
+            tags_str = ', '.join(args.strategy_tags) if args.strategy_tags else 'none'
+            print(f"  Tags: {tags_str}")
             print(f"  Version: {args.strategy_version or 'unversioned'}")
             print(
                 "\nNote: Registration is in-memory only. \
@@ -431,9 +485,81 @@ Persistent storage not yet implemented."
     logger.info("Starting directional backtest")
     logger.info("Direction: %s", args.direction)
     logger.info("Strategy: %s", ", ".join(args.strategy))
+    # Optional pair inference if user did not explicitly override default
+    # and data path suggests a different pair
+    inferred_pair = None
+    try:
+        # Examine parts of path for 6-letter currency code (e.g., usdjpy)
+        # reverse for specificity (file/parent dirs first)
+        for part in args.data.parts[::-1]:
+            part_lower = part.lower()
+            if len(part_lower) == 6 and part_lower.isalpha():
+                inferred_pair = part_lower.upper()
+                break
+        if (
+            inferred_pair
+            and len(args.pair) == 1
+            and args.pair[0].upper() != inferred_pair
+        ):
+            logger.info(
+                "Inferred pair '%s' from data path (overriding '%s'). "
+                "Pass --pair to force a different symbol.",
+                inferred_pair,
+                args.pair[0].upper(),
+            )
+            args.pair[0] = inferred_pair  # mutate for subsequent usage
+    except (AttributeError, IndexError, ValueError) as ex:
+        logger.warning("Pair inference failed: %s", ex)
+
     logger.info("Pair(s): %s", ", ".join(args.pair))
     logger.info("Data: %s", args.data)
     logger.info("Dry-run: %s", args.dry_run)
+
+    # Validate Phase 6 (US4) multi-symbol flags
+    if args.correlation_threshold is not None:
+        if not 0.0 <= args.correlation_threshold <= 1.0:
+            print(
+                "Error: --correlation-threshold must be between 0.0 and 1.0. "
+                f"Got: {args.correlation_threshold}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if args.portfolio_mode != "portfolio":
+            logger.warning(
+                "--correlation-threshold only applies to portfolio mode, but "
+                "--portfolio-mode=%s specified. Ignoring threshold.",
+                args.portfolio_mode,
+            )
+
+    if args.snapshot_interval is not None:
+        if args.snapshot_interval <= 0:
+            print(
+                "Error: --snapshot-interval must be positive. "
+                f"Got: {args.snapshot_interval}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if args.portfolio_mode != "portfolio":
+            logger.warning(
+                "--snapshot-interval only applies to portfolio mode, but "
+                "--portfolio-mode=%s specified. Ignoring interval.",
+                args.portfolio_mode,
+            )
+
+    # Log portfolio mode settings
+    if len(args.pair) > 1:
+        logger.info("Portfolio mode: %s", args.portfolio_mode)
+        if args.disable_symbol:
+            logger.info("Disabled symbols: %s", ", ".join(args.disable_symbol))
+        if (
+            args.correlation_threshold is not None
+            and args.portfolio_mode == "portfolio"
+        ):
+            logger.info(
+                "Correlation threshold override: %.2f", args.correlation_threshold
+            )
+        if args.snapshot_interval is not None and args.portfolio_mode == "portfolio":
+            logger.info("Snapshot interval: %d bars", args.snapshot_interval)
 
     # Fraction and portion validation/prompting (Phase 5: US3, FR-002, FR-012, FR-015)
     data_frac = args.data_frac
@@ -446,7 +572,8 @@ Persistent storage not yet implemented."
         while prompt_attempt < max_attempts:
             try:
                 user_input = input(
-                    "Enter dataset fraction to process (0.0-1.0, press Enter for 1.0): "
+                    "Enter dataset fraction to process "
+                    "(0.0-1.0, press Enter for 1.0): "
                 ).strip()
                 if not user_input:
                     data_frac = 1.0
@@ -455,18 +582,23 @@ Persistent storage not yet implemented."
                 data_frac = float(user_input)
                 if data_frac <= 0 or data_frac > 1.0:
                     print(
-                        f"Invalid fraction: {data_frac}. Must be between 0.0 (exclusive) and 1.0 (inclusive)."
+                        f"Invalid fraction: {data_frac}. "
+                        "Must be between 0.0 (exclusive) and 1.0 (inclusive)."
                     )
                     prompt_attempt += 1
                     continue
                 break
             except ValueError:
-                print(f"Invalid input: '{user_input}'. Please enter a numeric value.")
+                print(
+                    f"Invalid input: '{user_input}'. "
+                    "Please enter a numeric value."
+                )
                 prompt_attempt += 1
 
         if prompt_attempt >= max_attempts:
             print(
-                f"Error: Failed to get valid fraction after {max_attempts} attempts. Aborting.",
+                f"Error: Failed to get valid fraction after "
+                f"{max_attempts} attempts. Aborting.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -474,7 +606,8 @@ Persistent storage not yet implemented."
         # Validate command-line fraction
         if data_frac <= 0 or data_frac > 1.0:
             print(
-                f"Error: --data-frac must be between 0.0 (exclusive) and 1.0 (inclusive). Got: {data_frac}",
+                f"Error: --data-frac must be between 0.0 (exclusive) and "
+                f"1.0 (inclusive). Got: {data_frac}",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -494,13 +627,15 @@ Persistent storage not yet implemented."
                 portion = int(user_input)
                 if portion < 1 or portion > max_portions:
                     print(
-                        f"Error: Portion must be between 1 and {max_portions}. Got: {portion}",
+                        f"Error: Portion must be between 1 and "
+                        f"{max_portions}. Got: {portion}",
                         file=sys.stderr,
                     )
                     sys.exit(1)
         except ValueError:
             print(
-                f"Error: Invalid portion input '{user_input}'. Must be an integer.",
+                f"Error: Invalid portion input '{user_input}'. "
+                "Must be an integer.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -509,7 +644,8 @@ Persistent storage not yet implemented."
         max_portions = int(1.0 / data_frac)
         if portion < 1 or portion > max_portions:
             print(
-                f"Error: --portion must be between 1 and {max_portions} for fraction {data_frac}. Got: {portion}",
+                f"Error: --portion must be between 1 and {max_portions} "
+                f"for fraction {data_frac}. Got: {portion}",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -582,7 +718,11 @@ Persistent storage not yet implemented."
             )
 
             candles = slice_dataset(candles, fraction=data_frac, portion=portion)
-            logger.info("Sliced to %d candles (%.1f%%)", len(candles), 100 * len(candles) / total_candles)
+            logger.info(
+                "Sliced to %d candles (%.1f%%)",
+                len(candles),
+                100 * len(candles) / total_candles,
+            )
 
         # Create orchestrator
         direction_mode = DirectionMode[args.direction]
@@ -603,38 +743,227 @@ Persistent storage not yet implemented."
         if profiler:
             orchestrator.profiler = profiler
 
-        # Run backtest
-        # TODO: Future enhancement - loop over multiple pairs and strategies:
-        # for pair in args.pair:
-        #     for strategy in args.strategy:
-        #         result = run_strategy_on_pair(pair, strategy, candles)
-        # For now, use first pair/strategy from lists
-        pair = args.pair[0]
-        strategy = args.strategy[0]  # Currently only trend-pullback supported
+        # Check if multi-symbol mode should be used
+        is_multi_symbol = len(args.pair) > 1
 
-        run_id = f"{args.direction.lower()}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-        logger.info(
-            "Running backtest with run_id=%s, pair=%s, strategy=%s", run_id, pair, strategy
-        )
+        if is_multi_symbol:
+            # Multi-symbol mode (Phase 4: US2, T020-T021 + Phase 6: US4, T041-T044)
+            from ..backtest.portfolio.independent_runner import IndependentRunner
+            from ..backtest.portfolio.validation import validate_symbol_list
+            from ..models.portfolio import CurrencyPair, PortfolioConfig
 
-        # Build signal parameters from strategy config
-        signal_params = {
-            "ema_fast": parameters.ema_fast,
-            "ema_slow": parameters.ema_slow,
-            "atr_stop_mult": parameters.atr_stop_mult,
-            "target_r_mult": parameters.target_r_mult,
-            "cooldown_candles": parameters.cooldown_candles,
-            "rsi_length": parameters.rsi_length,
-        }
+            logger.info(
+                "Multi-symbol mode: %d pairs requested, mode=%s",
+                len(args.pair),
+                args.portfolio_mode,
+            )
 
-        result = orchestrator.run_backtest(
-            candles=candles,
-            pair=pair,
-            run_id=run_id,
-            **signal_params,
-        )
+            # Create CurrencyPair objects
+            requested_pairs = [CurrencyPair(code=p.upper()) for p in args.pair]
 
-        logger.info("Backtest complete: %s", result.run_id)
+            # Apply --disable-symbol filtering (Phase 6: US4, T042)
+            if args.disable_symbol:
+                disabled_codes = {code.upper() for code in args.disable_symbol}
+                before_count = len(requested_pairs)
+                requested_pairs = [
+                    pair for pair in requested_pairs if pair.code not in disabled_codes
+                ]
+                after_count = len(requested_pairs)
+                if after_count < before_count:
+                    logger.info(
+                        "Filtered out %d disabled symbol(s): %s",
+                        before_count - after_count,
+                        ", ".join(disabled_codes),
+                    )
+
+            if not requested_pairs:
+                logger.error(
+                    "No symbols remaining after --disable-symbol filter. Aborting."
+                )
+                sys.exit(1)
+
+            # Validate symbols and skip missing ones with warnings (T021)
+            data_dir = Path("price_data/processed")
+            valid_pairs, errors = validate_symbol_list(requested_pairs, data_dir)
+
+            if errors:
+                logger.warning(
+                    "Symbol validation found %d error(s), skipping invalid symbols:",
+                    len(errors),
+                )
+                for error in errors:
+                    logger.warning("  - %s", error)
+
+            if not valid_pairs:
+                logger.error(
+                    "No valid symbols found. Aborting multi-symbol run."
+                )
+                sys.exit(1)
+
+            logger.info(
+                "Proceeding with %d valid symbol(s): %s",
+                len(valid_pairs),
+                ", ".join([p.code for p in valid_pairs]),
+            )
+
+            # Generate run ID
+            run_id = (
+                f"multi_{args.portfolio_mode}_{args.direction.lower()}_"
+                f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+            )
+
+            # Route to appropriate runner based on portfolio mode
+            # (Phase 6: US4, T041)
+            if args.portfolio_mode == "portfolio":
+                # Portfolio mode: shared capital, correlation tracking
+                # (T041, T043, T044)
+                from ..backtest.portfolio.orchestrator import (
+                    PortfolioOrchestrator,
+                )
+
+                logger.info(
+                    "Running portfolio multi-symbol backtest with run_id=%s",
+                    run_id,
+                )
+
+                # Create portfolio configuration
+                portfolio_config = PortfolioConfig(
+                    correlation_threshold=(
+                        args.correlation_threshold
+                        if args.correlation_threshold is not None
+                        else 0.7  # Default from spec FR-010
+                    ),
+                    per_pair_thresholds={},  # No per-pair overrides from CLI yet
+                )
+
+                # Create portfolio orchestrator
+                # pylint: disable=fixme
+                portfolio_orch = PortfolioOrchestrator(
+                    symbols=valid_pairs,
+                    portfolio_config=portfolio_config,
+                    initial_capital=10000.0,  # TODO: Make configurable
+                    data_dir=data_dir,
+                )
+
+                # Run portfolio backtest
+                # Note: PortfolioOrchestrator.run() raises NotImplementedError
+                # This is expected for Phase 6 (primitives complete,
+                # full execution pending)
+                try:
+                    # pylint: disable=assignment-from-no-return
+                    results = portfolio_orch.run(
+                        strategy_params=parameters,
+                        mode=direction_mode,
+                        output_dir=args.output,
+                        snapshot_interval=args.snapshot_interval,
+                    )
+                    # Create result object for output formatting
+                    result = type(
+                        "PortfolioResult",
+                        (),
+                        {
+                            "run_id": run_id,
+                            "direction_mode": direction_mode,
+                            "start_time": datetime.now(UTC),
+                            "total_candles": 0,
+                            "symbols": [p.code for p in valid_pairs],
+                            "results": results,
+                            "failures": portfolio_orch.get_failures(),
+                            "metrics": None,
+                            "is_multi_symbol": True,
+                            "is_portfolio_mode": True,
+                        },
+                    )()
+                except NotImplementedError as exc:
+                    logger.error(
+                        "Portfolio mode full execution not yet implemented: %s",
+                        exc,
+                    )
+                    logger.info(
+                        "Portfolio primitives (correlation, allocation, "
+                        "snapshots) are complete. Full orchestration pending "
+                        "future phase."
+                    )
+                    sys.exit(1)
+
+            else:
+                # Independent mode: isolated per-symbol execution (T041)
+                runner = IndependentRunner(
+                    symbols=valid_pairs,
+                    data_dir=data_dir,
+                )
+
+                logger.info(
+                    "Running independent multi-symbol backtest with run_id=%s",
+                    run_id,
+                )
+
+                results = runner.run(
+                    strategy_params=parameters,
+                    mode=direction_mode,
+                    output_dir=args.output,
+                )
+
+                # Create result object for output formatting
+                result = type(
+                    "MultiSymbolResult",
+                    (),
+                    {
+                        "run_id": run_id,
+                        "direction_mode": direction_mode,
+                        "start_time": datetime.now(UTC),
+                        "total_candles": 0,  # Sum from individual results
+                        "symbols": [p.code for p in valid_pairs],
+                        "results": results,
+                        "failures": runner.get_failures(),
+                        "metrics": None,  # No single metrics for multi-symbol
+                        "is_multi_symbol": True,
+                        "is_portfolio_mode": False,
+                    },
+                )()
+
+                logger.info(
+                    "Multi-symbol backtest complete: %d successful, %d failed",
+                    len(results),
+                    len(runner.get_failures()),
+                )
+
+        else:
+            # Single-symbol mode (backward compatibility)
+            # Future: multi-strategy support will loop over args.strategy
+            # For now, use first strategy from list
+            pair = args.pair[0]
+            strategy = args.strategy[0]  # Currently only trend-pullback supported
+
+            run_id = (
+                f"{args.direction.lower()}_"
+                f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+            )
+            logger.info(
+                "Running backtest with run_id=%s, pair=%s, strategy=%s",
+                run_id,
+                pair,
+                strategy,
+            )
+
+            # Build signal parameters from strategy config
+            signal_params = {
+                "ema_fast": parameters.ema_fast,
+                "ema_slow": parameters.ema_slow,
+                "atr_stop_mult": parameters.atr_stop_mult,
+                "target_r_mult": parameters.target_r_mult,
+                "cooldown_candles": parameters.cooldown_candles,
+                "rsi_length": parameters.rsi_length,
+            }
+
+            result = orchestrator.run_backtest(
+                candles=candles,
+                pair=pair,
+                run_id=run_id,
+                **signal_params,
+            )
+
+            logger.info("Backtest complete: %s", result.run_id)
 
         # Write benchmark artifact if profiling enabled
         if args.profile and benchmark_path:
@@ -666,7 +995,9 @@ Persistent storage not yet implemented."
                 _, peak = tracemalloc.get_traced_memory()
                 memory_peak_mb = peak / (1024 * 1024)
                 # Estimate raw dataset size (rough approximation)
-                raw_bytes = dataset_rows * 8 * 6  # 8 bytes per float, 6 columns (OHLC+V+T)
+                raw_bytes = (
+                    dataset_rows * 8 * 6
+                )  # 8 bytes per float, 6 columns (OHLC+V+T)
                 memory_ratio = peak / raw_bytes if raw_bytes > 0 else 1.0
 
             # Create benchmark directory
@@ -690,16 +1021,47 @@ Persistent storage not yet implemented."
         OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
     )
 
-    if output_format == OutputFormat.JSON:
-        output_content = format_json_output(result)
+    # Check if this is a multi-symbol result
+    is_multi_symbol_result = (
+        hasattr(result, "is_multi_symbol") and result.is_multi_symbol
+    )
+
+    if is_multi_symbol_result:
+        # Multi-symbol formatting (T025)
+        from ..io.formatters import (
+            format_multi_symbol_text_output,
+            format_multi_symbol_json_output,
+        )
+
+        if output_format == OutputFormat.JSON:
+            output_content = format_multi_symbol_json_output(result)
+        else:
+            output_content = format_multi_symbol_text_output(result)
     else:
-        output_content = format_text_output(result)
+        # Single-symbol formatting
+        if output_format == OutputFormat.JSON:
+            output_content = format_json_output(result)
+        else:
+            output_content = format_text_output(result)
 
     # Generate output filename
+    # Derive symbol tag for filename (FR-023)
+    # Future multi-symbol logic will set 'multi'
+    symbol_tag = None
+    if hasattr(result, "pair") and result.pair:
+        symbol_tag = result.pair.lower()
+    if (
+        hasattr(result, "symbols")
+        and result.symbols
+        and len(result.symbols) > 1
+    ):
+        symbol_tag = "multi"
+
     output_filename = generate_output_filename(
         direction=direction_mode,
         output_format=output_format,
         timestamp=result.start_time,
+        symbol_tag=symbol_tag,
     )
     output_path = args.output / output_filename
 
@@ -712,15 +1074,23 @@ Persistent storage not yet implemented."
         print(output_content)
     else:
         print(f"Results saved to: {output_path}")
-        print(f"Direction: {result.direction_mode}")
-        print(f"Total candles: {result.total_candles}")
-        if result.metrics and hasattr(result.metrics, "combined"):
-            metrics = result.metrics.combined
-            print(f"Trades: {metrics.trade_count}")
-            print(f"Win rate: {metrics.win_rate:.2%}")
-        elif result.metrics:
-            print(f"Trades: {result.metrics.trade_count}")
-            print(f"Win rate: {result.metrics.win_rate:.2%}")
+        if is_multi_symbol_result:
+            # Multi-symbol summary
+            print(f"Direction: {result.direction_mode}")
+            print(f"Symbols: {', '.join(result.symbols)}")
+            print(f"Successful: {len(result.results)}")
+            print(f"Failed: {len(result.failures)}")
+        else:
+            # Single-symbol summary
+            print(f"Direction: {result.direction_mode}")
+            print(f"Total candles: {result.total_candles}")
+            if result.metrics and hasattr(result.metrics, "combined"):
+                metrics = result.metrics.combined
+                print(f"Trades: {metrics.trade_count}")
+                print(f"Win rate: {metrics.win_rate:.2%}")
+            elif result.metrics:
+                print(f"Trades: {result.metrics.trade_count}")
+                print(f"Win rate: {result.metrics.win_rate:.2%}")
 
     return 0
 

@@ -18,13 +18,21 @@ logger = logging.getLogger(__name__)
 
 
 def generate_output_filename(
-    direction: DirectionMode, output_format: OutputFormat, timestamp: datetime
+    direction: DirectionMode,
+    output_format: OutputFormat,
+    timestamp: datetime,
+    symbol_tag: str | None = None,
 ) -> str:
     """
     Generate standardized filename for backtest output.
 
     Produces filenames in the format:
-    backtest_{direction}_{YYYYMMDD}_{HHMMSS}.{ext}
+    backtest_{direction}_{symbol|multi}_{YYYYMMDD}_{HHMMSS}.{ext}
+
+    If `symbol_tag` is provided it is used directly (expected lowercase, e.g. 'eurusd').
+    If `symbol_tag` is not provided the legacy format WITHOUT symbol is used for 
+    backward compatibility (will be deprecated). Callers implementing multi-symbol 
+    MUST pass 'multi' for aggregated runs.
 
     Args:
         direction: Direction mode of the backtest (LONG/SHORT/BOTH).
@@ -47,7 +55,11 @@ def generate_output_filename(
     time_str = timestamp.strftime("%H%M%S")
     ext = "json" if output_format == OutputFormat.JSON else "txt"
 
-    filename = f"backtest_{direction_str}_{date_str}_{time_str}.{ext}"
+    if symbol_tag:
+        filename = f"backtest_{direction_str}_{symbol_tag}_{date_str}_{time_str}.{ext}"
+    else:
+        # Legacy fallback (pre-FR-023) - no symbol component
+        filename = f"backtest_{direction_str}_{date_str}_{time_str}.{ext}"
     logger.debug("Generated filename: %s", filename)
 
     return filename
@@ -89,6 +101,12 @@ def format_text_output(result: BacktestResult) -> str:
     lines.append("-" * 60)
     lines.append(f"Run ID:           {result.run_id}")
     lines.append(f"Direction Mode:   {result.direction_mode}")
+    # Symbol(s) line (FR-023) - BacktestResult may have attribute 'pair' or 'symbols'
+    if hasattr(result, "symbols") and isinstance(getattr(result, "symbols"), list):
+        syms = getattr(result, "symbols")
+        lines.append(f"Symbols:         {', '.join(syms)}")
+    elif hasattr(result, "pair"):
+        lines.append(f"Symbol:          {getattr(result, 'pair')}")
     lines.append(f"Start Time:       {result.start_time.isoformat()}")
     lines.append(f"End Time:         {result.end_time.isoformat()}")
     duration = (result.end_time - result.start_time).total_seconds()
@@ -504,3 +522,110 @@ def _serialize_single_metrics(metrics) -> dict:
         "latency_p95_ms": metrics.latency_p95_ms,
         "latency_mean_ms": metrics.latency_mean_ms,
     }
+
+
+def format_multi_symbol_text_output(multi_result) -> str:
+    """Format multi-symbol independent backtest results as text.
+
+    Args:
+        multi_result: Object with attributes: run_id, direction_mode, start_time,
+                     symbols, results (dict[str, BacktestResult]), failures
+
+    Returns:
+        Formatted text string
+    """
+    from ..backtest.portfolio.results import MultiSymbolResultsAggregator
+
+    lines = []
+    lines.append("=" * 60)
+    lines.append("INDEPENDENT MULTI-SYMBOL BACKTEST RESULTS")
+    lines.append("=" * 60)
+    lines.append("")
+
+    # Run metadata
+    lines.append("RUN METADATA")
+    lines.append("-" * 60)
+    lines.append(f"Run ID:           {multi_result.run_id}")
+    lines.append(f"Direction Mode:   {multi_result.direction_mode}")
+    lines.append(f"Symbols:          {', '.join(multi_result.symbols)}")
+    lines.append(f"Start Time:       {multi_result.start_time.isoformat()}")
+    lines.append("")
+
+    # Summary statistics
+    aggregator = MultiSymbolResultsAggregator(multi_result.results)
+    summary = aggregator.get_aggregate_summary()
+
+    lines.append("AGGREGATE SUMMARY")
+    lines.append("-" * 60)
+    lines.append(f"Total Symbols:    {summary['total_symbols']}")
+    lines.append(f"Total Trades:     {summary['total_trades']}")
+    lines.append(f"Avg Win Rate:     {summary['average_win_rate']:.2%}")
+    lines.append(f"Total P&L:        ${summary['total_pnl']:.2f}")
+    lines.append("")
+
+    # Per-symbol breakdown
+    lines.append("PER-SYMBOL BREAKDOWN")
+    lines.append("-" * 60)
+
+    for symbol in sorted(multi_result.symbols):
+        if symbol in multi_result.results:
+            symbol_summary = aggregator.get_symbol_summary(symbol)
+
+            lines.append(f"\n{symbol}:")
+            lines.append(f"  Trades:         {symbol_summary['total_trades']}")
+            if symbol_summary['total_trades'] > 0:
+                lines.append(f"  Win Rate:       {symbol_summary['win_rate']:.2%}")
+            lines.append(f"  Final Balance:  ${symbol_summary['final_balance']:.2f}")
+        elif symbol in multi_result.failures:
+            lines.append(f"\n{symbol}:")
+            lines.append("  Status:         FAILED")
+            lines.append(f"  Error:          {multi_result.failures[symbol]}")
+
+    lines.append("")
+
+    # Failures summary
+    if multi_result.failures:
+        lines.append("FAILURES")
+        lines.append("-" * 60)
+        for symbol, error in multi_result.failures.items():
+            lines.append(f"  {symbol}: {error}")
+        lines.append("")
+
+    lines.append("=" * 60)
+
+    return "\n".join(lines)
+
+
+def format_multi_symbol_json_output(multi_result) -> str:
+    """Format multi-symbol independent backtest results as JSON.
+
+    Args:
+        multi_result: Object with attributes: run_id, direction_mode, start_time,
+                     symbols, results, failures
+
+    Returns:
+        JSON string
+    """
+    from ..backtest.portfolio.results import MultiSymbolResultsAggregator
+
+    aggregator = MultiSymbolResultsAggregator(multi_result.results)
+    summary = aggregator.get_aggregate_summary()
+    per_symbol = aggregator.get_per_symbol_summary()
+
+    data = {
+        "run_id": multi_result.run_id,
+        "direction_mode": str(multi_result.direction_mode),
+        "start_time": multi_result.start_time.isoformat(),
+        "symbols": multi_result.symbols,
+        "mode": "independent",
+        "summary": {
+            "total_symbols": summary['total_symbols'],
+            "total_trades": summary['total_trades'],
+            "average_win_rate": summary['average_win_rate'],
+            "total_pnl": summary['total_pnl'],
+        },
+        "per_symbol": per_symbol,
+        "failures": multi_result.failures,
+    }
+
+    return json.dumps(data, indent=2)

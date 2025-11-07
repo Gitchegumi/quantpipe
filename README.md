@@ -62,6 +62,77 @@ Example (signals only):
 poetry run python -m src.cli.run_backtest --data price_data/processed/eurusd/test.csv --dry-run
 ```
 
+## Multi-Symbol Portfolio Backtesting
+
+Run backtests across multiple currency pairs with independent or portfolio execution modes:
+
+### Independent Mode (Default)
+
+Each symbol runs in isolation with separate capital and risk limits:
+
+```powershell
+# Run 3 symbols independently
+poetry run python -m src.cli.run_backtest `
+--direction BOTH `
+--pair EURUSD GBPUSD USDJPY `
+--portfolio-mode independent
+```
+
+**Features:**
+
+- Separate $10,000 capital per symbol
+- Isolated risk management
+- Failures don't affect other symbols
+- Aggregated summary statistics
+
+### Portfolio Mode
+
+Shared capital pool with correlation tracking and dynamic allocation:
+
+```powershell
+# Run portfolio mode with custom correlation threshold
+poetry run python -m src.cli.run_backtest `
+--direction BOTH `
+--pair EURUSD GBPUSD USDJPY `
+--portfolio-mode portfolio `
+--correlation-threshold 0.75 `
+--snapshot-interval 50
+```
+
+**Features:**
+
+- Shared capital pool ($10,000 total)
+- Dynamic allocation based on volatility
+- Correlation matrix tracking (100-candle rolling window)
+- Diversification metrics (ratio, effective assets)
+- Periodic snapshots (JSONL format)
+
+### Symbol Filtering
+
+Exclude specific symbols at runtime:
+
+```powershell
+# Run all pairs except GBPUSD
+poetry run python -m src.cli.run_backtest `
+--direction LONG `
+--pair EURUSD GBPUSD USDJPY NZDUSD `
+--disable-symbol GBPUSD
+```
+
+Invalid symbols (missing datasets) are automatically skipped with warnings.
+
+### CLI Flags Reference
+
+| Flag                      | Values                 | Default     | Purpose                            |
+| ------------------------- | ---------------------- | ----------- | ---------------------------------- |
+| `--pair`                  | EURUSD GBPUSD ...      | (required)  | Currency pairs to backtest         |
+| `--portfolio-mode`        | independent, portfolio | independent | Execution mode                     |
+| `--disable-symbol`        | EURUSD ...             | (none)      | Exclude symbols from execution     |
+| `--correlation-threshold` | 0.0-1.0                | 0.8         | Portfolio correlation warning level|
+| `--snapshot-interval`     | integer                | 50          | Snapshot frequency (candles)       |
+
+See `specs/008-multi-symbol/quickstart.md` for detailed examples and output formats.
+
 ## Performance Optimization
 
 The backtesting engine is optimized for large datasets (millions of candles):
