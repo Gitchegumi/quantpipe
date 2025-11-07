@@ -80,10 +80,10 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 ## Phase 6: User Story US4 (Selection & Filtering)
 
 - [X] T041 [US4] Implement CLI `--portfolio-mode` flag enumeration (independent|portfolio) in `src/cli/run_backtest.py`
-- [ ] T042 [P] [US4] Implement CLI symbol exclusion flag `--disable-symbol` logic in `independent_runner.py` & `orchestrator.py`
-- [ ] T043 [US4] Implement `--correlation-threshold` override plumbed to `correlation_service.py`
-- [ ] T044 [US4] Implement `--snapshot-interval` flag wired to snapshot logger
-- [ ] T045 [US4] Add integration test for selection filters `tests/integration/test_selection_filters.py`
+- [X] T042 [P] [US4] Implement CLI symbol exclusion flag `--disable-symbol` logic in `independent_runner.py` & `orchestrator.py`
+- [X] T043 [US4] Implement `--correlation-threshold` override plumbed to `correlation_service.py`
+- [X] T044 [US4] Implement `--snapshot-interval` flag wired to snapshot logger
+- [X] T045 [US4] Add integration test for selection filters `tests/integration/test_selection_filters.py`
 - [ ] T046 [US4] Add test for unknown symbol graceful abort `tests/unit/portfolio/test_unknown_symbol_abort.py`
 - [ ] T047 [US4] Update quickstart with filtering examples (`quickstart.md`)
 
