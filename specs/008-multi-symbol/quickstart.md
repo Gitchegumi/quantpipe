@@ -342,34 +342,225 @@ Examples:
 - `backtest_long_eurusd_20251106_123045.txt`
 - `backtest_both_multi_20251106_123045.json` (future multi-symbol)
 
-## 8. Planned New Flags (Design Only)
+## 8. CLI Flags & Filtering (Phase 6: Implemented)
 
-(Not yet wired into CLI — reserved for Phase 2/3 implementation.)
+The CLI now supports runtime filtering and configuration via command-line flags.
+
+### Portfolio Mode Selection
+
+Switch between independent and portfolio execution modes:
+
+```powershell
+# Independent mode (default): each symbol isolated
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode independent
+
+# Portfolio mode: shared capital, correlation tracking
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode portfolio
+```
+
+**Independent mode:**
+
+- Each symbol has separate capital ($10,000 default)
+- Risk limits applied per symbol
+- No correlation tracking
+- Failures don't affect other symbols
+
+**Portfolio mode:**
+
+- Shared capital pool ($10,000 total)
+- Dynamic allocation based on volatility/correlation
+- Correlation matrix updated each candle
+- Failed symbols excluded from allocation
+
+### Symbol Filtering
+
+Exclude specific symbols at runtime without modifying configuration:
+
+```powershell
+# Run all specified symbols
+poetry run python -m src.cli.run_backtest \
+--direction LONG \
+--pair EURUSD GBPUSD USDJPY
+
+# Exclude GBPUSD (useful for A/B testing or isolating failures)
+poetry run python -m src.cli.run_backtest \
+--direction LONG \
+--pair EURUSD GBPUSD USDJPY \
+--disable-symbol GBPUSD
+```
+
+Result: Only EURUSD and USDJPY execute. GBPUSD is filtered before validation.
+
+**Multiple exclusions:**
+
+```powershell
+poetry run python -m src.cli.run_backtest \
+--direction SHORT \
+--pair EURUSD GBPUSD USDJPY NZDUSD \
+--disable-symbol GBPUSD NZDUSD
+```
+
+### Correlation Threshold Override
+
+Customize correlation threshold for portfolio mode:
+
+```powershell
+# Default threshold: 0.8
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode portfolio
+
+# Stricter threshold: 0.7 (trigger warnings earlier)
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode portfolio \
+--correlation-threshold 0.7
+
+# Relaxed threshold: 0.9 (allow higher correlation)
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode portfolio \
+--correlation-threshold 0.9
+```
+
+**Validation:**
+
+- Must be between 0.0 and 1.0
+- Values outside range trigger error and abort
+- Threshold applies to all symbol pairs globally
+
+**Warning behavior:**
+
+When correlation exceeds threshold:
+
+```text
+WARNING: Correlation between EURUSD and GBPUSD (0.85) exceeds threshold (0.70)
+```
+
+### Snapshot Interval Override
+
+Control portfolio snapshot frequency:
+
+```powershell
+# Default interval: 50 candles
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode portfolio
+
+# More frequent snapshots: every 20 candles
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode portfolio \
+--snapshot-interval 20
+
+# Less frequent snapshots: every 100 candles
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode portfolio \
+--snapshot-interval 100
+```
+
+**Validation:**
+
+- Must be positive integer
+- Zero or negative values trigger error
+- Snapshot file grows proportionally with frequency
+
+**Output location:**
+
+```text
+results/snapshots/<run_id>.jsonl
+```
+
+**Snapshot contents:**
+
+```json
+{
+  "timestamp": "2025-11-06T14:30:00Z",
+  "candle_index": 50,
+  "positions": {
+    "EURUSD": {"size": 100000, "unrealized_pnl": 123.45},
+    "GBPUSD": {"size": 50000, "unrealized_pnl": -45.67}
+  },
+  "correlation_matrix": {
+    "EURUSD_GBPUSD": 0.75,
+    "EURUSD_USDJPY": 0.12,
+    "GBPUSD_USDJPY": 0.08
+  },
+  "diversification_ratio": 1.42
+}
+```
+
+### Combined Filtering Example
+
+All flags work together:
+
+```powershell
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY NZDUSD \
+--portfolio-mode portfolio \
+--disable-symbol NZDUSD \
+--correlation-threshold 0.75 \
+--snapshot-interval 30
+```
+
+**Result:**
+
+- Portfolio mode with shared capital
+- Only EURUSD, GBPUSD, USDJPY execute (NZDUSD excluded)
+- Correlation warnings at 0.75 threshold
+- Snapshots every 30 candles
+
+### Flag Summary
+
+| Flag                              | Type   | Default      | Purpose                                          |
+| --------------------------------- | ------ | ------------ | ------------------------------------------------ |
+| `--portfolio-mode`                | str    | independent  | Execution mode: `independent` or `portfolio`     |
+| `--disable-symbol`                | str(s) | (none)       | Exclude symbols from execution                   |
+| `--correlation-threshold`         | float  | 0.8          | Portfolio correlation warning threshold (0.0-1.0)|
+| `--snapshot-interval`             | int    | 50           | Portfolio snapshot frequency (candles)           |
+
+## 9. Planned New Flags (Design Only)
+
+(Not yet wired into CLI — reserved for future implementation.)
 
 | Flag                              | Purpose                                                  |
 | --------------------------------- | -------------------------------------------------------- |
-| `--portfolio-mode`                | Switch between `independent` and `portfolio` aggregation |
-| `--snapshot-interval <int>`       | Override default 50-candle snapshot interval             |
-| `--correlation-threshold <float>` | Global correlation cutoff (default 0.8)                  |
 | `--allocation-log`                | Emit allocation decisions at INFO level                  |
-| `--disable-symbol <code>`         | Exclude specific symbol at runtime (isolation test)      |
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
-| Issue                 | Cause                             | Resolution                                                      |
-| --------------------- | --------------------------------- | --------------------------------------------------------------- |
-| Data file error       | Path missing or format wrong      | Verify CSV header or run conversion automatically (done by CLI) |
-| Win rate shows `None` | Division by zero due to no trades | Use BOTH direction or larger dataset                            |
-| Memory spike          | Large candle ingestion            | Profile with `--profile` and compare against baseline formula   |
+| Issue                       | Cause                             | Resolution                                                      |
+| --------------------------- | --------------------------------- | --------------------------------------------------------------- |
+| Data file error             | Path missing or format wrong      | Verify CSV header or run conversion automatically (done by CLI) |
+| Win rate shows `None`       | Division by zero due to no trades | Use BOTH direction or larger dataset                            |
+| Memory spike                | Large candle ingestion            | Profile with `--profile` and compare against baseline formula   |
+| Symbol validation failure   | Missing dataset files             | Check `price_data/processed/{symbol}/processed.csv` exists      |
+| Correlation threshold error | Value outside 0.0-1.0 range       | Use valid threshold between 0.0 and 1.0                         |
+| Snapshot interval error     | Zero or negative value            | Use positive integer (e.g., 20, 50, 100)                        |
 
-## 10. Next Steps
+## 11. Next Steps
 
-1. Implement multi-pair loop & ingestion bundle.
-2. Wire correlation & allocation engine (`AllocationRequest`/`AllocationResponse`).
-3. Add snapshot emission with JSONL writer.
-4. Introduce `--portfolio-mode` flag and allocation logging.
+1. ✅ Implement multi-pair loop & ingestion bundle.
+2. ✅ Wire correlation & allocation engine (`AllocationRequest`/`AllocationResponse`).
+3. ✅ Add snapshot emission with JSONL writer.
+4. ✅ Introduce `--portfolio-mode` flag and CLI filtering options.
+5. Future: Add `--allocation-log` for debug-level allocation decisions.
 
-## 11. References
+## 12. References
 
 - `data-model.md`: Entity definitions.
 - `contracts/portfolio-allocation.yaml`: Request/response schema.

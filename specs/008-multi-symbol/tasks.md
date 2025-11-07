@@ -85,7 +85,7 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 - [X] T044 [US4] Implement `--snapshot-interval` flag wired to snapshot logger
 - [X] T045 [US4] Add integration test for selection filters `tests/integration/test_selection_filters.py`
 - [X] T046 [US4] Add test for unknown symbol graceful abort `tests/unit/portfolio/test_unknown_symbol_abort.py`
-- [ ] T047 [US4] Update quickstart with filtering examples (`quickstart.md`)
+- [X] T047 [US4] Update quickstart with filtering examples (`quickstart.md`)
 
 ## Phase 7: Polish & Cross-Cutting
 
