@@ -28,16 +28,16 @@ Refactor ingestion to produce only normalized core OHLCV + `is_gap` rapidly (≤
 | Principle | Compliance | Notes |
 |-----------|------------|-------|
 | I Strategy-First | ✓ | Decouples data from strategy logic; strategies opt-in to indicators. |
-| II Risk Mgmt | N/A (feature infra) | Does not alter risk enforcement; no violations. |
-| III Backtesting | ✓ | Provides faster data path enabling more frequent backtests; maintains data integrity. |
-| IV Monitoring | ✓ | Stage-level progress compliance; avoids noisy per-row logging. |
-| V Data Integrity | ✓ | Gap handling explicit (`is_gap`); duplicates resolved & logged; UTC enforcement. |
-| VI Data Provenance | ✓ | No change to manifest process; performance metrics can reference manifest. |
-| VII Parsimony | ✓ | Removes unnecessary indicators from ingestion; only requested computed. |
-| VIII Code Quality | ✓ | Plan enforces docstrings, type hints; new modules follow standards. |
-| IX Dependencies | ✓ | No new mandatory deps; optional future GPU path deferred. |
-| X Linting/Automation | ✓ | Will add tests & ensure lint passes; progress bars limited. |
-| XI Commit Format | ✓ | Will use feat(009): ..., test(009): ... etc. |
+| II Risk Mgmt | ✓ (indirect) | Data integrity supports accurate risk metrics; no strategy risk logic altered. |
+| III Backtesting | ✓ | Faster ingestion increases test iteration frequency; integrity preserved. |
+| IV Monitoring | ✓ | Defined progress stages (read, sort, dedupe, gaps, finalize); limited updates. |
+| V Data Integrity | ✓ | Standardized `is_gap` column; deterministic duplicates & UTC enforcement. |
+| VI Data Provenance | ✓ | Metrics & artifacts reference manifest; benchmark JSON planned. |
+| VII Parsimony | ✓ | Removes unnecessary indicator precompute; selective enrichment only. |
+| VIII Code Quality | ✓ | Docstrings, type hints, immutability & registry patterns; logging standard enforced (script task). |
+| IX Dependencies | ✓ | No new mandatory dependencies; Arrow optional; dependency check task planned. |
+| X Linting/Automation | ✓ | Static loop scan & logging format scan added; benchmark artifacts integrated. |
+| XI Commit Format | ✓ | Will use semantic format (feat/test/docs) referencing tasks (e.g., T087). |
 
 Gate Result: PASS – proceed to Phase 0.
 
@@ -103,12 +103,12 @@ Re-evaluated principles:
 
 | Principle | Status | Notes (Post-Design) |
 |-----------|--------|---------------------|
-| I Strategy-First | ✓ | Enrichment layer fully separated; no strategy logic in ingestion contracts. |
-| V Data Integrity | ✓ | Contracts formalize duplicate + gap + UTC enforcement steps. |
-| VII Parsimony | ✓ | Quickstart demonstrates minimal core ingestion path without indicators. |
-| IX Dependencies | ✓ | No new mandatory dependencies introduced by artifacts. |
-| X Linting/Automation | ✓ | Markdown lint adjustments applied (contracts, quickstart). |
-| XI Commit Format | ✓ | Pending implementation; no conflicts introduced. |
+| I Strategy-First | ✓ | Enrichment layer separated; ingestion free of indicator logic (audit planned). |
+| V Data Integrity | ✓ | Contracts formalize duplicate + gap + UTC enforcement steps; standardized `is_gap`. |
+| VII Parsimony | ✓ | Minimal ingestion path documented; enrichment optional. |
+| IX Dependencies | ✓ | Dependency check script scheduled; no new mandatory deps. |
+| X Linting/Automation | ✓ | Added logging formatting enforcement & per-row loop scan. |
+| XI Commit Format | ✓ | Semantic commit usage planned with task references. |
 
 New Complexity Justifications:
 
