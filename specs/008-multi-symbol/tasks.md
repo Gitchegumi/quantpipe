@@ -24,37 +24,37 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 
 ## Phase 1: Setup
 
-- [ ] T001 Ensure poetry environment ready (`poetry install`) and baseline tests pass
-- [ ] T002 Add placeholder module directory `src/backtest/portfolio/` for upcoming components
-- [ ] T003 Create `src/backtest/portfolio/__init__.py` to establish package
-- [ ] T004 Verify existing single-symbol CLI run still passes after new directories
+- [X] T001 Ensure poetry environment ready (`poetry install`) and baseline tests pass
+- [X] T002 Add placeholder module directory `src/backtest/portfolio/` for upcoming components
+- [X] T003 Create `src/backtest/portfolio/__init__.py` to establish package
+- [X] T004 Verify existing single-symbol CLI run still passes after new directories
 
 ## Phase 2: Foundational
 
-- [ ] T005 Implement entity models in `src/models/portfolio.py` (CurrencyPair, SymbolConfig, PortfolioConfig)
-- [ ] T006 Add correlation data classes in `src/models/correlation.py` (CorrelationWindowState, CorrelationMatrix)
-- [ ] T007 Implement allocation request/response pydantic models in `src/models/allocation.py`
-- [ ] T008 Add runtime failure event model to `src/models/events.py` (RuntimeFailureEvent)
-- [ ] T009 [P] Create validation utilities `src/backtest/portfolio/validation.py` (symbol existence, dataset overlap)
-- [ ] T010 Add edge case handling stubs in `src/backtest/portfolio/errors.py` (custom exceptions)
-- [ ] T011 Implement portfolio snapshot record model in `src/models/snapshots.py` (PortfolioSnapshotRecord)
-- [ ] T012 [P] Add unit tests for models in `tests/unit/portfolio/test_models.py`
+- [X] T005 Implement entity models in `src/models/portfolio.py` (CurrencyPair, SymbolConfig, PortfolioConfig)
+- [X] T006 Add correlation data classes in `src/models/correlation.py` (CorrelationWindowState, CorrelationMatrix)
+- [X] T007 Implement allocation request/response pydantic models in `src/models/allocation.py`
+- [X] T008 Add runtime failure event model to `src/models/events.py` (RuntimeFailureEvent)
+- [X] T009 [P] Create validation utilities `src/backtest/portfolio/validation.py` (symbol existence, dataset overlap)
+- [X] T010 Add edge case handling stubs in `src/backtest/portfolio/errors.py` (custom exceptions)
+- [X] T011 Implement portfolio snapshot record model in `src/models/snapshots.py` (PortfolioSnapshotRecord)
+- [X] T012 [P] Add unit tests for models in `tests/unit/portfolio/test_models.py`
 
 ## Phase 3: User Story US1 (Single Symbol Regression)
 
-- [ ] T013 [US1] Add regression test fixture for EURUSD baseline dataset in `tests/fixtures/eurusd_single.csv`
-- [ ] T014 [US1] Add regression test `tests/integration/test_single_symbol_regression.py` comparing metrics vs saved baseline
-- [ ] T015 [US1] Verify filename pattern unchanged for single-symbol run (test in `tests/unit/test_filename_single_symbol.py`)
-- [ ] T016 [US1] Implement manifest extension for single-symbol run in `src/io/manifest.py`
-- [ ] T017 [US1] Update README or docs note referencing maintained single-symbol behavior (`docs/backtesting.md`)
+- [X] T013 [US1] Add regression test fixture for EURUSD baseline dataset in `tests/fixtures/eurusd_single.csv`
+- [X] T014 [US1] Add regression test `tests/integration/test_single_symbol_regression.py` comparing metrics vs saved baseline
+- [X] T015 [US1] Verify filename pattern unchanged for single-symbol run (test in `tests/unit/test_filename_single_symbol.py`)
+- [X] T016 [US1] Implement manifest extension for single-symbol run in `src/io/manifest.py`
+- [X] T017 [US1] Update README or docs note referencing maintained single-symbol behavior (`docs/backtesting.md`)
 
 ## Phase 4: User Story US2 (Independent Multi-Symbol Mode)
 
-- [ ] T018 [P] [US2] Implement multi-symbol loop adapter in `src/backtest/portfolio/independent_runner.py`
-- [ ] T019 [US2] Add isolated per-symbol result aggregator in `src/backtest/portfolio/results.py`
+- [X] T018 [P] [US2] Implement multi-symbol loop adapter in `src/backtest/portfolio/independent_runner.py`
+- [X] T019 [US2] Add isolated per-symbol result aggregator in `src/backtest/portfolio/results.py`
 - [ ] T020 [US2] Extend CLI parsing for multiple pairs (already partially present) refine logic in `src/cli/run_backtest.py`
 - [ ] T021 [US2] Add validation: missing symbols → skip with warning (`validation.py`)
-- [ ] T022 [P] [US2] Implement risk isolation checks for independent mode in `src/backtest/portfolio/risk_isolation.py`
+- [X] T022 [P] [US2] Implement risk isolation checks for independent mode in `src/backtest/portfolio/risk_isolation.py`
 - [ ] T023 [US2] Add integration test for 3-symbol independent run `tests/integration/test_independent_three_symbols.py`
 - [ ] T024 [US2] Add test: one symbol risk breach halts only that symbol `tests/unit/portfolio/test_independent_risk_halt.py`
 - [ ] T025 [US2] Extend output artifact writing to include Symbols line for multi (`src/io/formatters.py`)

@@ -63,6 +63,27 @@ This document explains how datasets are prepared and how the backtesting framewo
 | Single run | `src.cli.run_backtest`       | Run on any CSV file                                 |
 | Split-mode | `src.cli.run_split_backtest` | Automatically evaluate test & validation partitions |
 
+### Single-Symbol Baseline Behavior
+
+The backtesting framework maintains full backward compatibility for single-symbol
+runs. All existing single-symbol functionality continues to work unchanged:
+
+- **Filename patterns**: Single-symbol outputs use the established naming convention
+  `backtest_{direction}_{YYYYMMDD}_{HHMMSS}.{ext}` without symbol tags (for backward
+  compatibility). Symbol tags are optional for single-symbol runs.
+
+- **Metrics calculations**: All metrics (win rate, average R, max drawdown, etc.)
+  are computed using the same algorithms as before multi-symbol support.
+
+- **Determinism**: Single-symbol runs produce identical results across repeated
+  executions with the same inputs and parameters.
+
+- **Output formats**: Both text and JSON output formats remain unchanged.
+
+Multi-symbol functionality (introduced in feature 008-multi-symbol) is purely
+additive and does not modify single-symbol execution paths. Regression tests
+ensure this invariant is maintained.
+
 ### Example Split Run
 
 ```powershell
