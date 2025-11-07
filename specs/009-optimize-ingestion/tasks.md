@@ -1,0 +1,172 @@
+# Tasks: Optimize & Decouple Ingestion (Spec 009)
+
+Feature: Optimize & Decouple Ingestion Process (`009-optimize-ingestion`)
+
+MVP Scope: Deliver User Story 1 (Fast Core Ingestion) with performance baseline (≤120s) and deterministic duplicate/gap handling.
+
+---
+
+## Phase 1: Setup
+
+(Repository already bootstrapped; these tasks ensure environment + baseline measurement & shared conventions.)
+
+- [ ] T001 Ensure Arrow backend enabled default where available (set pandas options) in `src/io/arrow_config.py`
+- [ ] T002 Add performance benchmark raw data manifest (baseline dataset reference) in `tests/performance/fixtures/README.md`
+- [ ] T003 Create timing + memory sampling utility skeleton in `src/io/perf_utils.py`
+- [ ] T004 Add hash utility for core immutability verification in `src/io/hash_utils.py`
+- [ ] T005 Add logging constants (progress stage names) in `src/io/logging_constants.py`
+- [ ] T006 Create placeholder ingestion module file (will be filled in US1) at `src/io/ingestion.py`
+- [ ] T007 Create placeholder registry package `src/indicators/registry/__init__.py`
+- [ ] T008 Add stub enrich module (will be filled in US2) at `src/indicators/enrich.py`
+- [ ] T009 Add empty performance benchmark script placeholder at `tests/performance/benchmark_ingestion.py`
+- [ ] T010 Add integration test placeholder at `tests/integration/test_ingest_then_enrich_pipeline.py`
+- [ ] T011 Add README for indicators package at `src/indicators/README.md`
+
+## Phase 2: Foundational (Shared Utilities / Blocking Prereqs)
+
+- [ ] T012 Implement cadence interval computation + expected row count helper in `src/io/cadence.py`
+- [ ] T013 Implement duplicate detection + resolution (keep-first) helper in `src/io/duplicates.py`
+- [ ] T014 Implement gap detection & index reindex helper (no fill yet) in `src/io/gaps.py`
+- [ ] T015 Implement gap fill synthesizer (vectorized insertion + flag) in `src/io/gap_fill.py`
+- [ ] T016 Implement numeric downcast utility with safe precision checks in `src/io/downcast.py`
+- [ ] T017 Implement throughput + runtime metric capture in `src/io/perf_utils.py`
+- [ ] T018 Implement progress stage reporter (≤5 updates) in `src/io/progress.py`
+- [ ] T019 Implement core schema enforcement & column restriction in `src/io/schema.py`
+- [ ] T020 Implement UTC timestamp validator (reject non-UTC) in `src/io/timezone_validate.py`
+- [ ] T021 Implement immutability hash function in `src/io/hash_utils.py`
+- [ ] T022 Implement registry base data structures (IndicatorSpec dataclass) in `src/indicators/registry/specs.py`
+- [ ] T023 Implement registry storage & register/unregister API in `src/indicators/registry/store.py`
+- [ ] T024 Implement dependency resolution (topological sort) in `src/indicators/registry/deps.py`
+- [ ] T025 Implement enrichment validation helpers (duplicate indicator names) in `src/indicators/validation.py`
+- [ ] T026 Add unit tests for foundational utilities at `tests/unit/test_foundations_ingestion.py`
+- [ ] T027 Add unit tests for registry base + deps at `tests/unit/test_indicator_registry.py`
+
+## Phase 3: User Story 1 - Fast Core Ingestion (P1)
+
+Goal: Ingest 6.9M-row baseline ≤120s; produce only core columns + deterministic gaps & duplicates handling.
+Independent Test Criteria: (a) runtime ≤120s (b) core schema only (c) gap count correctness (d) duplicate removals logged (e) no per-row loops (static lint/inspection) (f) progress updates ≤5.
+
+- [ ] T028 [US1] Implement ingestion pipeline assembly (read→sort→dedupe→cadence validate→gap fill→schema restrict→metrics) in `src/io/ingestion.py`
+- [ ] T029 [P] [US1] Implement Arrow backend detection + fallback logging in `src/io/arrow_config.py`
+- [ ] T030 [P] [US1] Integrate downcast option into pipeline in `src/io/ingestion.py`
+- [ ] T031 [P] [US1] Add metrics struct (runtime, counts, backend) in `src/io/metrics.py`
+- [ ] T032 [P] [US1] Add progress stage emission (stages enumerated) in `src/io/progress.py`
+- [ ] T033 [US1] Implement gap fill vectorization using reindex & forward-fill in `src/io/gap_fill.py`
+- [ ] T034 [US1] Implement duplicate resolution integration into pipeline in `src/io/ingestion.py`
+- [ ] T035 [US1] Implement cadence deviation check (>2% threshold) in `src/io/cadence.py`
+- [ ] T036 [US1] Add unit tests: gap synthesis correctness at `tests/unit/test_ingestion_gap_fill.py`
+- [ ] T037 [US1] Add unit tests: duplicate handling deterministic at `tests/unit/test_ingestion_duplicates.py`
+- [ ] T038 [US1] Add unit tests: cadence validation errors at `tests/unit/test_ingestion_cadence.py`
+- [ ] T039 [US1] Add unit tests: schema restriction & column order at `tests/unit/test_ingestion_schema.py`
+- [ ] T040 [US1] Add integration test: end-to-end ingestion result invariants at `tests/integration/test_ingestion_pipeline.py`
+- [ ] T041 [US1] Add performance benchmark harness with baseline timing at `tests/performance/benchmark_ingestion.py`
+- [ ] T042 [US1] Add static scan (Ruff rule/custom) to detect forbidden per-row loops in `src/io/` at `scripts/ci/check_no_row_loops.py`
+- [ ] T043 [US1] Document ingestion usage & performance expectations at `docs/performance.md`
+- [ ] T044 [US1] Update quickstart ingestion section runtime notes in `specs/009-optimize-ingestion/quickstart.md`
+
+## Phase 4: User Story 2 - Opt-In Indicator Enrichment (P2)
+
+Goal: Compute only requested indicators via registry without mutating core dataset.
+Independent Test Criteria: (a) only requested columns appended (b) unknown names fast-fail (strict) (c) non-strict accumulates failures (d) core hash stable (e) registry API supports dynamic registration.
+
+- [ ] T045 [US2] Implement enrichment orchestration (validate→resolve deps→compute→assemble result) in `src/indicators/enrich.py`
+- [ ] T046 [P] [US2] Implement immutability guard (hash before/after) in `src/indicators/enrich.py`
+- [ ] T047 [P] [US2] Implement strict vs non-strict handling (fast-fail) in `src/indicators/enrich.py`
+- [ ] T048 [P] [US2] Implement error types/exceptions for enrichment in `src/indicators/errors.py`
+- [ ] T049 [US2] Implement built-in EMA (vectorized) in `src/indicators/builtin/ema.py`
+- [ ] T050 [P] [US2] Implement ATR in `src/indicators/builtin/atr.py`
+- [ ] T051 [P] [US2] Implement placeholder StochRSI (if already existing move/refactor) in `src/indicators/builtin/stochrsi.py`
+- [ ] T052 [US2] Register built-in indicators in `src/indicators/registry/builtins.py`
+- [ ] T053 [US2] Add unit tests: registry registration/unregistration at `tests/unit/test_indicator_registry.py`
+- [ ] T054 [US2] Add unit tests: enrichment only requested columns at `tests/unit/test_enrich_selectivity.py`
+- [ ] T055 [US2] Add unit tests: strict unknown fast-fail at `tests/unit/test_enrich_strict.py`
+- [ ] T056 [US2] Add unit tests: non-strict collects failures at `tests/unit/test_enrich_non_strict.py`
+- [ ] T057 [US2] Add unit tests: immutability hash unchanged at `tests/unit/test_enrich_immutability.py`
+- [ ] T058 [US2] Add integration test: ingest→enrich pipeline at `tests/integration/test_ingest_then_enrich_pipeline.py`
+- [ ] T059 [US2] Update quickstart enrichment examples with final indicator names at `specs/009-optimize-ingestion/quickstart.md`
+- [ ] T060 [US2] Update contracts (`contracts/enrich.md`) with any param refinements
+
+## Phase 5: User Story 3 - Dual Output Modes (P3)
+
+Goal: Support both columnar DataFrame and iterator object modes with performance delta ≥25% advantage for columnar.
+Independent Test Criteria: (a) iterator yields objects conforming to schema (b) columnar throughput advantage ≥25% (c) invalid mode errors (d) both paths share core logic, no duplication.
+
+- [ ] T061 [US3] Implement iterator wrapper class in `src/io/iterator_mode.py`
+- [ ] T062 [P] [US3] Integrate mode selection param & branching in `src/io/ingestion.py`
+- [ ] T063 [P] [US3] Add mode validation errors in `src/io/errors.py`
+- [ ] T064 [US3] Add unit tests: invalid mode errors at `tests/unit/test_ingestion_modes.py`
+- [ ] T065 [US3] Add unit tests: iterator first N objects correctness at `tests/unit/test_ingestion_iterator.py`
+- [ ] T066 [US3] Add performance comparison test (assert ≥25% faster) at `tests/performance/test_mode_performance.py`
+- [ ] T067 [US3] Update contracts (`contracts/ingest.md`) mode section with iterator details
+- [ ] T068 [US3] Update quickstart dual mode example performance note at `specs/009-optimize-ingestion/quickstart.md`
+
+## Final Phase: Polish & Cross-Cutting
+
+- [ ] T069 Refine downcast heuristics (skip columns with precision risk) in `src/io/downcast.py`
+- [ ] T070 Add memory peak sampling integration (optional psutil) in `src/io/perf_utils.py`
+- [ ] T071 Add stretch goal optimization experiment notes in `docs/performance.md`
+- [ ] T072 Add Ruff rule / config to flag .itertuples()/iterrows usage at `pyproject.toml`
+- [ ] T073 Add CI script to run performance benchmark in non-blocking mode at `scripts/ci/run_performance.py`
+- [ ] T074 Add documentation for adding a new indicator at `src/indicators/README.md`
+- [ ] T075 Add multi-symbol extension placeholder design note in `specs/009-optimize-ingestion/research.md`
+- [ ] T076 Add GPU future hook comment + TODO in `src/io/arrow_config.py`
+- [ ] T077 Final spec & plan cross-check (update any drift) in `specs/009-optimize-ingestion/spec.md`
+- [ ] T078 Final constitution compliance summary appended in `specs/009-optimize-ingestion/plan.md`
+- [ ] T079 Prepare release notes entry (CHANGELOG) in `CHANGELOG.md`
+- [ ] T080 Add benchmark summary JSON export integration at `results/benchmark_summary.json`
+- [ ] T081 Add contract validation script (schema lint) at `scripts/ci/validate_contracts.py`
+- [ ] T082 Remove placeholders / TODO markers across new modules in `src/io/*.py`
+- [ ] T083 Add README section describing ingestion architecture in `README.md`
+- [ ] T084 Ensure all new modules have docstrings & type hints in `src/io/` and `src/indicators/`
+- [ ] T085 Final performance run & record metrics in `results/benchmarks/ingestion_final.txt`
+- [ ] T086 Clean up orphan test fixtures in `tests/fixtures/`
+
+---
+\n## Dependency Graph (User Stories)
+
+US1 (Fast Core Ingestion) → US2 (Indicator Enrichment) → US3 (Dual Output Modes)
+
+Rationale: Enrichment depends on stable ingestion output; dual modes rely on ingestion core but are independent of enrichment logic (however, sequencing after US2 simplifies shared testing harness reuse).
+
+## Parallel Execution Examples
+
+US1 Parallelizable: T029, T030, T031, T032 can run alongside T028 once foundational utilities (Phase 2) merged.
+US2 Parallelizable: T046, T047, T048, T049–T051 can proceed after T045 skeleton committed.
+US3 Parallelizable: T062, T063 can proceed after core ingestion (T028) baseline merged.
+Polish Phase Parallel: T069, T070, T072 may run simultaneously; T085 must occur last.
+
+## Implementation Strategy
+
+1. MVP: Complete Phases 1–3 (through T044) to deliver fast ingestion with performance benchmark & tests.
+2. Iteration 2: Implement enrichment (Phase 4) enabling selective indicators; update quickstart.
+3. Iteration 3: Add dual output modes (Phase 5) and performance comparison test.
+4. Polish: Execute final optimizations, documentation, compliance, and stretch goal tuning.
+
+## Independent Test Criteria (Per Story)
+
+| Story | Criteria Summary |
+|-------|------------------|
+| US1 | Runtime ≤120s; core schema only; gaps correct; duplicates deterministic; ≤5 progress updates; no per-row loops |
+| US2 | Only requested indicators; unknown strict fast-fail; non-strict collects failures; core hash stable; registry dynamic registration |
+| US3 | Columnar ≥25% faster vs iterator; iterator correctness; invalid mode errors; shared pipeline |
+
+## Task Counts
+
+| Phase | Count |
+|-------|-------|
+| Setup | 11 |
+| Foundational | 15 |
+| US1 | 17 |
+| US2 | 16 |
+| US3 | 8 |
+| Polish | 18 |
+| Total | 85 |
+
+Counts by User Story: US1=17, US2=16, US3=8.
+
+Parallel Opportunities Identified: 4 (US1), 5 (US2), 2 (US3), 3 (Polish) groups.
+
+Format Validation: All tasks follow `- [ ] T### [P]? [US#]? Description with file path` pattern.
+
+---
+Generated via speckit.tasks workflow using available artifacts (plan, spec, data-model, contracts, quickstart, research). Ready for execution.
