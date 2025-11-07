@@ -92,7 +92,7 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 - [ ] T048 Add performance benchmark test for 3-symbol independent vs portfolio `tests/performance/test_three_symbol_benchmark.py`
 - [ ] T049 Add memory profiling hook and log (≤1.5× baseline for 10 symbols per SC-015) `src/backtest/portfolio/memory_profile.py`
 - [ ] T050 Add structured logging enhancements (trade log fields) `src/backtest/portfolio/logging.py`
-- [ ] T051 Add README section summarizing multi-symbol feature `README.md`
+- [X] T051 Add README section summarizing multi-symbol feature `README.md`
 - [ ] T052 Refactor duplicated validation code (if any) in `validation.py`
 - [ ] T053 Add docstrings & type hints pass on all new modules
 - [ ] T054 Final constitution compliance review update `specs/008-multi-symbol/plan.md`
@@ -103,9 +103,9 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 - [ ] T059 Parallel execution feasibility prototype (deferred) placeholder task note only
 - [ ] T060 [FR-008] Implement symbol-specific spread/commission config in `src/models/portfolio.py` (add fields to SymbolConfig) and wire to execution in `orchestrator.py`
 - [ ] T061 [FR-016] Add CLI `--list-pairs` command to enumerate available currency pairs from processed dataset directory `src/cli/run_backtest.py`
-- [ ] T062 [Principle X] Audit src/backtest/portfolio/ for W1203 logging violations; fix all to use lazy % formatting (zero W1203 warnings required)
-- [ ] T063 [Principle X] Run markdownlint on specs/008-multi-symbol/*.md and fix all critical errors per constitution
-- [ ] T064 Verify docstrings via pylint/pydocstyle and type hints coverage on all portfolio/ modules per Principle VIII
+- [X] T062 [Principle X] Audit src/backtest/portfolio/ for W1203 logging violations; fix all to use lazy % formatting (zero W1203 warnings required)
+- [X] T063 [Principle X] Run markdownlint on specs/008-multi-symbol/*.md and fix all critical errors per constitution
+- [X] T064 Verify docstrings via pylint/pydocstyle and type hints coverage on all portfolio/ modules per Principle VIII
 
 ## Implementation Strategy
 
