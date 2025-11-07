@@ -43,6 +43,7 @@ class PortfolioOrchestrator:
         self,
         symbols: list[CurrencyPair],
         portfolio_config: PortfolioConfig,
+        initial_capital: float,
         data_dir: Path = Path("price_data/processed"),
     ):
         """Initialize portfolio orchestrator.
@@ -50,12 +51,13 @@ class PortfolioOrchestrator:
         Args:
             symbols: List of currency pairs to include in portfolio
             portfolio_config: Portfolio configuration
+            initial_capital: Starting capital for portfolio
             data_dir: Directory containing processed datasets
         """
         self.symbols = symbols
         self.portfolio_config = portfolio_config
         self.data_dir = data_dir
-        self.initial_capital = portfolio_config.initial_capital
+        self.initial_capital = initial_capital
 
         # Initialize services
         self.correlation_service = CorrelationService(

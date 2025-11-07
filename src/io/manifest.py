@@ -94,7 +94,11 @@ def load_manifest(manifest_path: Path, verify_checksum: bool = True) -> DataMani
         >>> from pathlib import Path
         >>> manifest_path = Path("data/manifests/EURUSD_M5_2025-01.json")
         >>> manifest = load_manifest(manifest_path)
-        >>> print(f"{manifest.pair} {manifest.timeframe}: {manifest.total_candles} candles")
+        >>> pair_tf_candles = (
+        ...     f"{manifest.pair} {manifest.timeframe}: "
+        ...     f"{manifest.total_candles} candles"
+        ... )
+        >>> print(pair_tf_candles)
         EURUSD M5: 8928 candles
     """
     if not manifest_path.exists():
@@ -185,6 +189,7 @@ def load_manifest(manifest_path: Path, verify_checksum: bool = True) -> DataMani
 
 
 def create_manifest(
+    *,
     data_file_path: Path,
     pair: str,
     timeframe: str,
@@ -275,3 +280,76 @@ def create_manifest(
     logger.info("Manifest created: %s", output_path)
 
     return manifest
+
+
+def create_portfolio_manifest(
+    *,
+    symbols: list[str],
+    execution_mode: str,
+    dataset_paths: dict[str, str],
+    correlation_threshold: float,
+    snapshot_interval: int,
+    allocation_strategy: str,
+    initial_capital: float,
+    output_path: Path,
+) -> dict:
+    """
+    Create a portfolio-mode backtest manifest per FR-019.
+
+    Documents portfolio configuration including symbols, execution mode,
+    dataset references, correlation settings, and allocation strategy.
+
+    Args:
+        symbols: List of currency pair codes (e.g., ["EURUSD", "GBPUSD"])
+        execution_mode: "independent" or "portfolio"
+        dataset_paths: Dictionary mapping symbol codes to dataset file paths
+        correlation_threshold: Default correlation threshold for portfolio mode
+        snapshot_interval: Candles between portfolio snapshots
+        allocation_strategy: "equal_weight", "risk_parity", or "custom"
+        initial_capital: Starting capital for portfolio
+        output_path: Path where manifest JSON will be written
+
+    Returns:
+        Created manifest dictionary
+
+    Examples:
+        >>> from pathlib import Path
+        >>> manifest = create_portfolio_manifest(
+        ...     symbols=["EURUSD", "GBPUSD"],
+        ...     execution_mode="portfolio",
+        ...     dataset_paths={
+        ...         "EURUSD": "price_data/processed/eurusd/processed.csv",
+        ...         "GBPUSD": "price_data/processed/gbpusd/processed.csv"
+        ...     },
+        ...     correlation_threshold=0.8,
+        ...     snapshot_interval=50,
+        ...     allocation_strategy="equal_weight",
+        ...     initial_capital=10000.0,
+        ...     output_path=Path("results/manifest_portfolio_20251106.json")
+        ... )
+    """
+    logger.info("Creating portfolio manifest for %d symbols", len(symbols))
+
+    manifest_data = {
+        "execution_mode": execution_mode,
+        "symbols": sorted(symbols),  # Deterministic ordering
+        "dataset_paths": dataset_paths,
+        "portfolio_config": {
+            "correlation_threshold": correlation_threshold,
+            "snapshot_interval_candles": snapshot_interval,
+            "allocation_strategy": allocation_strategy,
+            "initial_capital": initial_capital,
+        },
+        "timestamp": Path(output_path).stem.split("_")[-1]
+        if "_" in output_path.stem
+        else "",
+    }
+
+    # Write JSON
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f, indent=2)
+
+    logger.info("Portfolio manifest created: %s", output_path)
+
+    return manifest_data
