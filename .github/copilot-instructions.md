@@ -69,6 +69,13 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - Use type hints for all signatures
 - Line length ≤88 characters (Black standard)
 
+**Commit Messages (Principle XI):**
+- Format: `<semantic-tag>(<spec-number>): <Descriptive Title> (<Task-number>)`
+- Semantic tags: docs, test, feat, fix, break, chore
+- Example: `test(008): Add unknown symbol validation tests (T046)`
+- Include detailed summary with bullet points for multi-part changes
+- See Constitution Principle XI for full requirements
+
 ## Recent Changes
 - 007-performance-optimization: Added Python 3.11 (confirmed by constitution) + numpy, pandas, pydantic, rich (existing). Optional: numba (JIT) [NEEDS CLARIFICATION: adopt as hard dependency or optional fallback?].
 - 006-multi-strategy: Added Python 3.11 (per project standards) + Poetry-managed; numpy, pandas (data & metrics), pydantic (config validation), rich/logging (structured logs), pytest (tests). No new external runtime services.

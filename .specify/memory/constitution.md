@@ -1,25 +1,25 @@
 <!--
 Sync Impact Report:
-- Version change: 1.6.0 → 1.7.0
+- Version change: 1.7.0 → 1.8.0
 - Modified principles:
-  - Principle IX - Dependency Management & Reproducibility (removed duplicate section, consolidated)
+  - Principle XI (NEW) - Commit Message Standards (semantic commit format)
+  - Milestone Commit Messages section removed (superseded by Principle XI)
 - Added sections:
-  - Performance Validation Requirements (Principle IV enhancement)
-  - Infrastructure Quality Standards (Principles VIII, X validation)
+  - Principle XI: Commit Message Standards (semantic format with spec/task tracking)
+  - Acceptable semantic tags: docs, test, feat, fix, break, chore
+  - Required format: <semantic-tag>(<spec-number>): <Descriptive Title>(<Task-number>)
 - Removed sections:
-  - Duplicate Principle IX (consolidated into single comprehensive section)
+  - Milestone Commit Messages (Development Workflow section) - consolidated into Principle XI
 - Validated through implementation:
-  - PR #17 (007-performance-optimization): All 72 tasks complete
-  - Principle VIII (Code Quality): 26 new tests, all passing, docstrings/type hints enforced
-  - Principle IX (Poetry): All dependencies managed via pyproject.toml, poetry.lock committed
-  - Principle X (Quality Tools): Black/Ruff/Pylint enforced, 62 logging fixes, pylint 8.78→9.68
-  - Performance criteria validated: SC-001 (≤20min), SC-003 (sub-linear load), SC-004 (86.1% cache speedup)
+  - Spec 008-multi-symbol: All commits follow new format
+  - Examples: "test(008): Add unknown symbol validation tests (T046)"
+  - Examples: "docs(008): Add CLI filtering examples to quickstart (T047)"
 - Templates requiring updates:
-  ✅ plan-template.md - Compatible (constitution check references validated)
-  ✅ spec-template.md - Compatible (success criteria format validated)
-  ✅ tasks-template.md - Compatible (task categorization validated in 007 spec)
+  ✅ plan-template.md - Compatible (no commit guidance in template)
+  ✅ spec-template.md - Compatible (no commit guidance in template)
+  ✅ tasks-template.md - Compatible (task IDs match commit format)
   ✅ agent-file-template.md - Compatible (no changes needed)
-- Follow-up TODOs: None (all principles validated through 007-performance-optimization)
+- Follow-up TODOs: None
 -->
 
 # Trading Strategies Constitution
@@ -202,6 +202,65 @@ markdownlint-cli2 "**/*.md" "!poetry.lock"
 
 All quality checks SHOULD be automated in pre-commit hooks and CI/CD pipelines.
 
+### Principle XI: Commit Message Standards
+
+All Git commits MUST follow a standardized semantic format to ensure traceability, clarity, and consistent project history. Commit messages SHALL link code changes to specifications and tasks, enabling efficient navigation and change tracking.
+
+**Required Format:**
+
+```text
+<semantic-tag>(<spec-number>): <Descriptive Title> (<Task-number>)
+
+<summary-of-changes>
+```
+
+**Acceptable Semantic Tags:**
+
+- `docs`: Documentation changes (README, specs, guides, comments)
+- `test`: Test additions or modifications (unit, integration, performance)
+- `feat`: New features or functionality
+- `fix`: Bug fixes or defect corrections
+- `break`: Breaking changes or backward-incompatible modifications
+- `chore`: Maintenance tasks (dependencies, tooling, cleanup)
+
+**Component Definitions:**
+
+- `<spec-number>`: Feature specification number (e.g., `008` for `008-multi-symbol`)
+- `<Descriptive Title>`: Brief summary of changes (imperative mood, ≤72 characters)
+- `<Task-number>`: Task identifier from tasks.md (e.g., `T046`, `T047`)
+- `<summary-of-changes>`: Detailed description with bullet points for multi-part changes
+
+**Examples:**
+
+```text
+test(008): Add unknown symbol validation tests (T046)
+
+- Create 15 comprehensive tests across 4 test classes
+- TestUnknownSymbolValidation: Single/multiple/mixed symbol scenarios
+- TestValidationListBehavior: Empty list, all valid, all invalid edge cases
+- All tests passing (15/15), lint score 10.00/10
+```
+
+```text
+docs(008): Add CLI filtering examples to quickstart (T047)
+
+- Document --portfolio-mode flag (independent vs portfolio)
+- Add --disable-symbol examples for runtime filtering
+- Include combined filtering example using all flags
+- Markdown lint: 0 errors
+```
+
+```text
+feat(008): Add --portfolio-mode and multi-symbol CLI flags (T041)
+
+- Implement --portfolio-mode enumeration (independent|portfolio)
+- Add validation for portfolio mode selection
+- Wire portfolio mode to orchestrator/independent_runner
+- Lint score: 9.92/10
+```
+
+**Rationale**: Structured commit messages provide clear change history, facilitate code review, enable efficient navigation of project evolution, and maintain traceability between specifications, tasks, and implementation. The semantic tag system enables automated changelog generation and release management.
+
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -226,33 +285,6 @@ Strategy development follows a structured pipeline:
 
 All phases MUST include peer review and compliance verification before progression.
 
-### Milestone Commit Messages
-
-After completing any development milestone (feature implementation, code quality improvements, constitution amendments, etc.), a concise commit message MUST be provided that summarizes all changes made during that milestone.
-
-**Commit Message Requirements:**
-
-- Use conventional commit format: `type(scope): brief description`
-- Include key metrics or file counts when relevant (e.g., "16 files", "score improved 8.78→9.68")
-- List major changes as bullet points in the commit body
-- Cover all significant modifications in a single coherent message
-- Keep descriptions concise but informative
-- Combine related changes into one commit when appropriate
-
-**Example:**
-
-```md
-feat(quality): enforce lazy logging and add constitution Principle X
-
-- Fix 62 logging calls: f-strings → lazy % formatting (16 files)
-- Eliminate W1203 warnings, improve pylint 8.78→9.68/10
-- Constitution v1.4.0: formalize Black/Ruff/Pylint requirements
-- Mandate lazy % logging, prohibit f-strings in logging calls
-- Update copilot-instructions.md with quality standards
-```
-
-**Rationale**: Structured commit messages provide clear change history, facilitate code review, and enable efficient navigation of project evolution. Milestone-based commits ensure related changes are grouped logically rather than scattered across multiple small commits.
-
 ## Governance
 
 This constitution supersedes all other development practices and trading procedures.
@@ -271,6 +303,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.7.0
+**Version:** 1.8.0
 **Ratified:** October 25, 2025
-**Last Amended:** November 5, 2025
+**Last Amended:** November 6, 2025
