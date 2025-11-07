@@ -69,7 +69,7 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 - [X] T031 [US3] Implement diversification metrics calculator `src/backtest/portfolio/diversification.py`
 - [X] T032 [US3] Integrate correlation threshold overrides (Decision 8) in `correlation_service.py`
 - [X] T033 [US3] Portfolio manifest generation in `src/io/manifest.py`
-- [ ] T034 [US3] Add integration test for portfolio run 3 symbols `tests/integration/test_portfolio_three_symbols.py`
+- [X] T034 [US3] Add integration test for portfolio run 3 symbols `tests/integration/test_portfolio_three_symbols.py`
 - [X] T035 [US3] Add test ensuring correlation provisional window logic (≥20 then grow) `tests/unit/portfolio/test_correlation_provisional.py`
 - [X] T036 [US3] Add test ensuring allocation sum precision `tests/unit/portfolio/test_allocation_precision.py`
 - [X] T037 [US3] Add test verifying snapshot interval honored `tests/unit/portfolio/test_snapshot_interval.py`
