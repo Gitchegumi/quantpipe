@@ -52,13 +52,13 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 
 - [X] T018 [P] [US2] Implement multi-symbol loop adapter in `src/backtest/portfolio/independent_runner.py`
 - [X] T019 [US2] Add isolated per-symbol result aggregator in `src/backtest/portfolio/results.py`
-- [ ] T020 [US2] Extend CLI parsing for multiple pairs (already partially present) refine logic in `src/cli/run_backtest.py`
-- [ ] T021 [US2] Add validation: missing symbols → skip with warning (`validation.py`)
+- [X] T020 [US2] Extend CLI parsing for multiple pairs (already partially present) refine logic in `src/cli/run_backtest.py`
+- [X] T021 [US2] Add validation: missing symbols → skip with warning (`validation.py`)
 - [X] T022 [P] [US2] Implement risk isolation checks for independent mode in `src/backtest/portfolio/risk_isolation.py`
-- [ ] T023 [US2] Add integration test for 3-symbol independent run `tests/integration/test_independent_three_symbols.py`
-- [ ] T024 [US2] Add test: one symbol risk breach halts only that symbol `tests/unit/portfolio/test_independent_risk_halt.py`
-- [ ] T025 [US2] Extend output artifact writing to include Symbols line for multi (`src/io/formatters.py`)
-- [ ] T026 [US2] Update quickstart with independent example (`specs/008-multi-symbol/quickstart.md`)
+- [X] T023 [US2] Add integration test for 3-symbol independent run `tests/integration/test_independent_three_symbols.py`
+- [X] T024 [US2] Add test: one symbol risk breach halts only that symbol `tests/unit/portfolio/test_independent_risk_halt.py`
+- [X] T025 [US2] Extend output artifact writing to include Symbols line for multi (`src/io/formatters.py`)
+- [X] T026 [US2] Update quickstart with independent example (`specs/008-multi-symbol/quickstart.md`)
 
 ## Phase 5: User Story US3 (Portfolio Mode)
 

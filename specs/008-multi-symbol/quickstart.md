@@ -33,10 +33,132 @@ poetry run python -m src.cli.run_backtest \
 --output-format json
 ```
 
-## 4. Multiple Pairs (Design Preview)
+## 4. Independent Multi-Symbol Mode (Phase 4: Implemented)
 
-Current CLI accepts multiple values via `--pair` but processes only the first. Future
-portfolio mode will:
+The CLI now supports independent multi-symbol execution. When multiple pairs are
+specified, each symbol runs its own isolated backtest with separate capital,
+risk limits, and execution context.
+
+### Running Independent Multi-Symbol Backtest
+
+```powershell
+poetry run python -m src.cli.run_backtest \
+--direction BOTH \
+--pair EURUSD GBPUSD USDJPY
+```
+
+**What happens:**
+
+- Each symbol is validated (missing datasets are skipped with warnings)
+- Valid symbols run independent backtests in isolation
+- Results are aggregated for summary reporting
+- Failures in one symbol don't affect others
+
+### Symbol Validation
+
+Symbols without datasets are automatically skipped:
+
+```powershell
+poetry run python -m src.cli.run_backtest \
+--direction LONG \
+--pair EURUSD INVALID GBPUSD
+```
+
+Output:
+
+```text
+WARNING: Symbol validation found 1 error(s), skipping invalid symbols:
+  - Dataset not found for INVALID at price_data/processed/invalid/...
+INFO: Proceeding with 2 valid symbol(s): EURUSD, GBPUSD
+```
+
+### Text Output Format
+
+```text
+=============================================================
+INDEPENDENT MULTI-SYMBOL BACKTEST RESULTS
+=============================================================
+
+RUN METADATA
+-------------------------------------------------------------
+Run ID:           multi_both_20251106_143022
+Direction Mode:   BOTH
+Symbols:          EURUSD, GBPUSD, USDJPY
+Start Time:       2025-11-06T14:30:22+00:00
+
+AGGREGATE SUMMARY
+-------------------------------------------------------------
+Total Symbols:    3
+Total Trades:     142
+Avg Win Rate:     54.23%
+Total P&L:        $1,245.67
+
+PER-SYMBOL BREAKDOWN
+-------------------------------------------------------------
+
+EURUSD:
+  Trades:         48
+  Win Rate:       52.08%
+  Final Balance:  $10,412.34
+
+GBPUSD:
+  Trades:         51
+  Win Rate:       56.86%
+  Final Balance:  $10,521.12
+
+USDJPY:
+  Trades:         43
+  Win Rate:       53.49%
+  Final Balance:  $10,312.21
+
+=============================================================
+```
+
+### JSON Output Format
+
+```powershell
+poetry run python -m src.cli.run_backtest \
+--direction SHORT \
+--pair EURUSD GBPUSD \
+--output-format json
+```
+
+Output:
+
+```json
+{
+  "run_id": "multi_short_20251106_143045",
+  "direction_mode": "SHORT",
+  "start_time": "2025-11-06T14:30:45+00:00",
+  "symbols": ["EURUSD", "GBPUSD"],
+  "mode": "independent",
+  "summary": {
+    "total_symbols": 2,
+    "total_trades": 95,
+    "average_win_rate": 0.5315,
+    "total_pnl": 823.45
+  },
+  "per_symbol": {
+    "EURUSD": {
+      "symbol": "EURUSD",
+      "total_trades": 48,
+      "win_rate": 0.5208,
+      "final_balance": 10412.34
+    },
+    "GBPUSD": {
+      "symbol": "GBPUSD",
+      "total_trades": 47,
+      "win_rate": 0.5426,
+      "final_balance": 10411.11
+    }
+  },
+  "failures": {}
+}
+```
+
+## 5. Portfolio Mode (Phase 5: Planned)
+
+Future portfolio mode will:
 
 - Ingest each pair's candles.
 - Maintain `CorrelationWindowState` objects.
@@ -48,13 +170,11 @@ Example (future behavior):
 ```powershell
 poetry run python -m src.cli.run_backtest \
 --direction BOTH \
---data price_data/raw/eurusd/eurusd_20250101.csv \
---pair EURUSD GBPUSD USDJPY
+--pair EURUSD GBPUSD USDJPY \
+--portfolio-mode
 ```
 
-(Expected Phase 2: independent or portfolio aggregation selection flag.)
-
-## 5. Profiling & Benchmark Output
+## 6. Profiling & Benchmark Output
 
 ```powershell
 poetry run python -m src.cli.run_backtest --direction LONG --data price_data/raw/eurusd/eurusd_20250101.csv --profile
