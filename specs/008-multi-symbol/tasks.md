@@ -75,7 +75,7 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 - [X] T037 [US3] Add test verifying snapshot interval honored `tests/unit/portfolio/test_snapshot_interval.py`
 - [X] T038 [US3] Add test verifying diversification ratio monotonic vs correlation changes `tests/unit/portfolio/test_diversification_ratio.py`
 - [X] T039 [US3] Add test verifying failure isolation excludes symbol from further correlation `tests/unit/portfolio/test_failure_isolation.py`
-- [ ] T040 [US3] Document portfolio mode usage in quickstart (`quickstart.md`)
+- [X] T040 [US3] Document portfolio mode usage in quickstart (`quickstart.md`)
 
 ## Phase 6: User Story US4 (Selection & Filtering)
 

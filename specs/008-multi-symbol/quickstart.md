@@ -156,22 +156,161 @@ Output:
 }
 ```
 
-## 5. Portfolio Mode (Phase 5: Planned)
+## 5. Portfolio Mode (Phase 5: Components Ready, CLI Integration Pending)
 
-Future portfolio mode will:
+Portfolio mode enables coordinated multi-symbol execution with shared capital,
+correlation tracking, and portfolio-level metrics. The core components are
+implemented and tested:
 
-- Ingest each pair's candles.
-- Maintain `CorrelationWindowState` objects.
-- Generate `AllocationRequest` per snapshot interval.
-- Persist snapshots to JSONL.
+### Portfolio Mode Features
 
-Example (future behavior):
+**Shared Capital Pool:**
+
+- Capital allocated dynamically across symbols based on volatility and correlation
+- Allocation sum enforced to 100% with <0.01% precision (largest remainder rounding)
+- Failed symbols excluded from allocation (isolation per Decision 5)
+
+**Correlation Tracking:**
+
+- Rolling 100-period window with provisional 20-period minimum (FR-010)
+- Pair-wise correlation matrix updated each candle
+- Customizable thresholds per symbol pair (default 0.8)
+- Failed symbols frozen in matrix (no further updates)
+
+**Diversification Metrics:**
+
+- Diversification ratio: portfolio_vol / avg_symbol_vol
+- Effective number of assets (independence measure)
+- Portfolio variance reduction estimation
+
+**Periodic Snapshots:**
+
+- JSONL format (Decision 7)
+- Configurable interval (default 50 candles)
+- Includes: timestamp, positions, unrealized PnL, correlation matrix, diversification ratio
+
+### Portfolio Configuration Example
+
+```python
+from src.models.portfolio import PortfolioConfig, CurrencyPair
+from src.backtest.portfolio.orchestrator import PortfolioOrchestrator
+
+symbols = [
+    CurrencyPair(code="EURUSD"),
+    CurrencyPair(code="GBPUSD"),
+    CurrencyPair(code="USDJPY"),
+]
+
+config = PortfolioConfig(
+    correlation_threshold_default=0.8,
+    snapshot_interval_candles=50,
+    allocation_rounding_dp=2,
+)
+
+orchestrator = PortfolioOrchestrator(
+    symbols=symbols,
+    portfolio_config=config,
+    initial_capital=10000.0,
+)
+```
+
+### Allocation Strategies
+
+**Equal Weight:**
+
+- Each symbol receives equal capital allocation
+- Simplest approach, no volatility adjustment
+
+**Volatility-Based:**
+
+- Higher volatility symbols receive smaller allocations
+- Balances risk contribution across symbols
+
+**Custom Weights:**
+
+- Explicit per-symbol weights via SymbolConfig
+- Allows manual portfolio construction
+
+### Correlation Threshold Overrides
+
+Set different correlation thresholds for specific symbol pairs:
+
+```python
+from src.backtest.portfolio.correlation_service import CorrelationService
+
+service = CorrelationService(correlation_threshold=0.8)
+
+# Override for specific pair
+service.set_threshold_override(
+    pair_a=CurrencyPair(code="EURUSD"),
+    pair_b=CurrencyPair(code="GBPUSD"),
+    threshold=0.7  # More strict for this pair
+)
+```
+
+### Failure Isolation
+
+Per Decision 5, failed symbols are automatically isolated:
+
+```python
+# Mark symbol as failed (e.g., data loading error)
+orchestrator.mark_symbol_failed(
+    symbol=CurrencyPair(code="GBPUSD"),
+    error="Dataset file not found"
+)
+
+# Failed symbol is:
+# - Removed from active symbols set
+# - Excluded from correlation updates (matrix frozen)
+# - Excluded from capital allocation
+# - Recorded in failures dictionary
+```
+
+### Manifest Generation
+
+Portfolio manifests document execution configuration per FR-019:
+
+```python
+from src.io.manifest import create_portfolio_manifest
+from pathlib import Path
+
+manifest = create_portfolio_manifest(
+    symbols=["EURUSD", "GBPUSD", "USDJPY"],
+    execution_mode="portfolio",
+    dataset_paths={
+        "EURUSD": "price_data/processed/eurusd/processed.csv",
+        "GBPUSD": "price_data/processed/gbpusd/processed.csv",
+        "USDJPY": "price_data/processed/usdjpy/processed.csv",
+    },
+    correlation_threshold=0.8,
+    snapshot_interval=50,
+    allocation_strategy="equal_weight",
+    initial_capital=10000.0,
+    output_path=Path("results/manifest_portfolio_20251106.json"),
+)
+```
+
+**Manifest contents:**
+
+- Symbols executed
+- Execution mode
+- Dataset paths
+- Correlation settings
+- Allocation strategy
+- Initial capital
+
+### Future CLI Integration
+
+Planned command-line interface (not yet wired):
 
 ```powershell
 poetry run python -m src.cli.run_backtest \
 --direction BOTH \
 --pair EURUSD GBPUSD USDJPY \
---portfolio-mode
+--portfolio-mode portfolio \
+--correlation-threshold 0.8 \
+--snapshot-interval 50 \
+--allocation-strategy equal_weight
 ```
 
 ## 6. Profiling & Benchmark Output
