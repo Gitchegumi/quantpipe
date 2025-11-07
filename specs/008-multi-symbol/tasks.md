@@ -95,7 +95,7 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 - [X] T051 Add README section summarizing multi-symbol feature `README.md`
 - [ ] T052 Refactor duplicated validation code (if any) in `validation.py`
 - [ ] T053 Add docstrings & type hints pass on all new modules
-- [ ] T054 Final constitution compliance review update `specs/008-multi-symbol/plan.md`
+- [X] T054 Final constitution compliance review update `specs/008-multi-symbol/plan.md`
 - [ ] T055 Add regression test ensuring deterministic outputs across repeated portfolio runs `tests/integration/test_portfolio_determinism.py`
 - [ ] T056 Add failure mode tests for allocation errors `tests/unit/portfolio/test_allocation_error_modes.py`
 - [ ] T057 Add correlation penalty stub (optional field) `allocation_engine.py`

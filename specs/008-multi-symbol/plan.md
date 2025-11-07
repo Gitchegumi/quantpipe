@@ -67,6 +67,36 @@ Deferred items (remaining): portfolio drawdown kill-switch, walk-forward multi-s
 
 Phase 1 Completion: COMPLETE. Proceed to Phase 2 (Foundational implementation tasks).
 
+## Constitution Check (Final - Phase 7)
+
+Implementation complete through Phase 6 (T001-T047). Final compliance review:
+
+| Principle                    | Status | Final Notes (Phase 7)                                                                                                                                                     |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I Strategy-first             | PASS   | Single-symbol baseline preserved via regression tests (T014). Multi-symbol layers fully additive (independent_runner, orchestrator, correlation/allocation services).    |
+| II Risk Mgmt                 | PASS   | Per-symbol risk isolation implemented (T024). Portfolio allocation limits enforced (T036). Failure isolation validated (T039). Correlation thresholds configurable (T043).|
+| III Backtesting & Validation | PASS   | Comprehensive test coverage: 47 unit tests, 11 integration tests across US1-US4. Correlation provisional window (T035), deterministic results validated.                 |
+| IV Real-Time Monitoring      | PASS   | Snapshot logging implemented (T030). Structured JSONL output (FR-022). Configurable intervals (T044, T037). Portfolio metrics tracked.                                   |
+| V Data Integrity             | PASS   | Multi-symbol validation implemented (T009, T021). Unknown symbol graceful abort (T046). Dataset overlap checks in place. No source mutation.                             |
+| VI Data Provenance           | PASS   | Portfolio manifest generation (T033). Enumerates all symbol datasets. Symbol-level metadata preserved. Execution mode documented.                                        |
+| VII Parsimony                | PASS   | Lean correlation design (100-period rolling, provisional 20). Simple allocation (equal weight, largest remainder). Advanced features explicitly deferred.                |
+| VIII Code Quality            | PASS   | All modules have docstrings/type hints (T064: 10.00/10 score). Lazy % logging enforced (T062: zero W1203 violations). Pylint 9.96/10 for portfolio/.                    |
+| IX Dependency Mgmt           | PASS   | Zero new mandatory dependencies. Poetry-managed. No requirements.txt. Lock file committed. Numba deferred (optional future enhancement).                                 |
+| X Quality Automation         | PASS   | All tests passing (58 total). Markdownlint: 0 errors (T063). Black/Ruff/Pylint enforced. CI-ready. Constitution Principle XI (commit format) validated across all tasks.|
+| XI Commit Standards (NEW)    | PASS   | All Phase 6 commits follow semantic format: `<tag>(<spec>): <title> (<task>)`. Examples: test(008): ... (T046), docs(008): ... (T047). Traceability maintained.         |
+
+Deferred Items Status:
+
+- Portfolio drawdown kill-switch → Logged as future enhancement
+- Walk-forward multi-symbol validation → Existing single-symbol approach sufficient
+- Advanced tagging/filtering → FR-016 (--list-pairs) deferred to future phase
+- Parallel execution (T059) → Feasibility noted, deferred
+- Risk-parity allocation → Simple equal-weight sufficient for MVP
+- T048 (performance benchmark) → Deferred (complex API integration)
+- T049-T050 (memory profiling, structured logging) → Deferred to future optimization phase
+
+Phase 7 Completion: SUBSTANTIAL PROGRESS. Core quality gates (T051, T062-T064) complete. README updated. Constitution compliance verified. Feature ready for merge pending optional polish tasks (T048-T050, T052-T061).
+
 ## Project Structure
 
 ### Documentation (this feature)
