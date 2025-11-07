@@ -34,6 +34,8 @@ class CorrelationService:
     Attributes:
         window_size: Target window length (default 100)
         provisional_min: Minimum length for provisional evaluation (default 20)
+        correlation_threshold: Default correlation threshold (default 0.8)
+        threshold_overrides: Per-pair threshold overrides
         windows: Dictionary mapping pair keys to CorrelationWindowState
         active_symbols: Set of currently active symbols (excludes failures)
         correlation_matrix: Current correlation matrix
@@ -43,12 +45,17 @@ class CorrelationService:
         self,
         window_size: int = 100,
         provisional_min: int = 20,
+        correlation_threshold: float = 0.8,
+        threshold_overrides: Optional[dict[str, float]] = None,
     ):
         """Initialize correlation service.
 
         Args:
             window_size: Target window length (default 100)
             provisional_min: Minimum length for provisional evaluation (default 20)
+            correlation_threshold: Default correlation threshold (default 0.8)
+            threshold_overrides: Optional per-pair threshold overrides
+                (key: sorted pair token e.g. "EURUSD:GBPUSD", value: threshold)
 
         Raises:
             ValueError: If window_size < provisional_min
@@ -61,6 +68,8 @@ class CorrelationService:
 
         self.window_size = window_size
         self.provisional_min = provisional_min
+        self.correlation_threshold = correlation_threshold
+        self.threshold_overrides = threshold_overrides or {}
         self.windows: dict[str, CorrelationWindowState] = {}
         self.active_symbols: set[str] = set()
         self.correlation_matrix = CorrelationMatrix()
@@ -181,3 +190,63 @@ class CorrelationService:
         if key not in self.windows:
             return False
         return self.windows[key].is_ready()
+
+    def get_threshold(
+        self, pair_a: CurrencyPair, pair_b: CurrencyPair
+    ) -> float:
+        """Get correlation threshold for a specific pair.
+
+        Returns pair-specific override if configured, otherwise default threshold.
+        Per Decision 8: normalized pair key ordering for stable lookup.
+
+        Args:
+            pair_a: First currency pair
+            pair_b: Second currency pair
+
+        Returns:
+            Correlation threshold for this pair
+        """
+        key = CorrelationMatrix.make_key(pair_a, pair_b)
+        return self.threshold_overrides.get(key, self.correlation_threshold)
+
+    def is_highly_correlated(
+        self, pair_a: CurrencyPair, pair_b: CurrencyPair
+    ) -> bool:
+        """Check if two pairs are highly correlated above threshold.
+
+        Args:
+            pair_a: First currency pair
+            pair_b: Second currency pair
+
+        Returns:
+            True if correlation exceeds threshold, False otherwise
+        """
+        correlation = abs(self.get_correlation(pair_a, pair_b))
+        threshold = self.get_threshold(pair_a, pair_b)
+        return correlation > threshold
+
+    def set_threshold_override(
+        self, pair_a: CurrencyPair, pair_b: CurrencyPair, threshold: float
+    ) -> None:
+        """Set correlation threshold override for specific pair.
+
+        Args:
+            pair_a: First currency pair
+            pair_b: Second currency pair
+            threshold: Threshold value to set
+
+        Raises:
+            ValueError: If threshold not in [-1, 1]
+        """
+        if not -1.0 <= threshold <= 1.0:
+            raise ValueError(
+                f"Threshold must be in [-1, 1], got {threshold}"
+            )
+
+        key = CorrelationMatrix.make_key(pair_a, pair_b)
+        self.threshold_overrides[key] = threshold
+        logger.info(
+            "Set correlation threshold override: %s = %.2f",
+            key,
+            threshold,
+        )

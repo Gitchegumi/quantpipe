@@ -210,3 +210,147 @@ class TestCorrelationProvisionalWindow:
 
         # Timestamp should have updated
         assert updated_timestamp > initial_timestamp
+
+
+class TestCorrelationThresholds:
+    """Test correlation threshold and override functionality."""
+
+    def test_default_threshold(self):
+        """Verify default threshold is 0.8."""
+        service = CorrelationService()
+
+        assert service.correlation_threshold == 0.8
+
+    def test_custom_default_threshold(self):
+        """Verify custom default threshold can be set."""
+        service = CorrelationService(correlation_threshold=0.7)
+
+        assert service.correlation_threshold == 0.7
+
+    def test_threshold_override(self):
+        """Verify pair-specific threshold override."""
+        service = CorrelationService(correlation_threshold=0.8)
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+
+        # Set override for EURUSD:GBPUSD
+        service.set_threshold_override(eurusd, gbpusd, 0.75)
+
+        # Should return override
+        assert service.get_threshold(eurusd, gbpusd) == 0.75
+
+    def test_threshold_override_normalized_key(self):
+        """Verify threshold override works with reversed pair order."""
+        service = CorrelationService(correlation_threshold=0.8)
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+
+        # Set override with pairs in one order
+        service.set_threshold_override(eurusd, gbpusd, 0.75)
+
+        # Query with reversed order should return same threshold
+        assert service.get_threshold(gbpusd, eurusd) == 0.75
+
+    def test_threshold_override_map_initialization(self):
+        """Verify threshold overrides can be set during initialization."""
+        from src.models.correlation import CorrelationMatrix
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+        key = CorrelationMatrix.make_key(eurusd, gbpusd)
+
+        overrides = {key: 0.75}
+        service = CorrelationService(
+            correlation_threshold=0.8, threshold_overrides=overrides
+        )
+
+        assert service.get_threshold(eurusd, gbpusd) == 0.75
+
+    def test_get_threshold_without_override(self):
+        """Verify get_threshold returns default when no override."""
+        service = CorrelationService(correlation_threshold=0.8)
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+
+        # No override set - should return default
+        assert service.get_threshold(eurusd, gbpusd) == 0.8
+
+    def test_is_highly_correlated_above_threshold(self):
+        """Verify is_highly_correlated returns True above threshold."""
+        service = CorrelationService(correlation_threshold=0.7)
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+
+        service.register_symbol(eurusd)
+        service.register_symbol(gbpusd)
+
+        # Feed highly correlated data
+        for i in range(25):
+            prices = {"EURUSD": 1.10 + i * 0.01, "GBPUSD": 1.25 + i * 0.01}
+            service.update(prices)
+
+        # Should be highly correlated (>0.99)
+        assert service.is_highly_correlated(eurusd, gbpusd)
+
+    def test_is_highly_correlated_below_threshold(self):
+        """Verify is_highly_correlated returns False below threshold."""
+        service = CorrelationService(correlation_threshold=0.7)
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+
+        service.register_symbol(eurusd)
+        service.register_symbol(gbpusd)
+
+        # Feed independent random walk data
+        import random
+
+        random.seed(42)
+        eurusd_price = 1.10
+        gbpusd_price = 1.25
+
+        for _ in range(30):
+            eurusd_price += random.uniform(-0.01, 0.01)
+            gbpusd_price += random.uniform(-0.01, 0.01)
+            prices = {"EURUSD": eurusd_price, "GBPUSD": gbpusd_price}
+            service.update(prices)
+
+        # Should not be highly correlated (below 0.7 threshold)
+        correlation = abs(service.get_correlation(eurusd, gbpusd))
+        assert correlation < 0.7
+        assert not service.is_highly_correlated(eurusd, gbpusd)
+
+    def test_is_highly_correlated_uses_absolute_value(self):
+        """Verify is_highly_correlated uses absolute correlation value."""
+        service = CorrelationService(correlation_threshold=0.7)
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+
+        service.register_symbol(eurusd)
+        service.register_symbol(gbpusd)
+
+        # Feed negatively correlated data
+        for i in range(25):
+            prices = {"EURUSD": 1.10 + i * 0.01, "GBPUSD": 1.50 - i * 0.01}
+            service.update(prices)
+
+        # Should be highly correlated (negative correlation)
+        assert service.is_highly_correlated(eurusd, gbpusd)
+
+    def test_invalid_threshold_override_raises_error(self):
+        """Verify ValueError raised for invalid threshold override."""
+        service = CorrelationService()
+
+        eurusd = CurrencyPair(code="EURUSD")
+        gbpusd = CurrencyPair(code="GBPUSD")
+
+        with pytest.raises(ValueError, match="Threshold must be in"):
+            service.set_threshold_override(eurusd, gbpusd, 1.5)
+
+        with pytest.raises(ValueError, match="Threshold must be in"):
+            service.set_threshold_override(eurusd, gbpusd, -1.5)
