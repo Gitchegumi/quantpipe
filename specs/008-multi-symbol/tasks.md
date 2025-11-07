@@ -79,7 +79,7 @@ MVP Scope Recommendation: Complete US1 regression + US2 independent multi-symbol
 
 ## Phase 6: User Story US4 (Selection & Filtering)
 
-- [ ] T041 [US4] Implement CLI `--portfolio-mode` flag enumeration (independent|portfolio) in `src/cli/run_backtest.py`
+- [X] T041 [US4] Implement CLI `--portfolio-mode` flag enumeration (independent|portfolio) in `src/cli/run_backtest.py`
 - [ ] T042 [P] [US4] Implement CLI symbol exclusion flag `--disable-symbol` logic in `independent_runner.py` & `orchestrator.py`
 - [ ] T043 [US4] Implement `--correlation-threshold` override plumbed to `correlation_service.py`
 - [ ] T044 [US4] Implement `--snapshot-interval` flag wired to snapshot logger

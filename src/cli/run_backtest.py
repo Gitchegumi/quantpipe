@@ -340,6 +340,51 @@ def main():
         help="Disable aggregation, produce only per-strategy outputs",
     )
 
+    # Multi-symbol execution mode flags (Phase 6: US4)
+    parser.add_argument(
+        "--portfolio-mode",
+        type=str,
+        choices=["independent", "portfolio"],
+        default="independent",
+        help=(
+            "Multi-symbol execution mode: 'independent' (isolated per-symbol "
+            "backtests) or 'portfolio' (unified portfolio with shared capital, "
+            "correlation tracking, and portfolio metrics). Default: independent (US4)"
+        ),
+    )
+
+    parser.add_argument(
+        "--disable-symbol",
+        type=str,
+        nargs="*",
+        default=[],
+        help=(
+            "Symbol(s) to exclude from multi-symbol run "
+            "(e.g., --disable-symbol GBPUSD USDJPY). Applies to both independent "
+            "and portfolio modes (US4)"
+        ),
+    )
+
+    parser.add_argument(
+        "--correlation-threshold",
+        type=float,
+        help=(
+            "Override default correlation threshold for portfolio mode "
+            "(0.0-1.0). Controls correlation-based position sizing adjustments. "
+            "Only applies when --portfolio-mode=portfolio (US4)"
+        ),
+    )
+
+    parser.add_argument(
+        "--snapshot-interval",
+        type=int,
+        help=(
+            "Snapshot recording interval in bars for portfolio mode. "
+            "Records portfolio state (allocations, correlations, diversification) "
+            "every N bars. Only applies when --portfolio-mode=portfolio (US4)"
+        ),
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -469,6 +514,52 @@ Persistent storage not yet implemented."
     logger.info("Pair(s): %s", ", ".join(args.pair))
     logger.info("Data: %s", args.data)
     logger.info("Dry-run: %s", args.dry_run)
+
+    # Validate Phase 6 (US4) multi-symbol flags
+    if args.correlation_threshold is not None:
+        if not 0.0 <= args.correlation_threshold <= 1.0:
+            print(
+                "Error: --correlation-threshold must be between 0.0 and 1.0. "
+                f"Got: {args.correlation_threshold}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if args.portfolio_mode != "portfolio":
+            logger.warning(
+                "--correlation-threshold only applies to portfolio mode, but "
+                "--portfolio-mode=%s specified. Ignoring threshold.",
+                args.portfolio_mode,
+            )
+
+    if args.snapshot_interval is not None:
+        if args.snapshot_interval <= 0:
+            print(
+                "Error: --snapshot-interval must be positive. "
+                f"Got: {args.snapshot_interval}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if args.portfolio_mode != "portfolio":
+            logger.warning(
+                "--snapshot-interval only applies to portfolio mode, but "
+                "--portfolio-mode=%s specified. Ignoring interval.",
+                args.portfolio_mode,
+            )
+
+    # Log portfolio mode settings
+    if len(args.pair) > 1:
+        logger.info("Portfolio mode: %s", args.portfolio_mode)
+        if args.disable_symbol:
+            logger.info("Disabled symbols: %s", ", ".join(args.disable_symbol))
+        if (
+            args.correlation_threshold is not None
+            and args.portfolio_mode == "portfolio"
+        ):
+            logger.info(
+                "Correlation threshold override: %.2f", args.correlation_threshold
+            )
+        if args.snapshot_interval is not None and args.portfolio_mode == "portfolio":
+            logger.info("Snapshot interval: %d bars", args.snapshot_interval)
 
     # Fraction and portion validation/prompting (Phase 5: US3, FR-002, FR-012, FR-015)
     data_frac = args.data_frac
@@ -652,21 +743,44 @@ Persistent storage not yet implemented."
         if profiler:
             orchestrator.profiler = profiler
 
-        # Check if multi-symbol independent mode should be used
+        # Check if multi-symbol mode should be used
         is_multi_symbol = len(args.pair) > 1
 
         if is_multi_symbol:
-            # Multi-symbol independent mode (Phase 4: US2, T020-T021)
+            # Multi-symbol mode (Phase 4: US2, T020-T021 + Phase 6: US4, T041-T044)
             from ..backtest.portfolio.independent_runner import IndependentRunner
             from ..backtest.portfolio.validation import validate_symbol_list
-            from ..models.portfolio import CurrencyPair
+            from ..models.portfolio import CurrencyPair, PortfolioConfig
 
             logger.info(
-                "Multi-symbol independent mode: %d pairs requested", len(args.pair)
+                "Multi-symbol mode: %d pairs requested, mode=%s",
+                len(args.pair),
+                args.portfolio_mode,
             )
 
             # Create CurrencyPair objects
             requested_pairs = [CurrencyPair(code=p.upper()) for p in args.pair]
+
+            # Apply --disable-symbol filtering (Phase 6: US4, T042)
+            if args.disable_symbol:
+                disabled_codes = {code.upper() for code in args.disable_symbol}
+                before_count = len(requested_pairs)
+                requested_pairs = [
+                    pair for pair in requested_pairs if pair.code not in disabled_codes
+                ]
+                after_count = len(requested_pairs)
+                if after_count < before_count:
+                    logger.info(
+                        "Filtered out %d disabled symbol(s): %s",
+                        before_count - after_count,
+                        ", ".join(disabled_codes),
+                    )
+
+            if not requested_pairs:
+                logger.error(
+                    "No symbols remaining after --disable-symbol filter. Aborting."
+                )
+                sys.exit(1)
 
             # Validate symbols and skip missing ones with warnings (T021)
             data_dir = Path("price_data/processed")
@@ -692,51 +806,127 @@ Persistent storage not yet implemented."
                 ", ".join([p.code for p in valid_pairs]),
             )
 
-            # Create independent runner
-            runner = IndependentRunner(
-                symbols=valid_pairs,
-                data_dir=data_dir,
-            )
-
-            # Run independent backtests
+            # Generate run ID
             run_id = (
-                f"multi_{args.direction.lower()}_"
+                f"multi_{args.portfolio_mode}_{args.direction.lower()}_"
                 f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
             )
-            logger.info(
-                "Running independent multi-symbol backtest with run_id=%s",
-                run_id,
-            )
 
-            results = runner.run(
-                strategy_params=parameters,
-                mode=direction_mode,
-                output_dir=args.output,
-            )
+            # Route to appropriate runner based on portfolio mode
+            # (Phase 6: US4, T041)
+            if args.portfolio_mode == "portfolio":
+                # Portfolio mode: shared capital, correlation tracking
+                # (T041, T043, T044)
+                from ..backtest.portfolio.orchestrator import (
+                    PortfolioOrchestrator,
+                )
 
-            # Store multi-symbol result for output formatting
-            # We'll create a synthetic result object that contains all symbol results
-            result = type(
-                "MultiSymbolResult",
-                (),
-                {
-                    "run_id": run_id,
-                    "direction_mode": direction_mode,
-                    "start_time": datetime.now(UTC),
-                    "total_candles": 0,  # Will sum from individual results
-                    "symbols": [p.code for p in valid_pairs],
-                    "results": results,
-                    "failures": runner.get_failures(),
-                    "metrics": None,  # Multi-symbol doesn't have single metrics object
-                    "is_multi_symbol": True,
-                },
-            )()
+                logger.info(
+                    "Running portfolio multi-symbol backtest with run_id=%s",
+                    run_id,
+                )
 
-            logger.info(
-                "Multi-symbol backtest complete: %d successful, %d failed",
-                len(results),
-                len(runner.get_failures()),
-            )
+                # Create portfolio configuration
+                portfolio_config = PortfolioConfig(
+                    correlation_threshold=(
+                        args.correlation_threshold
+                        if args.correlation_threshold is not None
+                        else 0.7  # Default from spec FR-010
+                    ),
+                    per_pair_thresholds={},  # No per-pair overrides from CLI yet
+                )
+
+                # Create portfolio orchestrator
+                # pylint: disable=fixme
+                portfolio_orch = PortfolioOrchestrator(
+                    symbols=valid_pairs,
+                    portfolio_config=portfolio_config,
+                    initial_capital=10000.0,  # TODO: Make configurable
+                    data_dir=data_dir,
+                )
+
+                # Run portfolio backtest
+                # Note: PortfolioOrchestrator.run() raises NotImplementedError
+                # This is expected for Phase 6 (primitives complete,
+                # full execution pending)
+                try:
+                    # pylint: disable=assignment-from-no-return
+                    results = portfolio_orch.run(
+                        strategy_params=parameters,
+                        mode=direction_mode,
+                        output_dir=args.output,
+                        snapshot_interval=args.snapshot_interval,
+                    )
+                    # Create result object for output formatting
+                    result = type(
+                        "PortfolioResult",
+                        (),
+                        {
+                            "run_id": run_id,
+                            "direction_mode": direction_mode,
+                            "start_time": datetime.now(UTC),
+                            "total_candles": 0,
+                            "symbols": [p.code for p in valid_pairs],
+                            "results": results,
+                            "failures": portfolio_orch.get_failures(),
+                            "metrics": None,
+                            "is_multi_symbol": True,
+                            "is_portfolio_mode": True,
+                        },
+                    )()
+                except NotImplementedError as exc:
+                    logger.error(
+                        "Portfolio mode full execution not yet implemented: %s",
+                        exc,
+                    )
+                    logger.info(
+                        "Portfolio primitives (correlation, allocation, "
+                        "snapshots) are complete. Full orchestration pending "
+                        "future phase."
+                    )
+                    sys.exit(1)
+
+            else:
+                # Independent mode: isolated per-symbol execution (T041)
+                runner = IndependentRunner(
+                    symbols=valid_pairs,
+                    data_dir=data_dir,
+                )
+
+                logger.info(
+                    "Running independent multi-symbol backtest with run_id=%s",
+                    run_id,
+                )
+
+                results = runner.run(
+                    strategy_params=parameters,
+                    mode=direction_mode,
+                    output_dir=args.output,
+                )
+
+                # Create result object for output formatting
+                result = type(
+                    "MultiSymbolResult",
+                    (),
+                    {
+                        "run_id": run_id,
+                        "direction_mode": direction_mode,
+                        "start_time": datetime.now(UTC),
+                        "total_candles": 0,  # Sum from individual results
+                        "symbols": [p.code for p in valid_pairs],
+                        "results": results,
+                        "failures": runner.get_failures(),
+                        "metrics": None,  # No single metrics for multi-symbol
+                        "is_multi_symbol": True,
+                        "is_portfolio_mode": False,
+                    },
+                )()
+
+                logger.info(
+                    "Multi-symbol backtest complete: %d successful, %d failed",
+                    len(results),
+                    len(runner.get_failures()),
+                )
 
         else:
             # Single-symbol mode (backward compatibility)
