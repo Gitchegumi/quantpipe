@@ -5,9 +5,6 @@ results with proper handling of duplicates, gaps, cadence validation,
 and schema restriction.
 """
 
-import tempfile
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
@@ -257,7 +254,7 @@ class TestIngestionPipelineIntegration:
         timestamps = pd.date_range(
             "2025-01-01", periods=100, freq="1min", tz="UTC"
         ).tolist()
-        # Remove 10% of timestamps spread throughout (10 out of 100) - exceeds 2% threshold
+        # Remove 10% of timestamps (10 out of 100) - exceeds 2% threshold
         # Remove every 10th timestamp to create distributed gaps
         timestamps_subset = [timestamps[i] for i in range(100) if i % 10 != 5]
 

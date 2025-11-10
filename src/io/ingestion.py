@@ -210,10 +210,10 @@ def ingest_ohlcv_data(
             )
 
             if deviation > 2.0:
+                missing = expected_intervals - actual_intervals
                 raise RuntimeError(
                     f"Cadence deviation exceeds tolerance: {deviation:.2f}% "
-                    f"(expected ≤2.0%). Missing {expected_intervals - actual_intervals} "
-                    f"intervals."
+                    f"(expected ≤2.0%). Missing {missing} intervals."
                 )
 
             # Stage 5: Gap detection and filling
