@@ -114,7 +114,9 @@ def compute_cadence_minutes(timestamps: pd.Series) -> int:
 
 
 def validate_cadence(
-    timestamps: pd.Series | pd.DatetimeIndex, expected_minutes: int, tolerance: float = 0.02
+    timestamps: pd.Series | pd.DatetimeIndex,
+    expected_minutes: int,
+    tolerance: float = 0.02,
 ) -> None:
     """Validate that timestamps meet cadence uniformity requirements.
 

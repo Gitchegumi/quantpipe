@@ -38,7 +38,11 @@ from src.io.hash_utils import compute_dataframe_hash
 from src.io.logging_constants import IngestionStage, MAX_PROGRESS_UPDATES
 from src.io.perf_utils import PerformanceTimer, calculate_throughput
 from src.io.progress import ProgressReporter
-from src.io.schema import CORE_COLUMNS, restrict_to_core_schema, validate_required_columns
+from src.io.schema import (
+    CORE_COLUMNS,
+    restrict_to_core_schema,
+    validate_required_columns,
+)
 from src.io.timezone_validate import validate_utc_timezone
 
 logger = logging.getLogger(__name__)

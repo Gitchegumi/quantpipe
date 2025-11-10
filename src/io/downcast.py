@@ -100,6 +100,6 @@ def downcast_float_columns(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+
 # Alias for backward compatibility
 try_downcast_float_columns = downcast_float_columns
-

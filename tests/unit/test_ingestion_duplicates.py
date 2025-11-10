@@ -324,4 +324,3 @@ class TestDuplicateHandlingDeterministic:
         # Duplicates should be at indices 3 and 4 (first occurrences at 1 and 2)
         assert mask[3] and mask[4]
         assert not mask[1] and not mask[2]
-
