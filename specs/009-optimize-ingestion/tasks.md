@@ -46,18 +46,18 @@ MVP Scope: Deliver User Story 1 (Fast Core Ingestion) with performance baseline 
 Goal: Ingest 6.9M-row baseline ≤120s; produce only core columns + deterministic gaps & duplicates handling.
 Independent Test Criteria: (a) runtime ≤120s (b) core schema only (c) gap count correctness (d) duplicate removals logged (e) no per-row loops (static lint/inspection) (f) progress updates ≤5.
 
-- [ ] T028 [US1] Implement ingestion pipeline assembly (read→sort→dedupe→cadence validate→gap fill→schema restrict→metrics) in `src/io/ingestion.py`
-- [ ] T029 [P] [US1] Implement Arrow backend detection + fallback logging in `src/io/arrow_config.py`
-- [ ] T030 [P] [US1] Integrate downcast option into pipeline in `src/io/ingestion.py`
-- [ ] T031 [P] [US1] Add metrics struct (runtime, counts, backend) in `src/io/metrics.py`
-- [ ] T032 [P] [US1] Add progress stage emission (stages enumerated) in `src/io/progress.py`
-- [ ] T033 [US1] Implement gap fill vectorization using reindex & forward-fill in `src/io/gap_fill.py`
-- [ ] T034 [US1] Implement duplicate resolution integration into pipeline in `src/io/ingestion.py`
-- [ ] T035 [US1] Implement cadence deviation check (>2% threshold) in `src/io/cadence.py`
-- [ ] T036 [US1] Add unit tests: gap synthesis correctness at `tests/unit/test_ingestion_gap_fill.py`
-- [ ] T037 [US1] Add unit tests: duplicate handling deterministic at `tests/unit/test_ingestion_duplicates.py`
-- [ ] T038 [US1] Add unit tests: cadence validation errors at `tests/unit/test_ingestion_cadence.py`
-- [ ] T039 [US1] Add unit tests: schema restriction & column order at `tests/unit/test_ingestion_schema.py`
+- [X] T028 [US1] Implement ingestion pipeline assembly (read→sort→dedupe→cadence validate→gap fill→schema restrict→metrics) in `src/io/ingestion.py`
+- [X] T029 [P] [US1] Implement Arrow backend detection + fallback logging in `src/io/arrow_config.py`
+- [X] T030 [P] [US1] Integrate downcast option into pipeline in `src/io/ingestion.py`
+- [X] T031 [P] [US1] Add metrics struct (runtime, counts, backend) in `src/io/metrics.py`
+- [X] T032 [P] [US1] Add progress stage emission (stages enumerated) in `src/io/progress.py`
+- [X] T033 [US1] Implement gap fill vectorization using reindex & forward-fill in `src/io/gap_fill.py`
+- [X] T034 [US1] Implement duplicate resolution integration into pipeline in `src/io/ingestion.py`
+- [X] T035 [US1] Implement cadence deviation check (>2% threshold) in `src/io/cadence.py`
+- [X] T036 [US1] Add unit tests: gap synthesis correctness at `tests/unit/test_ingestion_gap_fill.py`
+- [X] T037 [US1] Add unit tests: duplicate handling deterministic at `tests/unit/test_ingestion_duplicates.py`
+- [X] T038 [US1] Add unit tests: cadence validation errors at `tests/unit/test_ingestion_cadence.py`
+- [X] T039 [US1] Add unit tests: schema restriction & column order at `tests/unit/test_ingestion_schema.py`
 - [ ] T040 [US1] Add integration test: end-to-end ingestion result invariants at `tests/integration/test_ingestion_pipeline.py`
 - [ ] T041 [US1] Add performance benchmark harness with baseline timing at `tests/performance/benchmark_ingestion.py`
 - [ ] T042 [US1] Add static scan (Ruff rule/custom) to detect forbidden per-row loops in `src/io/` at `scripts/ci/check_no_row_loops.py`
