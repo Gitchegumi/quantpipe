@@ -13,6 +13,7 @@ from .store import (
     unregister_indicator,
 )
 
+
 __all__ = [
     "IndicatorSpec",
     "register_indicator",

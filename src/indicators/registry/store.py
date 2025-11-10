@@ -5,9 +5,10 @@ and retrieving indicator specifications.
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Optional
 
 from .specs import IndicatorSpec
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class IndicatorRegistry:
 
     def __init__(self) -> None:
         """Initialize the indicator registry."""
-        self._indicators: Dict[str, IndicatorSpec] = {}
+        self._indicators: dict[str, IndicatorSpec] = {}
 
     def register(self, spec: IndicatorSpec) -> None:
         """Register an indicator specification.
@@ -29,9 +30,7 @@ class IndicatorRegistry:
             ValueError: If an indicator with the same name already exists.
         """
         if spec.name in self._indicators:
-            raise ValueError(
-                f"Indicator '{spec.name}' is already registered"
-            )
+            raise ValueError(f"Indicator '{spec.name}' is already registered")
 
         self._indicators[spec.name] = spec
         logger.info("Registered indicator: %s (v%s)", spec.name, spec.version)
@@ -62,7 +61,7 @@ class IndicatorRegistry:
         """
         return self._indicators.get(name)
 
-    def list_all(self) -> List[str]:
+    def list_all(self) -> list[str]:
         """List all registered indicator names.
 
         Returns:
@@ -130,7 +129,7 @@ def get_indicator(name: str) -> Optional[IndicatorSpec]:
     return _global_registry.get(name)
 
 
-def list_indicators() -> List[str]:
+def list_indicators() -> list[str]:
     """List all registered indicator names.
 
     Returns:

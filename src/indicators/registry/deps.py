@@ -5,9 +5,9 @@ using topological sorting to ensure correct computation order.
 """
 
 import logging
-from typing import Dict, List, Set
 
 from .specs import IndicatorSpec
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,9 @@ class DependencyCycleError(Exception):
 
 
 def topological_sort(
-    indicators: Dict[str, IndicatorSpec],
-    requested: List[str],
-) -> List[str]:
+    indicators: dict[str, IndicatorSpec],
+    requested: list[str],
+) -> list[str]:
     """Sort indicators in dependency order using topological sort.
 
     Args:
@@ -34,8 +34,8 @@ def topological_sort(
         KeyError: If a required indicator is not found.
     """
     # Build dependency graph
-    graph: Dict[str, Set[str]] = {}
-    in_degree: Dict[str, int] = {}
+    graph: dict[str, set[str]] = {}
+    in_degree: dict[str, int] = {}
 
     # Initialize graph for all requested indicators
     for name in requested:
@@ -56,8 +56,8 @@ def topological_sort(
                 in_degree[name] = in_degree.get(name, 0) + 1
 
     # Kahn's algorithm for topological sort
-    result: List[str] = []
-    queue: List[str] = [name for name in requested if in_degree[name] == 0]
+    result: list[str] = []
+    queue: list[str] = [name for name in requested if in_degree[name] == 0]
 
     while queue:
         current = queue.pop(0)
@@ -82,9 +82,9 @@ def topological_sort(
 
 
 def resolve_dependencies(
-    indicators: Dict[str, IndicatorSpec],
-    requested: List[str],
-) -> List[IndicatorSpec]:
+    indicators: dict[str, IndicatorSpec],
+    requested: list[str],
+) -> list[IndicatorSpec]:
     """Resolve indicator dependencies and return specs in computation order.
 
     Args:

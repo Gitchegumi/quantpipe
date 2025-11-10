@@ -5,12 +5,12 @@ including duplicate detection and request validation.
 """
 
 import logging
-from typing import List
+
 
 logger = logging.getLogger(__name__)
 
 
-def validate_unique_indicators(indicators: List[str]) -> None:
+def validate_unique_indicators(indicators: list[str]) -> None:
     """Validate that indicator list contains no duplicates.
 
     Args:
@@ -28,14 +28,12 @@ def validate_unique_indicators(indicators: List[str]) -> None:
         seen.add(indicator)
 
     if duplicates:
-        raise ValueError(
-            f"Duplicate indicator names: {', '.join(sorted(duplicates))}"
-        )
+        raise ValueError(f"Duplicate indicator names: {', '.join(sorted(duplicates))}")
 
     logger.debug("Indicator uniqueness validation passed")
 
 
-def validate_indicator_names(indicators: List[str]) -> None:
+def validate_indicator_names(indicators: list[str]) -> None:
     """Validate that indicator names are non-empty and properly formatted.
 
     Args:

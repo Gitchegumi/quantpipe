@@ -4,8 +4,9 @@ This module defines the core data structures for indicator specifications
 in the registry system.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List
+from typing import Any
 
 import pandas as pd
 
@@ -24,11 +25,11 @@ class IndicatorSpec:
     """
 
     name: str
-    requires: List[str]
-    provides: List[str]
-    compute: Callable[[pd.DataFrame, Dict[str, Any]], Dict[str, pd.Series]]
+    requires: list[str]
+    provides: list[str]
+    compute: Callable[[pd.DataFrame, dict[str, Any]], dict[str, pd.Series]]
     version: str = "1.0.0"
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate indicator spec after initialization."""
@@ -39,11 +40,7 @@ class IndicatorSpec:
             raise ValueError(f"Indicator '{self.name}' must specify required columns")
 
         if not self.provides:
-            raise ValueError(
-                f"Indicator '{self.name}' must specify provided columns"
-            )
+            raise ValueError(f"Indicator '{self.name}' must specify provided columns")
 
         if not callable(self.compute):
-            raise ValueError(
-                f"Indicator '{self.name}' compute must be callable"
-            )
+            raise ValueError(f"Indicator '{self.name}' compute must be callable")

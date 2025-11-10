@@ -6,12 +6,26 @@ original ingestion result.
 """
 
 import logging
+import time
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 
+from src.io.hash_utils import compute_dataframe_hash
+from src.indicators.errors import (
+    DuplicateIndicatorError,
+    ImmutabilityViolationError,
+    UnknownIndicatorError,
+)
+from src.indicators.registry.builtins import register_builtins
+from src.indicators.registry.store import get_registry
+
+
 logger = logging.getLogger(__name__)
+
+# Core columns that must remain unchanged
+CORE_COLUMNS = ["timestamp_utc", "open", "high", "low", "close", "volume", "is_gap"]
 
 
 @dataclass
@@ -28,15 +42,15 @@ class EnrichmentResult:
 
     core: pd.DataFrame
     enriched: pd.DataFrame
-    indicators_applied: List[str]
-    failed_indicators: List[str]
+    indicators_applied: list[str]
+    failed_indicators: list[str]
     runtime_seconds: float
 
 
 def enrich(
     core_ref: Any,  # IngestionResult reference
-    indicators: List[str],
-    params: Dict[str, Any] = None,
+    indicators: list[str],
+    params: dict[str, Any] = None,
     strict: bool = False,
 ) -> EnrichmentResult:
     """Compute requested indicators on core dataset without mutation.
@@ -53,6 +67,113 @@ def enrich(
     Raises:
         ValueError: If duplicate indicator names or core ref invalid (always).
         KeyError: If unknown indicator and strict=True.
+        ImmutabilityViolationError: If core dataset mutated during enrichment.
     """
-    # Implementation will be completed in Phase 4 (US2)
-    raise NotImplementedError("Enrichment pipeline to be implemented in Phase 4")
+    start_time = time.perf_counter()
+
+    # Ensure builtins are registered
+    register_builtins()
+
+    # Validate inputs
+    if core_ref is None:
+        raise ValueError("core_ref cannot be None")
+
+    # Extract core DataFrame (support both IngestionResult and raw DataFrame)
+    if hasattr(core_ref, "data"):
+        core_df = core_ref.data
+    elif isinstance(core_ref, pd.DataFrame):
+        core_df = core_ref
+    else:
+        raise ValueError(
+            f"core_ref must be IngestionResult or DataFrame, got {type(core_ref)}"
+        )
+
+    if params is None:
+        params = {}
+
+    # Check for duplicate indicators
+    duplicates = {ind for ind in indicators if indicators.count(ind) > 1}
+    if duplicates:
+        raise DuplicateIndicatorError(duplicates)
+
+    # Compute hash of core columns before enrichment
+    core_hash_before = compute_dataframe_hash(core_df, CORE_COLUMNS)
+
+    # Resolve indicators and check for unknown names
+    registry = get_registry()
+    failed_indicators: list[str] = []
+    indicators_applied: list[str] = []
+    enriched_df = core_df.copy()
+
+    for indicator_name in indicators:
+        spec = registry.get(indicator_name)
+
+        if spec is None:
+            # Unknown indicator
+            available = registry.list_all()
+            if strict:
+                raise UnknownIndicatorError(indicator_name, available)
+
+            # Non-strict mode: collect failure and continue
+            failed_indicators.append(indicator_name)
+            logger.warning(
+                "Unknown indicator '%s' (non-strict mode), skipping",
+                indicator_name,
+            )
+            continue
+
+        # Check dependencies
+        missing_deps = set(spec.requires) - set(enriched_df.columns)
+        if missing_deps:
+            error_msg = (
+                f"Indicator '{indicator_name}' requires missing columns: "
+                f"{missing_deps}"
+            )
+            if strict:
+                raise ValueError(error_msg)
+
+            failed_indicators.append(indicator_name)
+            logger.warning("%s (non-strict mode), skipping", error_msg)
+            continue
+
+        # Compute indicator
+        try:
+            indicator_params = params.get(indicator_name, spec.params)
+            result = spec.compute(enriched_df, indicator_params)
+
+            # Add computed columns to enriched DataFrame
+            for col_name, col_series in result.items():
+                enriched_df[col_name] = col_series
+
+            indicators_applied.append(indicator_name)
+            logger.info("Applied indicator: %s", indicator_name)
+
+        except Exception as e:  # pylint: disable=broad-except
+            error_msg = f"Error computing indicator '{indicator_name}': {e}"
+            if strict:
+                raise ValueError(error_msg) from e
+
+            failed_indicators.append(indicator_name)
+            logger.warning("%s (non-strict mode), skipping", error_msg)
+
+    # Verify immutability: core columns must not have changed
+    core_hash_after = compute_dataframe_hash(enriched_df, CORE_COLUMNS)
+    if core_hash_before != core_hash_after:
+        raise ImmutabilityViolationError(core_hash_before, core_hash_after)
+
+    runtime = time.perf_counter() - start_time
+
+    logger.info(
+        "Enrichment complete: %d indicators applied, %d failed, %.3f seconds",
+        len(indicators_applied),
+        len(failed_indicators),
+        runtime,
+    )
+
+    return EnrichmentResult(
+        core=core_df,
+        enriched=enriched_df,
+        indicators_applied=indicators_applied,
+        failed_indicators=failed_indicators,
+        runtime_seconds=runtime,
+    )
