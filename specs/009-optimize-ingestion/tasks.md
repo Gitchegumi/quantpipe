@@ -58,11 +58,11 @@ Independent Test Criteria: (a) runtime ≤120s (b) core schema only (c) gap coun
 - [X] T037 [US1] Add unit tests: duplicate handling deterministic at `tests/unit/test_ingestion_duplicates.py`
 - [X] T038 [US1] Add unit tests: cadence validation errors at `tests/unit/test_ingestion_cadence.py`
 - [X] T039 [US1] Add unit tests: schema restriction & column order at `tests/unit/test_ingestion_schema.py`
-- [ ] T040 [US1] Add integration test: end-to-end ingestion result invariants at `tests/integration/test_ingestion_pipeline.py`
-- [ ] T041 [US1] Add performance benchmark harness with baseline timing at `tests/performance/benchmark_ingestion.py`
-- [ ] T042 [US1] Add static scan (Ruff rule/custom) to detect forbidden per-row loops in `src/io/` at `scripts/ci/check_no_row_loops.py`
-- [ ] T043 [US1] Document ingestion usage & performance expectations at `docs/performance.md`
-- [ ] T044 [US1] Update quickstart ingestion section runtime notes in `specs/009-optimize-ingestion/quickstart.md`
+- [X] T040 [US1] Add integration test: end-to-end ingestion result invariants at `tests/integration/test_ingestion_pipeline.py`
+- [x] T041 [US1] Add performance benchmark harness with baseline timing at `tests/performance/benchmark_ingestion.py`
+- [x] T042 [US1] Add static scan (Ruff rule/custom) to detect forbidden per-row loops in `src/io/` at `scripts/ci/check_no_row_loops.py`
+- [x] T043 [US1] Document ingestion usage & performance expectations at `docs/performance.md`
+- [x] T044 [US1] Update quickstart ingestion section runtime notes in `specs/009-optimize-ingestion/quickstart.md`
 
 ## Phase 4: User Story 2 - Opt-In Indicator Enrichment (P2)
 

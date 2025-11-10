@@ -11,6 +11,8 @@
 
 ## 1. Core Ingestion (Fast Columnar Mode)
 
+**Performance Note**: The implemented ingestion pipeline targets ≤120 seconds for ~6.9M rows (SC-001), with a stretch goal of ≤90 seconds (SC-012). All operations use vectorized pandas/numpy to avoid per-row iteration. For performance validation, run `poetry run pytest tests/performance/benchmark_ingestion.py -m performance`.
+
 ```python
 from trading_strategies.backtest.ingest import ingest
 
@@ -30,8 +32,19 @@ print("Gaps inserted:", result.metrics.gaps_inserted)
 Checklist validation:
 
 * Core columns only: `timestamp_utc, open, high, low, close, volume, is_gap`
-* Runtime ≤ 120s (SC-001) baseline target
+* Runtime ≤ 120s (SC-001) baseline target for 6.9M rows
+* Throughput ≥3.45M rows/min expected
 * ≤5 progress updates (SC-008)
+* All operations vectorized (no `.iterrows()` / `.itertuples()`)
+
+**Actual Implementation**: The current code uses `src.io.ingestion.ingest_ohlcv_data()` which provides:
+
+* Vectorized gap detection via numpy diff operations
+* Vectorized deduplication with pandas `drop_duplicates()`
+* Comprehensive metrics: runtime, throughput, gaps, duplicates
+* Static analysis enforcement (no per-row loops)
+
+See `docs/performance.md` for detailed performance documentation.
 
 ## 2. Iterator Mode (Legacy Compatibility)
 

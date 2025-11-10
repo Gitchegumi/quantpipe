@@ -19,6 +19,103 @@ Performance baseline captured on 2025-11-05 before optimization (Issue #15):
 | Memory peak ratio | 1.4× | ≤1.5× | Within bounds |
 | Parallel efficiency (4 workers) | N/A | ≥70% | Pending (Phase 6) |
 
+## Data Ingestion Performance
+
+**Objective**: Vectorized OHLCV data ingestion with gap detection and deduplication at scale.
+
+### Baseline Targets
+
+| Metric | Target | Stretch Goal | Requirement |
+|--------|--------|--------------|-------------|
+| Runtime (6.9M rows) | ≤120 seconds | ≤90 seconds | SC-001 |
+| Throughput | ≥3.45M rows/min | ≥4.6M rows/min | SC-001 |
+| Memory ratio | ≤1.5× raw data | ≤1.3× raw data | SC-009 |
+
+### Implementation (Spec 009)
+
+**Key Optimizations**:
+
+1. **Vectorized Gap Detection** (FR-006)
+   - Uses numpy diff operations instead of per-row loops
+   - Identifies missing timestamps via timedelta thresholds
+   - Generates synthetic OHLC bars for missing periods
+
+2. **Vectorized Deduplication** (FR-006)
+   - Pandas `drop_duplicates()` with subset=['timestamp_utc']
+   - Keep='last' policy for duplicate timestamps
+   - O(n log n) complexity vs O(n²) row-by-row
+
+3. **No Per-Row Iteration** (FR-006 Constraint)
+   - Static analysis enforces no `.iterrows()` or `.itertuples()`
+   - CI gate: `scripts/ci/check_no_row_loops.py`
+   - All operations use pandas/numpy vectorization
+
+4. **Comprehensive Metrics** (FR-012)
+   - Logs runtime, throughput, rows processed
+   - Tracks gaps inserted, duplicates removed
+   - Reports acceleration backend (numpy/numba)
+
+### Usage
+
+```python
+from src.io.ingestion import ingest_ohlcv_data
+
+# Ingest with gap filling and deduplication
+df = ingest_ohlcv_data(
+    raw_csv_path="price_data/raw/eurusd/eurusd_2024.csv",
+    output_csv_path="price_data/processed/eurusd/eurusd_2024.csv",
+    expected_cadence_seconds=60,
+    tz_name="UTC"
+)
+
+# Check ingestion metrics
+print(f"Rows output: {df.shape[0]:,}")
+print(f"Gaps filled: {df['is_gap'].sum():,}")
+```
+
+### Performance Validation
+
+```bash
+# Run ingestion benchmark (requires 6.9M row baseline dataset)
+poetry run pytest tests/performance/benchmark_ingestion.py -v -m performance
+
+# Results exported to: results/benchmark_summary.json
+```
+
+**Expected Output** (SC-001 compliance):
+
+```json
+{
+  "test_name": "test_ingestion_baseline_performance",
+  "runtime_seconds": 118.4,
+  "throughput_rows_per_min": 3500000,
+  "rows_output": 6900000,
+  "acceleration_backend": "numpy",
+  "gaps_inserted": 142,
+  "duplicates_removed": 8,
+  "target_seconds": 120,
+  "passed": true,
+  "stretch_candidate": false
+}
+```
+
+### Quality Gates
+
+1. **Performance Benchmark** (`tests/performance/benchmark_ingestion.py`)
+   - Asserts runtime ≤ 120 seconds for 6.9M rows
+   - Logs stretch goal achievement (≤90s)
+   - Exports JSON results for CI/CD
+
+2. **Integration Tests** (`tests/integration/test_ingestion_pipeline.py`)
+   - 10 end-to-end tests covering all ingestion scenarios
+   - Validates gap detection, deduplication, sorting, metrics
+   - Tests edge cases: empty files, missing columns, invalid cadence
+
+3. **Static Analysis** (`scripts/ci/check_no_row_loops.py`)
+   - Scans `src/io/` for forbidden `.iterrows()` / `.itertuples()`
+   - Exit code 1 if per-row iteration detected
+   - Run via: `poetry run python scripts/ci/check_no_row_loops.py`
+
 ## Optimization Phases
 
 ### Phase 3: User Story US1 (Fast Execution) - COMPLETE ✅
