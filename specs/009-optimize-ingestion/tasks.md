@@ -10,36 +10,36 @@ MVP Scope: Deliver User Story 1 (Fast Core Ingestion) with performance baseline 
 
 (Repository already bootstrapped; these tasks ensure environment + baseline measurement & shared conventions.)
 
-- [ ] T001 Ensure Arrow backend enabled default where available (set pandas options) in `src/io/arrow_config.py`
-- [ ] T002 Add performance benchmark raw data manifest (baseline dataset reference) in `tests/performance/fixtures/README.md`
-- [ ] T003 Create timing + memory sampling utility skeleton in `src/io/perf_utils.py`
-- [ ] T004 Add hash utility for core immutability verification in `src/io/hash_utils.py`
-- [ ] T005 Add logging constants (progress stage names) in `src/io/logging_constants.py`
-- [ ] T006 Create placeholder ingestion module file (will be filled in US1) at `src/io/ingestion.py`
-- [ ] T007 Create placeholder registry package `src/indicators/registry/__init__.py`
-- [ ] T008 Add stub enrich module (will be filled in US2) at `src/indicators/enrich.py`
-- [ ] T009 Add empty performance benchmark script placeholder at `tests/performance/benchmark_ingestion.py`
-- [ ] T010 Add integration test placeholder at `tests/integration/test_ingest_then_enrich_pipeline.py`
-- [ ] T011 Add README for indicators package at `src/indicators/README.md`
+- [X] T001 Ensure Arrow backend enabled default where available (set pandas options) in `src/io/arrow_config.py`
+- [X] T002 Add performance benchmark raw data manifest (baseline dataset reference) in `tests/performance/fixtures/README.md`
+- [X] T003 Create timing + memory sampling utility skeleton in `src/io/perf_utils.py`
+- [X] T004 Add hash utility for core immutability verification in `src/io/hash_utils.py`
+- [X] T005 Add logging constants (progress stage names) in `src/io/logging_constants.py`
+- [X] T006 Create placeholder ingestion module file (will be filled in US1) at `src/io/ingestion.py`
+- [X] T007 Create placeholder registry package `src/indicators/registry/__init__.py`
+- [X] T008 Add stub enrich module (will be filled in US2) at `src/indicators/enrich.py`
+- [X] T009 Add empty performance benchmark script placeholder at `tests/performance/benchmark_ingestion.py`
+- [X] T010 Add integration test placeholder at `tests/integration/test_ingest_then_enrich_pipeline.py`
+- [X] T011 Add README for indicators package at `src/indicators/README.md`
 
 ## Phase 2: Foundational (Shared Utilities / Blocking Prereqs)
 
-- [ ] T012 Implement cadence interval computation + expected row count helper in `src/io/cadence.py`
-- [ ] T013 Implement duplicate detection + resolution (keep-first) helper in `src/io/duplicates.py`
-- [ ] T014 Implement gap detection & index reindex helper (no fill yet) in `src/io/gaps.py`
-- [ ] T015 Implement gap fill synthesizer (vectorized insertion + flag) in `src/io/gap_fill.py`
-- [ ] T016 Implement numeric downcast utility with safe precision checks in `src/io/downcast.py`
-- [ ] T017 Implement throughput + runtime metric capture in `src/io/perf_utils.py`
-- [ ] T018 Implement progress stage reporter (≤5 updates) in `src/io/progress.py`
-- [ ] T019 Implement core schema enforcement & column restriction in `src/io/schema.py`
-- [ ] T020 Implement UTC timestamp validator (reject non-UTC) in `src/io/timezone_validate.py`
-- [ ] T021 Implement immutability hash function in `src/io/hash_utils.py`
-- [ ] T022 Implement registry base data structures (IndicatorSpec dataclass) in `src/indicators/registry/specs.py`
-- [ ] T023 Implement registry storage & register/unregister API in `src/indicators/registry/store.py`
-- [ ] T024 Implement dependency resolution (topological sort) in `src/indicators/registry/deps.py`
-- [ ] T025 Implement enrichment validation helpers (duplicate indicator names) in `src/indicators/validation.py`
-- [ ] T026 Add unit tests for foundational utilities at `tests/unit/test_foundations_ingestion.py`
-- [ ] T027 Add unit tests for registry base + deps at `tests/unit/test_indicator_registry.py`
+- [X] T012 Implement cadence interval computation + expected row count helper in `src/io/cadence.py`
+- [X] T013 Implement duplicate detection + resolution (keep-first) helper in `src/io/duplicates.py`
+- [X] T014 Implement gap detection & index reindex helper (no fill yet) in `src/io/gaps.py`
+- [X] T015 Implement gap fill synthesizer (vectorized insertion + flag) in `src/io/gap_fill.py`
+- [X] T016 Implement numeric downcast utility with safe precision checks in `src/io/downcast.py`
+- [X] T017 Implement throughput + runtime metric capture in `src/io/perf_utils.py`
+- [X] T018 Implement progress stage reporter (≤5 updates) in `src/io/progress.py`
+- [X] T019 Implement core schema enforcement & column restriction in `src/io/schema.py`
+- [X] T020 Implement UTC timestamp validator (reject non-UTC) in `src/io/timezone_validate.py`
+- [X] T021 Implement immutability hash function in `src/io/hash_utils.py`
+- [X] T022 Implement registry base data structures (IndicatorSpec dataclass) in `src/indicators/registry/specs.py`
+- [X] T023 Implement registry storage & register/unregister API in `src/indicators/registry/store.py`
+- [X] T024 Implement dependency resolution (topological sort) in `src/indicators/registry/deps.py`
+- [X] T025 Implement enrichment validation helpers (duplicate indicator names) in `src/indicators/validation.py`
+- [X] T026 Add unit tests for foundational utilities at `tests/unit/test_foundations_ingestion.py`
+- [X] T027 Add unit tests for registry base + deps at `tests/unit/test_indicator_registry.py`
 
 ## Phase 3: User Story 1 - Fast Core Ingestion (P1)
 
