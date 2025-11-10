@@ -16,10 +16,17 @@ Computes ONLY requested indicators on an existing immutable core ingestion resul
 
 | Name | Type | Required | Constraints | Description |
 |------|------|----------|-------------|-------------|
-| core_ref | object (IngestionResult reference) | Yes | MUST be valid ingestion output | Source core dataset (FR-018 immutability) |
+| core_ref | DataFrame | Yes | MUST contain core columns | Source core dataset (FR-018 immutability) |
 | indicators | list[str] | Yes | unique names | Indicator identifiers to compute (FR-006) |
-| params | dict[str, Any] | No | optional | Global / per-indicator tunables |
-| strict | bool | No | default False | Unknown names abort early if True (FR-007) |
+| params | dict[str, dict] | No | optional | Per-indicator parameter overrides |
+| strict | bool | No | default True | Unknown names abort early if True (FR-007) |
+
+**Implementation Notes:**
+
+* `core_ref` accepts a pandas DataFrame directly (not IngestionResult wrapper)
+* `params` structure: `{"indicator_name": {"param_key": value}}` for per-indicator tuning
+* `strict=True` (default) raises `UnknownIndicatorError` before any computation
+* `strict=False` collects failures and continues with valid indicators
 
 ### Indicator Registry Contract
 
@@ -56,10 +63,21 @@ Computes ONLY requested indicators on an existing immutable core ingestion resul
 
 ### Data Structure (In-Memory)
 
-| Component | Type | Notes |
-|-----------|------|-------|
-| core | DataFrame[CoreCandleRecord] | Unchanged reference |
-| enriched | DataFrame | New DataFrame with indicator columns only |
+**Return Type:** `EnrichmentResult` (dataclass)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| enriched | DataFrame | New DataFrame with core + indicator columns |
+| indicators_applied | list[str] | Successfully computed indicator names |
+| failed_indicators | list[tuple[str, Exception]] | Failed indicators with exceptions (empty if strict=True) |
+| runtime_seconds | float | Total enrichment computation time |
+
+**Implementation Details:**
+
+* `enriched` DataFrame contains all core columns plus new indicator columns
+* Original `core_ref` DataFrame is never modified (immutability guarantee)
+* `failed_indicators` is a list of tuples: `(indicator_name, exception_object)`
+* All fields accessible via dot notation: `result.enriched`, `result.indicators_applied`, etc.
 
 ## Errors
 
@@ -81,13 +99,33 @@ Computes ONLY requested indicators on an existing immutable core ingestion resul
 ## Example Request (Pseudo-Python)
 
 ```python
-enriched = enrich(
-    core_ref=ingestion_result,
+from src.io.enrich import enrich
+
+# Basic usage with strict validation
+result = enrich(
+    core_ref=ingestion_df,
     indicators=["ema20", "ema50", "atr14"],
-    params={"ema": {"method": "exponential"}},
     strict=True,
 )
-print(enriched.indicators_applied)
+print("Applied:", result.indicators_applied)
+print("Enriched shape:", result.enriched.shape)
+
+# With custom parameters
+result_custom = enrich(
+    core_ref=ingestion_df,
+    indicators=["ema20"],
+    params={"ema20": {"period": 30}},  # Override default period
+    strict=True,
+)
+
+# Non-strict mode (collect failures)
+result_soft = enrich(
+    core_ref=ingestion_df,
+    indicators=["ema20", "unknown_indicator", "atr14"],
+    strict=False,
+)
+print("Applied:", result_soft.indicators_applied)     # ['ema20', 'atr14']
+print("Failed:", result_soft.failed_indicators)       # [('unknown_indicator', UnknownIndicatorError(...))]
 ```
 
 ## Extensibility Hooks

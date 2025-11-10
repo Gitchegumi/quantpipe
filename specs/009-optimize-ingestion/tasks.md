@@ -69,22 +69,22 @@ Independent Test Criteria: (a) runtime ≤120s (b) core schema only (c) gap coun
 Goal: Compute only requested indicators via registry without mutating core dataset.
 Independent Test Criteria: (a) only requested columns appended (b) unknown names fast-fail (strict) (c) non-strict accumulates failures (d) core hash stable (e) registry API supports dynamic registration.
 
-- [ ] T045 [US2] Implement enrichment orchestration (validate→resolve deps→compute→assemble result) in `src/indicators/enrich.py`
-- [ ] T046 [P] [US2] Implement immutability guard (hash before/after) in `src/indicators/enrich.py`
-- [ ] T047 [P] [US2] Implement strict vs non-strict handling (fast-fail) in `src/indicators/enrich.py`
-- [ ] T048 [P] [US2] Implement error types/exceptions for enrichment in `src/indicators/errors.py`
-- [ ] T049 [US2] Implement built-in EMA (vectorized) in `src/indicators/builtin/ema.py`
-- [ ] T050 [P] [US2] Implement ATR in `src/indicators/builtin/atr.py`
-- [ ] T051 [P] [US2] Implement placeholder StochRSI (if already existing move/refactor) in `src/indicators/builtin/stochrsi.py`
-- [ ] T052 [US2] Register built-in indicators in `src/indicators/registry/builtins.py`
-- [ ] T053 [US2] Add unit tests: registry registration/unregistration at `tests/unit/test_indicator_registry.py`
-- [ ] T054 [US2] Add unit tests: enrichment only requested columns at `tests/unit/test_enrich_selectivity.py`
-- [ ] T055 [US2] Add unit tests: strict unknown fast-fail at `tests/unit/test_enrich_strict.py`
-- [ ] T056 [US2] Add unit tests: non-strict collects failures at `tests/unit/test_enrich_non_strict.py`
-- [ ] T057 [US2] Add unit tests: immutability hash unchanged at `tests/unit/test_enrich_immutability.py`
-- [ ] T058 [US2] Add integration test: ingest→enrich pipeline at `tests/integration/test_ingest_then_enrich_pipeline.py`
-- [ ] T059 [US2] Update quickstart enrichment examples with final indicator names at `specs/009-optimize-ingestion/quickstart.md`
-- [ ] T060 [US2] Update contracts (`contracts/enrich.md`) with any param refinements
+- [x] T045 [US2] Implement enrichment orchestration (validate→resolve deps→compute→assemble result) in `src/indicators/enrich.py`
+- [x] T046 [P] [US2] Implement immutability guard (hash before/after) in `src/indicators/enrich.py`
+- [x] T047 [P] [US2] Implement strict vs non-strict handling (fast-fail) in `src/indicators/enrich.py`
+- [x] T048 [P] [US2] Implement error types/exceptions for enrichment in `src/indicators/errors.py`
+- [x] T049 [US2] Implement built-in EMA (vectorized) in `src/indicators/builtin/ema.py`
+- [x] T050 [P] [US2] Implement ATR in `src/indicators/builtin/atr.py`
+- [x] T051 [P] [US2] Implement placeholder StochRSI (if already existing move/refactor) in `src/indicators/builtin/stochrsi.py`
+- [x] T052 [US2] Register built-in indicators in `src/indicators/registry/builtins.py`
+- [x] T053 [US2] Add unit tests: registry registration/unregistration at `tests/unit/test_indicator_registry.py`
+- [x] T054 [US2] Add unit tests: enrichment only requested columns at `tests/unit/test_enrich_selectivity.py`
+- [x] T055 [US2] Add unit tests: strict unknown fast-fail at `tests/unit/test_enrich_strict.py`
+- [x] T056 [US2] Add unit tests: non-strict collects failures at `tests/unit/test_enrich_non_strict.py`
+- [x] T057 [US2] Add unit tests: immutability hash unchanged at `tests/unit/test_enrich_immutability.py`
+- [x] T058 [US2] Add integration test: ingest→enrich pipeline at `tests/integration/test_ingest_then_enrich_pipeline.py`
+- [x] T059 [US2] Update quickstart enrichment examples with final indicator names at `specs/009-optimize-ingestion/quickstart.md`
+- [x] T060 [US2] Update contracts (`contracts/enrich.md`) with any param refinements
 
 ## Phase 5: User Story 3 - Dual Output Modes (P3)
 

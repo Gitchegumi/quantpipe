@@ -70,40 +70,77 @@ Expectations:
 
 ## 3. Indicator Enrichment (Opt-In)
 
+**Actual Implementation**: Uses `src.io.enrich.enrich()` function with the following final API:
+
 ```python
-from trading_strategies.backtest.enrich import enrich
+from src.io.enrich import enrich
 
-selected = ["ema20", "ema50", "atr14"]
-
-enriched = enrich(
-    core_ref=result,
-    indicators=selected,
-    params={"ema": {"method": "exponential"}},
-    strict=True,
+# Basic enrichment with multiple indicators
+enrichment_result = enrich(
+    core_ref=result.data,  # Pass the DataFrame directly, not the IngestionResult
+    indicators=["ema20", "ema50", "atr14"],
+    strict=True,  # Fast-fail on unknown indicators
 )
 
-enriched_df = enriched.enriched
-print("Applied:", enriched.indicators_applied)
-print("Columns added:", set(enriched_df.columns) - set(result.data.columns))
+enriched_df = enrichment_result.enriched
+print("Applied:", enrichment_result.indicators_applied)
+print("Runtime (s):", enrichment_result.runtime_seconds)
+print("New columns:", [c for c in enriched_df.columns if c not in result.data.columns])
+```
+
+**Available Built-in Indicators:**
+
+* `ema20` - 20-period Exponential Moving Average
+* `ema50` - 50-period Exponential Moving Average
+* `atr14` - 14-period Average True Range
+* `stoch_rsi` - Stochastic RSI oscillator
+
+**With Custom Parameters:**
+
+```python
+enrichment_result = enrich(
+    core_ref=result.data,
+    indicators=["ema20"],
+    params={"ema20": {"period": 30}},  # Override default period
+    strict=True,
+)
 ```
 
 Validation:
 
-* Only requested columns appear (SC-003)
-* Core hash unchanged (SC-010)
-* Unknown indicator would raise before partial work if strict=True (FR-007)
+* Only requested columns appear (SC-003) ✓
+* Core hash unchanged (SC-010) ✓
+* Unknown indicator raises `UnknownIndicatorError` before any computation if `strict=True` (FR-007) ✓
+* Returns `EnrichmentResult` with `.enriched` DataFrame, `.indicators_applied` list, `.failed_indicators` list, `.runtime_seconds` float
 
 ## 4. Handling Unknown Indicators (Non-Strict)
 
+**Non-strict mode** collects failures and continues with valid indicators:
+
 ```python
-soft = enrich(
-    core_ref=result,
-    indicators=["ema20", "bogus_indicator"],
+from src.io.enrich import enrich
+
+enrichment_result = enrich(
+    core_ref=result.data,
+    indicators=["ema20", "bogus_indicator", "atr14"],
     strict=False,
 )
-print("Applied:", soft.indicators_applied)
-print("Failed:", soft.failed_indicators)
+
+print("Applied:", enrichment_result.indicators_applied)  # ['ema20', 'atr14']
+print("Failed:", enrichment_result.failed_indicators)    # [('bogus_indicator', UnknownIndicatorError(...))]
+
+# Only successful indicators are added as columns
+assert "ema20" in enrichment_result.enriched.columns
+assert "atr14" in enrichment_result.enriched.columns
+assert "bogus_indicator" not in enrichment_result.enriched.columns
 ```
+
+**Behavior:**
+
+* Valid indicators compute successfully
+* Invalid indicators logged as warnings
+* `failed_indicators` list contains tuples of `(indicator_name, exception)`
+* No partial computation - each indicator is atomic
 
 ## 5. Measuring Performance (Harness Example)
 
@@ -128,15 +165,20 @@ if elapsed <= 90:
 
 ## 6. Registry Operations (Pluggable Indicators)
 
+**Actual Implementation**: Uses `src.io.indicators.registry` for registering custom indicators.
+
 ```python
-from trading_strategies.backtest.indicators.registry import register_indicator
+from src.io.indicators.registry import register_indicator
+import pandas as pd
 
 # Example: Simple rate-of-change indicator
-
-def compute_roc(df, period=1):
+def compute_roc(df: pd.DataFrame, period: int = 1) -> dict[str, pd.Series]:
+    """Compute rate of change over specified period."""
     close = df["close"].astype("float64")
-    return {f"roc{period}": (close / close.shift(period) - 1.0).fillna(0.0)}
+    roc_series = (close / close.shift(period) - 1.0).fillna(0.0)
+    return {f"roc{period}": roc_series}
 
+# Register the indicator
 register_indicator(
     name="roc1",
     requires=["close"],
@@ -145,26 +187,62 @@ register_indicator(
     version="1.0.0",
 )
 
-custom = enrich(core_ref=result, indicators=["roc1"], strict=True)
-print("Custom Applied:", custom.indicators_applied)
+# Use the custom indicator
+from src.io.enrich import enrich
+custom_result = enrich(
+    core_ref=result.data,
+    indicators=["roc1"],
+    params={"roc1": {"period": 1}},
+    strict=True,
+)
+print("Custom Applied:", custom_result.indicators_applied)
+assert "roc1" in custom_result.enriched.columns
 ```
 
 Registry rules:
 
-* Must declare `requires` dependencies
-* `compute` returns dict of column_name -> Series
-* Version string used for audit
+* Must declare `requires` dependencies (list of column names needed)
+* Must declare `provides` (list of column names created)
+* `compute` function signature: `(df: pd.DataFrame, **params) -> dict[str, pd.Series]`
+* Returns dict mapping column name → pandas Series
+* Version string used for audit trail
+* All parameters passed via `params` dict in `enrich()` call
 
 ## 7. Immutability Verification
 
-```python
-import hashlib
+**Actual Implementation**: Core hash verification ensures enrichment never mutates the input DataFrame.
 
-before_hash = hashlib.sha256(result.data[["timestamp_utc","open","high","low","close","volume","is_gap"]].to_string().encode()).hexdigest()
-_ = enrich(core_ref=result, indicators=["ema20"], strict=True)
-after_hash = hashlib.sha256(result.data[["timestamp_utc","open","high","low","close","volume","is_gap"]].to_string().encode()).hexdigest()
+```python
+from src.io.hash_utils import compute_dataframe_hash
+
+CORE_COLUMNS = ["timestamp_utc", "open", "high", "low", "close", "volume", "is_gap"]
+
+# Hash before enrichment
+before_hash = compute_dataframe_hash(result.data, CORE_COLUMNS)
+
+# Perform enrichment
+from src.io.enrich import enrich
+enrichment_result = enrich(
+    core_ref=result.data,
+    indicators=["ema20", "ema50", "atr14"],
+    strict=True,
+)
+
+# Hash after enrichment (on the enriched DataFrame)
+after_hash = compute_dataframe_hash(enrichment_result.enriched, CORE_COLUMNS)
+
+# Verify core columns unchanged
 assert before_hash == after_hash, "Core dataset mutated!"
+print("✓ Core immutability verified")
 ```
+
+**How it works:**
+
+* `compute_dataframe_hash()` creates a deterministic hash of specified columns
+* Enrichment creates a copy of the input DataFrame (`.copy()`)
+* New indicator columns added only to the copy
+* Original DataFrame remains untouched
+* Comprehensive unit tests validate this behavior (see `tests/unit/test_enrich_immutability.py`)
 
 ## 8. Failure Scenarios Quick Table
 
