@@ -1,4 +1,5 @@
 """Unit tests for strict mode enrichment - fast-fail on errors."""
+# pylint: disable=redefined-outer-name  # pytest fixtures
 
 import pandas as pd
 import pytest
@@ -161,5 +162,5 @@ def test_strict_mode_no_failed_indicators_on_success(core_dataframe):
     )
 
     # In strict mode with no errors, failed list should be empty
-    assert result.failed_indicators == []
+    assert not result.failed_indicators
     assert len(result.indicators_applied) == 2

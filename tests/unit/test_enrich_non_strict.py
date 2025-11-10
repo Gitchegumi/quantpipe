@@ -1,4 +1,5 @@
 """Unit tests for non-strict mode enrichment - collects failures without aborting."""
+# pylint: disable=redefined-outer-name  # pytest fixtures
 
 import pandas as pd
 import pytest

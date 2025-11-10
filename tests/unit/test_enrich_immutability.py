@@ -1,10 +1,10 @@
 """Unit tests for enrichment immutability - core hash unchanged after enrichment."""
+# pylint: disable=redefined-outer-name  # pytest fixtures
 
 import pandas as pd
 import pytest
 
 from src.indicators.enrich import enrich
-from src.indicators.errors import ImmutabilityViolationError
 from src.io.hash_utils import compute_dataframe_hash
 
 

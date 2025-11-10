@@ -1,10 +1,10 @@
 """Unit tests for enrichment selectivity - only requested columns added."""
+# pylint: disable=redefined-outer-name  # pytest fixtures
 
 import pandas as pd
 import pytest
 
 from src.indicators.enrich import enrich
-from src.indicators.registry.store import get_registry
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def cleanup_registry():
     # Note: Built-in indicators will be auto-registered, which is OK
 
 
-def test_no_indicators_returns_only_core_columns(core_dataframe):
+def test_no_indicators_returns_only_core(core_dataframe):
     """Test that requesting no indicators returns only core columns."""
     result = enrich(core_dataframe, indicators=[], strict=True)
 

@@ -3,9 +3,9 @@
 This module tests the complete pipeline flow: ingest -> enrich, verifying
 that both phases work together correctly while maintaining immutability.
 """
+# pylint: disable=redefined-outer-name  # pytest fixtures
 
 import logging
-from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -45,7 +45,7 @@ def temp_output_path(tmp_path):
     return tmp_path / "processed_data.csv"
 
 @pytest.mark.integration
-def test_ingest_then_enrich_pipeline(temp_raw_csv, temp_output_path):
+def test_ingest_then_enrich_pipeline(temp_raw_csv):
     """Test complete pipeline: ingest core data then enrich with indicators."""
     # Step 1: Ingest raw OHLCV data
     ingestion_result = ingest_ohlcv_data(
@@ -76,7 +76,7 @@ def test_ingest_then_enrich_pipeline(temp_raw_csv, temp_output_path):
 
 
 @pytest.mark.integration
-def test_pipeline_immutability(temp_raw_csv, temp_output_path):
+def test_pipeline_immutability(temp_raw_csv):
     """Test that enrichment doesn't mutate core ingestion result."""
     from src.io.hash_utils import compute_dataframe_hash
 
@@ -148,7 +148,7 @@ def test_pipeline_with_gap_filling(tmp_path):
 
 
 @pytest.mark.integration
-def test_pipeline_metrics_captured(temp_raw_csv, temp_output_path):
+def test_pipeline_metrics_captured(temp_raw_csv):
     """Test that both ingestion and enrichment metrics are captured."""
     # Ingest
     ingestion_result = ingest_ohlcv_data(
@@ -164,7 +164,7 @@ def test_pipeline_metrics_captured(temp_raw_csv, temp_output_path):
         ingestion_result.data, indicators=["ema20", "atr14"], strict=True
     )
 
+
     # Check enrichment metrics
     assert enrichment_result.runtime_seconds > 0
     assert len(enrichment_result.indicators_applied) == 2
-
