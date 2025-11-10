@@ -91,14 +91,14 @@ Independent Test Criteria: (a) only requested columns appended (b) unknown names
 Goal: Support both columnar DataFrame and iterator object modes with performance delta ≥25% advantage for columnar.
 Independent Test Criteria: (a) iterator yields objects conforming to schema (b) columnar throughput advantage ≥25% (c) invalid mode errors (d) both paths share core logic, no duplication.
 
-- [ ] T061 [US3] Implement iterator wrapper class in `src/io/iterator_mode.py`
-- [ ] T062 [P] [US3] Integrate mode selection param & branching in `src/io/ingestion.py`
-- [ ] T063 [P] [US3] Add mode validation errors in `src/io/errors.py`
-- [ ] T064 [US3] Add unit tests: invalid mode errors at `tests/unit/test_ingestion_modes.py`
-- [ ] T065 [US3] Add unit tests: iterator first N objects correctness at `tests/unit/test_ingestion_iterator.py`
-- [ ] T066 [US3] Add performance comparison test (assert ≥25% faster) at `tests/performance/test_mode_performance.py`
-- [ ] T067 [US3] Update contracts (`contracts/ingest.md`) mode section with iterator details
-- [ ] T068 [US3] Update quickstart dual mode example performance note at `specs/009-optimize-ingestion/quickstart.md`
+- [X] T061 [US3] Implement iterator wrapper class in `src/io/iterator_mode.py`
+- [X] T062 [P] [US3] Integrate mode selection param & branching in `src/io/ingestion.py`
+- [X] T063 [P] [US3] Add mode validation errors in `src/io/errors.py`
+- [X] T064 [US3] Add unit tests: invalid mode errors at `tests/unit/test_ingestion_modes.py`
+- [X] T065 [US3] Add unit tests: iterator first N objects correctness at `tests/unit/test_ingestion_modes.py`
+- [X] T066 [US3] Add performance comparison test (assert ≥25% faster) at `tests/performance/test_ingestion_performance.py`
+- [X] T067 [US3] Update contracts (`contracts/ingest.md`) mode section with iterator details
+- [X] T068 [US3] Update quickstart dual mode example performance note at `specs/009-optimize-ingestion/quickstart.md`
 
 ## Final Phase: Polish & Cross-Cutting
 

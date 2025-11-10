@@ -22,6 +22,7 @@ Performance Target: ≤120s for 6.9M rows (SC-001), stretch goal ≤90s (SC-012)
 
 import logging
 from dataclasses import dataclass
+from typing import Union
 
 import pandas as pd
 
@@ -35,6 +36,7 @@ from src.io.duplicates import remove_duplicates
 from src.io.gap_fill import fill_gaps_vectorized
 from src.io.gaps import detect_gaps
 from src.io.hash_utils import compute_dataframe_hash
+from src.io.iterator_mode import DataFrameIteratorWrapper
 from src.io.logging_constants import IngestionStage, MAX_PROGRESS_UPDATES
 from src.io.perf_utils import PerformanceTimer, calculate_throughput
 from src.io.progress import ProgressReporter
@@ -80,13 +82,13 @@ class IngestionResult:
     """Result of ingestion pipeline execution.
 
     Attributes:
-        data: Core dataset (DataFrame or iterator wrapper).
+        data: Core dataset (DataFrame for columnar, iterator wrapper for iterator mode).
         metrics: Performance and processing metrics.
         mode: Output mode (columnar or iterator).
         core_hash: SHA256 hash of core columns for immutability verification.
     """
 
-    data: pd.DataFrame
+    data: Union[pd.DataFrame, DataFrameIteratorWrapper]
     metrics: IngestionMetrics
     mode: str
     core_hash: str
@@ -281,5 +283,12 @@ def ingest_ohlcv_data(
         backend,
     )
 
-    # Return result (iterator mode will be implemented in Phase 5)
-    return IngestionResult(data=df, metrics=metrics, mode=mode, core_hash=core_hash)
+    # Return result with mode-specific data wrapper
+    if mode == "iterator":
+        # Wrap DataFrame in iterator for row-by-row consumption
+        data = DataFrameIteratorWrapper(df)
+    else:
+        # Return DataFrame directly for columnar mode
+        data = df
+
+    return IngestionResult(data=data, metrics=metrics, mode=mode, core_hash=core_hash)

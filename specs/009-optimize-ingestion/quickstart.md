@@ -46,27 +46,65 @@ Checklist validation:
 
 See `docs/performance.md` for detailed performance documentation.
 
-## 2. Iterator Mode (Legacy Compatibility)
+## 2. Iterator Mode (Streaming Object Consumption)
+
+**Performance Note**: Iterator mode enables row-by-row streaming consumption, suitable for sequential processing pipelines. Columnar mode is ≥25% faster (SC-004) and should be preferred for batch operations.
 
 ```python
-result_iter = ingest(
+from src.io.ingestion import ingest_ohlcv_data
+
+result_iter = ingest_ohlcv_data(
     path="price_data/raw/eurusd/eurusd_2024.csv",
     timeframe_minutes=1,
-    mode="iterator",      # Materialized object sequence
+    mode="iterator",      # Streaming object sequence
     downcast=False,
 )
 
+# Iterate through CoreCandleRecord objects
 for i, candle in enumerate(result_iter.data):
     if i < 3:
-        print(candle)
+        print(f"{candle.timestamp_utc}: O={candle.open} H={candle.high} "
+              f"L={candle.low} C={candle.close} V={candle.volume} "
+              f"Gap={candle.is_gap}")
     else:
         break
+
+# Can iterate multiple times (creates new iterator each time)
+records = list(result_iter.data)
+print(f"Total records: {len(records)}")
 ```
 
-Expectations:
+**CoreCandleRecord Schema:**
 
-* Objects yield attributes matching schema
-* Slower than columnar (FR-009) but enables drop-in legacy usage
+* `timestamp_utc: datetime` - UTC timestamp
+* `open: float` - Opening price
+* `high: float` - Highest price
+* `low: float` - Lowest price
+* `close: float` - Closing price
+* `volume: float` - Trading volume (0.0 for gaps)
+* `is_gap: bool` - True for synthetic gap rows
+
+**Iterator Mode Characteristics:**
+
+* Yields immutable `CoreCandleRecord` objects (frozen dataclass)
+* Suitable for sequential processing pipelines
+* Lower memory footprint for very large datasets
+* Implements `__len__()` for size queries without full iteration
+* Can be consumed multiple times (creates new iterator each pass)
+* Slower than columnar mode (≥25% performance difference)
+
+**When to Use:**
+
+* Sequential processing where only current row needed
+* Memory-constrained environments with very large datasets
+* Legacy codebases expecting object-based iteration
+* Streaming pipelines with downstream row-by-row operations
+
+**When to Avoid:**
+
+* Batch operations requiring vectorized computations
+* Indicator enrichment (requires columnar mode)
+* Performance-critical simulations (columnar ≥25% faster)
 
 ## 3. Indicator Enrichment (Opt-In)
 

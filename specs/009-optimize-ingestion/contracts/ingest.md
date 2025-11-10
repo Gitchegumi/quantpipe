@@ -75,18 +75,62 @@ Content-Type: application/json (metadata) + in‑memory structure (DataFrame or 
 | volume | float32/64 | 0.0 for gap rows |
 | is_gap | bool | True on synthetic rows |
 
-Iterator mode yields objects:
+**Columnar Mode (`mode="columnar"`):**
+
+Returns the full DataFrame with all 7 core columns. Optimized for:
+
+- Batch processing and vectorized operations
+- Direct indicator enrichment
+- Memory-efficient storage (especially with downcast=True)
+- Performance: ≥25% faster than iterator mode (SC-004)
+
+**Iterator Mode (`mode="iterator"`):**
+
+Returns a `DataFrameIteratorWrapper` that yields `CoreCandleRecord` objects row-by-row:
 
 ```python
-Candle(
-  timestamp_utc: datetime,
-  open: float,
-  high: float,
-  low: float,
-  close: float,
-  volume: float,
-  is_gap: bool
-)
+@dataclass(frozen=True)
+class CoreCandleRecord:
+    """Immutable single candle record from iterator mode.
+    
+    Attributes:
+        timestamp_utc: UTC timestamp of the candle
+        open: Opening price
+        high: Highest price during the interval
+        low: Lowest price during the interval
+        close: Closing price
+        volume: Trading volume (0.0 for synthetic gap rows)
+        is_gap: True if this is a synthetic gap-fill row
+    """
+    timestamp_utc: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+    is_gap: bool
+```
+
+Iterator mode characteristics:
+
+- Streaming consumption: process one candle at a time
+- Lower memory footprint for large datasets
+- Suitable for sequential processing pipelines
+- Can be iterated multiple times (creates new iterator each time)
+- Implements `__len__()` for size queries without full iteration
+
+Example usage:
+
+```python
+# Columnar mode (default)
+result = ingest_ohlcv_data(path="data.csv", timeframe_minutes=1, mode="columnar")
+df = result.data  # pandas DataFrame
+print(df.head())
+
+# Iterator mode
+result = ingest_ohlcv_data(path="data.csv", timeframe_minutes=1, mode="iterator")
+for candle in result.data:
+    print(f"{candle.timestamp_utc}: O={candle.open} H={candle.high}")
 ```
 
 ## Errors
@@ -125,10 +169,10 @@ print(result.metrics.runtime_seconds)
 
 ## Non-Functional Constraints
 
-* ≤5 progress updates (SC-008)
-* No per-row loops in critical path (FR-023 / SC-007)
-* Indicator logic excluded (FR-005, FR-017)
-* Backend fallback emits warning (FR-025)
+- ≤5 progress updates (SC-008)
+- No per-row loops in critical path (FR-023 / SC-007)
+- Indicator logic excluded (FR-005, FR-017)
+- Backend fallback emits warning (FR-025)
 
 ## Extensibility Hooks
 
@@ -140,9 +184,9 @@ print(result.metrics.runtime_seconds)
 
 ## Validation Checklist
 
-* [ ] Columns restricted to core set
-* [ ] Runtime threshold met
-* [ ] Duplicate resolution deterministic
-* [ ] Gap count matches expected missing intervals
-* [ ] Acceleration backend reported
-* [ ] No indicator columns present
+- [ ] Columns restricted to core set
+- [ ] Runtime threshold met
+- [ ] Duplicate resolution deterministic
+- [ ] Gap count matches expected missing intervals
+- [ ] Acceleration backend reported
+- [ ] No indicator columns present
