@@ -11,6 +11,18 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def get_duplicate_mask(df: pd.DataFrame) -> pd.Series:
+    """Get boolean mask indicating which rows are duplicates.
+
+    Args:
+        df: DataFrame with 'timestamp_utc' column.
+
+    Returns:
+        pd.Series: Boolean mask where True indicates a duplicate row.
+    """
+    return df["timestamp_utc"].duplicated(keep="first")
+
+
 def detect_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     """Detect duplicate timestamps in candle data.
 

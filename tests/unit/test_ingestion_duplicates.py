@@ -8,9 +8,8 @@ across repeated runs.
 import hashlib
 
 import pandas as pd
-import pytest
 
-from src.io.duplicates import detect_duplicates
+from src.io.duplicates import get_duplicate_mask
 
 
 class TestDuplicateHandlingDeterministic:
@@ -31,7 +30,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         assert mask.sum() == 0
         assert (~mask).all()
@@ -53,7 +52,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         # Exactly 1 duplicate
         assert mask.sum() == 1
@@ -89,7 +88,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         # Exactly 2 duplicates
         assert mask.sum() == 2
@@ -119,7 +118,7 @@ class TestDuplicateHandlingDeterministic:
         )
 
         # Run detection multiple times
-        results = [detect_duplicates(df, "timestamp_utc") for _ in range(5)]
+        results = [get_duplicate_mask(df) for _ in range(5)]
 
         # All results should be identical
         for result in results[1:]:
@@ -146,7 +145,7 @@ class TestDuplicateHandlingDeterministic:
         # Compute hash multiple times
         hashes = []
         for _ in range(3):
-            mask = detect_duplicates(df, "timestamp_utc")
+            mask = get_duplicate_mask(df)
             result = df[~mask].reset_index(drop=True)
 
             # Compute hash of result
@@ -175,7 +174,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
         result = df[~mask]
 
         # Sequence should be preserved (excluding duplicate)
@@ -199,7 +198,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         # Exactly 2 duplicates
         assert mask.sum() == 2
@@ -221,7 +220,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         # 4 duplicates (all except first)
         assert mask.sum() == 4
@@ -249,7 +248,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
         duplicate_count = mask.sum()
 
         # Should detect exactly 3 duplicates
@@ -259,7 +258,7 @@ class TestDuplicateHandlingDeterministic:
         """Test that empty dataframe returns empty mask."""
         df = pd.DataFrame({"timestamp_utc": pd.to_datetime([], utc=True)})
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         assert len(mask) == 0
 
@@ -269,7 +268,7 @@ class TestDuplicateHandlingDeterministic:
             {"timestamp_utc": pd.to_datetime(["2025-01-01 00:00:00"], utc=True)}
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         assert mask.sum() == 0
 
@@ -288,7 +287,7 @@ class TestDuplicateHandlingDeterministic:
         # Run multiple times
         hashes = []
         for _ in range(3):
-            mask = detect_duplicates(df, "timestamp_utc")
+            mask = get_duplicate_mask(df)
             result = df[~mask].reset_index(drop=True)
 
             # Hash the result
@@ -317,7 +316,7 @@ class TestDuplicateHandlingDeterministic:
             }
         )
 
-        mask = detect_duplicates(df, "timestamp_utc")
+        mask = get_duplicate_mask(df)
 
         # Should detect 2 duplicates
         assert mask.sum() == 2
@@ -325,3 +324,4 @@ class TestDuplicateHandlingDeterministic:
         # Duplicates should be at indices 3 and 4 (first occurrences at 1 and 2)
         assert mask[3] and mask[4]
         assert not mask[1] and not mask[2]
+

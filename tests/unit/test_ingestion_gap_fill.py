@@ -5,10 +5,8 @@ rows, with proper forward-fill logic and gap flagging.
 """
 
 import pandas as pd
-import pytest
 
 from src.io.gap_fill import fill_gaps_vectorized
-from src.io.gaps import detect_gaps
 
 
 class TestGapSynthesisCorrectness:
@@ -29,7 +27,7 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=1)
 
         # Should have is_gap column
         assert "is_gap" in result.columns
@@ -61,7 +59,7 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=1)
 
         # Should have 4 rows now (3 original + 1 gap)
         assert len(result) == 4
@@ -104,7 +102,7 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=1)
 
         # Should have 5 rows (2 original + 3 gaps)
         assert len(result) == 5
@@ -144,16 +142,12 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        # Detect gaps first
-        gap_indices = detect_gaps(df["timestamp_utc"], timeframe_minutes=1)
-        expected_gap_count = len(gap_indices)
-
         # Fill gaps
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, gap_count = fill_gaps_vectorized(df, timeframe_minutes=1)
 
-        # Gap count in result should match detection
+        # Gap count in result should match returned count
         actual_gap_count = result["is_gap"].sum()
-        assert actual_gap_count == expected_gap_count
+        assert actual_gap_count == gap_count
         assert actual_gap_count == 4  # 2 + 2 gaps
 
     def test_gap_fill_preserves_chronological_order(self):
@@ -176,7 +170,7 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=1)
 
         # Timestamps should be sorted
         assert result["timestamp_utc"].is_monotonic_increasing
@@ -206,7 +200,7 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=5)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=5)
 
         # Should have 3 rows (2 original + 1 gap)
         assert len(result) == 3
@@ -239,7 +233,7 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=1)
 
         # Must fill the gap with zero tolerance
         assert result["is_gap"].sum() == 1
@@ -264,13 +258,14 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=1)
 
         # Original timestamps should not be flagged
-        original_timestamps = df["timestamp_utc"].values
+        original_timestamps = df["timestamp_utc"].tolist()
         for ts in original_timestamps:
             row = result[result["timestamp_utc"] == ts]
-            assert not row["is_gap"].iloc[0]
+            assert len(row) == 1  # Should find exactly one row
+            assert not row["is_gap"].values[0]  # Should not be a gap
 
     def test_gap_fill_large_dataset_performance(self):
         """Test that gap filling scales efficiently with large datasets."""
@@ -298,7 +293,7 @@ class TestGapSynthesisCorrectness:
             }
         )
 
-        result = fill_gaps_vectorized(df, timeframe_minutes=1)
+        result, _ = fill_gaps_vectorized(df, timeframe_minutes=1)
 
         # Should fill all gaps
         expected_total = 10000

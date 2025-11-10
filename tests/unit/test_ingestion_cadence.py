@@ -7,7 +7,10 @@ and raises appropriate errors when deviation exceeds 2% tolerance.
 import pandas as pd
 import pytest
 
-from src.io.cadence import compute_cadence_minutes, validate_cadence
+from src.io.cadence import (
+    compute_cadence_minutes,
+    validate_cadence,
+)
 
 
 class TestCadenceValidationErrors:
@@ -50,7 +53,8 @@ class TestCadenceValidationErrors:
         """Test that error message includes deviation percentage."""
         timestamps = pd.date_range("2025-01-01", periods=100, freq="1min", tz="UTC")
         keep_mask = [True] * 100
-        keep_mask[50:60] = False  # Remove 10 rows (10% missing)
+        for i in range(50, 60):
+            keep_mask[i] = False  # Remove 10 rows (10% missing)
 
         timestamps = timestamps[keep_mask]
 
@@ -66,7 +70,8 @@ class TestCadenceValidationErrors:
         """Test that error message includes expected and actual interval counts."""
         timestamps = pd.date_range("2025-01-01", periods=100, freq="1min", tz="UTC")
         keep_mask = [True] * 100
-        keep_mask[10:20] = False  # Remove 10 rows
+        for i in range(10, 20):
+            keep_mask[i] = False  # Remove 10 rows
 
         timestamps = timestamps[keep_mask]
 
@@ -207,7 +212,8 @@ class TestCadenceValidationErrors:
         """Test that custom tolerance values are respected."""
         timestamps = pd.date_range("2025-01-01", periods=1000, freq="1min", tz="UTC")
         keep_mask = [True] * 1000
-        keep_mask[100:150] = False  # Remove 50 rows (5% missing)
+        for i in range(100, 150):
+            keep_mask[i] = False  # Remove 50 rows (5% missing)
 
         timestamps = timestamps[keep_mask]
 
@@ -225,7 +231,8 @@ class TestCadenceValidationErrors:
 
         timestamps = pd.date_range("2025-01-01", periods=100, freq="1min", tz="UTC")
         keep_mask = [True] * 100
-        keep_mask[50:60] = False  # 10% missing
+        for i in range(50, 60):
+            keep_mask[i] = False  # 10% missing
 
         timestamps = timestamps[keep_mask]
 

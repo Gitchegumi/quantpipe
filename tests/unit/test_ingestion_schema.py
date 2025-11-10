@@ -7,7 +7,11 @@ and maintains the specified column order.
 import pandas as pd
 import pytest
 
-from src.io.schema import CORE_COLUMNS, restrict_to_core_schema, validate_required_columns
+from src.io.schema import (
+    CORE_COLUMNS,
+    restrict_to_core_schema,
+    validate_required_columns,
+)
 
 
 class TestSchemaRestrictionAndOrder:
@@ -118,7 +122,7 @@ class TestSchemaRestrictionAndOrder:
         """Test that validation passes with all required columns."""
         df = pd.DataFrame(
             {
-                "timestamp": ["2025-01-01"],
+                "timestamp_utc": pd.to_datetime(["2025-01-01"], utc=True),
                 "open": [1.0],
                 "high": [1.05],
                 "low": [0.95],
@@ -134,7 +138,7 @@ class TestSchemaRestrictionAndOrder:
         """Test that validation fails with missing required columns."""
         df = pd.DataFrame(
             {
-                "timestamp": ["2025-01-01"],
+                "timestamp_utc": pd.to_datetime(["2025-01-01"], utc=True),
                 "open": [1.0],
                 # Missing: high, low, close, volume
             }

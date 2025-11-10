@@ -85,3 +85,21 @@ def downcast_numeric_columns(
         logger.info("Downcasted %d columns to float32", len(downcasted_columns))
 
     return df, downcasted_columns
+
+
+def downcast_float_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Downcast float64 columns to float32 where safe (convenience wrapper).
+
+    Args:
+        df: DataFrame with numeric columns.
+
+    Returns:
+        pd.DataFrame: DataFrame with downcasted columns.
+    """
+    result, _ = downcast_numeric_columns(df)
+    return result
+
+
+# Alias for backward compatibility
+try_downcast_float_columns = downcast_float_columns
+

@@ -94,3 +94,58 @@ def validate_cadence_uniformity(
     )
 
     return actual_count, expected_count, deviation
+
+
+def compute_cadence_minutes(timestamps: pd.Series) -> int:
+    """Compute the median cadence in minutes from timestamps.
+
+    Args:
+        timestamps: Series of UTC timestamps.
+
+    Returns:
+        int: Median cadence in minutes.
+    """
+    if len(timestamps) < 2:
+        return 1  # Default to 1 minute if insufficient data
+
+    time_diffs = timestamps.diff()[1:]  # Skip first NaT
+    median_diff = time_diffs.median()
+    return int(median_diff.total_seconds() / 60)
+
+
+def validate_cadence(
+    timestamps: pd.Series | pd.DatetimeIndex, expected_minutes: int, tolerance: float = 0.02
+) -> None:
+    """Validate that timestamps meet cadence uniformity requirements.
+
+    Args:
+        timestamps: Series or DatetimeIndex of UTC timestamps.
+        expected_minutes: Expected cadence in minutes.
+        tolerance: Maximum allowed deviation as fraction (e.g., 0.02 for 2%).
+
+    Raises:
+        RuntimeError: If cadence deviation exceeds tolerance.
+    """
+    if len(timestamps) < 2:
+        return  # Not enough data to validate
+
+    # Convert to Series if DatetimeIndex
+    if isinstance(timestamps, pd.DatetimeIndex):
+        timestamps = pd.Series(timestamps)
+
+    start_time = timestamps.iloc[0]
+    end_time = timestamps.iloc[-1]
+
+    actual_count = len(timestamps)
+    expected_count = compute_expected_intervals(
+        start_time, end_time, expected_minutes
+    )
+    deviation_percent = compute_cadence_deviation(actual_count, expected_count)
+    tolerance_percent = tolerance * 100.0
+
+    if deviation_percent > tolerance_percent:
+        raise RuntimeError(
+            f"Cadence deviation exceeds tolerance: {deviation_percent:.2f}% "
+            f"(expected ≤{tolerance_percent:.2f}%). "
+            f"Missing {expected_count - actual_count} intervals."
+        )

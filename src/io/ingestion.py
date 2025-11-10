@@ -22,21 +22,23 @@ Performance Target: ≤120s for 6.9M rows (SC-001), stretch goal ≤90s (SC-012)
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import pandas as pd
 
 from src.io.arrow_config import configure_arrow_backend, detect_backend
-from src.io.cadence import compute_cadence_minutes, validate_cadence
-from src.io.downcast import try_downcast_float_columns
-from src.io.duplicates import detect_duplicates
+from src.io.cadence import (
+    compute_cadence_deviation,
+    compute_expected_intervals,
+)
+from src.io.downcast import downcast_float_columns
+from src.io.duplicates import remove_duplicates
 from src.io.gap_fill import fill_gaps_vectorized
 from src.io.gaps import detect_gaps
 from src.io.hash_utils import compute_dataframe_hash
-from src.io.logging_constants import IngestionStage
+from src.io.logging_constants import IngestionStage, MAX_PROGRESS_UPDATES
 from src.io.perf_utils import PerformanceTimer, calculate_throughput
 from src.io.progress import ProgressReporter
-from src.io.schema import restrict_to_core_schema, validate_required_columns
+from src.io.schema import CORE_COLUMNS, restrict_to_core_schema, validate_required_columns
 from src.io.timezone_validate import validate_utc_timezone
 
 logger = logging.getLogger(__name__)
@@ -129,7 +131,7 @@ def ingest_ohlcv_data(
         raise ValueError(f"Invalid mode: {mode}. Must be 'columnar' or 'iterator'.")
 
     # Initialize progress reporter (≤5 updates for entire pipeline)
-    progress = ProgressReporter(total_stages=7)
+    progress = ProgressReporter(total_stages=MAX_PROGRESS_UPDATES)
 
     # Configure Arrow backend if requested
     backend = "pandas"
@@ -162,29 +164,40 @@ def ingest_ohlcv_data(
         validate_utc_timezone(df, "timestamp_utc")
 
         # Stage 2: Sort chronologically
-        progress.report_stage(IngestionStage.SORT, "Sorting by timestamp")
+        progress.report_stage(IngestionStage.PROCESS, "Sorting by timestamp")
         df = df.sort_values("timestamp_utc").reset_index(drop=True)
         logger.debug("Sorted %d rows chronologically", len(df))
 
         # Stage 3: Detect and remove duplicates
-        progress.report_stage(IngestionStage.DEDUPLICATE, "Removing duplicates")
-        duplicate_mask = detect_duplicates(df, "timestamp_utc")
-        duplicates_removed = duplicate_mask.sum()
+        df, duplicates_removed = remove_duplicates(df)
         if duplicates_removed > 0:
-            df = df[~duplicate_mask].reset_index(drop=True)
             logger.info("Removed %d duplicate rows", duplicates_removed)
 
         # Stage 4: Cadence validation
-        progress.report_stage(IngestionStage.VALIDATE_CADENCE, "Validating cadence")
-        detected_cadence = compute_cadence_minutes(df["timestamp_utc"])
-        logger.info("Detected cadence: %d minutes", detected_cadence)
+        start_time = df["timestamp_utc"].iloc[0]
+        end_time = df["timestamp_utc"].iloc[-1]
+        expected_intervals = compute_expected_intervals(
+            start_time, end_time, timeframe_minutes
+        )
+        actual_intervals = len(df)
+        deviation = compute_cadence_deviation(actual_intervals, expected_intervals)
 
-        validate_cadence(
-            df["timestamp_utc"], expected_minutes=timeframe_minutes, tolerance=0.02
+        logger.info(
+            "Cadence check: %d intervals (expected %d), deviation: %.2f%%",
+            actual_intervals,
+            expected_intervals,
+            deviation,
         )
 
+        if deviation > 2.0:
+            raise RuntimeError(
+                f"Cadence deviation exceeds tolerance: {deviation:.2f}% "
+                f"(expected ≤2.0%). Missing {expected_intervals - actual_intervals} "
+                f"intervals."
+            )
+
         # Stage 5: Gap detection and filling
-        progress.report_stage(IngestionStage.FILL_GAPS, "Filling gaps")
+        progress.report_stage(IngestionStage.GAP_FILL, "Filling gaps")
         gap_indices = detect_gaps(df["timestamp_utc"], timeframe_minutes)
         gaps_inserted = len(gap_indices)
 
@@ -193,22 +206,22 @@ def ingest_ohlcv_data(
             logger.info("Filled %d gaps with synthetic candles", gaps_inserted)
 
         # Stage 6: Schema restriction
-        progress.report_stage(IngestionStage.RESTRICT_SCHEMA, "Restricting to core")
+        progress.report_stage(IngestionStage.SCHEMA, "Restricting to core")
         df = restrict_to_core_schema(df)
         logger.debug("Restricted to core schema with %d columns", len(df.columns))
 
         # Stage 7: Optional downcasting
         downcast_applied = False
         if downcast:
-            progress.report_stage(IngestionStage.DOWNCAST, "Downcasting numerics")
+            progress.report_stage(IngestionStage.FINALIZE, "Downcasting numerics")
             original_memory = df.memory_usage(deep=True).sum()
-            df = try_downcast_float_columns(df)
+            df = downcast_float_columns(df)
             new_memory = df.memory_usage(deep=True).sum()
             memory_saved_pct = ((original_memory - new_memory) / original_memory) * 100
             logger.info("Downcast saved %.1f%% memory", memory_saved_pct)
             downcast_applied = True
         else:
-            progress.report_stage(IngestionStage.DOWNCAST, "Skipped (not requested)")
+            progress.report_stage(IngestionStage.FINALIZE, "Finalizing")
 
         # Compute final metrics
         output_row_count = len(df)
@@ -217,7 +230,7 @@ def ingest_ohlcv_data(
         stretch_candidate = runtime_seconds <= 90.0
 
         # Compute core hash for immutability verification
-        core_hash = compute_dataframe_hash(df)
+        core_hash = compute_dataframe_hash(df, CORE_COLUMNS)
 
     # Assemble metrics
     metrics = IngestionMetrics(
