@@ -160,12 +160,16 @@ def ingest_ohlcv_data(
         input_row_count = len(df)
         logger.info("Loaded %d raw rows", input_row_count)
 
-        # Validate required columns present
-        validate_required_columns(df)
-
         # Parse and validate timestamps
-        df["timestamp_utc"] = pd.to_datetime(df["timestamp"], utc=True)
+        if "timestamp" in df.columns:
+            df["timestamp_utc"] = pd.to_datetime(df["timestamp"], utc=True)
+        elif "timestamp_utc" not in df.columns:
+            raise ValueError("Input must have 'timestamp' or 'timestamp_utc' column")
+
         validate_utc_timezone(df, "timestamp_utc")
+
+        # Validate required columns present (after timestamp conversion)
+        validate_required_columns(df)
 
         # Stage 2: Sort chronologically
         progress.report_stage(IngestionStage.PROCESS, "Sorting by timestamp")
@@ -177,64 +181,83 @@ def ingest_ohlcv_data(
         if duplicates_removed > 0:
             logger.info("Removed %d duplicate rows", duplicates_removed)
 
-        # Stage 4: Cadence validation
-        start_time = df["timestamp_utc"].iloc[0]
-        end_time = df["timestamp_utc"].iloc[-1]
-        expected_intervals = compute_expected_intervals(
-            start_time, end_time, timeframe_minutes
-        )
-        actual_intervals = len(df)
-        deviation = compute_cadence_deviation(actual_intervals, expected_intervals)
+        # Handle empty data early
+        if len(df) == 0:
+            logger.warning("Empty dataset after deduplication")
+            # Add is_gap column for schema consistency
+            df["is_gap"] = pd.Series(dtype=bool)
+            # Restrict to core schema
+            df = restrict_to_core_schema(df)
+            output_row_count = 0
+            gaps_inserted = 0
+            downcast_applied = False
+            core_hash = compute_dataframe_hash(df, CORE_COLUMNS)
+        else:
+            # Stage 4: Cadence validation
+            start_time = df["timestamp_utc"].iloc[0]
+            end_time = df["timestamp_utc"].iloc[-1]
+            expected_intervals = compute_expected_intervals(
+                start_time, end_time, timeframe_minutes
+            )
+            actual_intervals = len(df)
+            deviation = compute_cadence_deviation(actual_intervals, expected_intervals)
 
-        logger.info(
-            "Cadence check: %d intervals (expected %d), deviation: %.2f%%",
-            actual_intervals,
-            expected_intervals,
-            deviation,
-        )
-
-        if deviation > 2.0:
-            raise RuntimeError(
-                f"Cadence deviation exceeds tolerance: {deviation:.2f}% "
-                f"(expected ≤2.0%). Missing {expected_intervals - actual_intervals} "
-                f"intervals."
+            logger.info(
+                "Cadence check: %d intervals (expected %d), deviation: %.2f%%",
+                actual_intervals,
+                expected_intervals,
+                deviation,
             )
 
-        # Stage 5: Gap detection and filling
-        progress.report_stage(IngestionStage.GAP_FILL, "Filling gaps")
-        gap_indices = detect_gaps(df["timestamp_utc"], timeframe_minutes)
-        gaps_inserted = len(gap_indices)
+            if deviation > 2.0:
+                raise RuntimeError(
+                    f"Cadence deviation exceeds tolerance: {deviation:.2f}% "
+                    f"(expected ≤2.0%). Missing {expected_intervals - actual_intervals} "
+                    f"intervals."
+                )
 
-        if gaps_inserted > 0:
-            df = fill_gaps_vectorized(df, timeframe_minutes)
-            logger.info("Filled %d gaps with synthetic candles", gaps_inserted)
+            # Stage 5: Gap detection and filling
+            progress.report_stage(IngestionStage.GAP_FILL, "Filling gaps")
+            gap_indices = detect_gaps(df, timeframe_minutes)
+            gaps_inserted = len(gap_indices)
 
-        # Stage 6: Schema restriction
-        progress.report_stage(IngestionStage.SCHEMA, "Restricting to core")
-        df = restrict_to_core_schema(df)
-        logger.debug("Restricted to core schema with %d columns", len(df.columns))
+            if gaps_inserted > 0:
+                df, gaps_inserted = fill_gaps_vectorized(df, timeframe_minutes)
+                logger.info("Filled %d gaps with synthetic candles", gaps_inserted)
+            else:
+                # No gaps - add is_gap column with all False
+                df["is_gap"] = False
 
-        # Stage 7: Optional downcasting
-        downcast_applied = False
-        if downcast:
-            progress.report_stage(IngestionStage.FINALIZE, "Downcasting numerics")
-            original_memory = df.memory_usage(deep=True).sum()
-            df = downcast_float_columns(df)
-            new_memory = df.memory_usage(deep=True).sum()
-            memory_saved_pct = ((original_memory - new_memory) / original_memory) * 100
-            logger.info("Downcast saved %.1f%% memory", memory_saved_pct)
-            downcast_applied = True
-        else:
-            progress.report_stage(IngestionStage.FINALIZE, "Finalizing")
+            # Stage 6: Schema restriction
+            progress.report_stage(IngestionStage.SCHEMA, "Restricting to core")
+            df = restrict_to_core_schema(df)
+            logger.debug("Restricted to core schema with %d columns", len(df.columns))
 
-        # Compute final metrics
-        output_row_count = len(df)
-        runtime_seconds = timer.elapsed()
-        throughput = calculate_throughput(output_row_count, runtime_seconds)
-        stretch_candidate = runtime_seconds <= 90.0
+            # Stage 7: Optional downcasting
+            downcast_applied = False
+            if downcast:
+                progress.report_stage(IngestionStage.FINALIZE, "Downcasting numerics")
+                original_memory = df.memory_usage(deep=True).sum()
+                df = downcast_float_columns(df)
+                new_memory = df.memory_usage(deep=True).sum()
+                memory_saved_pct = (
+                    (original_memory - new_memory) / original_memory
+                ) * 100
+                logger.info("Downcast saved %.1f%% memory", memory_saved_pct)
+                downcast_applied = True
+            else:
+                progress.report_stage(IngestionStage.FINALIZE, "Finalizing")
 
-        # Compute core hash for immutability verification
-        core_hash = compute_dataframe_hash(df, CORE_COLUMNS)
+            # Store output count for metrics (before exiting context)
+            output_row_count = len(df)
+
+            # Compute core hash for immutability verification
+            core_hash = compute_dataframe_hash(df, CORE_COLUMNS)
+
+    # Timer context has exited - now we can access elapsed time
+    runtime_seconds = timer.elapsed
+    throughput = calculate_throughput(output_row_count, runtime_seconds)
+    stretch_candidate = runtime_seconds <= 90.0
 
     # Assemble metrics
     metrics = IngestionMetrics(
