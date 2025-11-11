@@ -52,15 +52,17 @@ exclude = '''
 line-length = 88
 target-version = "py311"
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "N",   # pep8-naming
-    "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "SIM", # flake8-simplify
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "SIM",   # flake8-simplify
+    "PERF",  # perflint (performance anti-patterns)
+    "PD",    # pandas-vet (pandas best practices)
 ]
 ignore = [
     "E501",  # line too long (handled by black)
@@ -75,6 +77,8 @@ exclude = [
 
 [tool.ruff.per-file-ignores]
 "tests/**/*.py" = ["S101"]  # Allow assert in tests
+# iterator_mode.py intentionally uses .iterrows() for row-by-row iteration pattern
+"src/io/iterator_mode.py" = ["PD010"]  # Allow .iterrows() in iterator mode
 
 [tool.pylint.main]
 fail-under = 8.0
