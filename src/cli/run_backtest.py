@@ -686,11 +686,15 @@ Persistent storage not yet implemented."
 
         # Load strategy to get required indicators
         from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-        
+
         strategy = TREND_PULLBACK_STRATEGY
         required_indicators = strategy.metadata.required_indicators
-        
-        logger.info("Strategy: %s v%s", strategy.metadata.name, strategy.metadata.version)
+
+        logger.info(
+            "Strategy: %s v%s",
+            strategy.metadata.name,
+            strategy.metadata.version,
+        )
         logger.info("Required indicators: %s", required_indicators)
 
         logger.info("Ingesting candles from %s", converted_csv)
@@ -703,7 +707,7 @@ Persistent storage not yet implemented."
             mode="columnar",
             downcast=False,
             use_arrow=True,
-            strict_cadence=False,  # FX data has natural gaps (weekends/holidays)
+            strict_cadence=False,  # FX data has gaps (weekends/holidays)
         )
         logger.info(
             "✓ Ingested %d rows in %.2fs",
@@ -714,7 +718,7 @@ Persistent storage not yet implemented."
         # Stage 2: Indicator enrichment
         logger.info("Stage 2/3: Computing technical indicators...")
         from ..indicators.enrich import enrich
-        
+
         enrichment_result = enrich(
             core_ref=ingestion_result,
             indicators=required_indicators,
@@ -734,16 +738,16 @@ Persistent storage not yet implemented."
         # Vectorized conversion using list comprehension with to_dict
         # Much faster than iterrows() for large datasets
         records = enriched_df.to_dict('records')
-        
+
         candles = []
         for record in records:
             # Build indicators dict from indicator columns
             indicators_dict = {
-                name: record[name] 
-                for name in required_indicators 
+                name: record[name]
+                for name in required_indicators
                 if name in record
             }
-            
+
             candles.append(
                 Candle(
                     timestamp_utc=record["timestamp_utc"],

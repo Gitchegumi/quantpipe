@@ -21,7 +21,7 @@ from ..models.core import Candle
 logger = logging.getLogger(__name__)
 
 
-def ingest_candles(
+def ingest_candles(  # pylint: disable=unused-argument
     csv_path: str | Path,
     ema_fast: int = 20,
     ema_slow: int = 50,

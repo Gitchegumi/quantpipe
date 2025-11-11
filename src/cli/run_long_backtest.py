@@ -73,7 +73,6 @@ def run_simple_backtest(
     output_dir: Path,
     parameters: StrategyParameters | None = None,
     log_level: str = "INFO",
-    fill_gaps: bool = False,
 ) -> dict:
     """
     Run simplified long-only backtest.

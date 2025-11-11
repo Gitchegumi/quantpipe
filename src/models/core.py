@@ -30,8 +30,10 @@ class Candle:
         low: Lowest price during the period.
         close: Closing price for the period.
         volume: Trading volume during the period.
-        indicators: Dictionary mapping indicator names to values (e.g., {"ema20": 1.1000}).
-        is_gap: True if this candle was synthetically created to fill a timestamp gap.
+        indicators: Dictionary mapping indicator names to values
+            (e.g., {"ema20": 1.1000}).
+        is_gap: True if this candle was synthetically created to fill a
+            timestamp gap.
 
     Examples:
         >>> from datetime import datetime, timezone
