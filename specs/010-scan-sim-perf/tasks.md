@@ -44,11 +44,11 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 
 ## Phase 4 – User Story 2 (Strategy-Owned Indicators) P2
 
-- [ ] T032 [US2] Enforce indicator declaration location (strategy only) `src/strategy/indicator_registry.py`
-- [ ] T033 [P] [US2] Implement indicator ownership audit test `tests/contract/test_indicator_ownership.py`
-- [ ] T034 [US2] Remove any legacy indicator mutation from `src/backtest/` modules
-- [ ] T035 [US2] Add zero-indicator strategy test `tests/unit/test_zero_indicator_strategy.py`
-- [ ] T036 [US2] Add warm-up NaN exclusion test `tests/unit/test_indicator_warmup.py`
+- [X] T032 [US2] Enforce indicator declaration location (strategy only) `src/strategy/indicator_registry.py`
+- [X] T033 [P] [US2] Implement indicator ownership audit test `tests/contract/test_indicator_ownership.py`
+- [X] T034 [US2] Remove any legacy indicator mutation from `src/backtest/` modules
+- [X] T035 [US2] Add zero-indicator strategy test `tests/unit/test_zero_indicator_strategy.py`
+- [X] T036 [US2] Add warm-up NaN exclusion test `tests/unit/test_indicator_warmup.py`
 
 ## Phase 5 – User Story 3 (Efficient Trade Simulation) P3
 
