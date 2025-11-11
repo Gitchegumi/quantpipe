@@ -19,6 +19,10 @@ class Candle:
     """
     Represents a single OHLCV candle with computed technical indicators.
 
+    The Candle model uses a flexible indicators dictionary to support arbitrary
+    technical indicators rather than hardcoded fields. This enables strategies
+    to use any indicators they need without modifying the core data model.
+
     Attributes:
         timestamp_utc: Candle close time in UTC timezone.
         open: Opening price for the period.
@@ -26,11 +30,7 @@ class Candle:
         low: Lowest price during the period.
         close: Closing price for the period.
         volume: Trading volume during the period.
-        ema20: 20-period exponential moving average at candle close.
-        ema50: 50-period exponential moving average at candle close.
-        atr: Average True Range indicator value.
-        rsi: Relative Strength Index (14-period default).
-        stoch_rsi: Optional Stochastic RSI value for additional confirmation.
+        indicators: Dictionary mapping indicator names to values (e.g., {"ema20": 1.1000}).
         is_gap: True if this candle was synthetically created to fill a timestamp gap.
 
     Examples:
@@ -42,13 +42,17 @@ class Candle:
         ...     low=1.0990,
         ...     close=1.1005,
         ...     volume=1000.0,
-        ...     ema20=1.1000,
-        ...     ema50=1.0995,
-        ...     atr=0.0015,
-        ...     rsi=55.0
+        ...     indicators={
+        ...         "ema20": 1.1000,
+        ...         "ema50": 1.0995,
+        ...         "atr14": 0.0015,
+        ...         "stoch_rsi": 55.0
+        ...     }
         ... )
         >>> candle.close
         1.1005
+        >>> candle.indicators["ema20"]
+        1.1000
     """
 
     timestamp_utc: datetime
@@ -57,12 +61,95 @@ class Candle:
     low: float
     close: float
     volume: float
-    ema20: float
-    ema50: float
-    atr: float
-    rsi: float
-    stoch_rsi: float | None = None
+    indicators: dict[str, float] = field(default_factory=dict)
     is_gap: bool = False
+
+    @classmethod
+    def from_legacy(
+        cls,
+        timestamp_utc: datetime,
+        open: float,  # pylint: disable=redefined-builtin
+        high: float,
+        low: float,
+        close: float,
+        volume: float,
+        ema20: float | None = None,
+        ema50: float | None = None,
+        atr: float | None = None,
+        rsi: float | None = None,
+        stoch_rsi: float | None = None,
+        is_gap: bool = False,
+    ) -> "Candle":
+        """Create Candle using legacy field names (backward compatibility).
+
+        This factory method allows legacy code to continue using the old
+        constructor signature with named indicator parameters.
+
+        Args:
+            timestamp_utc: Candle close time in UTC.
+            open: Opening price.
+            high: Highest price.
+            low: Lowest price.
+            close: Closing price.
+            volume: Trading volume.
+            ema20: 20-period EMA value.
+            ema50: 50-period EMA value.
+            atr: ATR indicator value (stored as atr14).
+            rsi: RSI value (stored as rsi).
+            stoch_rsi: Stochastic RSI value.
+            is_gap: Whether this is a synthetic gap-fill candle.
+
+        Returns:
+            Candle instance with indicators dict populated.
+        """
+        indicators_dict = {}
+        if ema20 is not None:
+            indicators_dict["ema20"] = ema20
+        if ema50 is not None:
+            indicators_dict["ema50"] = ema50
+        if atr is not None:
+            indicators_dict["atr14"] = atr
+        if rsi is not None:
+            indicators_dict["rsi"] = rsi
+        if stoch_rsi is not None:
+            indicators_dict["stoch_rsi"] = stoch_rsi
+
+        return cls(
+            timestamp_utc=timestamp_utc,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            volume=volume,
+            indicators=indicators_dict,
+            is_gap=is_gap,
+        )
+
+    # Backward compatibility properties for legacy code
+    @property
+    def ema20(self) -> float | None:
+        """Backward compatibility: access ema20 from indicators dict."""
+        return self.indicators.get("ema20")
+
+    @property
+    def ema50(self) -> float | None:
+        """Backward compatibility: access ema50 from indicators dict."""
+        return self.indicators.get("ema50")
+
+    @property
+    def atr(self) -> float | None:
+        """Backward compatibility: access atr/atr14 from indicators dict."""
+        return self.indicators.get("atr14") or self.indicators.get("atr")
+
+    @property
+    def rsi(self) -> float | None:
+        """Backward compatibility: access rsi from indicators dict."""
+        return self.indicators.get("rsi") or self.indicators.get("stoch_rsi")
+
+    @property
+    def stoch_rsi(self) -> float | None:
+        """Backward compatibility: access stoch_rsi from indicators dict."""
+        return self.indicators.get("stoch_rsi")
 
 
 @dataclass(frozen=True)

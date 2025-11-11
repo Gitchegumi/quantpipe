@@ -182,7 +182,7 @@ def long_setup_candles():
     # Create Candle objects - reset timestamp
     timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
     for i, close_val in enumerate(close_arr):
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=timestamp,
             open=open_arr[i],
             high=high_arr[i],
@@ -314,7 +314,7 @@ def short_setup_candles():
     # Create Candle objects - reset timestamp
     timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
     for i, close_val in enumerate(close_arr):
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=timestamp,
             open=open_arr[i],
             high=high_arr[i],
@@ -435,7 +435,7 @@ class TestLongSignalGeneration:
         # Create candles
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
         for i, close_val in enumerate(close_arr):
-            candle = Candle(
+            candle = Candle.from_legacy(
                 timestamp_utc=timestamp,
                 open=open_arr[i],
                 high=high_arr[i],
@@ -560,7 +560,7 @@ class TestShortSignalGeneration:
         # Create candles
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
         for i, close_val in enumerate(close_arr):
-            candle = Candle(
+            candle = Candle.from_legacy(
                 timestamp_utc=timestamp,
                 open=open_arr[i],
                 high=high_arr[i],

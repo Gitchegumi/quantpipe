@@ -304,7 +304,7 @@ def test_candle_accumulation_memory():
 
     # Accumulate 10,000 candles
     for i in range(10000):
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=base_time + timedelta(minutes=i),
             open=1.1000,
             high=1.1010,

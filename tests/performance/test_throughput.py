@@ -245,7 +245,7 @@ def test_signal_generation_throughput_estimate():
     base_time = datetime(2025, 1, 1, tzinfo=UTC)
 
     for i in range(5000):
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=base_time + timedelta(minutes=i),
             open=1.1000 + (i * 0.00001),
             high=1.1010 + (i * 0.00001),

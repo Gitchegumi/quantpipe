@@ -34,7 +34,7 @@ class TestBullishEngulfingPattern:
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         # Previous: small bearish candle
-        prev_candle = Candle(
+        prev_candle = Candle.from_legacy(
             timestamp_utc=timestamp,
             open=1.10000,
             high=1.10010,
@@ -49,7 +49,7 @@ class TestBullishEngulfingPattern:
         )
 
         # Current: larger bullish candle that engulfs previous
-        current_candle = Candle(
+        current_candle = Candle.from_legacy(
             timestamp_utc=timestamp + timedelta(hours=1),
             open=1.09985,  # Opens below prev close
             high=1.10030,
@@ -73,7 +73,7 @@ class TestBullishEngulfingPattern:
         """
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
-        prev_candle = Candle(
+        prev_candle = Candle.from_legacy(
             timestamp_utc=timestamp,
             open=1.10000,
             high=1.10010,
@@ -88,7 +88,7 @@ class TestBullishEngulfingPattern:
         )
 
         # Current is bearish (close < open)
-        current_candle = Candle(
+        current_candle = Candle.from_legacy(
             timestamp_utc=timestamp + timedelta(hours=1),
             open=1.10020,
             high=1.10030,
@@ -112,7 +112,7 @@ class TestBullishEngulfingPattern:
         """
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
-        prev_candle = Candle(
+        prev_candle = Candle.from_legacy(
             timestamp_utc=timestamp,
             open=1.10000,
             high=1.10010,
@@ -127,7 +127,7 @@ class TestBullishEngulfingPattern:
         )
 
         # Current doesn't fully engulf (close < prev open)
-        current_candle = Candle(
+        current_candle = Candle.from_legacy(
             timestamp_utc=timestamp + timedelta(hours=1),
             open=1.09985,
             high=1.10005,
@@ -156,7 +156,7 @@ class TestBearishEngulfingPattern:
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         # Previous: small bullish candle
-        prev_candle = Candle(
+        prev_candle = Candle.from_legacy(
             timestamp_utc=timestamp,
             open=1.10000,
             high=1.10020,
@@ -171,7 +171,7 @@ class TestBearishEngulfingPattern:
         )
 
         # Current: larger bearish candle that engulfs previous
-        current_candle = Candle(
+        current_candle = Candle.from_legacy(
             timestamp_utc=timestamp + timedelta(hours=1),
             open=1.10015,  # Opens above prev close
             high=1.10025,  # High above prev high
@@ -198,7 +198,7 @@ class TestHammerPattern:
         Then should return True.
         """
         # Hammer: lower_wick >= 2x body, upper_wick < 0.5x body
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             open=1.10050,
             high=1.10052,  # Small upper wick (0.00002, < 0.5x body)
@@ -224,7 +224,7 @@ class TestHammerPattern:
         When checking for hammer,
         Then should return False.
         """
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             open=1.10000,
             high=1.10055,
@@ -252,7 +252,7 @@ class TestShootingStarPattern:
         Then should return True.
         """
         # Shooting star: upper_wick >= 2x body, lower_wick < 0.5x body
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
             open=1.10005,
             high=1.10060,  # Long upper wick
@@ -286,7 +286,7 @@ class TestBullishReversalDetection:
 
         candles = [
             # 3 candles ago: RSI declining
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=2),
                 open=1.10000,
                 high=1.10010,
@@ -300,7 +300,7 @@ class TestBullishReversalDetection:
                 stoch_rsi=0.28,
             ),
             # 2 candles ago: RSI at bottom
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=1),
                 open=1.09995,
                 high=1.10000,
@@ -314,7 +314,7 @@ class TestBullishReversalDetection:
                 stoch_rsi=0.18,  # Oversold
             ),
             # Current: RSI turning up + bullish engulfing
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp,
                 open=1.09980,
                 high=1.10020,
@@ -340,7 +340,7 @@ class TestBullishReversalDetection:
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=1),
                 open=1.09995,
                 high=1.10000,
@@ -353,7 +353,7 @@ class TestBullishReversalDetection:
                 rsi=32.0,
                 stoch_rsi=0.28,
             ),
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp,
                 open=1.09980,
                 high=1.10020,
@@ -384,7 +384,7 @@ class TestBearishReversalDetection:
 
         candles = [
             # 2 candles ago: RSI at peak
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=1),
                 open=1.10000,
                 high=1.10020,
@@ -398,7 +398,7 @@ class TestBearishReversalDetection:
                 stoch_rsi=0.82,  # Overbought
             ),
             # Current: RSI turning down + bearish engulfing
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp,
                 open=1.10020,
                 high=1.10025,
@@ -428,7 +428,7 @@ class TestReversalDetection:
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=2),
                 open=1.10005,
                 high=1.10010,
@@ -441,7 +441,7 @@ class TestReversalDetection:
                 rsi=32.0,
                 stoch_rsi=0.22,
             ),
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=1),
                 open=1.09995,
                 high=1.10000,
@@ -454,7 +454,7 @@ class TestReversalDetection:
                 rsi=28.0,  # Low RSI
                 stoch_rsi=0.18,
             ),
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(minutes=30),
                 open=1.09980,  # Opens below prev close (1.09985)
                 high=1.10020,
@@ -488,7 +488,7 @@ class TestReversalDetection:
         timestamp = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         candles = [
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=2),
                 open=1.09995,
                 high=1.10005,
@@ -501,7 +501,7 @@ class TestReversalDetection:
                 rsi=68.0,
                 stoch_rsi=0.78,
             ),
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(hours=1),
                 open=1.10000,
                 high=1.10020,
@@ -514,7 +514,7 @@ class TestReversalDetection:
                 rsi=72.0,  # High RSI
                 stoch_rsi=0.82,
             ),
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=timestamp - timedelta(minutes=30),
                 open=1.10020,  # Opens above prev close (1.10015)
                 high=1.10025,
@@ -545,7 +545,7 @@ class TestReversalDetection:
         Then should raise ValueError.
         """
         candles = [
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
                 open=1.10000,
                 high=1.10020,

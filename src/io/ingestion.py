@@ -100,6 +100,7 @@ def ingest_ohlcv_data(
     mode: str = "columnar",
     downcast: bool = False,
     use_arrow: bool = True,
+    strict_cadence: bool = True,
 ) -> IngestionResult:
     """Ingest and normalize raw OHLCV candle data.
 
@@ -113,6 +114,8 @@ def ingest_ohlcv_data(
         mode: Output mode, either 'columnar' or 'iterator'.
         downcast: If True, apply float64→float32 downcasting for memory savings.
         use_arrow: If True, attempt to use Arrow backend for acceleration.
+        strict_cadence: If True, raise error if deviation >2%. If False, log warning
+            and proceed with gap filling (useful for FX data with weekends/holidays).
 
     Returns:
         IngestionResult: Contains processed data, metrics, and metadata.
@@ -213,10 +216,17 @@ def ingest_ohlcv_data(
 
             if deviation > 2.0:
                 missing = expected_intervals - actual_intervals
-                raise RuntimeError(
+                error_msg = (
                     f"Cadence deviation exceeds tolerance: {deviation:.2f}% "
                     f"(expected ≤2.0%). Missing {missing} intervals."
                 )
+                if strict_cadence:
+                    raise RuntimeError(error_msg)
+                else:
+                    logger.warning(
+                        "%s Proceeding with gap filling (strict_cadence=False).",
+                        error_msg,
+                    )
 
             # Stage 5: Gap detection and filling
             progress.report_stage(IngestionStage.GAP_FILL, "Filling gaps")

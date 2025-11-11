@@ -56,7 +56,7 @@ from ..io.formatters import (
     format_text_output,
     generate_output_filename,
 )
-from ..io.ingestion import ingest_candles
+from ..io.ingestion import ingest_ohlcv_data
 from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
 
@@ -451,7 +451,7 @@ must expose 'run' or 'execute' function",
 
             print(f"Successfully registered strategy: {args.register_strategy}")
             print(f"  Module: {args.strategy_module}")
-            tags_str = ', '.join(args.strategy_tags) if args.strategy_tags else 'none'
+            tags_str = ", ".join(args.strategy_tags) if args.strategy_tags else "none"
             print(f"  Tags: {tags_str}")
             print(f"  Version: {args.strategy_version or 'unversioned'}")
             print(
@@ -590,8 +590,7 @@ Persistent storage not yet implemented."
                 break
             except ValueError:
                 print(
-                    f"Invalid input: '{user_input}'. "
-                    "Please enter a numeric value."
+                    f"Invalid input: '{user_input}'. " "Please enter a numeric value."
                 )
                 prompt_attempt += 1
 
@@ -634,8 +633,7 @@ Persistent storage not yet implemented."
                     sys.exit(1)
         except ValueError:
             print(
-                f"Error: Invalid portion input '{user_input}'. "
-                "Must be an integer.",
+                f"Error: Invalid portion input '{user_input}'. " "Must be an integer.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -686,23 +684,83 @@ Persistent storage not yet implemented."
         if profiler:
             profiler.start_phase("ingest")
 
+        # Load strategy to get required indicators
+        from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
+        
+        strategy = TREND_PULLBACK_STRATEGY
+        required_indicators = strategy.metadata.required_indicators
+        
+        logger.info("Strategy: %s v%s", strategy.metadata.name, strategy.metadata.version)
+        logger.info("Required indicators: %s", required_indicators)
+
         logger.info("Ingesting candles from %s", converted_csv)
-        candles = list(
-            ingest_candles(
-                csv_path=converted_csv,
-                ema_fast=parameters.ema_fast,
-                ema_slow=parameters.ema_slow,
-                atr_period=parameters.atr_length,
-                rsi_period=parameters.rsi_length,
-                stoch_rsi_period=parameters.rsi_length,
-                expected_timeframe_minutes=1,
-                allow_gaps=True,
-                show_progress=True,  # Show progress bar for CLI usage
-            )
+
+        # Stage 1: Core ingestion (OHLCV only)
+        logger.info("Stage 1/3: Loading OHLCV data from CSV...")
+        ingestion_result = ingest_ohlcv_data(
+            path=converted_csv,
+            timeframe_minutes=1,
+            mode="columnar",
+            downcast=False,
+            use_arrow=True,
+            strict_cadence=False,  # FX data has natural gaps (weekends/holidays)
         )
-        logger.info("Loaded %d candles", len(candles))
+        logger.info(
+            "✓ Ingested %d rows in %.2fs",
+            len(ingestion_result.data),
+            ingestion_result.metrics.runtime_seconds,
+        )
+
+        # Stage 2: Indicator enrichment
+        logger.info("Stage 2/3: Computing technical indicators...")
+        from ..indicators.enrich import enrich
+        
+        enrichment_result = enrich(
+            core_ref=ingestion_result,
+            indicators=required_indicators,
+            strict=True,
+        )
+        logger.info(
+            "✓ Applied %d indicators in %.2fs",
+            len(enrichment_result.indicators_applied),
+            enrichment_result.runtime_seconds,
+        )
+
+        # Stage 3: Convert DataFrame to Candle objects
+        logger.info("Stage 3/3: Converting to Candle objects...")
+        enriched_df = enrichment_result.enriched
+        from ..models.core import Candle
+
+        # Vectorized conversion using list comprehension with to_dict
+        # Much faster than iterrows() for large datasets
+        records = enriched_df.to_dict('records')
+        
+        candles = []
+        for record in records:
+            # Build indicators dict from indicator columns
+            indicators_dict = {
+                name: record[name] 
+                for name in required_indicators 
+                if name in record
+            }
+            
+            candles.append(
+                Candle(
+                    timestamp_utc=record["timestamp_utc"],
+                    open=record["open"],
+                    high=record["high"],
+                    low=record["low"],
+                    close=record["close"],
+                    volume=record.get("volume", 0.0),
+                    indicators=indicators_dict,
+                    is_gap=record.get("is_gap", False),
+                )
+            )
+
+        logger.info("✓ Created %d Candle objects", len(candles))
 
         if profiler:
+            profiler.end_phase("ingest")
             profiler.end_phase("ingest")
 
         # Slice dataset if fraction < 1.0 (Phase 5: US3, FR-002, SC-003)
@@ -795,9 +853,7 @@ Persistent storage not yet implemented."
                     logger.warning("  - %s", error)
 
             if not valid_pairs:
-                logger.error(
-                    "No valid symbols found. Aborting multi-symbol run."
-                )
+                logger.error("No valid symbols found. Aborting multi-symbol run.")
                 sys.exit(1)
 
             logger.info(
@@ -1050,11 +1106,7 @@ Persistent storage not yet implemented."
     symbol_tag = None
     if hasattr(result, "pair") and result.pair:
         symbol_tag = result.pair.lower()
-    if (
-        hasattr(result, "symbols")
-        and result.symbols
-        and len(result.symbols) > 1
-    ):
+    if hasattr(result, "symbols") and result.symbols and len(result.symbols) > 1:
         symbol_tag = "multi"
 
     output_filename = generate_output_filename(

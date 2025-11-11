@@ -51,7 +51,7 @@ class TestLongSignalPerformance:
             high = max(open_price, close_price) + 0.00002
             low = min(open_price, close_price) - 0.00002
 
-            candle = Candle(
+            candle = Candle.from_legacy(
                 timestamp_utc=timestamp,
                 open=open_price,
                 high=high,
@@ -203,7 +203,7 @@ class TestLongSignalPerformance:
         # Generate 100k candles
         for i in range(100000):
             base_price += 0.00001 if i % 2 == 0 else -0.00001
-            candle = Candle(
+            candle = Candle.from_legacy(
                 timestamp_utc=timestamp,
                 open=base_price,
                 high=base_price + 0.00005,
@@ -250,7 +250,7 @@ class TestLatencyMeasurement:
         candles = []
         for i in range(100):
             candles.append(
-                Candle(
+                Candle.from_legacy(
                     timestamp_utc=timestamp + timedelta(hours=i),
                     open=1.10000,
                     high=1.10020,

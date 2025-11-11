@@ -1,4 +1,4 @@
-﻿"""Unit tests for risk sizing edge cases and extreme scenarios."""
+"""Unit tests for risk sizing edge cases and extreme scenarios."""
 
 from datetime import UTC, datetime
 

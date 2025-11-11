@@ -224,7 +224,7 @@ class TestFullRunDeterministic:
         from datetime import datetime, timezone
 
         # Candle where both entry and exit could trigger
-        same_bar_candle = Candle(
+        same_bar_candle = Candle.from_legacy(
             timestamp_utc=datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
             open=1.1000,
             high=1.1050,  # High enough to trigger TP
