@@ -104,12 +104,12 @@ Independent Test Criteria: (a) iterator yields objects conforming to schema (b) 
 
 - [ ] T069 Refine downcast heuristics (skip columns with precision risk) in `src/io/downcast.py`
 - [ ] T070 Add memory peak sampling integration (optional psutil) in `src/io/perf_utils.py`
-- [ ] T071 Add stretch goal optimization experiment notes in `docs/performance.md`
+- [X] T071 Add stretch goal optimization experiment notes in `docs/performance.md`
 - [X] T072 Add Ruff rule / config to flag .itertuples()/iterrows usage at `pyproject.toml`
 - [ ] T073 Add CI script to run performance benchmark in non-blocking mode at `scripts/ci/run_performance.py`
 - [X] T074 Add documentation for adding a new indicator at `src/indicators/README.md`
-- [ ] T075 Add multi-symbol extension placeholder design note in `specs/009-optimize-ingestion/research.md`
-- [ ] T076 Add GPU future hook comment + TODO in `src/io/arrow_config.py`
+- [X] T075 Add multi-symbol extension placeholder design note in `specs/009-optimize-ingestion/research.md`
+- [X] T076 Add GPU future hook comment + TODO in `src/io/arrow_config.py`
 - [X] T077 Final spec & plan cross-check (update any drift) in `specs/009-optimize-ingestion/spec.md`
 - [X] T078 Final constitution compliance summary appended in `specs/009-optimize-ingestion/plan.md`
 - [X] T079 Prepare release notes entry (CHANGELOG) in `CHANGELOG.md`
@@ -119,7 +119,7 @@ Independent Test Criteria: (a) iterator yields objects conforming to schema (b) 
 - [X] T083 Add README section describing ingestion architecture in `README.md`
 - [X] T084 Ensure all new modules have docstrings & type hints in `src/io/` and `src/indicators/`
 - [ ] T085 Final performance run & record metrics in `results/benchmarks/ingestion_final.txt`
-- [ ] T086 Clean up orphan test fixtures in `tests/fixtures/`
+- [X] T086 Clean up orphan test fixtures in `tests/fixtures/`
 
 ### Remediation Additions (Address Analysis Findings)
 
