@@ -395,7 +395,6 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
         signal_indices=eurusd_deterministic_signal_set["signal_indices"],
         timestamps=eurusd_deterministic_signal_set["timestamps"],
         ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
-        progress=progress,
     )
 
     # Validate identical outcomes

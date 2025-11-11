@@ -59,7 +59,7 @@ from ..io.formatters import (
     format_text_output,
     generate_output_filename,
 )
-from ..io.ingestion import ingest_ohlcv_data
+from ..io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
 from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
 
