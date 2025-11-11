@@ -6,6 +6,7 @@ measuring runtime, throughput, and memory usage against baseline targets.
 
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -53,12 +54,16 @@ def test_ingestion_baseline_performance():
     logger.info("  Gaps inserted: %d", result.metrics.gaps_inserted)
     logger.info("  Duplicates removed: %d", result.metrics.duplicates_removed)
 
-    # Save benchmark results
-    results_path = Path("results/benchmark_summary.json")
-    results_path.parent.mkdir(parents=True, exist_ok=True)
+    # Save benchmark results (FR-016, NFR-009)
+    # NFR-009: Artifacts stored under results/benchmarks/ as ingestion_run_<timestamp>.json
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    results_dir = Path("results/benchmarks")
+    results_dir.mkdir(parents=True, exist_ok=True)
+    results_path = results_dir / f"ingestion_run_{timestamp}.json"
 
     benchmark_data = {
         "test": "ingestion_baseline",
+        "timestamp": datetime.now(UTC).isoformat(),
         "runtime_seconds": runtime,
         "throughput_rows_per_min": throughput,
         "rows_output": rows_output,
