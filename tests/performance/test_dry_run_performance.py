@@ -14,6 +14,7 @@ Test Coverage:
 import csv
 import tempfile
 import time
+from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -30,7 +31,7 @@ pytestmark = pytest.mark.performance
 # pylint: disable=redefined-outer-name
 # ^ Fixture name reuse is standard pytest pattern
 @pytest.fixture()
-def dataset_100k_candles() -> Path:
+def dataset_100k_candles() -> Generator[Path, None, None]:
     """
     Create a 100K candle dataset for dry-run performance testing.
 
