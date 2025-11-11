@@ -51,6 +51,7 @@ class ProgressReporter:
         self.show_progress = show_progress
         self.progress: Optional[Progress] = None
         self.task_id: Optional[TaskID] = None
+        self._started = False
 
         if self.show_progress:
             self.progress = Progress(
@@ -59,7 +60,6 @@ class ProgressReporter:
                 BarColumn(),
                 RowCountColumn(),
             )
-            self.progress.start()
 
     def start_stage(
         self, stage: IngestionStage, message: str, total: Optional[int] = None
@@ -76,6 +76,11 @@ class ProgressReporter:
 
         # Update or create visual progress bar
         if self.progress:
+            # Start progress bar on first use
+            if not self._started:
+                self.progress.start()
+                self._started = True
+
             if self.task_id is not None:
                 # Complete previous task
                 if self.progress.tasks[0].total:
@@ -127,5 +132,6 @@ class ProgressReporter:
 
     def finish(self) -> None:
         """Finalize and stop the progress bar."""
-        if self.progress:
+        if self.progress and self._started:
             self.progress.stop()
+            self._started = False
