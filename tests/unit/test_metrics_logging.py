@@ -160,7 +160,7 @@ def test_metrics_throughput_calculation():
 
         # Verify throughput is present, positive, and reasonable
         assert result.metrics.throughput_rows_per_min > 0
-        
+
         # Throughput should be reasonable (not absurdly high or low)
         # Minimum: 1000 rows/min (very slow)
         # Maximum: 100M rows/min (unrealistic)
