@@ -55,7 +55,8 @@ def test_ingestion_baseline_performance():
     logger.info("  Duplicates removed: %d", result.metrics.duplicates_removed)
 
     # Save benchmark results (FR-016, NFR-009)
-    # NFR-009: Artifacts stored under results/benchmarks/ as ingestion_run_<timestamp>.json
+    # NFR-009: Artifacts stored under results/benchmarks/
+    # as ingestion_run_<timestamp>.json
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     results_dir = Path("results/benchmarks")
     results_dir.mkdir(parents=True, exist_ok=True)

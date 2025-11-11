@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 from src.io.ingestion import ingest_ohlcv_data
 

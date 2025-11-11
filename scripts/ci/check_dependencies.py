@@ -54,7 +54,7 @@ def check_forbidden_files() -> list[str]:
         path = Path(forbidden)
         if path.exists():
             violations.append(
-                "FORBIDDEN: %s found (use pyproject.toml with Poetry)" % forbidden
+                f"FORBIDDEN: {forbidden} found (use pyproject.toml with Poetry)"
             )
 
     return violations
@@ -266,11 +266,11 @@ def check_undeclared_imports(strict: bool = False) -> list[str]:
 
     if undeclared:
         for package in sorted(undeclared):
-            msg = "UNDECLARED: Import '%s' not found in pyproject.toml" % package
+            msg = f"UNDECLARED: Import '{package}' not found in pyproject.toml"
             if strict:
                 violations.append(msg)
             else:
-                print("Warning: %s" % msg, file=sys.stderr)
+                print(f"Warning: {msg}", file=sys.stderr)
 
     return violations
 
@@ -307,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
     if violations:
         all_violations.extend(violations)
         for v in violations:
-            print("  ✗ %s" % v)
+            print(f"  ✗ {v}")
     else:
         print("  ✓ No forbidden files found")
     print()
@@ -318,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
     if violations:
         all_violations.extend(violations)
         for v in violations:
-            print("  ✗ %s" % v)
+            print(f"  ✗ {v}")
     else:
         print("  ✓ pyproject.toml valid")
     print()
@@ -329,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
     if violations:
         all_violations.extend(violations)
         for v in violations:
-            print("  ✗ %s" % v)
+            print(f"  ✗ {v}")
     else:
         print("  ✓ poetry.lock exists")
     print()
@@ -340,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     if violations:
         all_violations.extend(violations)
         for v in violations:
-            print("  ✗ %s" % v)
+            print(f"  ✗ {v}")
     else:
         print("  ✓ All imports declared")
     print()
@@ -348,7 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     # Summary
     if all_violations:
         print("=" * 60)
-        print("FAILED: %d policy violation(s) detected" % len(all_violations))
+        print(f"FAILED: {len(all_violations)} policy violation(s) detected")
         print("=" * 60)
         return 1
 

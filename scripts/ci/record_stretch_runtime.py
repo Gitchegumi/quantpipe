@@ -12,10 +12,12 @@ Examples:
     python scripts/ci/record_stretch_runtime.py
 
     # Custom benchmark input
-    python scripts/ci/record_stretch_runtime.py --input results/benchmarks/ingestion_run_20241106.json
+    python scripts/ci/record_stretch_runtime.py \\
+        --input results/benchmarks/ingestion_run_20241106.json
 
     # Custom artifact output
-    python scripts/ci/record_stretch_runtime.py --output results/stretch_runtime.json
+    python scripts/ci/record_stretch_runtime.py \\
+        --output results/stretch_runtime.json
 
 Artifact Schema (FR-027):
     {
@@ -105,7 +107,8 @@ def load_stretch_artifact(artifact_path: Path) -> dict[str, Any]:
                 return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             print(
-                f"Warning: Could not load existing artifact ({artifact_path.name}), creating new: {e!s}",
+                f"Warning: Could not load existing artifact "
+                f"({artifact_path.name}), creating new: {e!s}",
                 file=sys.stderr,
             )
 
@@ -153,7 +156,7 @@ def save_stretch_artifact(artifact_path: Path, artifact: dict[str, Any]) -> None
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     with artifact_path.open("w", encoding="utf-8") as f:
         json.dump(artifact, f, indent=2)
-    print("Stretch runtime artifact updated: %s" % artifact_path)
+    print(f"Stretch runtime artifact updated: {artifact_path}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -186,34 +189,32 @@ def main(argv: list[str] | None = None) -> int:
     if args.input:
         benchmark_path = args.input
         if not benchmark_path.exists():
-            print(
-                "Error: Benchmark file not found: %s" % benchmark_path, file=sys.stderr
-            )
+            print(f"Error: Benchmark file not found: {benchmark_path}", file=sys.stderr)
             return 1
     else:
         # Find latest benchmark in results/benchmarks/
         benchmark_dir = Path("results/benchmarks")
         if not benchmark_dir.exists():
             print(
-                "Error: Benchmark directory not found: %s" % benchmark_dir,
+                f"Error: Benchmark directory not found: {benchmark_dir}",
                 file=sys.stderr,
             )
             return 1
         benchmark_path = find_latest_benchmark(benchmark_dir)
         if benchmark_path is None:
             print(
-                "Error: No benchmark files found in %s" % benchmark_dir,
+                f"Error: No benchmark files found in {benchmark_dir}",
                 file=sys.stderr,
             )
             return 1
-        print("Using latest benchmark: %s" % benchmark_path.name)
+        print(f"Using latest benchmark: {benchmark_path.name}")
 
     # Extract runtime from benchmark
     try:
         latest_runtime = extract_runtime_from_benchmark(benchmark_path)
-        print("Latest runtime: %.2f seconds" % latest_runtime)
+        print(f"Latest runtime: {latest_runtime:.2f} seconds")
     except ValueError as e:
-        print("Error: %s" % str(e), file=sys.stderr)
+        print(f"Error: {e!s}", file=sys.stderr)
         return 1
 
     # Load existing artifact or create new
@@ -243,14 +244,14 @@ def main(argv: list[str] | None = None) -> int:
             print("  ✓ Stretch target met!")
         else:
             remaining = artifact["latest_seconds"] - artifact["stretch_target_seconds"]
-            print("  ⚠ %.2f seconds above stretch target" % remaining)
+            print(f"  ⚠ {remaining:.2f} seconds above stretch target")
 
     # Save artifact
     try:
         save_stretch_artifact(args.output, artifact)
         return 0
     except OSError as e:
-        print("Error: Could not save artifact: %s" % str(e), file=sys.stderr)
+        print(f"Error: Could not save artifact: {e!s}", file=sys.stderr)
         return 1
 
 
