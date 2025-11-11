@@ -52,13 +52,13 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 
 ## Phase 5 – User Story 3 (Efficient Trade Simulation) P3
 
-- [ ] T037 [US3] Implement batch simulation core `src/backtest/batch_simulation.py`
-- [ ] T038 [US3] Implement vectorized SL/TP evaluation helper `src/backtest/sim_eval.py`  # Removed [P]; requires batch simulation scaffold
-- [ ] T039 [US3] Implement position state arrays (entry/exit indices) `src/backtest/batch_simulation.py`
-- [ ] T040 [US3] Add simulation equivalence test (trade count, PnL tolerance) `tests/integration/test_sim_equivalence.py`
-- [ ] T041 [US3] Add simulation performance benchmark test `tests/performance/test_sim_perf.py`  # Removed [P]; after core simulation stable
-- [ ] T042 [US3] Add memory usage benchmark test `tests/performance/test_sim_memory.py`
-- [ ] T043 [US3] Add deterministic multi-run test (±1% timing variance) `tests/integration/test_deterministic_runs.py`
+- [X] T037 [US3] Implement batch simulation core `src/backtest/batch_simulation.py`
+- [X] T038 [US3] Implement vectorized SL/TP evaluation helper `src/backtest/sim_eval.py`  # Removed [P]; requires batch simulation scaffold
+- [X] T039 [US3] Implement position state arrays (entry/exit indices) `src/backtest/batch_simulation.py`
+- [X] T040 [US3] Add simulation equivalence test (trade count, PnL tolerance) `tests/integration/test_sim_equivalence.py`
+- [X] T041 [US3] Add simulation performance benchmark test `tests/performance/test_sim_perf.py`  # Removed [P]; after core simulation stable
+- [X] T042 [US3] Add memory usage benchmark test `tests/performance/test_sim_memory.py`
+- [X] T043 [US3] Add deterministic multi-run test (±1% timing variance) `tests/integration/test_deterministic_runs.py`
 
 ## Phase 6 – Polish & Cross-Cutting
 
