@@ -114,8 +114,9 @@ def ingest_ohlcv_data(
         mode: Output mode, either 'columnar' or 'iterator'.
         downcast: If True, apply float64→float32 downcasting for memory savings.
         use_arrow: If True, attempt to use Arrow backend for acceleration.
-        strict_cadence: If True, raise error if deviation >2%. If False, log warning
-            and proceed with gap filling (useful for FX data with weekends/holidays).
+        strict_cadence: If True, warn if deviation >50% (extreme gaps suggesting
+            data quality issues). If False, no warnings. In both cases, gap filling
+            proceeds normally. Historical FX data naturally has ~30% gaps (weekends).
 
     Returns:
         IngestionResult: Contains processed data, metrics, and metadata.
@@ -198,7 +199,9 @@ def ingest_ohlcv_data(
             downcast_applied = False
             core_hash = compute_dataframe_hash(df, CORE_COLUMNS)
         else:
-            # Stage 4: Cadence validation
+            # Stage 4: Cadence analysis (informational only)
+            # Note: FX data naturally has gaps (weekends, holidays, low liquidity)
+            # This check just reports statistics - gap filling handles the actual gaps
             start_time = df["timestamp_utc"].iloc[0]
             end_time = df["timestamp_utc"].iloc[-1]
             expected_intervals = compute_expected_intervals(
@@ -208,25 +211,21 @@ def ingest_ohlcv_data(
             deviation = compute_cadence_deviation(actual_intervals, expected_intervals)
 
             logger.info(
-                "Cadence check: %d intervals (expected %d), deviation: %.2f%%",
+                "Cadence analysis: %d intervals present, %d expected (%.1f%% complete)",
                 actual_intervals,
                 expected_intervals,
-                deviation,
+                100.0 - deviation,
             )
 
-            if deviation > 2.0:
+            # Only warn if deviation is extreme (suggests data quality issue)
+            if deviation > 50.0 and strict_cadence:
                 missing = expected_intervals - actual_intervals
-                error_msg = (
-                    f"Cadence deviation exceeds tolerance: {deviation:.2f}% "
-                    f"(expected ≤2.0%). Missing {missing} intervals."
+                logger.warning(
+                    "Large data gap detected: %.1f%% missing (%d intervals). "
+                    "This may indicate a data quality issue. Gap filling will proceed.",
+                    deviation,
+                    missing,
                 )
-                if strict_cadence:
-                    raise RuntimeError(error_msg)
-                else:
-                    logger.warning(
-                        "%s Proceeding with gap filling (strict_cadence=False).",
-                        error_msg,
-                    )
 
             # Stage 5: Gap detection and filling
             progress.report_stage(IngestionStage.GAP_FILL, "Filling gaps")
