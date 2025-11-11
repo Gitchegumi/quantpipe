@@ -11,21 +11,20 @@ Test Coverage:
 - SC-007: Deterministic results (signals always generated the same way)
 """
 
-import pytest
-
-
-pytestmark = pytest.mark.performance
-
 import csv
 import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from src.backtest.orchestrator import BacktestOrchestrator
 from src.config.parameters import StrategyParameters
 from src.io.legacy_ingestion import ingest_candles
 from src.models.enums import DirectionMode
+
+pytestmark = pytest.mark.performance
 
 
 @pytest.fixture()
@@ -136,9 +135,10 @@ def test_dry_run_performance_100k_candles(dataset_100k_candles: Path):
     end_time = time.perf_counter()
     elapsed_seconds = end_time - start_time
 
+    candles_per_sec = result.total_candles / elapsed_seconds
     print(
         f"\nDry-run performance: {result.total_candles} candles "
-        f"in {elapsed_seconds:.2f}s ({result.total_candles/elapsed_seconds:.0f} candles/sec)"
+        f"in {elapsed_seconds:.2f}s ({candles_per_sec:.0f} candles/sec)"
     )
     print(f"Signals generated: {len(result.signals)}")
 

@@ -1,10 +1,6 @@
-"""Performance memory usage tests for backtest execution."""
-
-import pytest
-
-
-pytestmark = pytest.mark.performance
 """
+Performance memory usage tests for backtest execution.
+
 This module measures and validates memory consumption to ensure the system
 can handle large datasets without excessive memory usage. Tests monitor:
 
@@ -24,9 +20,13 @@ from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from src.backtest.metrics import compute_metrics
 from src.io.legacy_ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
+
+pytestmark = pytest.mark.performance
 
 
 def get_process_memory_mb() -> float:
