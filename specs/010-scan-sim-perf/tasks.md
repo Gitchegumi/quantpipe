@@ -33,14 +33,14 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 
 ## Phase 3 – User Story 1 (Accelerated Market Scan) P1
 
-- [ ] T024 [US1] Implement batch scan core `src/backtest/batch_scan.py`
-- [ ] T025 [P] [US1] Implement indicator input extractor `src/preprocess/indicator_inputs.py`
-- [ ] T026 [US1] Integrate dedupe + extraction + progress into scan pipeline `src/backtest/batch_scan.py`
-- [ ] T027 [US1] Add scan equivalence test (timestamps & counts) `tests/integration/test_scan_equivalence.py`
-- [ ] T028 [US1] Add performance benchmark test (duration assertion) `tests/performance/test_scan_perf.py`  # Removed [P]; depends on stable scan core
-- [ ] T029 [US1] Add memory usage benchmark (peak reduced ≥30%) `tests/performance/test_scan_memory.py`  # Removed [P]; depends on scan implementation
-- [ ] T030 [US1] Add progress cadence test (interval ≤120s) `tests/unit/test_progress_scan.py`
-- [ ] T031 [US1] Add duplicate timestamp handling test `tests/unit/test_dedupe.py`
+- [X] T024 [US1] Implement batch scan core `src/backtest/batch_scan.py`
+- [X] T025 [P] [US1] Implement indicator input extractor `src/preprocess/indicator_inputs.py`
+- [X] T026 [US1] Integrate dedupe + extraction + progress into scan pipeline `src/backtest/batch_scan.py`
+- [X] T027 [US1] Add scan equivalence test (timestamps & counts) `tests/integration/test_scan_equivalence.py`
+- [X] T028 [US1] Add performance benchmark test (duration assertion) `tests/performance/test_scan_perf.py`  # Removed [P]; depends on stable scan core
+- [X] T029 [US1] Add memory usage benchmark (peak reduced ≥30%) `tests/performance/test_scan_memory.py`  # Removed [P]; depends on scan implementation
+- [X] T030 [US1] Add progress cadence test (interval ≤120s) `tests/unit/test_progress_scan.py`
+- [X] T031 [US1] Add duplicate timestamp handling test `tests/unit/test_dedupe.py`
 
 ## Phase 4 – User Story 2 (Strategy-Owned Indicators) P2
 
