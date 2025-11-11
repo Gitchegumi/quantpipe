@@ -422,8 +422,9 @@ def main():
             print("Error: --strategy-module required for registration", file=sys.stderr)
             sys.exit(1)
 
-        from ..strategy.registry import StrategyRegistry
         import importlib
+
+        from ..strategy.registry import StrategyRegistry
 
         registry = StrategyRegistry()
 
@@ -740,15 +741,13 @@ Persistent storage not yet implemented."
 
         # Vectorized conversion using list comprehension with to_dict
         # Much faster than iterrows() for large datasets
-        records = enriched_df.to_dict('records')
+        records = enriched_df.to_dict("records")
 
         candles = []
         for record in records:
             # Build indicators dict from indicator columns
             indicators_dict = {
-                name: record[name]
-                for name in required_indicators
-                if name in record
+                name: record[name] for name in required_indicators if name in record
             }
 
             candles.append(
@@ -1030,8 +1029,9 @@ Persistent storage not yet implemented."
 
         # Write benchmark artifact if profiling enabled
         if args.profile and benchmark_path:
-            from ..backtest.profiling import write_benchmark_record
             import tracemalloc
+
+            from ..backtest.profiling import write_benchmark_record
 
             # Get phase times from orchestrator if available
             phase_times = {}
@@ -1079,6 +1079,25 @@ Persistent storage not yet implemented."
             )
             logger.info("Benchmark artifact written to %s", benchmark_path)
 
+    # TODO(T045): Generate PerformanceReport after backtest completes
+    # NOTE: Currently orchestrator doesn't expose ScanResult/SimulationResult
+    # Full integration requires orchestrator refactoring to return:
+    # - ScanResult: scan timing, candle count, signal count, progress overhead
+    # - SimulationResult: simulation timing, trade count, memory stats
+    # Once available, uncomment:
+    # from ..backtest.report import create_report
+    # perf_report = create_report(
+    #     scan_result=scan_result,
+    #     sim_result=sim_result,
+    #     candle_count=len(candles),
+    #     equivalence_verified=True,
+    #     indicator_names=["ema_fast", "ema_slow", "atr", "rsi"],
+    #     duplicate_timestamps=0,
+    # )
+    # report_writer = ReportWriter(output_dir=args.output)
+    # report_path = report_writer.write_report(perf_report)
+    # logger.info("Performance report written to %s", report_path)
+
     # Format output (outside profiling context)
     output_format = (
         OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
@@ -1092,8 +1111,8 @@ Persistent storage not yet implemented."
     if is_multi_symbol_result:
         # Multi-symbol formatting (T025)
         from ..io.formatters import (
-            format_multi_symbol_text_output,
             format_multi_symbol_json_output,
+            format_multi_symbol_text_output,
         )
 
         if output_format == OutputFormat.JSON:
