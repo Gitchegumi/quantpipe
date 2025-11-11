@@ -43,40 +43,199 @@ enriched = enrich(
 
 ### Adding Custom Indicators
 
-To add a new indicator:
+This guide shows how to add a new technical indicator to the system.
 
-1. **Define the computation function**:
+#### Step 1: Create the Computation Function
 
-    ```python
-    def compute_roc(df, period=1):
-        """Compute rate of change."""
-        close = df["close"].astype("float64")
-        return {f"roc{period}": (close / close.shift(period) - 1.0).fillna(0.0)}
-    ```
+Create a new file in `src/indicators/` (e.g., `src/indicators/roc.py`):
 
-2. **Register the indicator**:
+```python
+"""Rate of Change (ROC) indicator implementation."""
 
-    ```python
-    from trading_strategies.backtest.indicators.registry import register_indicator
+import pandas as pd
 
+
+def compute_roc(df: pd.DataFrame, period: int = 1) -> dict[str, pd.Series]:
+    """Compute Rate of Change indicator.
+    
+    ROC measures the percentage change in price over a given period.
+    
+    Args:
+        df: DataFrame with 'close' column
+        period: Number of periods to look back (default: 1)
+        
+    Returns:
+        Dictionary with single Series: roc{period}
+        
+    Raises:
+        ValueError: If 'close' column missing or period < 1
+    """
+    # Validate inputs
+    if "close" not in df.columns:
+        msg = "ROC indicator requires 'close' column"
+        raise ValueError(msg)
+    if period < 1:
+        msg = f"ROC period must be ≥1, got {period}"
+        raise ValueError(msg)
+    
+    # Compute indicator (vectorized)
+    close = df["close"].astype("float64")
+    roc = (close / close.shift(period) - 1.0).fillna(0.0)
+    
+    return {f"roc{period}": roc}
+```
+
+**Key Requirements:**
+
+- **Type hints**: All parameters and return type annotated
+- **Docstring**: Complete PEP 257 docstring with Args, Returns, Raises
+- **Validation**: Check required columns present, validate parameters
+- **Vectorization**: Use pandas operations (no row loops)
+- **Immutability**: Never mutate input DataFrame
+- **NaN handling**: Return reasonable defaults or NaN for invalid periods
+
+#### Step 2: Add Tests
+
+Create test file `tests/unit/test_roc_indicator.py`:
+
+```python
+"""Unit tests for ROC indicator."""
+
+import pandas as pd
+import pytest
+
+from src.indicators.roc import compute_roc
+
+
+def test_roc_basic():
+    """Test ROC basic calculation."""
+    df = pd.DataFrame({
+        "close": [100.0, 110.0, 105.0, 115.0]
+    })
+    result = compute_roc(df, period=1)
+    
+    assert "roc1" in result
+    assert len(result["roc1"]) == 4
+    # First value should be 0 (no prior value)
+    assert result["roc1"].iloc[0] == 0.0
+    # Second value: (110-100)/100 = 0.10
+    assert result["roc1"].iloc[1] == pytest.approx(0.10)
+
+
+def test_roc_missing_column():
+    """Test ROC raises error for missing close column."""
+    df = pd.DataFrame({"open": [100.0, 110.0]})
+    
+    with pytest.raises(ValueError, match="requires 'close' column"):
+        compute_roc(df, period=1)
+
+
+def test_roc_invalid_period():
+    """Test ROC raises error for invalid period."""
+    df = pd.DataFrame({"close": [100.0, 110.0]})
+    
+    with pytest.raises(ValueError, match="period must be ≥1"):
+        compute_roc(df, period=0)
+```
+
+#### Step 3: Register the Indicator
+
+Option A: **Manual Registration** (for testing/prototyping):
+
+```python
+from src.indicators.registry import register_indicator
+from src.indicators.roc import compute_roc
+
+register_indicator(
+    name="roc1",
+    requires=["close"],
+    provides=["roc1"],
+    compute=lambda df: compute_roc(df, period=1),
+    version="1.0.0"
+)
+```
+
+Option B: **Built-in Registration** (recommended for production):
+
+Add to `src/indicators/builtin/__init__.py`:
+
+```python
+from src.indicators.roc import compute_roc
+
+# ... existing imports ...
+
+def register_builtin_indicators():
+    """Register all built-in indicators."""
+    # ... existing registrations ...
+    
+    # Rate of Change (ROC)
     register_indicator(
         name="roc1",
         requires=["close"],
         provides=["roc1"],
-        compute=compute_roc,
+        compute=lambda df: compute_roc(df, period=1),
         version="1.0.0"
     )
-    ```
-
-3. **Use it in enrichment**:
-
-    ```python
-    enriched = enrich(
-        core_ref=result,
-        indicators=["roc1"],
-        strict=True
+    
+    register_indicator(
+        name="roc5",
+        requires=["close"],
+        provides=["roc5"],
+        compute=lambda df: compute_roc(df, period=5),
+        version="1.0.0"
     )
-    ```
+```
+
+#### Step 4: Use the Indicator
+
+```python
+from src.io.ingestion import ingest_ohlcv_data
+from src.indicators.enrich import enrich
+
+# Ingest core data
+result = ingest_ohlcv_data(
+    path="price_data/raw/eurusd/eurusd_2024.csv",
+    timeframe_minutes=1
+)
+
+# Enrich with ROC indicator
+enriched = enrich(
+    core_ref=result,
+    indicators=["roc1", "roc5"],
+    strict=True
+)
+
+# Access computed indicators
+df = enriched.to_dataframe()
+print(df[["timestamp_utc", "close", "roc1", "roc5"]].head())
+```
+
+#### Step 5: Document in Registry
+
+Add entry to `src/indicators/README.md` Built-in Indicators section:
+
+```markdown
+- **ROC** (Rate of Change): `roc1`, `roc5`
+```
+
+### Indicator Development Checklist
+
+- [ ] Computation function with complete docstring
+- [ ] Type hints for all parameters and return
+- [ ] Input validation (columns, parameters)
+- [ ] Vectorized implementation (no row loops)
+- [ ] Unit tests (basic, edge cases, errors)
+- [ ] Registration in builtin or manual
+- [ ] Documentation in README.md
+- [ ] Verified with `ruff check` and `pylint` (≥8.0)
+
+### Common Pitfalls
+
+1. **Mutating input DataFrame**: Always create new Series, never modify input
+2. **Row loops**: Use `.shift()`, `.rolling()`, `.ewm()` instead of `.iterrows()`
+3. **Missing validation**: Always check required columns exist
+4. **Poor NaN handling**: Consider what NaN means for your indicator
+5. **No tests**: Indicators without tests will break
 
 ## Indicator Contract
 
