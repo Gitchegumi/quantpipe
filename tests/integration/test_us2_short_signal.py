@@ -149,7 +149,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
@@ -207,7 +206,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
@@ -266,7 +264,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
@@ -341,7 +338,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
