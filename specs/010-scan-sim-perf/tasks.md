@@ -18,18 +18,18 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 
 ## Phase 2 – Foundational
 
-- [ ] T012 Implement Manifest pydantic model in `src/io/ingestion/manifest.py`
-- [ ] T013 Implement CSV→Parquet conversion with zstd & checksum in `src/io/ingestion/parquet_convert.py`
-- [ ] T014 Implement Parquet LazyFrame loader & schema fingerprint in `src/io/ingestion/load.py`
-- [ ] T015 Implement performance targets constants in `src/backtest/performance_targets.py`
-- [ ] T016 Implement env metadata capture in `src/backtest/env_info.py`
-- [ ] T017 Implement memory sampler (tracemalloc + psutil fallback) in `src/backtest/memory_sampler.py`
-- [ ] T018 Implement progress dispatcher stride + time logic in `src/backtest/progress.py`
-- [ ] T019 Implement deterministic controls (seed, ordering) in `src/backtest/deterministic.py`
-- [ ] T020 Add dedupe utility `src/backtest/dedupe.py`
-- [ ] T021 Add columnar extraction helper `src/backtest/arrays.py`
-- [ ] T022 Add baseline equivalence fixture ingestion helper `tests/fixtures/baseline_equivalence.py`
-- [ ] T023 Add logging format audit baseline for Phase 2 modules `scripts/ci/check_logging_format.py` (verify lazy % formatting in new modules) [Principle X]
+- [X] T012 Implement Manifest pydantic model in `src/io/ingestion/manifest.py`
+- [X] T013 Implement CSV→Parquet conversion with zstd & checksum in `src/io/ingestion/parquet_convert.py`
+- [X] T014 Implement Parquet LazyFrame loader & schema fingerprint in `src/io/ingestion/load.py`
+- [X] T015 Implement performance targets constants in `src/backtest/performance_targets.py`
+- [X] T016 Implement env metadata capture in `src/backtest/env_info.py`
+- [X] T017 Implement memory sampler (tracemalloc + psutil fallback) in `src/backtest/memory_sampler.py`
+- [X] T018 Implement progress dispatcher stride + time logic in `src/backtest/progress.py`
+- [X] T019 Implement deterministic controls (seed, ordering) in `src/backtest/deterministic.py`
+- [X] T020 Add dedupe utility `src/backtest/dedupe.py`
+- [X] T021 Add columnar extraction helper `src/backtest/arrays.py`
+- [X] T022 Add baseline equivalence fixture ingestion helper `tests/fixtures/baseline_equivalence.py`
+- [X] T023 Add logging format audit baseline for Phase 2 modules `scripts/ci/check_logging_format.py` (verify lazy % formatting in new modules) [Principle X]
 
 ## Phase 3 – User Story 1 (Accelerated Market Scan) P1
 

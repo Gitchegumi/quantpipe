@@ -4,7 +4,9 @@ This module provides optimized data loading functionality using Polars LazyFrame
 for efficient memory usage and query optimization through lazy evaluation.
 """
 
+import hashlib
 import logging
+from pathlib import Path
 from typing import Optional
 
 import polars as pl
@@ -36,9 +38,36 @@ def load_parquet_lazy(
     """
     logger.info("Loading Parquet file (lazy): %s", parquet_path)
 
-    # TODO: Implement Parquet lazy loading with projection/predicate pushdown
-    # Placeholder implementation
-    raise NotImplementedError("Parquet lazy loading not yet implemented")
+    # Verify file exists
+    parquet_file = Path(parquet_path)
+    if not parquet_file.exists():
+        msg = "Parquet file not found: %s"
+        logger.error(msg, parquet_path)
+        raise FileNotFoundError(msg % parquet_path)
+
+    # Start with scan (lazy operation)
+    lf = pl.scan_parquet(parquet_path)
+
+    # Apply column selection (projection pushdown)
+    if columns is not None:
+        try:
+            lf = lf.select(columns)
+        except Exception as e:
+            msg = "Invalid columns specified: %s"
+            logger.error(msg, str(e))
+            raise ValueError(msg % str(e)) from e
+
+    # Apply predicate filter (predicate pushdown)
+    if predicate is not None:
+        lf = lf.filter(predicate)
+
+    logger.debug(
+        "LazyFrame created with %d column(s) and predicate=%s",
+        len(columns) if columns else 0,
+        predicate is not None,
+    )
+
+    return lf
 
 
 def load_parquet_eager(
@@ -61,9 +90,26 @@ def load_parquet_eager(
     """
     logger.info("Loading Parquet file (eager): %s", parquet_path)
 
-    # TODO: Implement eager Parquet loading
-    # Placeholder implementation
-    raise NotImplementedError("Eager Parquet loading not yet implemented")
+    # Verify file exists
+    parquet_file = Path(parquet_path)
+    if not parquet_file.exists():
+        msg = "Parquet file not found: %s"
+        logger.error(msg, parquet_path)
+        raise FileNotFoundError(msg % parquet_path)
+
+    # Read Parquet file directly (eager operation)
+    try:
+        df = pl.read_parquet(parquet_path, columns=columns)
+    except Exception as e:
+        msg = "Failed to read Parquet file: %s"
+        logger.error(msg, str(e))
+        raise ValueError(msg % str(e)) from e
+
+    logger.info(
+        "Loaded DataFrame with %d rows and %d columns", len(df), len(df.columns)
+    )
+
+    return df
 
 
 def get_schema_fingerprint(parquet_path: str) -> str:
@@ -78,6 +124,25 @@ def get_schema_fingerprint(parquet_path: str) -> str:
     Raises:
         FileNotFoundError: If Parquet file does not exist
     """
-    # TODO: Implement schema fingerprint extraction
-    # Placeholder implementation
-    raise NotImplementedError("Schema fingerprint extraction not yet implemented")
+    # Verify file exists
+    parquet_file = Path(parquet_path)
+    if not parquet_file.exists():
+        msg = "Parquet file not found: %s"
+        logger.error(msg, parquet_path)
+        raise FileNotFoundError(msg % parquet_path)
+
+    # Read schema without loading data (very fast)
+    lf = pl.scan_parquet(parquet_path)
+    schema = lf.collect_schema()
+
+    # Build schema string: "col1:type1,col2:type2,..."
+    schema_parts = [f"{name}:{dtype}" for name, dtype in schema.items()]
+    schema_str = ",".join(schema_parts)
+
+    # Compute MD5 hash
+    md5_hash = hashlib.md5(schema_str.encode("utf-8"), usedforsecurity=False)
+    fingerprint = md5_hash.hexdigest()
+
+    logger.debug("Schema fingerprint for %s: %s", parquet_path, fingerprint[:8])
+
+    return fingerprint
