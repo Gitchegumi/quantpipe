@@ -23,6 +23,7 @@ import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -34,7 +35,7 @@ pytestmark = pytest.mark.performance
 
 
 @pytest.fixture()
-def large_dataset_path() -> Path:
+def large_dataset_path() -> Generator[Path, None, None]:
     """
     Create a large synthetic dataset for throughput testing.
 
@@ -108,7 +109,9 @@ def test_ingestion_throughput(
     start_time = time.perf_counter()
 
     candle_count = 0
-    for _ in ingest_candles(  # pylint: disable=undefined-variable
+    for (
+        _
+    ) in ingest_candles(  # pylint: disable=undefined-variable  # type: ignore[name-defined]
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,
@@ -300,7 +303,9 @@ def test_end_to_end_backtest_performance_estimate(
     start_time = time.perf_counter()
 
     candle_count = 0
-    for candle in ingest_candles(  # pylint: disable=undefined-variable
+    for (
+        candle
+    ) in ingest_candles(  # pylint: disable=undefined-variable  # type: ignore[name-defined]
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,
@@ -345,7 +350,9 @@ def test_memory_efficiency_during_ingestion(
 
     # Process candles one at a time
     candle_count = 0
-    for _ in ingest_candles(  # pylint: disable=undefined-variable
+    for (
+        _
+    ) in ingest_candles(  # pylint: disable=undefined-variable  # type: ignore[name-defined]
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,
