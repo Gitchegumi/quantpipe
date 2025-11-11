@@ -25,7 +25,7 @@ class TestSignalCooldown:
         base_time = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
         for i in range(10):
-            candle = Candle(
+            candle = Candle.from_legacy(
                 timestamp_utc=base_time + timedelta(hours=i),
                 open=1.10000,
                 high=1.10010,

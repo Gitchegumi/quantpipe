@@ -184,7 +184,7 @@ def rsi(prices: NDArray[np.float64], period: int = 14) -> NDArray[np.float64]:
 
     # Avoid division by zero - suppress the warning since we handle it with np.where
     valid_mask = avg_losses != 0
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         rs = np.where(valid_mask, avg_gains / avg_losses, 100.0)
 
     # RSI = 100 - (100 / (1 + RS))

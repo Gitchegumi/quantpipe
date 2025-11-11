@@ -369,7 +369,7 @@ class TestBacktestOrchestratorRunBacktest:
     def sample_candles(self):
         """Provide sample candle sequence for testing."""
         return [
-            Candle(
+            Candle.from_legacy(
                 timestamp_utc=datetime(2025, 1, 1, i, 0, 0, tzinfo=UTC),
                 open=1.1000 + i * 0.0001,
                 high=1.1010 + i * 0.0001,

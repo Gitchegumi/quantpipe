@@ -1,10 +1,6 @@
-"""Performance memory usage tests for backtest execution."""
-
-import pytest
-
-
-pytestmark = pytest.mark.performance
 """
+Performance memory usage tests for backtest execution.
+
 This module measures and validates memory consumption to ensure the system
 can handle large datasets without excessive memory usage. Tests monitor:
 
@@ -24,9 +20,13 @@ from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from src.backtest.metrics import compute_metrics
-from src.io.ingestion import ingest_candles
+from src.io.legacy_ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
+
+pytestmark = pytest.mark.performance
 
 
 def get_process_memory_mb() -> float:
@@ -49,6 +49,8 @@ def get_process_memory_mb() -> float:
         return -1.0
 
 
+# pylint: disable=redefined-outer-name
+# ^ Fixture name reuse is standard pytest pattern
 @pytest.fixture()
 def huge_dataset_path() -> Generator[Path, None, None]:
     """
@@ -304,7 +306,7 @@ def test_candle_accumulation_memory():
 
     # Accumulate 10,000 candles
     for i in range(10000):
-        candle = Candle(
+        candle = Candle.from_legacy(
             timestamp_utc=base_time + timedelta(minutes=i),
             open=1.1000,
             high=1.1010,

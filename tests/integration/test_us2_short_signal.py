@@ -11,12 +11,14 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.integration
-
 from src.backtest.execution import simulate_execution
 from src.backtest.metrics_ingest import MetricsIngestor
-from src.io.ingestion import ingest_candles
-from src.strategy.trend_pullback.signal_generator import generate_short_signals
+from src.io.legacy_ingestion import ingest_candles
+from src.strategy.trend_pullback.signal_generator import (
+    generate_short_signals,
+)
+
+pytestmark = pytest.mark.integration
 
 
 class TestUS2ShortSignalIntegration:
@@ -49,14 +51,16 @@ class TestUS2ShortSignalIntegration:
             low = close_price - 0.00003
 
             rows.append(
-                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},{open_price:.5f},{high:.5f},"
-                f"{low:.5f},{close_price:.5f},1000"
+                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},"
+                f"{open_price:.5f},{high:.5f},{low:.5f},"
+                f"{close_price:.5f},1000"
             )
             timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
             if timestamp.hour == 0:
                 timestamp = timestamp.replace(day=timestamp.day + 1)
 
-        # Next 15 candles: strong pullback up (rising prices to trigger RSI > 70)
+        # Next 15 candles: strong pullback up (rising prices to trigger
+        # RSI > 70)
         bottom_price = close_price
         for i in range(15):
             open_price = bottom_price + (i * 0.00040)
@@ -65,8 +69,9 @@ class TestUS2ShortSignalIntegration:
             low = open_price - 0.00003
 
             rows.append(
-                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},{open_price:.5f},{high:.5f},"
-                f"{low:.5f},{close_price:.5f},1500"
+                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},"
+                f"{open_price:.5f},{high:.5f},{low:.5f},"
+                f"{close_price:.5f},1000"
             )
             timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
             if timestamp.hour == 0:
@@ -80,8 +85,9 @@ class TestUS2ShortSignalIntegration:
             low = close_price - 0.00003
 
             rows.append(
-                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},{open_price:.5f},{high:.5f},"
-                f"{low:.5f},{close_price:.5f},1000"
+                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},"
+                f"{open_price:.5f},{high:.5f},{low:.5f},"
+                f"{close_price:.5f},1000"
             )
             timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
 
@@ -119,8 +125,9 @@ class TestUS2ShortSignalIntegration:
             low = close_price - 0.00003
 
             rows.append(
-                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},{open_price:.5f},{high:.5f},"
-                f"{low:.5f},{close_price:.5f},1000"
+                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},"
+                f"{open_price:.5f},{high:.5f},{low:.5f},"
+                f"{close_price:.5f},1000"
             )
             timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
             if timestamp.hour == 0:
@@ -131,13 +138,15 @@ class TestUS2ShortSignalIntegration:
 
     def test_short_signal_generation_workflow(self, sample_short_data: Path):
         """
-        GIVEN: Price data showing downtrend with pullback and bearish reversal
+        GIVEN: Price data showing downtrend with pullback and bearish
+            reversal
         WHEN: Running short signal generation
         THEN: Should generate valid short signal with correct stop placement
 
-        NOTE: This test validates the function can be called and returns proper structure.
-        Full end-to-end validation with synthetic data requires precise RSI momentum turn
-        coordination which is complex to generate. Real market data testing in Phase 5.
+        NOTE: This test validates the function can be called and returns
+            proper structure. Full end-to-end validation with synthetic data
+            requires precise RSI momentum turn coordination which is complex
+            to generate. Real market data testing in Phase 5.
         """
         # Arrange: Ingest candles
         candles = list(
@@ -149,7 +158,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
@@ -207,7 +215,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
@@ -266,7 +273,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
@@ -322,8 +328,9 @@ class TestUS2ShortSignalIntegration:
             low = open_price - 0.00005
 
             rows.append(
-                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},{open_price:.5f},{high:.5f},"
-                f"{low:.5f},{close_price:.5f},1000"
+                f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},"
+                f"{open_price:.5f},{high:.5f},{low:.5f},"
+                f"{close_price:.5f},1000"
             )
             timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
             if timestamp.hour == 0:
@@ -341,7 +348,6 @@ class TestUS2ShortSignalIntegration:
                 rsi_period=14,
                 stoch_rsi_period=14,
                 expected_timeframe_minutes=60,
-                fill_gaps=False,  # Test data has non-continuous timestamps
             )
         )
 
