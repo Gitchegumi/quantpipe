@@ -137,7 +137,7 @@ class BatchScan:
         # Step 3: Validate array lengths
         timestamps = ohlc_arrays[0]
         all_arrays = list(ohlc_arrays) + list(indicator_arrays.values())
-        validate_array_lengths(all_arrays, expected_length=len(timestamps))
+        validate_array_lengths(*all_arrays)
 
         logger.debug(
             "Extracted arrays: %d candles, %d indicators",
@@ -162,8 +162,8 @@ class BatchScan:
         # Step 6: Finalize progress tracking
         progress_overhead_pct = 0.0
         if progress is not None:
-            progress.finish()
-            progress_overhead_pct = progress.get_overhead_percentage()
+            result = progress.finish()
+            progress_overhead_pct = result["progress_overhead_pct"]
             logger.info("Progress overhead: %.2f%%", progress_overhead_pct)
 
         scan_duration = time.perf_counter() - scan_start
@@ -200,9 +200,9 @@ class BatchScan:
 
     def _scan_signals(
         self,
-        timestamps: np.ndarray,
-        ohlc_arrays: tuple[np.ndarray, ...],
-        indicator_arrays: dict[str, np.ndarray],
+        timestamps: np.ndarray,  # pylint: disable=unused-argument
+        ohlc_arrays: tuple[np.ndarray, ...],  # pylint: disable=unused-argument
+        indicator_arrays: dict[str, np.ndarray],  # pylint: disable=unused-argument
         progress: Optional[ProgressDispatcher],
     ) -> np.ndarray:
         """Scan for signal indices using batch processing.

@@ -24,7 +24,7 @@ from src.backtest.performance_targets import (
 
 
 # Dummy test fixtures - will be replaced with actual fixtures in integration phase
-@pytest.fixture
+@pytest.fixture()
 def eurusd_signal_set():
     """Generate dummy EURUSD signal set for testing."""
     np.random.seed(42)
@@ -49,7 +49,7 @@ def eurusd_signal_set():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def usdjpy_signal_set():
     """Generate dummy USDJPY signal set for testing."""
     np.random.seed(123)
@@ -100,7 +100,7 @@ def simulate_baseline(signal_indices, timestamps, ohlc_arrays):
     }
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_eurusd_equivalence(eurusd_signal_set):
     """Test batch simulation equivalence for EURUSD signal set.
 
@@ -121,7 +121,6 @@ def test_eurusd_equivalence(eurusd_signal_set):
         signal_indices=eurusd_signal_set["signal_indices"],
         timestamps=eurusd_signal_set["timestamps"],
         ohlc_arrays=eurusd_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     # Validate trade count exact match
@@ -142,7 +141,7 @@ def test_eurusd_equivalence(eurusd_signal_set):
     ), f"PnL variance {pnl_diff_pct:.2f}% exceeds tolerance {EQUIVALENCE_PNL_TOLERANCE_PCT}%"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_usdjpy_equivalence(usdjpy_signal_set):
     """Test batch simulation equivalence for USDJPY signal set.
 
@@ -163,7 +162,6 @@ def test_usdjpy_equivalence(usdjpy_signal_set):
         signal_indices=usdjpy_signal_set["signal_indices"],
         timestamps=usdjpy_signal_set["timestamps"],
         ohlc_arrays=usdjpy_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     # Validate trade count exact match
@@ -184,7 +182,7 @@ def test_usdjpy_equivalence(usdjpy_signal_set):
     ), f"PnL variance {pnl_diff_pct:.2f}% exceeds tolerance {EQUIVALENCE_PNL_TOLERANCE_PCT}%"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_both_symbols_equivalence(eurusd_signal_set, usdjpy_signal_set):
     """Test batch simulation equivalence for combined EURUSD+USDJPY signal sets.
 
@@ -212,14 +210,12 @@ def test_both_symbols_equivalence(eurusd_signal_set, usdjpy_signal_set):
         signal_indices=eurusd_signal_set["signal_indices"],
         timestamps=eurusd_signal_set["timestamps"],
         ohlc_arrays=eurusd_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     usdjpy_batch = batch_sim.simulate(
         signal_indices=usdjpy_signal_set["signal_indices"],
         timestamps=usdjpy_signal_set["timestamps"],
         ohlc_arrays=usdjpy_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     # Aggregate results
@@ -247,7 +243,7 @@ def test_both_symbols_equivalence(eurusd_signal_set, usdjpy_signal_set):
     ), f"Total PnL variance {pnl_diff_pct:.2f}% exceeds tolerance {EQUIVALENCE_PNL_TOLERANCE_PCT}%"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_zero_signals_edge_case():
     """Test zero signals edge case completes in <10 seconds.
 
@@ -278,7 +274,6 @@ def test_zero_signals_edge_case():
         signal_indices=signal_indices,
         timestamps=timestamps,
         ohlc_arrays=ohlc_arrays,
-        progress=None,
     )
     duration = time.time() - start_time
 
@@ -292,7 +287,7 @@ def test_zero_signals_edge_case():
     assert result.short_count == 0, f"Expected 0 shorts, got {result.short_count}"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_equivalence_tolerance_boundary():
     """Test PnL equivalence at boundary of tolerance threshold.
 
@@ -323,7 +318,6 @@ def test_equivalence_tolerance_boundary():
         signal_indices=signal_indices,
         timestamps=timestamps,
         ohlc_arrays=ohlc_arrays,
-        progress=None,
     )
 
     # Calculate variance

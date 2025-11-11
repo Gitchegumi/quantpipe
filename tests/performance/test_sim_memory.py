@@ -11,7 +11,6 @@ Test Coverage:
 - EURUSD, USDJPY, and both symbols test scenarios
 """
 
-import time
 
 import numpy as np
 import psutil
@@ -53,7 +52,7 @@ class MemoryTracker:
 
 
 # Dummy test fixtures - will be replaced with actual large-scale fixtures
-@pytest.fixture
+@pytest.fixture()
 def eurusd_memory_signal_set():
     """Generate EURUSD signal set for memory testing."""
     np.random.seed(300)
@@ -81,7 +80,7 @@ def eurusd_memory_signal_set():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def usdjpy_memory_signal_set():
     """Generate USDJPY signal set for memory testing."""
     np.random.seed(400)
@@ -133,7 +132,7 @@ def simulate_baseline_memory(signal_indices, timestamps, ohlc_arrays):
     return {"peak_memory_mb": tracker.get_peak_mb()}
 
 
-@pytest.mark.performance
+@pytest.mark.performance()
 def test_eurusd_memory_usage(eurusd_memory_signal_set):
     """Test batch simulation memory usage for EURUSD signal set.
 
@@ -154,7 +153,6 @@ def test_eurusd_memory_usage(eurusd_memory_signal_set):
         signal_indices=eurusd_memory_signal_set["signal_indices"],
         timestamps=eurusd_memory_signal_set["timestamps"],
         ohlc_arrays=eurusd_memory_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     # Sample after simulation
@@ -181,7 +179,7 @@ def test_eurusd_memory_usage(eurusd_memory_signal_set):
     ), f"Memory per trade {memory_per_trade_kb:.2f} KB seems excessive (>100 KB)"
 
 
-@pytest.mark.performance
+@pytest.mark.performance()
 def test_usdjpy_memory_usage(usdjpy_memory_signal_set):
     """Test batch simulation memory usage for USDJPY signal set.
 
@@ -202,7 +200,6 @@ def test_usdjpy_memory_usage(usdjpy_memory_signal_set):
         signal_indices=usdjpy_memory_signal_set["signal_indices"],
         timestamps=usdjpy_memory_signal_set["timestamps"],
         ohlc_arrays=usdjpy_memory_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     # Sample after simulation
@@ -229,7 +226,7 @@ def test_usdjpy_memory_usage(usdjpy_memory_signal_set):
     ), f"Memory per trade {memory_per_trade_kb:.2f} KB seems excessive (>100 KB)"
 
 
-@pytest.mark.performance
+@pytest.mark.performance()
 def test_memory_scaling_linear(eurusd_memory_signal_set, usdjpy_memory_signal_set):
     """Test memory scales linearly with trade count (no O(n²) patterns).
 
@@ -247,7 +244,6 @@ def test_memory_scaling_linear(eurusd_memory_signal_set, usdjpy_memory_signal_se
         signal_indices=eurusd_memory_signal_set["signal_indices"],
         timestamps=eurusd_memory_signal_set["timestamps"],
         ohlc_arrays=eurusd_memory_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     tracker_eurusd.sample()
@@ -263,7 +259,6 @@ def test_memory_scaling_linear(eurusd_memory_signal_set, usdjpy_memory_signal_se
         signal_indices=usdjpy_memory_signal_set["signal_indices"],
         timestamps=usdjpy_memory_signal_set["timestamps"],
         ohlc_arrays=usdjpy_memory_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     tracker_usdjpy.sample()
@@ -271,7 +266,7 @@ def test_memory_scaling_linear(eurusd_memory_signal_set, usdjpy_memory_signal_se
     usdjpy_trades = usdjpy_result.trade_count
     usdjpy_memory_per_trade = usdjpy_delta_mb / usdjpy_trades * 1024  # KB
 
-    print(f"\nMemory scaling analysis:")
+    print("\nMemory scaling analysis:")
     print(f"EURUSD: {eurusd_trades} trades, {eurusd_memory_per_trade:.2f} KB/trade")
     print(f"USDJPY: {usdjpy_trades} trades, {usdjpy_memory_per_trade:.2f} KB/trade")
 
@@ -291,7 +286,7 @@ def test_memory_scaling_linear(eurusd_memory_signal_set, usdjpy_memory_signal_se
     ), f"Memory variance {variance_pct:.2f}% suggests non-linear scaling"
 
 
-@pytest.mark.performance
+@pytest.mark.performance()
 def test_memory_vs_baseline(eurusd_memory_signal_set):
     """Test batch simulation memory usage vs baseline execution.
 
@@ -316,7 +311,6 @@ def test_memory_vs_baseline(eurusd_memory_signal_set):
         signal_indices=eurusd_memory_signal_set["signal_indices"],
         timestamps=eurusd_memory_signal_set["timestamps"],
         ohlc_arrays=eurusd_memory_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     tracker.sample()
@@ -329,7 +323,7 @@ def test_memory_vs_baseline(eurusd_memory_signal_set):
         else 0
     )
 
-    print(f"\nMemory comparison:")
+    print("\nMemory comparison:")
     print(f"Baseline: {baseline_memory_mb:.2f} MB")
     print(f"Batch: {batch_memory_mb:.2f} MB")
     print(f"Reduction: {memory_reduction_pct:.2f}%")
@@ -346,7 +340,7 @@ def test_memory_vs_baseline(eurusd_memory_signal_set):
     ), "Batch simulation trade count mismatch"
 
 
-@pytest.mark.performance
+@pytest.mark.performance()
 def test_both_symbols_memory_total(eurusd_memory_signal_set, usdjpy_memory_signal_set):
     """Test combined memory usage for both symbols.
 
@@ -363,7 +357,6 @@ def test_both_symbols_memory_total(eurusd_memory_signal_set, usdjpy_memory_signa
         signal_indices=eurusd_memory_signal_set["signal_indices"],
         timestamps=eurusd_memory_signal_set["timestamps"],
         ohlc_arrays=eurusd_memory_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     tracker.sample()
@@ -373,7 +366,6 @@ def test_both_symbols_memory_total(eurusd_memory_signal_set, usdjpy_memory_signa
         signal_indices=usdjpy_memory_signal_set["signal_indices"],
         timestamps=usdjpy_memory_signal_set["timestamps"],
         ohlc_arrays=usdjpy_memory_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     tracker.sample()
@@ -382,7 +374,7 @@ def test_both_symbols_memory_total(eurusd_memory_signal_set, usdjpy_memory_signa
     peak_memory_mb = tracker.get_peak_mb()
     memory_delta_mb = tracker.get_delta_mb()
 
-    print(f"\nCombined memory usage:")
+    print("\nCombined memory usage:")
     print(f"Total trades: {total_trades}")
     print(f"Peak memory: {peak_memory_mb:.2f} MB")
     print(f"Memory delta: {memory_delta_mb:.2f} MB")

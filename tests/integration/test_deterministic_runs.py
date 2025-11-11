@@ -23,7 +23,7 @@ from src.backtest.performance_targets import (
 
 
 # Dummy test fixtures - will be replaced with actual fixtures
-@pytest.fixture
+@pytest.fixture()
 def eurusd_deterministic_signal_set():
     """Generate EURUSD signal set for deterministic testing."""
     np.random.seed(500)
@@ -51,7 +51,7 @@ def eurusd_deterministic_signal_set():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def usdjpy_deterministic_signal_set():
     """Generate USDJPY signal set for deterministic testing."""
     np.random.seed(600)
@@ -79,7 +79,7 @@ def usdjpy_deterministic_signal_set():
     }
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_eurusd_timing_determinism(eurusd_deterministic_signal_set):
     """Test timing determinism for EURUSD signal set across 3 runs.
 
@@ -98,7 +98,6 @@ def test_eurusd_timing_determinism(eurusd_deterministic_signal_set):
             signal_indices=eurusd_deterministic_signal_set["signal_indices"],
             timestamps=eurusd_deterministic_signal_set["timestamps"],
             ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
-            progress=None,
         )
         duration = time.time() - start_time
 
@@ -114,7 +113,7 @@ def test_eurusd_timing_determinism(eurusd_deterministic_signal_set):
         (max_duration_diff / avg_duration * 100) if avg_duration > 0 else 0
     )
 
-    print(f"\nTiming analysis:")
+    print("\nTiming analysis:")
     print(f"Average duration: {avg_duration:.3f}s")
     print(f"Max deviation: {max_duration_diff:.3f}s")
     print(f"Timing variance: {timing_variance_pct:.2f}%")
@@ -131,7 +130,7 @@ def test_eurusd_timing_determinism(eurusd_deterministic_signal_set):
     ), f"Trade counts vary across runs: {trade_counts}"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_usdjpy_timing_determinism(usdjpy_deterministic_signal_set):
     """Test timing determinism for USDJPY signal set across 3 runs.
 
@@ -150,7 +149,6 @@ def test_usdjpy_timing_determinism(usdjpy_deterministic_signal_set):
             signal_indices=usdjpy_deterministic_signal_set["signal_indices"],
             timestamps=usdjpy_deterministic_signal_set["timestamps"],
             ohlc_arrays=usdjpy_deterministic_signal_set["ohlc_arrays"],
-            progress=None,
         )
         duration = time.time() - start_time
 
@@ -166,7 +164,7 @@ def test_usdjpy_timing_determinism(usdjpy_deterministic_signal_set):
         (max_duration_diff / avg_duration * 100) if avg_duration > 0 else 0
     )
 
-    print(f"\nTiming analysis:")
+    print("\nTiming analysis:")
     print(f"Average duration: {avg_duration:.3f}s")
     print(f"Max deviation: {max_duration_diff:.3f}s")
     print(f"Timing variance: {timing_variance_pct:.2f}%")
@@ -183,7 +181,7 @@ def test_usdjpy_timing_determinism(usdjpy_deterministic_signal_set):
     ), f"Trade counts vary across runs: {trade_counts}"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_eurusd_pnl_determinism(eurusd_deterministic_signal_set):
     """Test PnL determinism for EURUSD signal set across 3 runs.
 
@@ -201,7 +199,6 @@ def test_eurusd_pnl_determinism(eurusd_deterministic_signal_set):
             signal_indices=eurusd_deterministic_signal_set["signal_indices"],
             timestamps=eurusd_deterministic_signal_set["timestamps"],
             ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
-            progress=None,
         )
 
         pnl_values.append(result.total_pnl)
@@ -216,7 +213,7 @@ def test_eurusd_pnl_determinism(eurusd_deterministic_signal_set):
     max_pnl_diff = max(abs(p - avg_pnl) for p in pnl_values)
     pnl_variance_pct = (max_pnl_diff / abs(avg_pnl) * 100) if avg_pnl != 0 else 0
 
-    print(f"\nPnL analysis:")
+    print("\nPnL analysis:")
     print(f"Average PnL: {avg_pnl:.2f}")
     print(f"Max deviation: {max_pnl_diff:.2f}")
     print(f"PnL variance: {pnl_variance_pct:.2f}%")
@@ -233,7 +230,7 @@ def test_eurusd_pnl_determinism(eurusd_deterministic_signal_set):
     ), f"Trade counts vary across runs: {trade_counts}"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_usdjpy_pnl_determinism(usdjpy_deterministic_signal_set):
     """Test PnL determinism for USDJPY signal set across 3 runs.
 
@@ -251,7 +248,6 @@ def test_usdjpy_pnl_determinism(usdjpy_deterministic_signal_set):
             signal_indices=usdjpy_deterministic_signal_set["signal_indices"],
             timestamps=usdjpy_deterministic_signal_set["timestamps"],
             ohlc_arrays=usdjpy_deterministic_signal_set["ohlc_arrays"],
-            progress=None,
         )
 
         pnl_values.append(result.total_pnl)
@@ -266,7 +262,7 @@ def test_usdjpy_pnl_determinism(usdjpy_deterministic_signal_set):
     max_pnl_diff = max(abs(p - avg_pnl) for p in pnl_values)
     pnl_variance_pct = (max_pnl_diff / abs(avg_pnl) * 100) if avg_pnl != 0 else 0
 
-    print(f"\nPnL analysis:")
+    print("\nPnL analysis:")
     print(f"Average PnL: {avg_pnl:.2f}")
     print(f"Max deviation: {max_pnl_diff:.2f}")
     print(f"PnL variance: {pnl_variance_pct:.2f}%")
@@ -283,7 +279,7 @@ def test_usdjpy_pnl_determinism(usdjpy_deterministic_signal_set):
     ), f"Trade counts vary across runs: {trade_counts}"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_both_symbols_determinism(
     eurusd_deterministic_signal_set, usdjpy_deterministic_signal_set
 ):
@@ -307,7 +303,6 @@ def test_both_symbols_determinism(
             signal_indices=eurusd_deterministic_signal_set["signal_indices"],
             timestamps=eurusd_deterministic_signal_set["timestamps"],
             ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
-            progress=None,
         )
         eurusd_duration = time.time() - start_time
 
@@ -317,7 +312,6 @@ def test_both_symbols_determinism(
             signal_indices=usdjpy_deterministic_signal_set["signal_indices"],
             timestamps=usdjpy_deterministic_signal_set["timestamps"],
             ohlc_arrays=usdjpy_deterministic_signal_set["ohlc_arrays"],
-            progress=None,
         )
         usdjpy_duration = time.time() - start_time
 
@@ -346,7 +340,7 @@ def test_both_symbols_determinism(
     max_pnl_diff = max(abs(p - avg_pnl) for p in total_pnl_values)
     pnl_variance_pct = (max_pnl_diff / abs(avg_pnl) * 100) if avg_pnl != 0 else 0
 
-    print(f"\nCombined determinism analysis:")
+    print("\nCombined determinism analysis:")
     print(
         f"Timing variance: {timing_variance_pct:.2f}% (target ≤{DETERMINISTIC_TIMING_VARIANCE_PCT}%)"
     )
@@ -370,7 +364,7 @@ def test_both_symbols_determinism(
     ), f"Trade counts vary across runs: {total_trade_counts}"
 
 
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
     """Test determinism is maintained with progress tracking enabled.
 
@@ -378,7 +372,6 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
     - Progress tracking doesn't introduce variance
     - Results identical with/without progress
     """
-    from src.backtest.progress import ProgressDispatcher
 
     batch_sim = BatchSimulation()
 
@@ -387,7 +380,6 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
         signal_indices=eurusd_deterministic_signal_set["signal_indices"],
         timestamps=eurusd_deterministic_signal_set["timestamps"],
         ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
-        progress=None,
     )
 
     # Run with progress tracking (mock dispatcher)
@@ -396,7 +388,7 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
 
         def update(self, current_item: int):
             """Mock update method."""
-            pass  # No-op for determinism testing
+            # No-op for determinism testing
 
     progress = MockProgressDispatcher()
     result_with_progress = batch_sim.simulate(
@@ -418,7 +410,7 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
         else 0
     )
 
-    print(f"\nProgress tracking determinism:")
+    print("\nProgress tracking determinism:")
     print(f"PnL without progress: {result_no_progress.total_pnl:.2f}")
     print(f"PnL with progress: {result_with_progress.total_pnl:.2f}")
     print(f"PnL variance: {pnl_variance_pct:.2f}%")

@@ -155,11 +155,11 @@ class BatchSimulation:
             position_state, timestamps, ohlc_arrays, progress
         )
 
-        # Finalize progress tracking
+        # Step 6: Finalize progress tracking
         progress_overhead_pct = 0.0
         if progress is not None:
-            progress.finish()
-            progress_overhead_pct = progress.get_overhead_percentage()
+            result = progress.finish()
+            progress_overhead_pct = result["progress_overhead_pct"]
             logger.info("Progress overhead: %.2f%%", progress_overhead_pct)
 
         sim_duration = time.perf_counter() - sim_start
@@ -242,7 +242,7 @@ class BatchSimulation:
     def _initialize_positions(
         self,
         signal_indices: np.ndarray,
-        timestamps: np.ndarray,
+        timestamps: np.ndarray,  # pylint: disable=unused-argument
         ohlc_arrays: tuple[np.ndarray, ...],
     ) -> PositionState:
         """Initialize position state arrays.
@@ -258,7 +258,7 @@ class BatchSimulation:
         n_signals = len(signal_indices)
 
         # Extract price arrays
-        _, open_prices, high_prices, low_prices, close_prices = ohlc_arrays
+        _, open_prices, _high_prices, _low_prices, _close_prices = ohlc_arrays
 
         # Initialize state arrays (placeholder values)
         entry_indices = signal_indices.copy()
@@ -309,7 +309,7 @@ class BatchSimulation:
         n_trades = len(position_state.entry_indices)
 
         # Extract OHLC arrays
-        _, open_prices, high_prices, low_prices, close_prices = ohlc_arrays
+        _, _open_prices, high_prices, low_prices, _close_prices = ohlc_arrays
 
         # Apply slippage to entry prices
         adjusted_entries = apply_slippage_vectorized(
