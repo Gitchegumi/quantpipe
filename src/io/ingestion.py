@@ -37,7 +37,7 @@ from src.io.gap_fill import fill_gaps_vectorized
 from src.io.gaps import detect_gaps
 from src.io.hash_utils import compute_dataframe_hash
 from src.io.iterator_mode import DataFrameIteratorWrapper
-from src.io.logging_constants import IngestionStage, MAX_PROGRESS_UPDATES
+from src.io.logging_constants import IngestionStage
 from src.io.perf_utils import PerformanceTimer, calculate_throughput
 from src.io.progress import ProgressReporter
 from src.io.schema import (
@@ -156,12 +156,28 @@ def ingest_ohlcv_data(
 
     # Start performance timer
     with PerformanceTimer() as timer:
-        # Stage 1: Read raw data (atomic operation - indeterminate)
-        progress.start_stage(IngestionStage.READ, f"Reading {path}")
+        # Stage 1: Read raw data with progress tracking
+        # First pass: count total lines for progress bar
         try:
-            df = pd.read_csv(path)
+            with open(path, 'r', encoding='utf-8') as f:
+                total_lines = sum(1 for _ in f) - 1  # Subtract header
         except FileNotFoundError as exc:
             raise FileNotFoundError(f"Input file not found: {path}") from exc
+
+        progress.start_stage(
+            IngestionStage.READ, f"Reading {path}", total=total_lines
+        )
+
+        # Read CSV in chunks with progress tracking
+        chunk_size = 100_000  # 100k rows per chunk
+        chunks = []
+        try:
+            for chunk in pd.read_csv(path, chunksize=chunk_size):
+                chunks.append(chunk)
+                progress.update_progress(advance=len(chunk))
+            df = pd.concat(chunks, ignore_index=True)
+        except Exception as exc:
+            raise RuntimeError(f"Error reading CSV: {exc}") from exc
 
         input_row_count = len(df)
         logger.info("Loaded %d raw rows", input_row_count)
@@ -178,7 +194,9 @@ def ingest_ohlcv_data(
         validate_required_columns(df)
 
         # Stage 2: Sort chronologically (atomic operation - indeterminate)
-        progress.start_stage(IngestionStage.PROCESS, f"Sorting {len(df):,} rows by timestamp")
+        progress.start_stage(
+            IngestionStage.PROCESS, f"Sorting {len(df):,} rows by timestamp"
+        )
         df = df.sort_values("timestamp_utc").reset_index(drop=True)
         logger.debug("Sorted %d rows chronologically", len(df))
 
@@ -227,8 +245,11 @@ def ingest_ohlcv_data(
                     missing,
                 )
 
-            # Stage 5: Gap detection and filling (atomic operation - indeterminate)
-            progress.start_stage(IngestionStage.GAP_FILL, f"Detecting and filling gaps in {len(df):,} rows")
+            # Stage 5: Gap detection and filling (atomic - indeterminate)
+            progress.start_stage(
+                IngestionStage.GAP_FILL,
+                f"Detecting and filling gaps in {len(df):,} rows",
+            )
             gap_indices = detect_gaps(df, timeframe_minutes)
             gaps_inserted = len(gap_indices)
 
@@ -240,14 +261,22 @@ def ingest_ohlcv_data(
                 df["is_gap"] = False
 
             # Stage 6: Schema restriction (atomic operation - indeterminate)
-            progress.start_stage(IngestionStage.SCHEMA, f"Restricting {len(df):,} rows to core schema")
+            progress.start_stage(
+                IngestionStage.SCHEMA,
+                f"Restricting {len(df):,} rows to core schema",
+            )
             df = restrict_to_core_schema(df)
-            logger.debug("Restricted to core schema with %d columns", len(df.columns))
+            logger.debug(
+                "Restricted to core schema with %d columns", len(df.columns)
+            )
 
-            # Stage 7: Optional downcasting (atomic operation - indeterminate)
+            # Stage 7: Optional downcasting (atomic - indeterminate)
             downcast_applied = False
             if downcast:
-                progress.start_stage(IngestionStage.FINALIZE, f"Downcasting {len(df):,} rows to float32")
+                progress.start_stage(
+                    IngestionStage.FINALIZE,
+                    f"Downcasting {len(df):,} rows to float32",
+                )
                 original_memory = df.memory_usage(deep=True).sum()
                 df = downcast_float_columns(df)
                 new_memory = df.memory_usage(deep=True).sum()
