@@ -83,24 +83,31 @@ Performance engineer runs the simulation phase for ≈84,938 trades and observes
   Fill them out with the right functional requirements.
 -->
 
+### Terminology Glossary
+
+- **Batch scan / batch scanning**: Columnar processing approach using NumPy arrays to evaluate multiple candles simultaneously; implemented in `src/backtest/batch_scan.py` module.
+- **Parquet conversion**: One-time transformation of CSV datasets into Parquet format with compression (zstd) and schema validation; implemented in `src/io/ingestion/parquet_convert.py`.
+- **Parquet ingestion**: Loading preprocessed Parquet files into Polars LazyFrame/DataFrame for analysis; implemented in `src/io/ingestion/load.py`.
+- **Indicator ownership**: Architectural principle ensuring indicator definitions reside solely in strategy modules; enforced via `src/strategy/indicator_registry.py`.
+- **Indicator registry**: Canonical ordered list of indicator names declared by a strategy; immutable read-only reference outside strategy layer.
+- **Indicator mapping**: Runtime verification artifact (`indicator_names[]` in PerformanceReport) confirming declared indicators match actual usage.
+
 ### Functional Requirements
 
-The list below supersedes earlier draft items; duplicate FR-008 removed and clarified numbering extended to new FRs (011–014).
-
 - **FR-001 (Scan Performance)**: Complete the scan phase on the baseline 6.9M-candle dataset in ≤12 minutes while producing identical signal timestamps and counts to the recorded baseline.
-- **FR-002 (Allocation Efficiency)**: Eliminate per-record dynamic data structure creation during scanning; total Python object allocations during scan MUST be ≤1,500 per million candles (baseline measurement script records ~4,800). Signals only materialized after candidate batch identification.
+- **FR-002 (Allocation Efficiency)**: Eliminate per-record dynamic data structure creation during scanning; total Python heap object allocations (measured via `tracemalloc`) during scan MUST be ≤1,500 per million candles (baseline measurement script records ~4,800). Includes all dynamic allocations (dicts, lists, objects) but excludes NumPy array preallocations. Signals only materialized after candidate batch identification.
 - **FR-003 (Indicator Mapping)**: Provide an auditable one-to-one mapping of strategy-declared indicators to those used in scan & simulation. Mapping format: `indicator_names[]` (ordered exactly as strategy declaration). No extras, no omissions.
 - **FR-004 (Strategy Ownership Isolation)**: No indicators are defined, mutated, or filtered outside the strategy layer. Indicator registry (canonical) is read-only elsewhere.
-- **FR-005 (Simulation Performance)**: Reduce simulation phase runtime for ≈84,938 trades to ≤8 minutes while maintaining trade outcome equivalence (entry/exit timestamps) and net PnL variance ≤0.5% versus baseline.
+- **FR-005 (Simulation Performance)**: Reduce simulation phase runtime for ≈84,938 trades to ≤8 minutes while maintaining trade outcome equivalence (entry/exit timestamps match exactly to millisecond precision; tie-breaking via stable sort on signal ID if timestamps equal) and net PnL variance ≤0.5% versus baseline (absolute difference in final portfolio value).
 - **FR-006 (Deterministic Mode Controls)**: Deterministic runs MUST fix: random seeds (if any), stable ordering of signal generation, single-threaded critical sections for ordering, and environment capture (Python version, OS, CPU model) embedded in report. Three consecutive deterministic runs produce identical signals & trades.
-- **FR-007 (Performance Report Core)**: Provide a performance report including: scan_duration_sec, simulation_duration_sec, peak_memory_mb, signal_count, trade_count, equivalence verification status.
-- **FR-008 (Duplicate Timestamp Handling)**: Handle input datasets containing duplicate timestamps by retaining the first occurrence only, discarding subsequent duplicates, and logging a concise summary (count removed + first/last duplicate timestamp) without increasing signal or trade counts.
-- **FR-009 (Graceful Memory Abort)**: If available memory below configured `MEMORY_MIN_MB`, abort preprocessing gracefully within <3s, emitting structured log: `{event:"memory_abort", required_mb, available_mb, timestamp}` and no partial artifacts.
+- **FR-007 (Performance Report Core)**: Provide a performance report including: scan_duration_sec, simulation_duration_sec, peak_memory_mb, signal_count, trade_count, equivalence verification status, manifest_path, manifest_sha256, candle_count (see FR-012), indicator_names[] (see FR-013), progress_emission_count, progress_overhead_pct (see FR-011), allocation_count_scan, allocation_reduction_pct (see FR-014), duplicate_timestamps_removed, duplicate_first_ts, duplicate_last_ts (see FR-008), deterministic_mode (see FR-006), created_at.
+- **FR-008 (Duplicate Timestamp Handling)**: Handle input datasets containing duplicate timestamps (compared at microsecond resolution; ties broken by row order - first occurrence retained) by retaining the first occurrence only, discarding subsequent duplicates, and logging a concise summary (count removed + first/last duplicate timestamp in ISO 8601 format) without increasing signal or trade counts. Summary fields included in PerformanceReport per FR-007.
+- **FR-009 (Graceful Memory Abort)**: If available memory below configured `MEMORY_MIN_MB` (see U1 clarification below), abort preprocessing gracefully within <3s, emitting structured log: `{event:"memory_abort", required_mb, available_mb, timestamp}` and no partial artifacts.
 - **FR-010 (Zero Indicator Strategy)**: Strategies may declare zero indicators; scan and simulation complete without error and produce zero indicator-derived signals.
-- **FR-011 (Progress Cadence & Overhead)**: Emit progress updates at intervals not exceeding the minimum of (120s wall-clock OR 2% completion). MUST always emit a final 100% update. Progress overhead (time spent emitting) ≤1% of total phase runtime.
-- **FR-012 (Manifest Provenance)**: PerformanceReport MUST include dataset manifest provenance: `manifest_path`, `manifest_sha256`, `candle_count` matching the manifest file to satisfy Constitution Principle VI.
-- **FR-013 (Indicator Mapping Artifact)**: PerformanceReport MUST include `indicator_names[]` exactly matching declared strategy indicators (order preserved) to enable audit tests.
-- **FR-014 (Allocation Reduction Target)**: Scan MUST achieve ≥70% reduction in Python object allocations per million candles vs baseline (baseline recorded by allocation capture script). Allocation reduction percentage included in report.
+- **FR-011 (Progress Cadence & Overhead)**: Emit progress updates at intervals not exceeding the minimum of (120s wall-clock OR 2% completion) [meaning: emit when EITHER condition is met, whichever occurs first]. MUST always emit a final 100% update. Progress overhead (time spent emitting) ≤1% of total phase runtime. Metrics included in PerformanceReport per FR-007.
+- **FR-012 (Manifest Provenance)**: PerformanceReport MUST include dataset manifest provenance fields (included in FR-007): `manifest_path` (relative), `manifest_sha256`, `candle_count` matching the manifest file to satisfy Constitution Principle VI.
+- **FR-013 (Indicator Mapping Artifact)**: PerformanceReport MUST include `indicator_names[]` (included in FR-007) exactly matching declared strategy indicators (order preserved) to enable audit tests.
+- **FR-014 (Allocation Reduction Target)**: Scan MUST achieve ≥70% reduction in Python object allocations per million candles vs baseline (baseline recorded by `scripts/ci/profile_scan_allocations.py` allocation capture script). Allocation reduction metrics (allocation_count_scan, allocation_reduction_pct) included in PerformanceReport per FR-007.
 
 No critical ambiguities remain requiring clarification after these additions; measurable thresholds now defined (time, allocation counts, memory abort behavior, progress overhead).
 
@@ -140,7 +147,7 @@ No critical ambiguities remain requiring clarification after these additions; me
 
 All success criteria are technology-agnostic, user/value focused, and objectively measurable.
 
-## Clarifications
+### Clarifications
 
 ### Session 2025-11-11
 
@@ -149,6 +156,8 @@ All success criteria are technology-agnostic, user/value focused, and objectivel
 - Q: How is allocation efficiency measured? → A: Tracemalloc snapshot comparison before/after scan; baseline captured by dedicated script; threshold defined in FR-002 & FR-014.
 - Q: What constitutes deterministic controls? → A: Seed fixation (if randomness introduced), stable iteration order, single-thread ordering for signal generation, invariant environment metadata.
 - Q: How is manifest provenance enforced? → A: PerformanceReport fields validated against manifest file and checksum verified in tests.
+- **U1**: Where is `MEMORY_MIN_MB` configured (FR-009)? → A: Environment variable `TRADING_MEMORY_MIN_MB` (default: 512 if unset); checked in `src/backtest/memory_sampler.py` during preprocessing initialization.
+- **U3**: What is the baseline fixture format/path (FR-001)? → A: `tests/fixtures/baseline_equivalence/scan_baseline_signals.json` (JSON array of {timestamp, direction, signal_id}); generated once from known-good run.
 
 ## Non-Functional Requirements
 

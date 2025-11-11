@@ -125,7 +125,7 @@ Resolve remaining clarifications (dataset manifest linkage, mandatory Polars & P
 -- D5 Determinism: Fix seeds (if any), freeze parameters, disable adaptive logging, capture environment metadata (Python version, OS, CPU model) in report.
 -- D11 Mandatory Polars adoption: Replace pandas preprocessing with Polars LazyFrame; pandas retained only for legacy verification.
 -- D12 Parquet conversion: First ingest converts CSV→Parquet (compression=zstd, tuned row group) + schema fingerprint persisted.
--- D13 Allocation baseline methodology: Baseline via `scripts/capture_allocation_baseline.py` (tracemalloc snapshots) -> allocations per million candles.
+-- D13 Allocation baseline methodology: Baseline via `scripts/ci/profile_scan_allocations.py` (tracemalloc snapshots) -> allocations per million candles.
 -- D14 Progress overhead computation: Measure cumulative time in dispatcher vs phase runtime; enforce ≤1% threshold (FR-011 / SC-013).
 -- D15 Manifest provenance enforcement: Validation test compares manifest checksum & path to PerformanceReport (FR-012).
 -- D16 Indicator mapping artifact: PerformanceReport includes ordered `indicator_names[]` enabling direct audit (FR-013).
