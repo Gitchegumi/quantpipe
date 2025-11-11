@@ -130,16 +130,16 @@ Independent Test Criteria: (a) iterator yields objects conforming to schema (b) 
 - [X] T091 Add unit test: downcast precision guard (FR-011) at `tests/unit/test_downcast_precision.py`
 - [X] T092 Add unit test: Arrow fallback warning schema (FR-025) at `tests/unit/test_arrow_fallback_warning.py`
 - [X] T093 Add performance throughput assertion (SC-002 / FR-015) at `tests/performance/test_throughput.py`
-- [ ] T094 Add stretch runtime artifact recorder script at `scripts/ci/record_stretch_runtime.py` (FR-027)
+- [X] T094 Add stretch runtime artifact recorder script at `scripts/ci/record_stretch_runtime.py` (FR-027)
 - [X] T095 Add unit test: GPU independence (FR-028) at `tests/unit/test_no_gpu_dependency.py`
 - [X] T096 Add unit test: non-UTC timestamp rejection (FR-014) at `tests/unit/test_ingestion_timezone.py`
 - [X] T097 Add performance memory footprint test (SC-006 / NFR-002) at `tests/performance/test_memory_footprint.py`
-- [ ] T098 Add dependency policy verification script (Principle IX) at `scripts/ci/check_dependencies.py`
+- [X] T098 Add dependency policy verification script (Principle IX) at `scripts/ci/check_dependencies.py`
 - [X] T099 Add unit test: progress stage names & limit enforcement (FR-010 / NFR-003) at `tests/unit/test_progress_stages.py`
 - [X] T100 Add unit test: cadence deviation formula correctness (FR-012 / NFR-007) at `tests/unit/test_cadence_formula.py`
 - [X] T101 Add unit test: summary metrics include throughput & backend (FR-015) at `tests/unit/test_metrics_logging.py`
-- [ ] T102 Update performance benchmark harness to produce JSON artifacts (FR-016 / NFR-009) at `tests/performance/benchmark_ingestion.py`
-- [ ] T103 Update documentation: indicator contract details (FR-019) at `src/indicators/README.md`
+- [X] T102 Update performance benchmark harness to produce JSON artifacts (FR-016 / NFR-009) at `tests/performance/benchmark_ingestion.py`
+- [X] T103 Update documentation: indicator contract details (FR-019) at `src/indicators/README.md`
 
 ---
 \n## Dependency Graph (User Stories)
