@@ -1,0 +1,92 @@
+openapi: 3.1.0
+info:
+  title: Internal Performance Optimization Interfaces
+  version: 0.1.0
+  description: Internal (non-networked) contract definitions for modular boundaries.
+paths:
+  /internal/scan:
+    post:
+      summary: Run scan phase on dataset using specified strategy parameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dataset_manifest_ref: { type: string }
+                strategy_id: { type: string }
+                parameters: { type: object }
+              required: [dataset_manifest_ref, strategy_id]
+      responses:
+        '200':
+          description: Scan completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signal_count: { type: integer }
+                  duration_sec: { type: number }
+                  progress_samples:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pct: { type: number }
+                        elapsed_sec: { type: number }
+  /internal/simulate:
+    post:
+      summary: Execute simulation over provided signals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                strategy_id: { type: string }
+                signals_ref: { type: string }
+                slippage_pips: { type: number }
+              required: [strategy_id, signals_ref]
+      responses:
+        '200':
+          description: Simulation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trade_count: { type: integer }
+                  duration_sec: { type: number }
+                  pnl_summary:
+                    type: object
+                    properties:
+                      net_pnl: { type: number }
+                      avg_pnl: { type: number }
+  /internal/performance-report/{run_id}:
+    get:
+      summary: Retrieve performance report for a run
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Performance report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scan_duration_sec: { type: number }
+                  simulation_duration_sec: { type: number }
+                  peak_memory_mb: { type: number }
+                  manifest_path: { type: string }
+                  manifest_sha256: { type: string }
+                  candle_count: { type: integer }
+                  signal_count: { type: integer }
+                  trade_count: { type: integer }
+                  equivalence_verified: { type: boolean }
+                  progress_emission_count: { type: integer }
