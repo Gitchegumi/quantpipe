@@ -75,7 +75,96 @@ This document captures resolutions of all technical questions, provides rational
 ## Unresolved / Deferred Items
 
 * GPU acceleration pathway design (deferred until baseline and stretch targets validated)
-* Multi-symbol batch ingestion (explicitly out of current scope)
+* Multi-symbol batch ingestion (explicitly out of current scope; design sketch below)
+
+### Multi-Symbol Extension Design (T075, FR-022)
+
+**Status**: Future enhancement (out of spec 009 scope)
+
+**Motivation**: Current ingestion processes one symbol at a time. Multi-symbol backtesting (spec 008) orchestrates multiple single-symbol ingestion calls, which could benefit from batch processing to amortize I/O and progress overhead.
+
+**Proposed API Extension**:
+
+```python
+def ingest_multi_symbol(
+    symbol_paths: dict[str, Path],  # symbol_name -> CSV path
+    cadence: str = "1T",
+    fill_gaps: bool = True,
+    mode: OutputMode = "columnar",
+    parallel: bool = False,  # CPU parallelism via multiprocessing
+) -> dict[str, pd.DataFrame]:
+    """Ingest multiple symbols in batch.
+    
+    Args:
+        symbol_paths: Mapping of symbol names to CSV file paths
+        cadence: Expected time interval (e.g., "1T" for 1 minute)
+        fill_gaps: Whether to synthesize missing candles
+        mode: Output mode (columnar or iterator)
+        parallel: Enable parallel processing across symbols
+    
+    Returns:
+        Dictionary mapping symbol names to ingested DataFrames
+        
+    Performance Target: 
+        - 3 symbols × 6.9M rows each in ≤180s (≤60s per symbol avg)
+        - Memory: Peak ≤ 2× single-symbol baseline
+        
+    Design Considerations:
+        - Independent processing per symbol (no cross-symbol dependencies)
+        - Shared progress bar with per-symbol stages
+        - Error isolation: one symbol failure doesn't stop others
+        - Aggregated metrics summary (total rows, throughput, failures)
+    """
+    pass
+```
+
+**Implementation Notes**:
+
+1. **Progress Reporting**: Single progress bar with composite stages:
+   * `[EURUSD] Reading...` → `[GBPUSD] Reading...` → etc.
+   * Aggregate: "Ingesting 3 symbols • 20.7M rows total"
+
+2. **Memory Management**: Process symbols sequentially by default (memory-safe); `parallel=True` opts into higher memory for speed
+
+3. **Error Handling**: Collect failures in result dict with exception details; return successfully processed symbols
+
+4. **Metrics Aggregation**: Single summary with per-symbol breakdown:
+
+   ```json
+   {
+     "total_symbols": 3,
+     "successful": 2,
+     "failed": 1,
+     "total_rows": 13800000,
+     "total_runtime_seconds": 167.3,
+     "aggregate_throughput_rows_per_sec": 82500,
+     "per_symbol": {
+       "EURUSD": {"rows": 6900000, "runtime": 49.8, "status": "ok"},
+       "GBPUSD": {"rows": 6900000, "runtime": 51.2, "status": "ok"},
+       "USDJPY": {"rows": 0, "runtime": 0.5, "status": "error", "error": "MissingColumnsError: ..."}
+     }
+   }
+   ```
+
+5. **Compatibility**: Extend, don't replace `ingest_candles()`. Single-symbol ingestion remains primary API.
+
+**Alternatives Considered**:
+
+* **Parallel by default**: Rejected (memory pressure, unpredictable peak usage)
+* **Single DataFrame output**: Rejected (symbols need separate time indices)
+* **Streaming generator**: Deferred (adds API complexity for marginal benefit)
+
+**Success Criteria Extension** (if implemented in future spec):
+
+* **MSC-001**: 3-symbol batch ≤180s (≤60s per symbol average)
+* **MSC-002**: Memory peak ≤ 2× single-symbol baseline
+* **MSC-003**: Progress updates ≤ 5 × N_symbols stages
+* **MSC-004**: Error isolation: failures don't prevent other symbols
+* **MSC-005**: Metrics include per-symbol breakdown + aggregate
+
+**Implementation Effort**: Estimated 8-13 tasks (similar to Phase 3 scope)
+
+**References**: Spec 008 (multi-symbol backtesting) demonstrates demand pattern; performance optimization in spec 007 provides parallel processing patterns.
 
 ## Validation Strategy
 
