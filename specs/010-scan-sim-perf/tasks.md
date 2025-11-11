@@ -4,17 +4,17 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 
 ## Phase 1 – Setup
 
-- [ ] T001 Initialize Parquet ingestion directory structure in `src/io/ingestion`
-- [ ] T002 Create Poetry entry for Polars (verify version) in `pyproject.toml`
-- [ ] T003 Add performance targets module `src/backtest/performance_targets.py`
-- [ ] T004 Create empty manifest model file `src/io/ingestion/manifest.py`
-- [ ] T005 Create placeholder conversion module `src/io/ingestion/parquet_convert.py`
-- [ ] T006 Create placeholder loader module `src/io/ingestion/load.py`
-- [ ] T007 Add performance report model `src/models/performance_report.py`
-- [ ] T008 Add deterministic env capture utility `src/backtest/env_info.py`
-- [ ] T009 Add memory sampler utility `src/backtest/memory_sampler.py`
-- [ ] T010 Add progress dispatcher scaffold `src/backtest/progress.py`
-- [ ] T011 Add deterministic config module `src/backtest/deterministic.py` (seed management, ordering controls)
+- [X] T001 Initialize Parquet ingestion directory structure in `src/io/ingestion`
+- [X] T002 Create Poetry entry for Polars (verify version) in `pyproject.toml`
+- [X] T003 Add performance targets module `src/backtest/performance_targets.py`
+- [X] T004 Create empty manifest model file `src/io/ingestion/manifest.py`
+- [X] T005 Create placeholder conversion module `src/io/ingestion/parquet_convert.py`
+- [X] T006 Create placeholder loader module `src/io/ingestion/load.py`
+- [X] T007 Add performance report model `src/models/performance_report.py`
+- [X] T008 Add deterministic env capture utility `src/backtest/env_info.py`
+- [X] T009 Add memory sampler utility `src/backtest/memory_sampler.py`
+- [X] T010 Add progress dispatcher scaffold `src/backtest/progress.py`
+- [X] T011 Add deterministic config module `src/backtest/deterministic.py` (seed management, ordering controls)
 
 ## Phase 2 – Foundational
 
