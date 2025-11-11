@@ -127,13 +127,13 @@ Independent Test Criteria: (a) iterator yields objects conforming to schema (b) 
 - [X] T088 Add unit test: empty input handling (FR-013) at `tests/unit/test_ingestion_empty_input.py`
 - [X] T089 Add unit test: missing core columns error schema (FR-020) at `tests/unit/test_ingestion_missing_columns.py`
 - [X] T090 Add static audit test: ingestion has no indicator imports (FR-017) at `tests/unit/test_ingestion_no_indicator_imports.py`
-- [ ] T091 Add unit test: downcast precision guard (FR-011) at `tests/unit/test_downcast_precision.py`
-- [ ] T092 Add unit test: Arrow fallback warning schema (FR-025) at `tests/unit/test_arrow_fallback_warning.py`
-- [ ] T093 Add performance throughput assertion (SC-002 / FR-015) at `tests/performance/test_throughput.py`
+- [X] T091 Add unit test: downcast precision guard (FR-011) at `tests/unit/test_downcast_precision.py`
+- [X] T092 Add unit test: Arrow fallback warning schema (FR-025) at `tests/unit/test_arrow_fallback_warning.py`
+- [X] T093 Add performance throughput assertion (SC-002 / FR-015) at `tests/performance/test_throughput.py`
 - [ ] T094 Add stretch runtime artifact recorder script at `scripts/ci/record_stretch_runtime.py` (FR-027)
-- [ ] T095 Add unit test: GPU independence (FR-028) at `tests/unit/test_no_gpu_dependency.py`
+- [X] T095 Add unit test: GPU independence (FR-028) at `tests/unit/test_no_gpu_dependency.py`
 - [X] T096 Add unit test: non-UTC timestamp rejection (FR-014) at `tests/unit/test_ingestion_timezone.py`
-- [ ] T097 Add performance memory footprint test (SC-006 / NFR-002) at `tests/performance/test_memory_footprint.py`
+- [X] T097 Add performance memory footprint test (SC-006 / NFR-002) at `tests/performance/test_memory_footprint.py`
 - [ ] T098 Add dependency policy verification script (Principle IX) at `scripts/ci/check_dependencies.py`
 - [ ] T099 Add unit test: progress stage names & limit enforcement (FR-010 / NFR-003) at `tests/unit/test_progress_stages.py`
 - [ ] T100 Add unit test: cadence deviation formula correctness (FR-012 / NFR-007) at `tests/unit/test_cadence_formula.py`

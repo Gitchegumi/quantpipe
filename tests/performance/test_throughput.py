@@ -1,7 +1,3 @@
-import pytest
-
-
-pytestmark = pytest.mark.performance
 """
 Performance throughput tests for backtest execution.
 
@@ -16,6 +12,10 @@ performance metrics for:
 - End-to-end backtest duration
 
 Target: Process ≥10,000 candles/second for typical trend-pullback strategy.
+
+NOTE: ingest_candles was removed in 009-optimize-ingestion
+(replaced with ingest_ohlcv_data). Old tests using ingest_candles
+are marked with @pytest.mark.skip until migrated.
 """
 
 import csv
@@ -24,13 +24,13 @@ import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from src.backtest.drawdown import compute_max_drawdown
 from src.backtest.metrics import compute_metrics
-
-# NOTE: ingest_candles was removed in 009-optimize-ingestion (replaced with ingest_ohlcv_data)
-# Old tests below need updating to new API
-# from src.io.ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
+
+pytestmark = pytest.mark.performance
 
 
 @pytest.fixture()
@@ -92,7 +92,9 @@ def large_dataset_path() -> Path:
 @pytest.mark.skip(
     reason="Uses removed ingest_candles API. Needs migration to ingest_ohlcv_data."
 )
-def test_ingestion_throughput(large_dataset_path: Path):
+def test_ingestion_throughput(
+    large_dataset_path: Path,
+):  # pylint: disable=redefined-outer-name
     """
     Measure candle ingestion rate.
 
@@ -106,7 +108,7 @@ def test_ingestion_throughput(large_dataset_path: Path):
     start_time = time.perf_counter()
 
     candle_count = 0
-    for _ in ingest_candles(
+    for _ in ingest_candles(  # pylint: disable=undefined-variable
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,
@@ -280,7 +282,9 @@ def test_signal_generation_throughput_estimate():
 @pytest.mark.skip(
     reason="Uses removed ingest_candles API. Needs migration to ingest_ohlcv_data."
 )
-def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
+def test_end_to_end_backtest_performance_estimate(
+    large_dataset_path: Path,
+):  # pylint: disable=redefined-outer-name
     """
     Estimate end-to-end backtest duration.
 
@@ -296,7 +300,7 @@ def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
     start_time = time.perf_counter()
 
     candle_count = 0
-    for candle in ingest_candles(
+    for candle in ingest_candles(  # pylint: disable=undefined-variable
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,
@@ -323,7 +327,9 @@ def test_end_to_end_backtest_performance_estimate(large_dataset_path: Path):
 @pytest.mark.skip(
     reason="Uses removed ingest_candles API. Needs migration to ingest_ohlcv_data."
 )
-def test_memory_efficiency_during_ingestion(large_dataset_path: Path):
+def test_memory_efficiency_during_ingestion(
+    large_dataset_path: Path,
+):  # pylint: disable=redefined-outer-name
     """
     Verify that ingestion doesn't load entire dataset into memory.
 
@@ -339,7 +345,7 @@ def test_memory_efficiency_during_ingestion(large_dataset_path: Path):
 
     # Process candles one at a time
     candle_count = 0
-    for _ in ingest_candles(
+    for _ in ingest_candles(  # pylint: disable=undefined-variable
         large_dataset_path,
         ema_fast=20,
         ema_slow=50,

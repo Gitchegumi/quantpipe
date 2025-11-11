@@ -41,7 +41,9 @@ def synthetic_csv_5m_rows(tmp_path: Path) -> Path:
     return csv_path
 
 
-def test_columnar_memory_within_sc006_limit(synthetic_csv_5m_rows: Path):
+def test_columnar_memory_within_sc006_limit(
+    synthetic_csv_5m_rows: Path,
+):  # pylint: disable=redefined-outer-name
     """Test that columnar mode memory stays within SC-006 limit.
 
     SC-006: Memory for 5M rows ≤650 MB (columnar mode).
@@ -81,7 +83,9 @@ def test_columnar_memory_within_sc006_limit(synthetic_csv_5m_rows: Path):
     )
 
 
-def test_iterator_memory_constant(synthetic_csv_5m_rows: Path):
+def test_iterator_memory_constant(
+    synthetic_csv_5m_rows: Path,
+):  # pylint: disable=redefined-outer-name
     """Test that iterator mode maintains constant memory.
 
     Iterator mode should not load entire dataset into memory.
