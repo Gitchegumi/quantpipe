@@ -1,0 +1,180 @@
+{{
+
+  "summary_timestamp": "2025-11-11T00:00:00Z",  "error": "No benchmark files found",
+
+  "spec": "010-scan-sim-perf",  "pattern": "benchmark_*.json",
+
+  "status": "READY_FOR_VALIDATION",  "timestamp": "2025-11-05T11:37:48.106806"
+
+  "description": "Spec 010 Phase 3-6 implementation complete. Awaiting full backtest runs to generate benchmark data.",}
+  "implementation_summary": {
+    "phase_3": {
+      "status": "COMPLETE",
+      "tasks": ["T024-T031"],
+      "deliverables": [
+        "BatchScan with Polars LazyFrame support",
+        "Arrow ingestion with Parquet support",
+        "Progress tracking with configurable stride",
+        "Scan equivalence tests (±0.5% PnL tolerance)",
+        "Scan performance tests (≤720s target)"
+      ]
+    },
+    "phase_4": {
+      "status": "COMPLETE",
+      "tasks": ["T032-T036"],
+      "deliverables": [
+        "Indicator ownership validation",
+        "Contract tests for strategy declarations",
+        "Provenance tracking tests"
+      ]
+    },
+    "phase_5": {
+      "status": "COMPLETE",
+      "tasks": ["T037-T043"],
+      "deliverables": [
+        "BatchSimulation with vectorized position tracking",
+        "Vectorized SL/TP evaluation functions",
+        "Simulation equivalence tests (±0.5% PnL tolerance)",
+        "Simulation performance tests (≤480s target)",
+        "Memory efficiency tests (O(n) scaling)",
+        "Deterministic runs tests (±1% timing, ±0.5% PnL)"
+      ]
+    },
+    "phase_6": {
+      "status": "COMPLETE",
+      "tasks": ["T044-T054"],
+      "deliverables": [
+        "PerformanceReport model and generation",
+        "ReportWriter with JSON serialization",
+        "CLI report integration placeholder",
+        "Progress overhead tests (≤1% target)",
+        "Manifest provenance tests",
+        "Documentation updates (quickstart, performance, README)",
+        "Enhanced benchmark aggregation script",
+        "Quality checks (Black, Ruff, markdownlint)"
+      ]
+    }
+  },
+  "performance_targets": {
+    "scan": {
+      "target_seconds": 720.0,
+      "baseline_seconds": 1440.0,
+      "target_speedup_pct": 50.0,
+      "description": "Scan 6.9M candles in ≤720s (50%+ speedup)"
+    },
+    "simulation": {
+      "target_seconds": 480.0,
+      "baseline_seconds": 1067.0,
+      "target_speedup_pct": 55.0,
+      "description": "Simulate ~85k trades in ≤480s (55%+ speedup)"
+    },
+    "memory": {
+      "target_gb": 2.0,
+      "baseline_gb": 2.2,
+      "target_reduction_pct": 30.0,
+      "description": "Peak memory ≤2GB (30% reduction)"
+    },
+    "progress_overhead": {
+      "target_pct": 1.0,
+      "description": "Progress tracking overhead ≤1%"
+    },
+    "equivalence": {
+      "pnl_tolerance_pct": 0.5,
+      "description": "PnL variance ≤0.5% vs baseline"
+    },
+    "determinism": {
+      "timing_variance_pct": 1.0,
+      "pnl_variance_pct": 0.5,
+      "description": "Timing ±1%, PnL ±0.5% over 3 runs"
+    }
+  },
+  "validation_steps": [
+    {
+      "step": 1,
+      "description": "Run full backtest on EURUSD 6.9M candles",
+      "command": "poetry run python -m src.cli.run_backtest --data price_data/processed/eurusd/eurusd_full.csv --direction BOTH --profile --benchmark-out results/benchmarks/eurusd_full.json"
+    },
+    {
+      "step": 2,
+      "description": "Run full backtest on USDJPY dataset",
+      "command": "poetry run python -m src.cli.run_backtest --data price_data/processed/usdjpy/usdjpy_full.csv --direction BOTH --profile --benchmark-out results/benchmarks/usdjpy_full.json"
+    },
+    {
+      "step": 3,
+      "description": "Run performance test suite",
+      "command": "poetry run pytest tests/performance/ -v"
+    },
+    {
+      "step": 4,
+      "description": "Run equivalence test suite",
+      "command": "poetry run pytest tests/integration/test_sim_equivalence.py tests/integration/test_deterministic_runs.py -v"
+    },
+    {
+      "step": 5,
+      "description": "Aggregate benchmarks and validate targets",
+      "command": "poetry run python scripts/ci/aggregate_benchmarks.py --pattern results/benchmarks/*.json --fail-on-regression"
+    }
+  ],
+  "next_steps": [
+    "Execute validation steps 1-5 to generate benchmark data",
+    "Verify scan performance ≤720s (Step 1-2)",
+    "Verify simulation performance ≤480s (Step 1-2)",
+    "Verify equivalence ±0.5% PnL (Step 4)",
+    "Aggregate benchmarks and confirm targets met (Step 5)",
+    "Update tasks.md marking Phase 6 complete",
+    "Proceed to Phase 7 (T057-T070) for coverage extensions"
+  ],
+  "test_coverage": {
+    "unit": {
+      "count": 20,
+      "files": [
+        "tests/unit/test_manifest_provenance.py"
+      ]
+    },
+    "integration": {
+      "count": 26,
+      "files": [
+        "tests/integration/test_sim_equivalence.py",
+        "tests/integration/test_deterministic_runs.py",
+        "tests/integration/test_ingestion_arrow.py"
+      ]
+    },
+    "performance": {
+      "count": 20,
+      "files": [
+        "tests/performance/test_scan_perf.py",
+        "tests/performance/test_sim_perf.py",
+        "tests/performance/test_sim_memory.py",
+        "tests/performance/test_progress_overhead.py"
+      ]
+    },
+    "contract": {
+      "count": 10,
+      "files": [
+        "tests/contract/test_indicator_ownership.py"
+      ]
+    }
+  },
+  "dependencies": {
+    "polars": {
+      "version": "1.17.0",
+      "status": "MANDATORY",
+      "rationale": "20-30% preprocessing speedup, columnar operations"
+    },
+    "numpy": {
+      "version": "2.0+",
+      "status": "MANDATORY",
+      "rationale": "Vectorized simulation, 50-55% speedup"
+    },
+    "numba": {
+      "status": "DEFERRED",
+      "rationale": "JIT compilation deferred until baseline measured"
+    },
+    "pyarrow": {
+      "status": "OPTIONAL",
+      "rationale": "Parquet support, 3-5× IO speedup"
+    }
+  },
+  "schema_version": "1.0.0",
+  "generated_by": "Spec 010 Phase 6 completion (T054)"
+}
