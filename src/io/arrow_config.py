@@ -45,7 +45,27 @@ def detect_backend() -> ArrowBackend:
     return "pandas"
 
 
-# Future enhancement: GPU acceleration hook (T076)
-# def configure_gpu_backend() -> bool:
-#     """Configure GPU acceleration if available (future enhancement)."""
+# TODO(Future): GPU acceleration hook (T076, SC-013)
+# When GPU libraries (cuDF, RAPIDS) are added to dependencies (requires
+# Constitution Principle IX approval), implement optional GPU acceleration:
+#
+# def configure_gpu_backend() -> Literal["gpu", "cpu"]:
+#     """Configure GPU-accelerated dataframe backend if available.
+#
+#     Potential 15-25% additional runtime reduction for large datasets
+#     beyond current CPU-optimized performance (target: ≤75s for 6.9M rows).
+#
+#     Returns:
+#         "gpu" if CUDA-capable device + cuDF available, else "cpu"
+#
+#     Note: GPU backend is OPTIONAL. Baseline performance targets (SC-001,
+#     SC-002, SC-012) must remain achievable without GPU dependencies.
+#     See FR-028 and SC-013 for requirements.
+#     """
+#     try:
+#         import cudf  # noqa: F401
+#         # Detect CUDA device, configure cuDF options
+#         return "gpu"
+#     except ImportError:
+#         return "cpu"
 #     pass
