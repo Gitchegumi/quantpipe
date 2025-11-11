@@ -140,8 +140,8 @@ def ingest_ohlcv_data(
     if mode not in ("columnar", "iterator"):
         raise ValueError(f"Invalid mode: {mode}. Must be 'columnar' or 'iterator'.")
 
-    # Initialize progress reporter (≤5 updates for entire pipeline)
-    progress = ProgressReporter(total_stages=MAX_PROGRESS_UPDATES)
+    # Initialize progress reporter
+    progress = ProgressReporter(show_progress=True)
 
     # Configure Arrow backend if requested
     backend = "pandas"
@@ -156,8 +156,8 @@ def ingest_ohlcv_data(
 
     # Start performance timer
     with PerformanceTimer() as timer:
-        # Stage 1: Read raw data
-        progress.report_stage(IngestionStage.READ, f"Loading {path}")
+        # Stage 1: Read raw data (atomic operation - indeterminate)
+        progress.start_stage(IngestionStage.READ, f"Reading {path}")
         try:
             df = pd.read_csv(path)
         except FileNotFoundError as exc:
@@ -177,8 +177,8 @@ def ingest_ohlcv_data(
         # Validate required columns present (after timestamp conversion)
         validate_required_columns(df)
 
-        # Stage 2: Sort chronologically
-        progress.report_stage(IngestionStage.PROCESS, "Sorting by timestamp")
+        # Stage 2: Sort chronologically (atomic operation - indeterminate)
+        progress.start_stage(IngestionStage.PROCESS, f"Sorting {len(df):,} rows by timestamp")
         df = df.sort_values("timestamp_utc").reset_index(drop=True)
         logger.debug("Sorted %d rows chronologically", len(df))
 
@@ -227,8 +227,8 @@ def ingest_ohlcv_data(
                     missing,
                 )
 
-            # Stage 5: Gap detection and filling
-            progress.report_stage(IngestionStage.GAP_FILL, "Filling gaps")
+            # Stage 5: Gap detection and filling (atomic operation - indeterminate)
+            progress.start_stage(IngestionStage.GAP_FILL, f"Detecting and filling gaps in {len(df):,} rows")
             gap_indices = detect_gaps(df, timeframe_minutes)
             gaps_inserted = len(gap_indices)
 
@@ -239,15 +239,15 @@ def ingest_ohlcv_data(
                 # No gaps - add is_gap column with all False
                 df["is_gap"] = False
 
-            # Stage 6: Schema restriction
-            progress.report_stage(IngestionStage.SCHEMA, "Restricting to core")
+            # Stage 6: Schema restriction (atomic operation - indeterminate)
+            progress.start_stage(IngestionStage.SCHEMA, f"Restricting {len(df):,} rows to core schema")
             df = restrict_to_core_schema(df)
             logger.debug("Restricted to core schema with %d columns", len(df.columns))
 
-            # Stage 7: Optional downcasting
+            # Stage 7: Optional downcasting (atomic operation - indeterminate)
             downcast_applied = False
             if downcast:
-                progress.report_stage(IngestionStage.FINALIZE, "Downcasting numerics")
+                progress.start_stage(IngestionStage.FINALIZE, f"Downcasting {len(df):,} rows to float32")
                 original_memory = df.memory_usage(deep=True).sum()
                 df = downcast_float_columns(df)
                 new_memory = df.memory_usage(deep=True).sum()
@@ -257,7 +257,7 @@ def ingest_ohlcv_data(
                 logger.info("Downcast saved %.1f%% memory", memory_saved_pct)
                 downcast_applied = True
             else:
-                progress.report_stage(IngestionStage.FINALIZE, "Finalizing")
+                progress.start_stage(IngestionStage.FINALIZE, "Finalizing")
 
             # Store output count for metrics (before exiting context)
             output_row_count = len(df)
