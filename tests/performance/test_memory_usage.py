@@ -25,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from src.backtest.metrics import compute_metrics
-from src.io.ingestion import ingest_candles
+from src.io.legacy_ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
 
 

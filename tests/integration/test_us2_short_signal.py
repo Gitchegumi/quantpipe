@@ -15,7 +15,7 @@ pytestmark = pytest.mark.integration
 
 from src.backtest.execution import simulate_execution
 from src.backtest.metrics_ingest import MetricsIngestor
-from src.io.ingestion import ingest_candles
+from src.io.legacy_ingestion import ingest_candles
 from src.strategy.trend_pullback.signal_generator import generate_short_signals
 
 
