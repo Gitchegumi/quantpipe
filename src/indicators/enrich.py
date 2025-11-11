@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
 from src.io.hash_utils import compute_dataframe_hash
 from src.indicators.errors import (
@@ -105,56 +106,74 @@ def enrich(
     indicators_applied: list[str] = []
     enriched_df = core_df.copy()
 
-    for indicator_name in indicators:
-        spec = registry.get(indicator_name)
+    # Create progress bar for indicator computation
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+    ) as progress_bar:
+        task = progress_bar.add_task(
+            "Computing indicators...", total=len(indicators)
+        )
 
-        if spec is None:
-            # Unknown indicator
-            available = registry.list_all()
-            if strict:
-                raise UnknownIndicatorError(indicator_name, available)
+        for indicator_name in indicators:
+            spec = registry.get(indicator_name)
 
-            # Non-strict mode: collect failure and continue
-            failed_indicators.append(indicator_name)
-            logger.warning(
-                "Unknown indicator '%s' (non-strict mode), skipping",
-                indicator_name,
-            )
-            continue
+            if spec is None:
+                # Unknown indicator
+                available = registry.list_all()
+                if strict:
+                    raise UnknownIndicatorError(indicator_name, available)
 
-        # Check dependencies
-        missing_deps = set(spec.requires) - set(enriched_df.columns)
-        if missing_deps:
-            error_msg = (
-                f"Indicator '{indicator_name}' requires missing columns: "
-                f"{missing_deps}"
-            )
-            if strict:
-                raise ValueError(error_msg)
+                # Non-strict mode: collect failure and continue
+                failed_indicators.append(indicator_name)
+                logger.warning(
+                    "Unknown indicator '%s' (non-strict mode), skipping",
+                    indicator_name,
+                )
+                progress_bar.advance(task)
+                continue
 
-            failed_indicators.append(indicator_name)
-            logger.warning("%s (non-strict mode), skipping", error_msg)
-            continue
+            # Check dependencies
+            missing_deps = set(spec.requires) - set(enriched_df.columns)
+            if missing_deps:
+                error_msg = (
+                    f"Indicator '{indicator_name}' requires missing columns: "
+                    f"{missing_deps}"
+                )
+                if strict:
+                    raise ValueError(error_msg)
 
-        # Compute indicator
-        try:
-            indicator_params = params.get(indicator_name, spec.params)
-            result = spec.compute(enriched_df, indicator_params)
+                failed_indicators.append(indicator_name)
+                logger.warning("%s (non-strict mode), skipping", error_msg)
+                progress_bar.advance(task)
+                continue
 
-            # Add computed columns to enriched DataFrame
-            for col_name, col_series in result.items():
-                enriched_df[col_name] = col_series
+            # Compute indicator
+            try:
+                progress_bar.update(
+                    task, description=f"Computing {indicator_name}..."
+                )
+                indicator_params = params.get(indicator_name, spec.params)
+                result = spec.compute(enriched_df, indicator_params)
 
-            indicators_applied.append(indicator_name)
-            logger.info("Applied indicator: %s", indicator_name)
+                # Add computed columns to enriched DataFrame
+                for col_name, col_series in result.items():
+                    enriched_df[col_name] = col_series
 
-        except Exception as e:  # pylint: disable=broad-except
-            error_msg = f"Error computing indicator '{indicator_name}': {e}"
-            if strict:
-                raise ValueError(error_msg) from e
+                indicators_applied.append(indicator_name)
+                logger.info("Applied indicator: %s", indicator_name)
+                progress_bar.advance(task)
 
-            failed_indicators.append(indicator_name)
-            logger.warning("%s (non-strict mode), skipping", error_msg)
+            except Exception as e:  # pylint: disable=broad-except
+                error_msg = f"Error computing indicator '{indicator_name}': {e}"
+                if strict:
+                    raise ValueError(error_msg) from e
+
+                failed_indicators.append(indicator_name)
+                logger.warning("%s (non-strict mode), skipping", error_msg)
+                progress_bar.advance(task)
 
     # Verify immutability: core columns must not have changed
     core_hash_after = compute_dataframe_hash(enriched_df, CORE_COLUMNS)

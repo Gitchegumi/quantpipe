@@ -293,6 +293,9 @@ def ingest_ohlcv_data(
         backend,
     )
 
+    # Finalize progress bar
+    progress.finish()
+
     # Return result with mode-specific data wrapper
     if mode == "iterator":
         # Wrap DataFrame in iterator for row-by-row consumption
