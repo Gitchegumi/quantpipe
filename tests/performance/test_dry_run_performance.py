@@ -27,6 +27,8 @@ from src.models.enums import DirectionMode
 pytestmark = pytest.mark.performance
 
 
+# pylint: disable=redefined-outer-name
+# ^ Fixture name reuse is standard pytest pattern
 @pytest.fixture()
 def dataset_100k_candles() -> Path:
     """

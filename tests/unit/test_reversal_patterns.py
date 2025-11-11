@@ -213,8 +213,10 @@ class TestHammerPattern:
         )
 
         # Body = |close - open| = 0.00005
-        # Lower wick = min(open, close) - low = 1.10045 - 1.10000 = 0.00045 (9x body, > 2x ✓)
-        # Upper wick = high - max(open, close) = 1.10052 - 1.10050 = 0.00002 (0.4x body, < 0.5x ✓)
+        # Lower wick = min(open, close) - low
+        #            = 1.10045 - 1.10000 = 0.00045 (9x body, > 2x ✓)
+        # Upper wick = high - max(open, close)
+        #            = 1.10052 - 1.10050 = 0.00002 (0.4x body, < 0.5x ✓)
 
         assert _is_hammer(candle) is True
 
@@ -267,8 +269,10 @@ class TestShootingStarPattern:
         )
 
         # Body = |close - open| = 0.00005
-        # Upper wick = high - max(open, close) = 1.10060 - 1.10010 = 0.00050 (10x body, > 2x ✓)
-        # Lower wick = min(open, close) - low = 1.10005 - 1.10003 = 0.00002 (0.4x body, < 0.5x ✓)
+        # Upper wick = high - max(open, close)
+        #            = 1.10060 - 1.10010 = 0.00050 (10x body, > 2x ✓)
+        # Lower wick = min(open, close) - low
+        #            = 1.10005 - 1.10003 = 0.00002 (0.4x body, < 0.5x ✓)
 
         assert _is_shooting_star(candle) is True
 
@@ -566,6 +570,7 @@ class TestReversalDetection:
             qualifying_candle_ids=[],
             oscillator_extreme_flag=True,
         )
-        # detect_reversal should raise ValueError for insufficient candles (min default 3)
+        # detect_reversal should raise ValueError for insufficient candles
+        # (min default 3)
         with pytest.raises(ValueError):
             detect_reversal(candles, pullback_state=pullback_state)

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# pylint: disable=too-many-lines
+# ^ This is the main CLI orchestrator - refactoring to smaller modules
+#   would reduce cohesion. Acceptable for a CLI entry point.
 """
 Unified backtest CLI with direction mode support and JSON output.
 

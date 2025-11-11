@@ -49,6 +49,8 @@ def get_process_memory_mb() -> float:
         return -1.0
 
 
+# pylint: disable=redefined-outer-name
+# ^ Fixture name reuse is standard pytest pattern
 @pytest.fixture()
 def huge_dataset_path() -> Generator[Path, None, None]:
     """
