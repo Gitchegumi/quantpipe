@@ -40,6 +40,8 @@ if TYPE_CHECKING:
     import pandas as pd
     import polars as pl
 
+    from ..backtest.batch_scan import ScanResult
+    from ..backtest.batch_simulation import SimulationResult
     from ..strategy.base import Strategy
 
 
@@ -1080,6 +1082,113 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
                 polars_df, pair, run_id, start_time, strategy, **signal_params
             )
 
+    def _convert_scan_result_to_signals(
+        self,
+        scan_result: "ScanResult",
+        df: "pl.DataFrame",
+        pair: str,
+        direction: str,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> list[TradeSignal]:
+        """Convert BatchScan signal indices to TradeSignal objects.
+
+        Args:
+            scan_result: Result from BatchScan.scan()
+            df: Polars DataFrame with OHLC data
+            pair: Currency pair
+            direction: 'LONG' or 'SHORT'
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            List of TradeSignal objects
+        """
+        import hashlib
+
+        signals = []
+
+        if scan_result.signal_count == 0:
+            return signals
+
+        # Extract arrays for signal construction
+        timestamps = df["timestamp_utc"].to_numpy()
+        close_prices = df["close"].to_numpy()
+        atr_values = df["atr14"].to_numpy()
+
+        atr_stop_mult = signal_params.get("atr_stop_mult", 2.0)
+        risk_per_trade_pct = signal_params.get("risk_per_trade_pct", 0.01)
+
+        for idx in scan_result.signal_indices:
+            timestamp_utc = timestamps[idx]
+            entry_price = close_prices[idx]
+            atr = atr_values[idx]
+
+            # Calculate stop price based on direction
+            if direction == "LONG":
+                initial_stop_price = entry_price - (atr * atr_stop_mult)
+            else:  # SHORT
+                initial_stop_price = entry_price + (atr * atr_stop_mult)
+
+            # Generate deterministic signal ID
+            signal_data = (
+                f"{timestamp_utc}|{pair}|{direction}|"
+                f"{entry_price}|{strategy.metadata.version}"
+            )
+            signal_id = hashlib.sha256(signal_data.encode()).hexdigest()[:16]
+
+            # Placeholder position size (calculated from account equity normally)
+            calc_position_size = 10000.0
+
+            signal = TradeSignal(
+                id=signal_id,
+                pair=pair,
+                direction=direction,
+                entry_price=entry_price,
+                initial_stop_price=initial_stop_price,
+                risk_per_trade_pct=risk_per_trade_pct,
+                calc_position_size=calc_position_size,
+                tags=["batch_scan"],
+                version=strategy.metadata.version,
+                timestamp_utc=timestamp_utc,
+            )
+            signals.append(signal)
+
+        return signals
+
+    def _convert_simulation_result_to_executions(
+        self,
+        sim_result: "SimulationResult",  # pylint: disable=unused-argument
+        signals: list[TradeSignal],  # pylint: disable=unused-argument
+    ) -> list[TradeExecution]:
+        """Convert BatchSimulation result to TradeExecution objects.
+
+        Args:
+            sim_result: Result from BatchSimulation.simulate()
+            signals: List of TradeSignal objects that were simulated
+
+        Returns:
+            List of TradeExecution objects
+
+        Note:
+            This is a simplified conversion. Full implementation would extract
+            detailed trade data from simulation arrays (entry/exit timestamps,
+            prices, PnL, exit reasons, etc.)
+        """
+        executions = []
+
+        # TODO: Extract actual trade data from simulation result
+        # For now, create placeholder executions based on trade count
+        # In a complete implementation, BatchSimulation would return
+        # arrays of entry/exit data that we'd convert here
+
+        logger.warning(
+            "Simulation result conversion incomplete: returning empty list. "
+            "Requires BatchSimulation to return trade detail arrays."
+        )
+
+        return executions
+
     def _run_optimized_long(
         self,
         df: "pl.DataFrame",
@@ -1183,8 +1292,21 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             sim_result.progress_overhead_pct,
         )
 
-        # Convert results to BacktestResult format
-        # TODO: Implement conversion from sim_result to TradeSignal/TradeExecution
+        # Convert scan and simulation results to BacktestResult format
+        logger.info("Converting scan results to TradeSignal objects")
+        signals = self._convert_scan_result_to_signals(
+            scan_result, df, pair, "LONG", strategy, **signal_params
+        )
+
+        logger.info("Converting simulation results to TradeExecution objects")
+        executions = self._convert_simulation_result_to_executions(sim_result, signals)
+
+        # Calculate metrics
+        metrics = None
+        if executions:
+            logger.info("Calculating metrics for %d executions", len(executions))
+            metrics = calculate_directional_metrics(executions, DirectionMode.LONG)
+
         data_start_date = df["timestamp_utc"][0]
         data_end_date = df["timestamp_utc"][-1]
 
@@ -1197,10 +1319,10 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             data_start_date=data_start_date,
             data_end_date=data_end_date,
             total_candles=len(df),
-            signals=[],  # TODO: Convert signal_indices to TradeSignal objects
-            executions=[],  # TODO: Convert sim_result to TradeExecution objects
+            signals=signals if not self.dry_run else None,
+            executions=executions if not self.dry_run else None,
             conflicts=[],
-            metrics=None,  # TODO: Build metrics from sim_result
+            metrics=metrics,
         )
 
     def _run_optimized_short(
@@ -1283,8 +1405,21 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             sim_result.progress_overhead_pct,
         )
 
-        # Convert results to BacktestResult format
-        # TODO: Implement conversion from sim_result to TradeSignal/TradeExecution
+        # Convert scan and simulation results to BacktestResult format
+        logger.info("Converting scan results to TradeSignal objects")
+        signals = self._convert_scan_result_to_signals(
+            scan_result, df, pair, "SHORT", strategy, **signal_params
+        )
+
+        logger.info("Converting simulation results to TradeExecution objects")
+        executions = self._convert_simulation_result_to_executions(sim_result, signals)
+
+        # Calculate metrics
+        metrics = None
+        if executions:
+            logger.info("Calculating metrics for %d executions", len(executions))
+            metrics = calculate_directional_metrics(executions, DirectionMode.SHORT)
+
         data_start_date = df["timestamp_utc"][0]
         data_end_date = df["timestamp_utc"][-1]
 
@@ -1297,10 +1432,10 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             data_start_date=data_start_date,
             data_end_date=data_end_date,
             total_candles=len(df),
-            signals=[],  # TODO: Convert signal_indices to TradeSignal objects
-            executions=[],  # TODO: Convert sim_result to TradeExecution objects
+            signals=signals if not self.dry_run else None,
+            executions=executions if not self.dry_run else None,
             conflicts=[],
-            metrics=None,  # TODO: Build metrics from sim_result
+            metrics=metrics,
         )
 
     def _run_optimized_both(
@@ -1427,9 +1562,69 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         )
         logger.info("Total trades executed: %d", total_trades)
 
-        # Convert results to BacktestResult format
-        # TODO: Implement conversion from sim_result to TradeSignal/TradeExecution
-        # TODO: Implement conflict detection and merge logic
+        # Convert scan results to TradeSignal objects
+        logger.info("Converting LONG scan results to TradeSignal objects")
+        long_signals = self._convert_scan_result_to_signals(
+            long_scan, df, pair, "LONG", strategy, **signal_params
+        )
+
+        logger.info("Converting SHORT scan results to TradeSignal objects")
+        short_signals = self._convert_scan_result_to_signals(
+            short_scan, df, pair, "SHORT", strategy, **signal_params
+        )
+
+        # Merge signals with conflict detection
+        logger.info("Merging signals with conflict detection")
+        merged_signals, conflicts = merge_signals(long_signals, short_signals, pair)
+        logger.info(
+            "Merged %d signals (%d conflicts detected)",
+            len(merged_signals),
+            len(conflicts),
+        )
+
+        # Convert simulation results to TradeExecution objects
+        logger.info("Converting simulation results to TradeExecution objects")
+        long_executions = (
+            self._convert_simulation_result_to_executions(long_sim, long_signals)
+            if long_sim
+            else []
+        )
+        short_executions = (
+            self._convert_simulation_result_to_executions(short_sim, short_signals)
+            if short_sim
+            else []
+        )
+
+        # Combine all executions
+        all_executions = long_executions + short_executions
+
+        # Calculate three-tier metrics
+        metrics = None
+        if all_executions:
+            logger.info(
+                "Calculating three-tier metrics for %d executions", len(all_executions)
+            )
+            metrics = calculate_directional_metrics(all_executions, DirectionMode.BOTH)
+
+            if metrics.long_only:
+                logger.info(
+                    "Long-only metrics: %d trades, %.2f%% win rate",
+                    metrics.long_only.trade_count,
+                    metrics.long_only.win_rate * 100,
+                )
+            if metrics.short_only:
+                logger.info(
+                    "Short-only metrics: %d trades, %.2f%% win rate",
+                    metrics.short_only.trade_count,
+                    metrics.short_only.win_rate * 100,
+                )
+            if metrics.combined:
+                logger.info(
+                    "Combined metrics: %d trades, %.2f%% win rate",
+                    metrics.combined.trade_count,
+                    metrics.combined.win_rate * 100,
+                )
+
         data_start_date = df["timestamp_utc"][0]
         data_end_date = df["timestamp_utc"][-1]
 
@@ -1442,10 +1637,10 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             data_start_date=data_start_date,
             data_end_date=data_end_date,
             total_candles=len(df),
-            signals=[],  # TODO: Convert signal_indices to TradeSignal objects
-            executions=[],  # TODO: Convert sim_result to TradeExecution objects
-            conflicts=[],  # TODO: Detect conflicts between LONG/SHORT
-            metrics=None,  # TODO: Build three-tier metrics from sim_results
+            signals=merged_signals if not self.dry_run else None,
+            executions=all_executions if not self.dry_run else None,
+            conflicts=conflicts,
+            metrics=metrics,
         )
 
 
