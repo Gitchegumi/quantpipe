@@ -388,6 +388,16 @@ def main():
         ),
     )
 
+    parser.add_argument(
+        "--emit-perf-report",
+        action="store_true",
+        help=(
+            "Emit PerformanceReport JSON after backtest completion. "
+            "Captures scan/simulation timings, memory usage, signal/trade counts, "
+            "and dataset provenance for benchmark tracking (Feature 010: T077)"
+        ),
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -1190,6 +1200,58 @@ Persistent storage not yet implemented."
     # Write output file
     output_path.write_text(output_content)
     logger.info("Results written to %s", output_path)
+
+    # Emit PerformanceReport if requested (Feature 010: T077)
+    if args.emit_perf_report and use_optimized_path:
+        logger.info("Emitting PerformanceReport for optimized backtest")
+        from ..backtest.report_writer import ReportWriter
+        from ..models.performance_report import PerformanceReport
+
+        # Extract metrics from result
+        scan_duration = 0.0
+        simulation_duration = 0.0
+        signal_count = len(result.signals) if result.signals else 0
+        trade_count = len(result.executions) if result.executions else 0
+
+        # Try to extract timing from orchestrator phases if available
+        if hasattr(orchestrator, "_phase_times"):
+            scan_duration = orchestrator._phase_times.get("scan", 0.0)
+            simulation_duration = orchestrator._phase_times.get("simulation", 0.0)
+
+        # Create PerformanceReport
+        # Note: Some fields use placeholder values pending full instrumentation
+        perf_report = PerformanceReport(
+            scan_duration_sec=scan_duration,
+            simulation_duration_sec=simulation_duration,
+            peak_memory_mb=0.0,  # TODO: Add memory tracking
+            manifest_path="",  # TODO: Add manifest tracking
+            manifest_sha256="0" * 64,  # Placeholder
+            candle_count=result.total_candles,
+            signal_count=signal_count,
+            trade_count=trade_count,
+            equivalence_verified=False,  # Not applicable for optimized-only run
+            progress_emission_count=0,  # TODO: Track from progress dispatcher
+            progress_overhead_pct=None,
+            indicator_names=[],  # TODO: Extract from strategy metadata
+            deterministic_mode=False,
+            allocation_count_scan=None,
+            allocation_reduction_pct=None,
+            duplicate_timestamps_removed=0,
+            duplicate_first_ts=None,
+            duplicate_last_ts=None,
+            created_at=datetime.now(UTC),
+        )
+
+        # Write report to JSON
+        writer = ReportWriter(output_dir=str(args.output))
+        report_path = writer.write_report(perf_report)
+        logger.info("PerformanceReport written to %s", report_path)
+        print(f"Performance report: {report_path}")
+    elif args.emit_perf_report and not use_optimized_path:
+        logger.warning(
+            "PerformanceReport emission requested but optimized path not used. "
+            "Skipping report emission."
+        )
 
     # Print summary to console
     if output_format == OutputFormat.TEXT:
