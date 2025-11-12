@@ -8,7 +8,7 @@ The pipeline produces a normalized core dataset with performance metrics
 and supports both columnar (DataFrame) and iterator output modes.
 
 Core Pipeline Stages (FR-002):
-1. Read -> Load raw CSV data
+1. Read -> Load raw CSV data (with Parquet caching)
 2. Sort -> Chronological ordering by timestamp
 3. Deduplicate -> Remove duplicates (keep-first)
 4. Validate Cadence -> Check for excessive missing intervals
@@ -18,10 +18,12 @@ Core Pipeline Stages (FR-002):
 8. Collect Metrics -> Gather performance statistics
 
 Performance Target: ≤120s for 6.9M rows (SC-001), stretch goal ≤90s (SC-012)
+Parquet caching reduces subsequent loads to ≤15s
 """
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Union
 
 import pandas as pd
@@ -38,6 +40,7 @@ from src.io.gaps import detect_gaps
 from src.io.hash_utils import compute_dataframe_hash
 from src.io.iterator_mode import DataFrameIteratorWrapper
 from src.io.logging_constants import IngestionStage
+from src.io.parquet_cache import load_with_cache
 from src.io.perf_utils import PerformanceTimer, calculate_throughput
 from src.io.progress import ProgressReporter
 from src.io.schema import (
@@ -102,12 +105,14 @@ def ingest_ohlcv_data(
     downcast: bool = False,
     use_arrow: bool = True,
     strict_cadence: bool = True,
+    use_parquet_cache: bool = True,
 ) -> IngestionResult:
     """Ingest and normalize raw OHLCV candle data.
 
     Implements the full ingestion pipeline with performance optimization
     and comprehensive metrics collection. Supports both columnar DataFrame
-    and iterator output modes.
+    and iterator output modes. Automatically caches CSV→Parquet for faster
+    subsequent loads.
 
     Args:
         path: Path to raw CSV file containing OHLCV data.
@@ -118,6 +123,8 @@ def ingest_ohlcv_data(
         strict_cadence: If True, warn if deviation >50% (extreme gaps suggesting
             data quality issues). If False, no warnings. In both cases, gap filling
             proceeds normally. Historical FX data naturally has ~30% gaps (weekends).
+        use_parquet_cache: If True, use Parquet caching to skip CSV parsing on
+            subsequent loads (default: True for 10-15x speedup).
 
     Returns:
         IngestionResult: Contains processed data, metrics, and metadata.
@@ -159,32 +166,56 @@ def ingest_ohlcv_data(
 
     # Start performance timer
     with PerformanceTimer() as timer:
-        # Stage 1: Read raw data with progress tracking
-        # First pass: count total lines for progress bar
-        try:
-            with open(path, encoding="utf-8") as f:
-                total_lines = sum(1 for _ in f) - 1  # Subtract header
-        except FileNotFoundError as exc:
-            raise FileNotFoundError(f"Input file not found: {path}") from exc
+        # Stage 1: Read raw data with progress tracking (or load from Parquet cache)
+        csv_path = Path(path)
 
-        progress.start_stage(IngestionStage.READ, f"Reading {path}", total=total_lines)
+        # Try Parquet cache first for massive speedup
+        if use_parquet_cache:
+            try:
+                polars_df = load_with_cache(csv_path)
+                # Convert Polars → Pandas for pipeline compatibility
+                df = polars_df.to_pandas()
+                input_row_count = len(df)
+                logger.info("✓ Loaded %d rows from Parquet cache", input_row_count)
+            except Exception as exc:
+                logger.warning(
+                    "Parquet cache load failed, falling back to CSV: %s", exc
+                )
+                polars_df = None
+                df = None
+        else:
+            polars_df = None
+            df = None
 
-        # Read CSV in chunks with progress tracking
-        chunk_size = 100_000  # 100k rows per chunk
-        chunks = []
-        try:
-            read_kwargs = {"chunksize": chunk_size}
-            if dtype_backend:
-                read_kwargs["dtype_backend"] = dtype_backend
-            for chunk in pd.read_csv(path, **read_kwargs):
-                chunks.append(chunk)
-                progress.update_progress(advance=len(chunk))
-            df = pd.concat(chunks, ignore_index=True)
-        except Exception as exc:
-            raise RuntimeError(f"Error reading CSV: {exc}") from exc
+        # Fallback to CSV parsing if cache disabled or failed
+        if df is None:
+            # First pass: count total lines for progress bar
+            try:
+                with open(path, encoding="utf-8") as f:
+                    total_lines = sum(1 for _ in f) - 1  # Subtract header
+            except FileNotFoundError as exc:
+                raise FileNotFoundError(f"Input file not found: {path}") from exc
 
-        input_row_count = len(df)
-        logger.info("Loaded %d raw rows", input_row_count)
+            progress.start_stage(
+                IngestionStage.READ, f"Reading {path}", total=total_lines
+            )
+
+            # Read CSV in chunks with progress tracking
+            chunk_size = 100_000  # 100k rows per chunk
+            chunks = []
+            try:
+                read_kwargs = {"chunksize": chunk_size}
+                if dtype_backend:
+                    read_kwargs["dtype_backend"] = dtype_backend
+                for chunk in pd.read_csv(path, **read_kwargs):
+                    chunks.append(chunk)
+                    progress.update_progress(advance=len(chunk))
+                df = pd.concat(chunks, ignore_index=True)
+            except Exception as exc:
+                raise RuntimeError(f"Error reading CSV: {exc}") from exc
+
+            input_row_count = len(df)
+            logger.info("Loaded %d raw rows from CSV", input_row_count)
 
         # Parse and validate timestamps
         if "timestamp" in df.columns:

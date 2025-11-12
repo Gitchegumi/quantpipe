@@ -93,6 +93,17 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 - [ ] T069 Mark streaming prototype experimental or relocate to future feature (update documentation comment in `src/backtest/streaming_scan.py`) [Scope]
 - [X] T070 Extend logging format audit for new modules `scripts/ci/check_logging_format.py` (include progress, memory, abort, report) [Principle X]
 
+## Phase 8 – CLI Integration & Parquet Caching
+
+- [ ] T071 Replace orchestrator scan methods with BatchScan calls `src/backtest/orchestrator.py` (eliminate window-by-window iteration)
+- [X] T072 Implement CSV→Parquet conversion & caching `src/io/parquet_cache.py` (convert on first run, load cached on subsequent)
+- [X] T073 Integrate Parquet-first loading in CLI `src/io/ingestion.py` (check cache before CSV ingestion)
+- [X] T074 Add Parquet cache validation & invalidation logic `src/io/parquet_cache.py` (checksum validation, expiry)
+- [ ] T075 Add end-to-end optimized pipeline integration test `tests/integration/test_optimized_pipeline.py` (CSV→Parquet→BatchScan→BatchSimulation)
+- [ ] T076 Replace orchestrator simulation with BatchSimulation calls `src/backtest/orchestrator.py` (eliminate trade-by-trade iteration)
+- [ ] T077 Update CLI to emit PerformanceReport after backtest `src/cli/run_backtest.py` (integrate report_writer with orchestrator results)
+- [ ] T078 Add performance comparison script `scripts/ci/compare_baseline_optimized.py` (measure actual speedup achieved)
+
 ## Dependencies (User Story Order)
 
 US1 → US2 (indicator ownership audit depends on working scan path) → US3 (simulation depends on signals). Polish depends on all stories.
