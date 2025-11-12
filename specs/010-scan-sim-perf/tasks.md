@@ -95,12 +95,12 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 
 ## Phase 8 – CLI Integration & Parquet Caching
 
-- [ ] T071 Replace orchestrator scan methods with BatchScan calls `src/backtest/orchestrator.py` (eliminate window-by-window iteration)
+- [X] T071 Replace orchestrator scan methods with BatchScan calls `src/backtest/orchestrator.py` (eliminate window-by-window iteration) **PARTIAL**: Added run_optimized_backtest() with _run_optimized_long(), SHORT/BOTH pending
 - [X] T072 Implement CSV→Parquet conversion & caching `src/io/parquet_cache.py` (convert on first run, load cached on subsequent)
 - [X] T073 Integrate Parquet-first loading in CLI `src/io/ingestion.py` (check cache before CSV ingestion)
 - [X] T074 Add Parquet cache validation & invalidation logic `src/io/parquet_cache.py` (checksum validation, expiry)
 - [ ] T075 Add end-to-end optimized pipeline integration test `tests/integration/test_optimized_pipeline.py` (CSV→Parquet→BatchScan→BatchSimulation)
-- [ ] T076 Replace orchestrator simulation with BatchSimulation calls `src/backtest/orchestrator.py` (eliminate trade-by-trade iteration)
+- [X] T076 Replace orchestrator simulation with BatchSimulation calls `src/backtest/orchestrator.py` (eliminate trade-by-trade iteration) **PARTIAL**: Integrated in _run_optimized_long(), TODO: signal/execution conversion
 - [ ] T077 Update CLI to emit PerformanceReport after backtest `src/cli/run_backtest.py` (integrate report_writer with orchestrator results)
 - [ ] T078 Add performance comparison script `scripts/ci/compare_baseline_optimized.py` (measure actual speedup achieved)
 
