@@ -1158,33 +1158,69 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
 
     def _convert_simulation_result_to_executions(
         self,
-        sim_result: "SimulationResult",  # pylint: disable=unused-argument
-        signals: list[TradeSignal],  # pylint: disable=unused-argument
+        sim_result: "SimulationResult",
+        signals: list[TradeSignal],
+        timestamps: "np.ndarray",
     ) -> list[TradeExecution]:
         """Convert BatchSimulation result to TradeExecution objects.
 
         Args:
             sim_result: Result from BatchSimulation.simulate()
             signals: List of TradeSignal objects that were simulated
+            timestamps: Array of candle timestamps
 
         Returns:
             List of TradeExecution objects
-
-        Note:
-            This is a simplified conversion. Full implementation would extract
-            detailed trade data from simulation arrays (entry/exit timestamps,
-            prices, PnL, exit reasons, etc.)
         """
+        import numpy as np
+
         executions = []
 
-        # TODO: Extract actual trade data from simulation result
-        # For now, create placeholder executions based on trade count
-        # In a complete implementation, BatchSimulation would return
-        # arrays of entry/exit data that we'd convert here
+        # Map exit reason codes to strings
+        EXIT_REASON_MAP = {
+            1: "STOP_LOSS",
+            2: "TARGET",
+            3: "EXPIRY",  # Timeout/max holding period
+        }
 
-        logger.warning(
-            "Simulation result conversion incomplete: returning empty list. "
-            "Requires BatchSimulation to return trade detail arrays."
+        # Create TradeExecution for each trade
+        for i in range(sim_result.trade_count):
+            # Get timestamps from indices
+            entry_ts = timestamps[sim_result.entry_indices[i]]
+            exit_idx = sim_result.exit_indices[i]
+            if exit_idx >= 0 and exit_idx < len(timestamps):
+                exit_ts = timestamps[exit_idx]
+            else:
+                # Trade still open or invalid index - skip
+                continue
+
+            # Map direction code to string
+            direction_str = "LONG" if sim_result.directions[i] == 1 else "SHORT"
+
+            # Map exit reason code
+            exit_reason = EXIT_REASON_MAP.get(
+                int(sim_result.exit_reasons[i]), "UNKNOWN"
+            )
+
+            execution = TradeExecution(
+                signal_id=signals[i].id if i < len(signals) else f"sig_{i}",
+                direction=direction_str,
+                open_timestamp=entry_ts,
+                entry_fill_price=float(sim_result.entry_prices[i]),
+                close_timestamp=exit_ts,
+                exit_fill_price=float(sim_result.exit_prices[i]),
+                exit_reason=exit_reason,
+                pnl_r=float(sim_result.pnl_r[i]),
+                slippage_entry_pips=0.5,  # TODO: Calculate actual slippage
+                slippage_exit_pips=0.5,  # TODO: Calculate actual slippage
+                costs_total=0.0,  # TODO: Calculate actual costs
+            )
+            executions.append(execution)
+
+        logger.info(
+            "Converted %d/%d trades to TradeExecution objects",
+            len(executions),
+            sim_result.trade_count,
         )
 
         return executions
@@ -1215,10 +1251,12 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
 
         logger.info("Running optimized long-only scan for %s", pair)
 
-        # Initialize batch scanner
+        # Initialize batch scanner with LONG direction
         scanner = BatchScan(
             strategy=strategy,
             enable_progress=True,
+            direction="LONG",
+            parameters=signal_params,
         )
 
         # Execute batch scan
@@ -1299,7 +1337,9 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         )
 
         logger.info("Converting simulation results to TradeExecution objects")
-        executions = self._convert_simulation_result_to_executions(sim_result, signals)
+        executions = self._convert_simulation_result_to_executions(
+            sim_result, signals, timestamps
+        )
 
         # Calculate metrics
         metrics = None
@@ -1352,11 +1392,12 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         from ..backtest.batch_simulation import BatchSimulation
 
         # Run scan for SHORT direction
-        # TODO: BatchScan needs direction-aware scanning logic (Phase 8)
         logger.info("Running optimized BatchScan for SHORT direction")
         scanner = BatchScan(
             strategy=strategy,
             enable_progress=True,
+            direction="SHORT",
+            parameters=signal_params,
         )
 
         self._start_phase("scan")
@@ -1412,7 +1453,9 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         )
 
         logger.info("Converting simulation results to TradeExecution objects")
-        executions = self._convert_simulation_result_to_executions(sim_result, signals)
+        executions = self._convert_simulation_result_to_executions(
+            sim_result, signals, timestamps
+        )
 
         # Calculate metrics
         metrics = None
@@ -1464,14 +1507,14 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         from ..backtest.batch_scan import BatchScan
         from ..backtest.batch_simulation import BatchSimulation
 
-        # TODO: BatchScan needs direction-aware scanning logic (Phase 8)
-        # For now, both scanners use same strategy but will need direction support
         logger.info("Running optimized BatchScan for BOTH directions")
 
         # Scan LONG direction
         long_scanner = BatchScan(
             strategy=strategy,
             enable_progress=True,
+            direction="LONG",
+            parameters=signal_params,
         )
 
         self._start_phase("scan")
@@ -1486,6 +1529,8 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         short_scanner = BatchScan(
             strategy=strategy,
             enable_progress=True,
+            direction="SHORT",
+            parameters=signal_params,
         )
 
         short_scan = short_scanner.scan(df=df, timestamp_col="timestamp_utc")
@@ -1585,12 +1630,16 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         # Convert simulation results to TradeExecution objects
         logger.info("Converting simulation results to TradeExecution objects")
         long_executions = (
-            self._convert_simulation_result_to_executions(long_sim, long_signals)
+            self._convert_simulation_result_to_executions(
+                long_sim, long_signals, timestamps
+            )
             if long_sim
             else []
         )
         short_executions = (
-            self._convert_simulation_result_to_executions(short_sim, short_signals)
+            self._convert_simulation_result_to_executions(
+                short_sim, short_signals, timestamps
+            )
             if short_sim
             else []
         )

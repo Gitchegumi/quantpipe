@@ -201,7 +201,17 @@ def main():
         nargs="+",
         default=["EURUSD"],
         help="Currency pair(s) to backtest (default: EURUSD). Supports multiple: \
-            --pair EURUSD GBPUSD",
+            --pair EURUSD GBPUSD. When used without --data, auto-constructs path from \
+            price_data/processed/<pair>/",
+    )
+
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=["test", "validate"],
+        default="test",
+        help="Dataset to use when --data not specified (default: test). \
+            Looks for price_data/processed/<pair>/<dataset>/<pair>_<dataset>.parquet",
     )
 
     parser.add_argument(
@@ -490,8 +500,52 @@ Persistent storage not yet implemented."
     if args.data is None:
         # Data file required for backtest runs
         if not args.list_strategies and not args.register_strategy:
-            print("Error: --data required for backtest runs", file=sys.stderr)
-            sys.exit(1)
+            # Auto-construct data path from pair and dataset
+            # Try .parquet first, fallback to .csv
+            pair_lower = args.pair[0].lower()
+            base_path = (
+                Path("price_data")
+                / "processed"
+                / pair_lower
+                / args.dataset
+            )
+            filename_base = f"{pair_lower}_{args.dataset}"
+
+            # Try .parquet first (faster)
+            parquet_path = base_path / f"{filename_base}.parquet"
+            csv_path = base_path / f"{filename_base}.csv"
+
+            if parquet_path.exists():
+                data_path = parquet_path
+                logger.info(
+                    "Auto-constructed data path from --pair %s and --dataset %s: %s",
+                    args.pair[0],
+                    args.dataset,
+                    data_path,
+                )
+            elif csv_path.exists():
+                data_path = csv_path
+                logger.info(
+                    "Auto-constructed data path from --pair %s and --dataset %s: %s "
+                    "(Parquet not found, using CSV)",
+                    args.pair[0],
+                    args.dataset,
+                    data_path,
+                )
+            else:
+                print(
+                    f"Error: No data file found for --pair {args.pair[0]} "
+                    f"and --dataset {args.dataset}\n"
+                    f"Searched:\n"
+                    f"  - {parquet_path}\n"
+                    f"  - {csv_path}\n"
+                    f"Expected structure: price_data/processed/<pair>/<dataset>/"
+                    f"<pair>_<dataset>.[parquet|csv]\n"
+                    f"Use --data to specify a custom path.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            args.data = data_path
     elif not args.data.exists():
         print(f"Error: Data file not found: {args.data}", file=sys.stderr)
         sys.exit(1)
@@ -678,9 +732,24 @@ Persistent storage not yet implemented."
 
         profiler = ProfilingContext()
 
-    # Convert MetaTrader CSV if needed
-    logger.info("Preprocessing CSV data")
-    converted_csv = preprocess_metatrader_csv(args.data, args.output)
+    # Detect file type and preprocess if needed
+    data_path = Path(args.data)
+
+    if data_path.suffix.lower() == ".parquet":
+        logger.info("Detected Parquet file, skipping CSV preprocessing")
+        converted_csv = data_path
+        use_arrow = True  # Force Arrow backend for Parquet
+    elif data_path.suffix.lower() == ".csv":
+        logger.info("Preprocessing CSV data")
+        converted_csv = preprocess_metatrader_csv(args.data, args.output)
+        use_arrow = False  # Use standard backend for CSV
+    else:
+        logger.warning(
+            "Unknown file extension '%s', attempting to process as CSV",
+            data_path.suffix
+        )
+        converted_csv = preprocess_metatrader_csv(args.data, args.output)
+        use_arrow = False
 
     # Load strategy parameters (using defaults)
     parameters = StrategyParameters()
@@ -720,7 +789,7 @@ Persistent storage not yet implemented."
             timeframe_minutes=1,
             mode="columnar",
             downcast=False,
-            use_arrow=True,
+            use_arrow=use_arrow,
             strict_cadence=False,  # FX data has gaps (weekends/holidays)
             fill_gaps=False,  # Preserve gaps - don't create synthetic price data
         )

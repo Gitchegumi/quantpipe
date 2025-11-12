@@ -180,15 +180,26 @@ def ingest_ohlcv_data(
         # Stage 1: Read raw data with progress tracking (or load from Parquet cache)
         csv_path = Path(path)
 
-        # Try Parquet cache first for massive speedup
-        if use_parquet_cache:
+        # Check if input is already Parquet
+        if csv_path.suffix.lower() == ".parquet":
+            logger.info("Loading Parquet file directly: %s", csv_path)
+            try:
+                import polars as pl
+                polars_df = pl.read_parquet(csv_path)
+                df = polars_df.to_pandas()
+                input_row_count = len(df)
+                logger.info("✓ Loaded %d rows from Parquet file", input_row_count)
+            except Exception as exc:
+                raise RuntimeError(f"Failed to load Parquet file: {exc}") from exc
+        # Try Parquet cache for CSV files
+        elif use_parquet_cache:
             try:
                 polars_df = load_with_cache(csv_path)
                 # Convert Polars → Pandas for pipeline compatibility
                 df = polars_df.to_pandas()
                 input_row_count = len(df)
                 logger.info("✓ Loaded %d rows from Parquet cache", input_row_count)
-            except Exception as exc:
+            except (FileNotFoundError, ValueError, RuntimeError, OSError) as exc:
                 logger.warning(
                     "Parquet cache load failed, falling back to CSV: %s", exc
                 )
@@ -222,7 +233,7 @@ def ingest_ohlcv_data(
                     chunks.append(chunk)
                     progress.update_progress(advance=len(chunk))
                 df = pd.concat(chunks, ignore_index=True)
-            except Exception as exc:
+            except (pd.errors.ParserError, pd.errors.EmptyDataError, ValueError) as exc:
                 raise RuntimeError(f"Error reading CSV: {exc}") from exc
 
             input_row_count = len(df)
@@ -274,7 +285,7 @@ def ingest_ohlcv_data(
             actual_intervals = len(df)
             deviation = compute_cadence_deviation(actual_intervals, expected_intervals)
 
-            logger.info(
+            logger.debug(
                 "Cadence analysis: %d intervals present, %d expected (%.1f%% complete)",
                 actual_intervals,
                 expected_intervals,
@@ -369,6 +380,9 @@ def ingest_ohlcv_data(
         stretch_runtime_candidate=stretch_candidate,
     )
 
+    # Finalize progress bar
+    progress.finish()
+
     # Log final summary
     logger.info(
         "Ingestion complete: %d rows in %.2fs (%.0f rows/min, backend=%s)",
@@ -377,9 +391,6 @@ def ingest_ohlcv_data(
         throughput,
         backend,
     )
-
-    # Finalize progress bar
-    progress.finish()
 
     # Return result with mode-specific data wrapper
     if mode == "iterator":

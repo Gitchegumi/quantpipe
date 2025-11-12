@@ -194,13 +194,13 @@ def load_from_cache(csv_path: Path) -> Optional[pl.DataFrame]:
         return None
 
     parquet_path = get_cache_path(csv_path)
-    logger.info("Loading from Parquet cache: %s", parquet_path)
+    logger.debug("Loading from Parquet cache: %s", parquet_path)
 
     try:
         df = pl.read_parquet(parquet_path)
-        logger.info("Loaded %d rows from cache", len(df))
+        logger.debug("Loaded %d rows from cache", len(df))
         return df
-    except Exception as e:
+    except (pl.ComputeError, pl.SchemaError, OSError, ValueError) as e:
         logger.warning("Failed to load cache %s: %s", parquet_path, e)
         return None
 

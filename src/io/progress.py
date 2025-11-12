@@ -98,8 +98,10 @@ class ProgressReporter:
                 # Indeterminate spinner for atomic operations
                 self.task_id = self.progress.add_task(description, total=None)
 
-        # Also log for records
-        logger.info("%s: %s", stage.value, message)
+            # Don't also log when using progress UI - avoid duplication
+        else:
+            # Log only if no progress UI
+            logger.info("%s: %s", stage.value, message)
 
     def update_progress(
         self, advance: int = 1, completed: Optional[int] = None

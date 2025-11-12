@@ -75,7 +75,7 @@ class ProgressDispatcher:
 
         self._start_time = time.perf_counter()
         self._last_update_time = self._start_time
-        logger.info("Progress tracking started for %d items", self.total_items)
+        logger.debug("Progress tracking started for %d items", self.total_items)
 
         # Create Rich progress bar
         self._progress = Progress(

@@ -40,6 +40,16 @@ class SimulationResult:
         total_pnl_r: Total profit/loss in R multiples
         simulation_duration_sec: Wall-clock time for simulation
         progress_overhead_pct: Percentage of time spent on progress updates
+        entry_indices: Array of entry candle indices
+        exit_indices: Array of exit candle indices
+        entry_prices: Array of entry prices (after slippage)
+        exit_prices: Array of exit prices (after slippage)
+        stop_prices: Array of stop loss prices
+        target_prices: Array of take profit prices
+        pnl_currency: Array of PnL values in base currency
+        pnl_r: Array of PnL values in R multiples
+        directions: Array of trade directions (1=LONG, -1=SHORT)
+        exit_reasons: Array of exit reason codes
     """
 
     trade_count: int
@@ -51,6 +61,17 @@ class SimulationResult:
     total_pnl_r: float
     simulation_duration_sec: float
     progress_overhead_pct: float
+    # Trade detail arrays
+    entry_indices: np.ndarray
+    exit_indices: np.ndarray
+    entry_prices: np.ndarray
+    exit_prices: np.ndarray
+    stop_prices: np.ndarray
+    target_prices: np.ndarray
+    pnl_currency: np.ndarray
+    pnl_r: np.ndarray
+    directions: np.ndarray
+    exit_reasons: np.ndarray
 
 
 @dataclass
@@ -166,7 +187,7 @@ class BatchSimulation:
 
         # Aggregate results
         result = self._aggregate_results(
-            trade_outcomes, sim_duration, progress_overhead_pct
+            position_state, trade_outcomes, sim_duration, progress_overhead_pct
         )
 
         logger.info(
@@ -237,6 +258,17 @@ class BatchSimulation:
             total_pnl_r=0.0,
             simulation_duration_sec=duration,
             progress_overhead_pct=0.0,
+            # Empty arrays for zero trades
+            entry_indices=np.array([], dtype=np.int64),
+            exit_indices=np.array([], dtype=np.int64),
+            entry_prices=np.array([]),
+            exit_prices=np.array([]),
+            stop_prices=np.array([]),
+            target_prices=np.array([]),
+            pnl_currency=np.array([]),
+            pnl_r=np.array([]),
+            directions=np.array([], dtype=np.int8),
+            exit_reasons=np.array([], dtype=np.int8),
         )
 
     def _initialize_positions(
@@ -396,29 +428,45 @@ class BatchSimulation:
             "winners": winners,
             "directions": position_state.directions,
             "exit_reasons": exit_reasons,
+            "exit_prices": adjusted_exits,
         }
 
-        logger.info(
-            "Simulated %d trades: %d winners, %d losers",
-            n_trades,
-            np.sum(winners),
-            n_trades - np.sum(winners),
+        # Log trade summary using Rich console if progress bar active
+        trade_summary = (
+            f"Simulated {n_trades} trades: "
+            f"{np.sum(winners)} winners, {n_trades - np.sum(winners)} losers"
         )
+        if progress is not None and progress._progress is not None:
+            # Use Rich console to print below the progress bar
+            progress._progress.console.print(f"[cyan]{trade_summary}[/cyan]")
+        else:
+            # Fallback to regular logging
+            logger.info(
+                "Simulated %d trades: %d winners, %d losers",
+                n_trades,
+                np.sum(winners),
+                n_trades - np.sum(winners),
+            )
 
         return outcomes
 
     def _aggregate_results(
-        self, trade_outcomes: dict, duration: float, progress_overhead: float
+        self,
+        position_state: PositionState,
+        trade_outcomes: dict,
+        duration: float,
+        progress_overhead: float,
     ) -> SimulationResult:
         """Aggregate trade outcomes into simulation result.
 
         Args:
+            position_state: Position state with entry/exit/stop/target arrays
             trade_outcomes: Dictionary of trade outcomes
             duration: Simulation duration in seconds
             progress_overhead: Progress overhead percentage
 
         Returns:
-            SimulationResult with aggregated metrics
+            SimulationResult with aggregated metrics and trade detail arrays
         """
         n_trades = len(trade_outcomes["pnl"])
         winners_mask = trade_outcomes["winners"]
@@ -434,4 +482,15 @@ class BatchSimulation:
             total_pnl_r=float(np.sum(trade_outcomes["pnl_r"])),
             simulation_duration_sec=duration,
             progress_overhead_pct=progress_overhead,
+            # Trade detail arrays
+            entry_indices=position_state.entry_indices,
+            exit_indices=position_state.exit_indices,
+            entry_prices=position_state.entry_prices,
+            exit_prices=trade_outcomes.get("exit_prices", np.array([])),
+            stop_prices=position_state.stop_prices,
+            target_prices=position_state.target_prices,
+            pnl_currency=trade_outcomes["pnl"],
+            pnl_r=trade_outcomes["pnl_r"],
+            directions=directions,
+            exit_reasons=trade_outcomes["exit_reasons"],
         )

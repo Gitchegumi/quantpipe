@@ -62,15 +62,21 @@ class BatchScan:
         self,
         strategy: Strategy,
         enable_progress: bool = True,
+        direction: str = "BOTH",
+        parameters: dict | None = None,
     ):
         """Initialize batch scanner.
 
         Args:
             strategy: Strategy instance providing indicator requirements
             enable_progress: Whether to emit progress updates (default: True)
+            direction: Trade direction - "LONG", "SHORT", or "BOTH" (default: "BOTH")
+            parameters: Strategy parameters dict (default: None uses strategy defaults)
         """
         self.strategy = strategy
         self.enable_progress = enable_progress
+        self.direction = direction
+        self.parameters = parameters or {}
         self._validate_strategy()
 
     def _validate_strategy(self) -> None:
@@ -166,7 +172,7 @@ class BatchScan:
         if progress is not None:
             result = progress.finish()
             progress_overhead_pct = result["progress_overhead_pct"]
-            logger.info("Progress overhead: %.2f%%", progress_overhead_pct)
+            logger.debug("Progress overhead: %.2f%%", progress_overhead_pct)
 
         scan_duration = time.perf_counter() - scan_start
 
@@ -202,18 +208,18 @@ class BatchScan:
 
     def _scan_signals(
         self,
-        timestamps: np.ndarray,  # pylint: disable=unused-argument
-        ohlc_arrays: tuple[np.ndarray, ...],  # pylint: disable=unused-argument
-        indicator_arrays: dict[str, np.ndarray],  # pylint: disable=unused-argument
+        timestamps: np.ndarray,
+        ohlc_arrays: tuple[np.ndarray, ...],
+        indicator_arrays: dict[str, np.ndarray],
         progress: Optional[ProgressDispatcher],
     ) -> np.ndarray:
-        """Scan for signal indices using batch processing.
+        """Scan for signals using strategy's vectorized method.
 
-        This is a placeholder implementation that will be replaced with
-        actual strategy signal generation logic in subsequent tasks.
+        Delegates to strategy.scan_vectorized() for strategy-agnostic scanning.
+        The strategy implements its own signal logic using NumPy array operations.
 
         Args:
-            timestamps: Array of timestamps
+            timestamps: Array of timestamps (datetime64[ns])
             ohlc_arrays: Tuple of (timestamps, open, high, low, close) arrays
             indicator_arrays: Dictionary of indicator name -> array
             progress: Optional progress dispatcher
@@ -221,21 +227,45 @@ class BatchScan:
         Returns:
             NumPy array of indices where signals were generated
         """
-        # Placeholder: No signals generated yet
-        # Will be replaced with actual signal scanning logic that:
-        # 1. Iterates through arrays in configurable batch sizes
-        # 2. Evaluates strategy conditions vectorially
-        # 3. Emits progress updates at stride intervals
-        # 4. Returns indices of candles matching signal criteria
-
         n_candles = len(timestamps)
 
-        # Emit progress updates to demonstrate integration
-        if progress is not None:
-            # Simulate batch processing with progress updates
-            stride = 16384  # Match PROGRESS_STRIDE_ITEMS
-            for i in range(0, n_candles, stride):
-                progress.update(i)
+        # Extract close prices
+        _, _, _, _, close_arr = ohlc_arrays
 
-        # Return empty array for now (no signals)
-        return np.array([], dtype=np.int64)
+        # Check if strategy supports vectorized scanning
+        if not hasattr(self.strategy, "scan_vectorized"):
+            logger.error(
+                "Strategy '%s' does not implement scan_vectorized(). "
+                "Cannot perform batch scanning.",
+                self.strategy.metadata.name,
+            )
+            return np.array([], dtype=np.int64)
+
+        # Delegate to strategy's vectorized scan method
+        try:
+            signal_indices = self.strategy.scan_vectorized(
+                close=close_arr,
+                indicator_arrays=indicator_arrays,
+                parameters=self.parameters,
+                direction=self.direction,
+            )
+
+            # Update progress to completion
+            if progress is not None:
+                progress.update(n_candles)
+
+            logger.debug(
+                "Vectorized scan complete: %d signals found in %d candles",
+                len(signal_indices),
+                n_candles,
+            )
+
+            return signal_indices
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error(
+                "Strategy scan_vectorized() failed: %s",
+                e,
+                exc_info=True,
+            )
+            return np.array([], dtype=np.int64)

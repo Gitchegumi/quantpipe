@@ -163,7 +163,7 @@ def enrich(
                     enriched_df[col_name] = col_series
 
                 indicators_applied.append(indicator_name)
-                logger.info("Applied indicator: %s", indicator_name)
+                # Don't log during progress - causes messy output
                 progress_bar.advance(task)
 
             except Exception as e:  # pylint: disable=broad-except
