@@ -148,7 +148,9 @@ class BatchScan:
         # Step 4: Initialize progress tracking
         progress: Optional[ProgressDispatcher] = None
         if self.enable_progress:
-            progress = ProgressDispatcher(total_items=len(timestamps))
+            progress = ProgressDispatcher(
+                total_items=len(timestamps), description="Scanning signals"
+            )
             progress.start()
 
         # Step 5: Scan for signals using batch processing
