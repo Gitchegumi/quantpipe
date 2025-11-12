@@ -109,7 +109,8 @@ class ReportGenerator:
         )
 
         logger.info(
-            "Generated performance report: scan=%.2fs, sim=%.2fs, signals=%d, trades=%d",
+            "Generated performance report: scan=%.2fs, sim=%.2fs, "
+            "signals=%d, trades=%d",
             report.scan_duration_sec,
             report.simulation_duration_sec,
             report.signal_count,

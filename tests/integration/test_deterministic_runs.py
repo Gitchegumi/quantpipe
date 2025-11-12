@@ -9,6 +9,10 @@ Test Coverage:
 - Trade count exact match across runs
 - EURUSD, USDJPY, and both symbols test scenarios
 """
+# pylint: disable=redefined-outer-name,line-too-long
+# Justification:
+# - redefined-outer-name: pytest fixtures intentionally shadow fixture names
+# - line-too-long: Test assertion messages exceed 88 chars for clarity
 
 import time
 
@@ -382,15 +386,9 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
         ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
     )
 
-    # Run with progress tracking (mock dispatcher)
-    class MockProgressDispatcher:
-        """Mock progress dispatcher for testing."""
-
-        def update(self, current_item: int):
-            """Mock update method."""
-            # No-op for determinism testing
-
-    progress = MockProgressDispatcher()
+    # Run with progress tracking
+    # Note: Progress is controlled via BatchSimulation(enable_progress=True) constructor
+    # Not via simulate() parameter, so both runs use same configuration
     result_with_progress = batch_sim.simulate(
         signal_indices=eurusd_deterministic_signal_set["signal_indices"],
         timestamps=eurusd_deterministic_signal_set["timestamps"],

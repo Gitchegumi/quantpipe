@@ -10,6 +10,11 @@ Test Coverage:
 - Memory comparison vs baseline
 - EURUSD, USDJPY, and both symbols test scenarios
 """
+# pylint: disable=redefined-outer-name,unused-argument,line-too-long
+# Justification:
+# - redefined-outer-name: pytest fixtures intentionally shadow fixture names
+# - unused-argument: Mock function signatures match expected interface
+# - line-too-long: Test assertion messages exceed 88 chars for clarity
 
 
 import numpy as np

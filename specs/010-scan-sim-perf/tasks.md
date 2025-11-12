@@ -78,20 +78,20 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 
 ## Phase 7 – Coverage & Determinism Extensions
 
-- [ ] T057 [US1] Add scan determinism test `tests/integration/test_scan_deterministic.py` (repeat scan x3; identical signals & ≤1% timing variance)
-- [ ] T058 Add memory abort scenario test `tests/unit/test_memory_abort.py` (simulate low available memory; expect structured abort log) [FR-009]
-- [ ] T059 [US2] Add indicator mapping report test `tests/contract/test_indicator_mapping_report.py` (PerformanceReport indicator_names[] matches strategy registry) [FR-013]
-- [ ] T060 Add allocation profiling harness `scripts/ci/profile_scan_allocations.py` (captures baseline & optimized allocation counts) [FR-002, FR-014]
-- [ ] T061 [US1] Add allocation reduction assertion test `tests/performance/test_scan_allocations.py` (≥70% reduction vs baseline) [FR-014]
-- [ ] T062 Add manifest provenance validation test `tests/unit/test_manifest_in_report.py` (checksum/path match manifest) [FR-012]
-- [ ] T063 Extend performance report generation with new fields `src/backtest/report.py` (progress_overhead_pct, indicator_names[], allocation metrics) [FR-007, FR-011–FR-014]
-- [ ] T064 [US1] Add progress final emission test `tests/unit/test_progress_final.py` (mandatory 100% emission + overhead ≤1%) [FR-011]
-- [ ] T065 Add indicator mapping generation in report writer `src/backtest/report_writer.py` [FR-013]
-- [ ] T066 Add structured abort logging utility `src/backtest/abort.py` (emits memory abort record) [FR-009]
-- [ ] T067 Add allocation baseline capture script `scripts/ci/profile_scan_allocations.py` (unoptimized scan) [FR-002]
+- [X] T057 [US1] Add scan determinism test `tests/integration/test_scan_deterministic.py` (repeat scan x3; identical signals & ≤1% timing variance)
+- [X] T058 Add memory abort scenario test `tests/unit/test_memory_abort.py` (simulate low available memory; expect structured abort log) [FR-009]
+- [X] T059 [US2] Add indicator mapping report test `tests/contract/test_indicator_mapping_report.py` (PerformanceReport indicator_names[] matches strategy registry) [FR-013]
+- [X] T060 Add allocation profiling harness `scripts/ci/profile_scan_allocations.py` (captures baseline & optimized allocation counts) [FR-002, FR-014]
+- [X] T061 [US1] Add allocation reduction assertion test `tests/performance/test_scan_allocations.py` (≥70% reduction vs baseline) [FR-014]
+- [X] T062 Add manifest provenance validation test `tests/unit/test_manifest_in_report.py` (checksum/path match manifest) [FR-012]
+- [X] T063 Extend performance report generation with new fields `src/backtest/report.py` (progress_overhead_pct, indicator_names[], allocation metrics) [FR-007, FR-011–FR-014]
+- [X] T064 [US1] Add progress final emission test `tests/unit/test_progress_final.py` (mandatory 100% emission + overhead ≤1%) [FR-011]
+- [X] T065 Add indicator mapping generation in report writer `src/backtest/report_writer.py` [FR-013]
+- [X] T066 Add structured abort logging utility `src/backtest/memory_abort.py` (emits memory abort record) [FR-009]
+- [X] T067 Add allocation baseline capture script `scripts/ci/profile_scan_allocations.py` (unoptimized scan) [FR-002]
 - [ ] T068 Gate numba experiment script activation post-baseline (update `scripts/experiment_numba_sim.py`) [T055 dependency]
 - [ ] T069 Mark streaming prototype experimental or relocate to future feature (update documentation comment in `src/backtest/streaming_scan.py`) [Scope]
-- [ ] T070 Extend logging format audit for new modules `scripts/ci/check_logging_format.py` (include progress, memory, abort, report) [Principle X]
+- [X] T070 Extend logging format audit for new modules `scripts/ci/check_logging_format.py` (include progress, memory, abort, report) [Principle X]
 
 ## Dependencies (User Story Order)
 

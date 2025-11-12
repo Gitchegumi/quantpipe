@@ -17,11 +17,13 @@ SIM_MIN_SPEEDUP_PCT = 55  # Minimum 55% time reduction vs baseline
 # Memory Performance Targets
 MEM_PEAK_REDUCTION_TARGET_PCT = 30  # Minimum 30% peak memory reduction
 MEM_ALLOCATION_REDUCTION_TARGET_PCT = 70  # Minimum 70% allocation reduction
+ALLOCATION_REDUCTION_TARGET_PCT = 70  # Alias for allocation reduction target
 
 # Progress Emission Targets
 PROGRESS_MAX_INTERVAL_SECONDS = 120  # Maximum 2 minutes between updates
 PROGRESS_MAX_PERCENT_DRIFT = 2.0  # Maximum 2% increment between updates
 PROGRESS_MAX_OVERHEAD_PCT = 1.0  # Progress overhead must be ≤1% of total time
+PROGRESS_OVERHEAD_TARGET_PCT = 1.0  # Alias for progress overhead target
 
 # Determinism Targets
 DETERMINISTIC_TIMING_VARIANCE_PCT = 1.0  # ±1% timing variance across runs
