@@ -106,6 +106,7 @@ def ingest_ohlcv_data(
     use_arrow: bool = True,
     strict_cadence: bool = True,
     use_parquet_cache: bool = True,
+    fill_gaps: bool = False,
 ) -> IngestionResult:
     """Ingest and normalize raw OHLCV candle data.
 
@@ -121,10 +122,20 @@ def ingest_ohlcv_data(
         downcast: If True, apply float64→float32 downcasting for memory savings.
         use_arrow: If True, attempt to use Arrow backend for acceleration.
         strict_cadence: If True, warn if deviation >50% (extreme gaps suggesting
-            data quality issues). If False, no warnings. In both cases, gap filling
-            proceeds normally. Historical FX data naturally has ~30% gaps (weekends).
+            data quality issues). If False, no warnings. Historical FX data naturally
+            has ~30% gaps (weekends).
         use_parquet_cache: If True, use Parquet caching to skip CSV parsing on
             subsequent loads (default: True for 10-15x speedup).
+        fill_gaps: If True, fill timestamp gaps with synthetic candles (forward-fill
+            close prices). If False (default), preserve gaps as they represent actual
+            market closures (weekends, holidays). When False, is_gap column is still
+            added but all values are False.
+
+            **Note**: Gap filling during ingestion is generally NOT recommended as it
+            creates synthetic price data that never occurred. The primary use case for
+            gap filling is during **resampling to higher timeframes** (e.g., 1-min →
+            5-min → 1-hour), which will be implemented in a future specification.
+            For raw ingestion, gaps should be preserved to maintain data integrity.
 
     Returns:
         IngestionResult: Contains processed data, metrics, and metadata.
@@ -275,25 +286,38 @@ def ingest_ohlcv_data(
                 missing = expected_intervals - actual_intervals
                 logger.warning(
                     "Large data gap detected: %.1f%% missing (%d intervals). "
-                    "This may indicate a data quality issue. Gap filling will proceed.",
+                    "Enable fill_gaps=True if you want to fill these during resampling.",
                     deviation,
                     missing,
                 )
 
-            # Stage 5: Gap detection and filling (atomic - indeterminate)
-            progress.start_stage(
-                IngestionStage.GAP_FILL,
-                f"Detecting and filling gaps in {len(df):,} rows",
-            )
-            gap_indices = detect_gaps(df, timeframe_minutes)
-            gaps_inserted = len(gap_indices)
+            # Stage 5: Optional gap detection and filling
+            # Only detect gaps if we're going to fill them (for resampling use case)
+            gaps_inserted = 0  # Initialize for metrics
 
-            if gaps_inserted > 0:
-                df, gaps_inserted = fill_gaps_vectorized(df, timeframe_minutes)
-                logger.info("Filled %d gaps with synthetic candles", gaps_inserted)
+            if fill_gaps:
+                progress.start_stage(
+                    IngestionStage.GAP_FILL,
+                    f"Detecting and filling gaps in {len(df):,} rows",
+                )
+                gap_indices = detect_gaps(df, timeframe_minutes)
+                gaps_detected = len(gap_indices)
+
+                if gaps_detected > 0:
+                    logger.info("Detected %d gaps in timestamp sequence", gaps_detected)
+                    # Fill gaps with synthetic candles
+                    df, gaps_inserted = fill_gaps_vectorized(df, timeframe_minutes)
+                    logger.info("Filled %d gaps with synthetic candles", gaps_inserted)
+                else:
+                    # No gaps detected - add is_gap column with all False
+                    df["is_gap"] = False
             else:
-                # No gaps - add is_gap column with all False
+                # Skip gap detection entirely - just add is_gap column with all False
+                # Gap detection is expensive and unnecessary if we're not filling
                 df["is_gap"] = False
+                logger.debug(
+                    "Skipping gap detection (fill_gaps=False) - preserving original data"
+                )
 
             # Stage 6: Schema restriction (atomic operation - indeterminate)
             progress.start_stage(

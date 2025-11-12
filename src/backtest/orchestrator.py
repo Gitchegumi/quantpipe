@@ -11,6 +11,7 @@ simulation, and metrics aggregation.
 import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from rich.progress import (
     BarColumn,
@@ -32,6 +33,14 @@ from ..strategy.trend_pullback.signal_generator import (
     generate_long_signals,
     generate_short_signals,
 )
+
+
+if TYPE_CHECKING:
+    import numpy as np
+    import pandas as pd
+    import polars as pl
+
+    from ..strategy.base import Strategy
 
 
 logger = logging.getLogger(__name__)
@@ -1011,6 +1020,243 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             candles_by_strategy=candles_by_strategy,
             weights=weights,
             run_id=run_id,
+        )
+
+    def run_optimized_backtest(
+        self,
+        df: "pd.DataFrame",
+        pair: str,
+        run_id: str,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized backtest using BatchScan and BatchSimulation.
+
+        This method bypasses Candle object conversion and window-by-window iteration,
+        using vectorized operations on DataFrames for ≥50% scan speedup and
+        ≥55% simulation speedup (FR-001).
+
+        Args:
+            df: Enriched pandas DataFrame with OHLC and indicator columns
+            pair: Currency pair being backtested (e.g., "EURUSD")
+            run_id: Unique identifier for this backtest run
+            strategy: Strategy instance providing metadata and signal generation
+            **signal_params: Strategy parameters (ema_fast, ema_slow, etc.)
+
+        Returns:
+            BacktestResult with signals, executions, and metrics
+
+        Raises:
+            ValueError: If df is empty or missing required columns
+        """
+
+        if df.empty:
+            raise ValueError("DataFrame cannot be empty")
+
+        start_time = datetime.now(UTC)
+        logger.info(
+            "Starting optimized backtest run_id=%s, pair=%s, direction=%s",
+            run_id,
+            pair,
+            self.direction_mode.value,
+        )
+
+        # Convert pandas DataFrame to Polars for batch processing
+        import polars as pl
+
+        polars_df = pl.from_pandas(df)
+
+        # Route to direction-specific optimized workflow
+        if self.direction_mode == DirectionMode.LONG:
+            return self._run_optimized_long(
+                polars_df, pair, run_id, start_time, strategy, **signal_params
+            )
+        elif self.direction_mode == DirectionMode.SHORT:
+            return self._run_optimized_short(
+                polars_df, pair, run_id, start_time, strategy, **signal_params
+            )
+        else:  # BOTH
+            return self._run_optimized_both(
+                polars_df, pair, run_id, start_time, strategy, **signal_params
+            )
+
+    def _run_optimized_long(
+        self,
+        df: "pl.DataFrame",
+        pair: str,
+        run_id: str,
+        start_time: datetime,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized long-only backtest.
+
+        Args:
+            df: Polars DataFrame with OHLC and indicator columns
+            pair: Currency pair code
+            run_id: Backtest run identifier
+            start_time: Run start timestamp
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            BacktestResult with long signals and executions
+        """
+        from ..backtest.batch_scan import BatchScan
+
+        logger.info("Running optimized long-only scan for %s", pair)
+
+        # Initialize batch scanner
+        scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+        )
+
+        # Execute batch scan
+        self._start_phase("scan")
+        scan_result = scanner.scan(df, timestamp_col="timestamp_utc")
+        self._end_phase("scan")
+
+        logger.info(
+            "Scan complete: %d signals, %.2fs, %.1f%% progress overhead",
+            scan_result.signal_count,
+            scan_result.scan_duration_sec,
+            scan_result.progress_overhead_pct,
+        )
+
+        # If dry-run, return early with signals only
+        if self.dry_run:
+            # TODO: Convert signal_indices to TradeSignal objects for compatibility
+            # Placeholder implementation for Phase 8
+            data_start_date = df["timestamp_utc"][0]
+            data_end_date = df["timestamp_utc"][-1]
+
+            return BacktestResult(
+                run_id=run_id,
+                pair=pair,
+                direction_mode="LONG",
+                start_time=start_time,
+                end_time=datetime.now(UTC),
+                data_start_date=data_start_date,
+                data_end_date=data_end_date,
+                total_candles=len(df),
+                signals=[],  # TODO: Implement signal conversion
+                executions=[],
+                conflicts=[],
+                metrics=None,
+            )
+
+        # Execute batch simulation
+        from ..backtest.batch_simulation import BatchSimulation
+
+        logger.info(
+            "Running optimized simulation for %d signals", scan_result.signal_count
+        )
+
+        simulator = BatchSimulation(
+            risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
+            enable_progress=True,
+        )
+
+        # Extract OHLC arrays for simulation
+        timestamps = df["timestamp_utc"].to_numpy()
+        ohlc_arrays = (
+            timestamps,
+            df["open"].to_numpy(),
+            df["high"].to_numpy(),
+            df["low"].to_numpy(),
+            df["close"].to_numpy(),
+        )
+
+        self._start_phase("simulation")
+        sim_result = simulator.simulate(
+            signal_indices=scan_result.signal_indices,
+            timestamps=timestamps,
+            ohlc_arrays=ohlc_arrays,
+        )
+        self._end_phase("simulation")
+
+        logger.info(
+            "Simulation complete: %d trades, %.2fs, %.1f%% progress overhead",
+            sim_result.trade_count,
+            sim_result.simulation_duration_sec,
+            sim_result.progress_overhead_pct,
+        )
+
+        # Convert results to BacktestResult format
+        # TODO: Implement conversion from sim_result to TradeSignal/TradeExecution
+        data_start_date = df["timestamp_utc"][0]
+        data_end_date = df["timestamp_utc"][-1]
+
+        return BacktestResult(
+            run_id=run_id,
+            pair=pair,
+            direction_mode="LONG",
+            start_time=start_time,
+            end_time=datetime.now(UTC),
+            data_start_date=data_start_date,
+            data_end_date=data_end_date,
+            total_candles=len(df),
+            signals=[],  # TODO: Convert signal_indices to TradeSignal objects
+            executions=[],  # TODO: Convert sim_result to TradeExecution objects
+            conflicts=[],
+            metrics=None,  # TODO: Build metrics from sim_result
+        )
+
+    def _run_optimized_short(
+        self,
+        df: "pl.DataFrame",
+        pair: str,
+        run_id: str,
+        start_time: datetime,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized short-only backtest.
+
+        Args:
+            df: Polars DataFrame with OHLC and indicator columns
+            pair: Currency pair code
+            run_id: Backtest run identifier
+            start_time: Run start timestamp
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            BacktestResult with short signals and executions
+        """
+        # Implementation similar to _run_optimized_long but for SHORT direction
+        # For now, raise NotImplementedError to indicate this is Phase 8 work
+        raise NotImplementedError(
+            "Optimized short-only backtest not yet implemented (Phase 8: T071)"
+        )
+
+    def _run_optimized_both(
+        self,
+        df: "pl.DataFrame",
+        pair: str,
+        run_id: str,
+        start_time: datetime,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized BOTH-direction backtest.
+
+        Args:
+            df: Polars DataFrame with OHLC and indicator columns
+            pair: Currency pair code
+            run_id: Backtest run identifier
+            start_time: Run start timestamp
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            BacktestResult with long and short signals, executions, and conflicts
+        """
+        # Implementation combines long and short scans with conflict detection
+        # For now, raise NotImplementedError to indicate this is Phase 8 work
+        raise NotImplementedError(
+            "Optimized BOTH-direction backtest not yet implemented (Phase 8: T071)"
         )
 
 

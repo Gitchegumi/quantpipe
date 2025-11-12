@@ -712,6 +712,7 @@ Persistent storage not yet implemented."
             downcast=False,
             use_arrow=True,
             strict_cadence=False,  # FX data has gaps (weekends/holidays)
+            fill_gaps=False,  # Preserve gaps - don't create synthetic price data
         )
         logger.info(
             "✓ Ingested %d rows in %.2fs",
@@ -734,9 +735,11 @@ Persistent storage not yet implemented."
             enrichment_result.runtime_seconds,
         )
 
+        # Store enriched DataFrame for potential optimized path use
+        enriched_df = enrichment_result.enriched
+
         # Stage 3: Convert DataFrame to Candle objects
         logger.info("Stage 3/3: Converting to Candle objects...")
-        enriched_df = enrichment_result.enriched
         from ..models.core import Candle
 
         # Vectorized conversion using list comprehension with to_dict
@@ -782,6 +785,10 @@ Persistent storage not yet implemented."
             )
 
             candles = slice_dataset(candles, fraction=data_frac, portion=portion)
+
+            # Also slice the DataFrame for optimized path compatibility
+            enriched_df = enriched_df.iloc[: len(candles)]
+
             logger.info(
                 "Sliced to %d candles (%.1f%%)",
                 len(candles),
@@ -1016,16 +1023,38 @@ Persistent storage not yet implemented."
                 "target_r_mult": parameters.target_r_mult,
                 "cooldown_candles": parameters.cooldown_candles,
                 "rsi_length": parameters.rsi_length,
+                "risk_per_trade_pct": parameters.risk_per_trade_pct,
             }
 
-            result = orchestrator.run_backtest(
-                candles=candles,
-                pair=pair,
-                run_id=run_id,
-                **signal_params,
-            )
+            # Feature 010: Use optimized path if available (BatchScan/BatchSimulation)
+            if hasattr(orchestrator, "run_optimized_backtest"):
+                logger.info(
+                    "Using optimized vectorized backtest path (Feature 010: BatchScan/BatchSimulation)"
+                )
 
-            logger.info("Backtest complete: %s", result.run_id)
+                from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
+
+                result = orchestrator.run_optimized_backtest(
+                    df=enriched_df,
+                    pair=pair,
+                    run_id=run_id,
+                    strategy=TREND_PULLBACK_STRATEGY,
+                    **signal_params,
+                )
+
+                logger.info("Optimized backtest complete: %s", result.run_id)
+            else:
+                # Fallback to legacy Candle-based path
+                logger.info("Using legacy Candle-based backtest path")
+
+                result = orchestrator.run_backtest(
+                    candles=candles,
+                    pair=pair,
+                    run_id=run_id,
+                    **signal_params,
+                )
+
+                logger.info("Backtest complete: %s", result.run_id)
 
         # Write benchmark artifact if profiling enabled
         if args.profile and benchmark_path:

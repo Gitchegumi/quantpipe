@@ -38,10 +38,20 @@ def extract_ohlc_arrays(
 
     # Extract arrays (single pass, zero-copy where possible)
     timestamps = df["timestamp_utc"].to_numpy()
-    open_prices = df["open"].to_numpy(dtype=np.float64)
-    high_prices = df["high"].to_numpy(dtype=np.float64)
-    low_prices = df["low"].to_numpy(dtype=np.float64)
-    close_prices = df["close"].to_numpy(dtype=np.float64)
+    open_prices = df["open"].to_numpy()
+    high_prices = df["high"].to_numpy()
+    low_prices = df["low"].to_numpy()
+    close_prices = df["close"].to_numpy()
+
+    # Ensure float64 dtype for calculations
+    if open_prices.dtype != np.float64:
+        open_prices = open_prices.astype(np.float64)
+    if high_prices.dtype != np.float64:
+        high_prices = high_prices.astype(np.float64)
+    if low_prices.dtype != np.float64:
+        low_prices = low_prices.astype(np.float64)
+    if close_prices.dtype != np.float64:
+        close_prices = close_prices.astype(np.float64)
 
     logger.debug(
         "Extracted OHLC arrays: %d rows, dtype=%s",
@@ -77,7 +87,11 @@ def extract_indicator_arrays(
     # Extract all indicator arrays
     indicator_arrays = {}
     for name in indicator_names:
-        indicator_arrays[name] = df[name].to_numpy(dtype=np.float64)
+        arr = df[name].to_numpy()
+        # Ensure float64 dtype for calculations
+        if arr.dtype != np.float64:
+            arr = arr.astype(np.float64)
+        indicator_arrays[name] = arr
 
     logger.debug(
         "Extracted %d indicator arrays with %d rows each",
