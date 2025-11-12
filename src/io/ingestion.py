@@ -26,7 +26,7 @@ from typing import Union
 
 import pandas as pd
 
-from src.io.arrow_config import configure_arrow_backend, detect_backend
+from src.io.arrow_config import configure_arrow_backend
 from src.io.cadence import (
     compute_cadence_deviation,
     compute_expected_intervals,
@@ -46,6 +46,7 @@ from src.io.schema import (
     validate_required_columns,
 )
 from src.io.timezone_validate import validate_utc_timezone
+
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +146,12 @@ def ingest_ohlcv_data(
 
     # Configure Arrow backend if requested
     backend = "pandas"
+    dtype_backend = None  # Use pandas default (numpy)
     if use_arrow:
         try:
-            configure_arrow_backend()
-            backend = detect_backend()
+            backend = configure_arrow_backend()
+            if backend == "arrow":
+                dtype_backend = "pyarrow"
             logger.info("Using acceleration backend: %s", backend)
         except (ImportError, ValueError, AttributeError) as exc:
             logger.warning("Arrow backend unavailable, using pandas: %s", exc)
@@ -159,20 +162,21 @@ def ingest_ohlcv_data(
         # Stage 1: Read raw data with progress tracking
         # First pass: count total lines for progress bar
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, encoding="utf-8") as f:
                 total_lines = sum(1 for _ in f) - 1  # Subtract header
         except FileNotFoundError as exc:
             raise FileNotFoundError(f"Input file not found: {path}") from exc
 
-        progress.start_stage(
-            IngestionStage.READ, f"Reading {path}", total=total_lines
-        )
+        progress.start_stage(IngestionStage.READ, f"Reading {path}", total=total_lines)
 
         # Read CSV in chunks with progress tracking
         chunk_size = 100_000  # 100k rows per chunk
         chunks = []
         try:
-            for chunk in pd.read_csv(path, chunksize=chunk_size):
+            read_kwargs = {"chunksize": chunk_size}
+            if dtype_backend:
+                read_kwargs["dtype_backend"] = dtype_backend
+            for chunk in pd.read_csv(path, **read_kwargs):
                 chunks.append(chunk)
                 progress.update_progress(advance=len(chunk))
             df = pd.concat(chunks, ignore_index=True)
@@ -266,9 +270,7 @@ def ingest_ohlcv_data(
                 f"Restricting {len(df):,} rows to core schema",
             )
             df = restrict_to_core_schema(df)
-            logger.debug(
-                "Restricted to core schema with %d columns", len(df.columns)
-            )
+            logger.debug("Restricted to core schema with %d columns", len(df.columns))
 
             # Stage 7: Optional downcasting (atomic - indeterminate)
             downcast_applied = False

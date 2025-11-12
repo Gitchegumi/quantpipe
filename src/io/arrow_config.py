@@ -1,13 +1,13 @@
 """Arrow backend configuration for pandas.
 
-This module configures pandas to use the Arrow dtype backend where available
-to enable columnar acceleration for ingestion operations.
+This module provides utilities for using the Arrow dtype backend in pandas.
+The Arrow backend is enabled per-operation (e.g., pd.read_csv(dtype_backend='pyarrow'))
+rather than globally, to enable columnar acceleration for ingestion operations.
 """
 
 import logging
 from typing import Literal
 
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -16,33 +16,37 @@ ArrowBackend = Literal["arrow", "pandas"]
 
 
 def configure_arrow_backend() -> ArrowBackend:
-    """Configure pandas to use Arrow backend if available.
+    """Check if Arrow backend is available for pandas operations.
+
+    Note: Arrow backend is enabled per-operation in pandas 2.x+
+    (e.g., pd.read_csv(dtype_backend='pyarrow')), not globally.
 
     Returns:
-        ArrowBackend: The backend that was configured ("arrow" or "pandas").
+        ArrowBackend: "arrow" if pyarrow is available, else "pandas".
     """
     try:
-        # Try to enable Arrow backend
-        pd.options.mode.dtype_backend = "pyarrow"
-        logger.info("Arrow dtype backend enabled successfully")
+        # Check if pyarrow is importable
+        import pyarrow  # noqa: F401 pylint: disable=unused-import,import-outside-toplevel
+
+        logger.info("Arrow dtype backend available (pyarrow installed)")
         return "arrow"
-    except (AttributeError, ImportError, ValueError) as e:
-        logger.warning(
-            "Arrow backend unavailable, falling back to pandas: %s", str(e)
-        )
+    except ImportError as e:
+        logger.warning("Arrow backend unavailable, falling back to pandas: %s", str(e))
         return "pandas"
 
 
 def detect_backend() -> ArrowBackend:
-    """Detect which backend is currently active.
+    """Detect if Arrow backend is available.
 
     Returns:
-        ArrowBackend: The currently active backend.
+        ArrowBackend: "arrow" if pyarrow is available, else "pandas".
     """
-    backend = getattr(pd.options.mode, "dtype_backend", "pandas")
-    if backend == "pyarrow":
+    try:
+        import pyarrow  # noqa: F401 pylint: disable=unused-import,import-outside-toplevel
+
         return "arrow"
-    return "pandas"
+    except ImportError:
+        return "pandas"
 
 
 # TODO(Future): GPU acceleration hook (T076, SC-013)
