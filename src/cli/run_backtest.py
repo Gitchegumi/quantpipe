@@ -738,64 +738,7 @@ Persistent storage not yet implemented."
         # Store enriched DataFrame for potential optimized path use
         enriched_df = enrichment_result.enriched
 
-        # Stage 3: Convert DataFrame to Candle objects
-        logger.info("Stage 3/3: Converting to Candle objects...")
-        from ..models.core import Candle
-
-        # Vectorized conversion using list comprehension with to_dict
-        # Much faster than iterrows() for large datasets
-        records = enriched_df.to_dict("records")
-
-        candles = []
-        for record in records:
-            # Build indicators dict from indicator columns
-            indicators_dict = {
-                name: record[name] for name in required_indicators if name in record
-            }
-
-            candles.append(
-                Candle(
-                    timestamp_utc=record["timestamp_utc"],
-                    open=record["open"],
-                    high=record["high"],
-                    low=record["low"],
-                    close=record["close"],
-                    volume=record.get("volume", 0.0),
-                    indicators=indicators_dict,
-                    is_gap=record.get("is_gap", False),
-                )
-            )
-
-        logger.info("✓ Created %d Candle objects", len(candles))
-
-        if profiler:
-            profiler.end_phase("ingest")
-            profiler.end_phase("ingest")
-
-        # Slice dataset if fraction < 1.0 (Phase 5: US3, FR-002, SC-003)
-        if data_frac < 1.0:
-            from ..backtest.chunking import slice_dataset
-
-            total_candles = len(candles)
-            logger.info(
-                "Slicing dataset: fraction=%.2f, portion=%d, total_candles=%d",
-                data_frac,
-                portion,
-                total_candles,
-            )
-
-            candles = slice_dataset(candles, fraction=data_frac, portion=portion)
-
-            # Also slice the DataFrame for optimized path compatibility
-            enriched_df = enriched_df.iloc[: len(candles)]
-
-            logger.info(
-                "Sliced to %d candles (%.1f%%)",
-                len(candles),
-                100 * len(candles) / total_candles,
-            )
-
-        # Create orchestrator
+        # Create orchestrator early to check for optimized path
         direction_mode = DirectionMode[args.direction]
 
         # Set default benchmark output path if profiling enabled
@@ -813,6 +756,77 @@ Persistent storage not yet implemented."
         # Attach profiler to orchestrator if profiling enabled
         if profiler:
             orchestrator.profiler = profiler
+
+        # Check if optimized path is available (Feature 010)
+        use_optimized_path = hasattr(orchestrator, "run_optimized_backtest")
+
+        # Stage 3: Convert DataFrame to Candle objects (only for legacy path)
+        if use_optimized_path:
+            logger.info(
+                "Stage 3/3: Skipping Candle conversion - using optimized DataFrame path"
+            )
+            candles = None  # Not needed for optimized path
+        else:
+            logger.info("Stage 3/3: Converting to Candle objects...")
+            from ..models.core import Candle
+
+            # Vectorized conversion using list comprehension with to_dict
+            # Much faster than iterrows() for large datasets
+            records = enriched_df.to_dict("records")
+
+            candles = []
+            for record in records:
+                # Build indicators dict from indicator columns
+                indicators_dict = {
+                    name: record[name]
+                    for name in required_indicators
+                    if name in record
+                }
+
+                candles.append(
+                    Candle(
+                        timestamp_utc=record["timestamp_utc"],
+                        open=record["open"],
+                        high=record["high"],
+                        low=record["low"],
+                        close=record["close"],
+                        volume=record.get("volume", 0.0),
+                        indicators=indicators_dict,
+                        is_gap=record.get("is_gap", False),
+                    )
+                )
+
+            logger.info("✓ Created %d Candle objects", len(candles))
+
+        if profiler:
+            profiler.end_phase("ingest")
+            profiler.end_phase("ingest")
+
+        # Slice dataset if fraction < 1.0 (Phase 5: US3, FR-002, SC-003)
+        if data_frac < 1.0:
+            total_rows = len(enriched_df)
+            logger.info(
+                "Slicing dataset: fraction=%.2f, portion=%d, total_rows=%d",
+                data_frac,
+                portion,
+                total_rows,
+            )
+
+            # Slice DataFrame for optimized path
+            slice_count = int(total_rows * data_frac)
+            enriched_df = enriched_df.iloc[:slice_count]
+
+            # Also slice candles if legacy path
+            if not use_optimized_path:
+                from ..backtest.chunking import slice_dataset
+
+                candles = slice_dataset(candles, fraction=data_frac, portion=portion)
+
+            logger.info(
+                "Sliced to %d rows (%.1f%%)",
+                len(enriched_df),
+                100 * len(enriched_df) / total_rows,
+            )
 
         # Check if multi-symbol mode should be used
         is_multi_symbol = len(args.pair) > 1
@@ -1027,9 +1041,10 @@ Persistent storage not yet implemented."
             }
 
             # Feature 010: Use optimized path if available (BatchScan/BatchSimulation)
-            if hasattr(orchestrator, "run_optimized_backtest"):
+            if use_optimized_path:
                 logger.info(
-                    "Using optimized vectorized backtest path (Feature 010: BatchScan/BatchSimulation)"
+                    "Using optimized vectorized backtest path "
+                    "(Feature 010: BatchScan/BatchSimulation)"
                 )
 
                 from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
