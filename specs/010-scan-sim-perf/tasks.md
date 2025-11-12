@@ -100,7 +100,7 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 - [X] T073 Integrate Parquet-first loading in CLI `src/io/ingestion.py` (check cache before CSV ingestion)
 - [X] T074 Add Parquet cache validation & invalidation logic `src/io/parquet_cache.py` (checksum validation, expiry)
 - [X] T075 Add end-to-end optimized pipeline integration test `tests/integration/test_optimized_pipeline.py` (CSV→Parquet→BatchScan→BatchSimulation) **MANUAL TEST COMPLETE**: Verified on 1% data slice (69k rows) - Parquet caching works (2s vs 51s), Candle conversion skipped, BatchScan/BatchSimulation execute successfully, no crashes
-- [X] T076 Replace orchestrator simulation with BatchSimulation calls `src/backtest/orchestrator.py` (eliminate trade-by-trade iteration) **COMPLETE**: Integrated in all three directions (_run_optimized_long/short/both). TODO: signal/execution conversion, conflict detection (BOTH), three-tier metrics (BOTH)
+- [X] T076 Replace orchestrator simulation with BatchSimulation calls `src/backtest/orchestrator.py` (eliminate trade-by-trade iteration) **COMPLETE**: Integrated in all three directions with signal/execution conversion, conflict detection (BOTH), and three-tier metrics (BOTH). Awaits BatchScan signal generation and BatchSimulation trade detail arrays for full functionality.
 - [ ] T077 Update CLI to emit PerformanceReport after backtest `src/cli/run_backtest.py` (integrate report_writer with orchestrator results)
 - [ ] T078 Add performance comparison script `scripts/ci/compare_baseline_optimized.py` (measure actual speedup achieved)
 
