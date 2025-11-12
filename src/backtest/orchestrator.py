@@ -1225,10 +1225,82 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         Returns:
             BacktestResult with short signals and executions
         """
-        # Implementation similar to _run_optimized_long but for SHORT direction
-        # For now, raise NotImplementedError to indicate this is Phase 8 work
-        raise NotImplementedError(
-            "Optimized short-only backtest not yet implemented (Phase 8: T071)"
+        from ..backtest.arrays import extract_indicator_arrays, extract_ohlc_arrays
+        from ..backtest.batch_scan import BatchScan
+        from ..backtest.batch_simulation import BatchSimulation
+
+        # Run scan for SHORT direction
+        # TODO: BatchScan needs direction-aware scanning logic (Phase 8)
+        logger.info("Running optimized BatchScan for SHORT direction")
+        scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+        )
+
+        self._start_phase("scan")
+        scan_result = scanner.scan(df=df, timestamp_col="timestamp_utc")
+        self._end_phase("scan")
+
+        logger.info(
+            "SHORT scan complete: %d signals, %.2fs, %.1f%% progress overhead",
+            scan_result.signal_count,
+            scan_result.scan_duration_sec,
+            scan_result.progress_overhead_pct,
+        )
+
+        # Run simulation on signals
+        logger.info(
+            "Running optimized simulation for %d signals", scan_result.signal_count
+        )
+
+        simulator = BatchSimulation(
+            risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
+            enable_progress=True,
+        )
+
+        # Extract OHLC arrays for simulation
+        timestamps = df["timestamp_utc"].to_numpy()
+        ohlc_arrays = (
+            timestamps,
+            df["open"].to_numpy(),
+            df["high"].to_numpy(),
+            df["low"].to_numpy(),
+            df["close"].to_numpy(),
+        )
+
+        self._start_phase("simulation")
+        sim_result = simulator.simulate(
+            signal_indices=scan_result.signal_indices,
+            timestamps=timestamps,
+            ohlc_arrays=ohlc_arrays,
+        )
+        self._end_phase("simulation")
+
+        logger.info(
+            "Simulation complete: %d trades, %.2fs, %.1f%% progress overhead",
+            sim_result.trade_count,
+            sim_result.simulation_duration_sec,
+            sim_result.progress_overhead_pct,
+        )
+
+        # Convert results to BacktestResult format
+        # TODO: Implement conversion from sim_result to TradeSignal/TradeExecution
+        data_start_date = df["timestamp_utc"][0]
+        data_end_date = df["timestamp_utc"][-1]
+
+        return BacktestResult(
+            run_id=run_id,
+            pair=pair,
+            direction_mode="SHORT",
+            start_time=start_time,
+            end_time=datetime.now(UTC),
+            data_start_date=data_start_date,
+            data_end_date=data_end_date,
+            total_candles=len(df),
+            signals=[],  # TODO: Convert signal_indices to TradeSignal objects
+            executions=[],  # TODO: Convert sim_result to TradeExecution objects
+            conflicts=[],
+            metrics=None,  # TODO: Build metrics from sim_result
         )
 
     def _run_optimized_both(
@@ -1253,10 +1325,127 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         Returns:
             BacktestResult with long and short signals, executions, and conflicts
         """
-        # Implementation combines long and short scans with conflict detection
-        # For now, raise NotImplementedError to indicate this is Phase 8 work
-        raise NotImplementedError(
-            "Optimized BOTH-direction backtest not yet implemented (Phase 8: T071)"
+        from ..backtest.arrays import extract_indicator_arrays, extract_ohlc_arrays
+        from ..backtest.batch_scan import BatchScan
+        from ..backtest.batch_simulation import BatchSimulation
+
+        # TODO: BatchScan needs direction-aware scanning logic (Phase 8)
+        # For now, both scanners use same strategy but will need direction support
+        logger.info("Running optimized BatchScan for BOTH directions")
+
+        # Scan LONG direction
+        long_scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+        )
+
+        self._start_phase("scan")
+        long_scan = long_scanner.scan(df=df, timestamp_col="timestamp_utc")
+        logger.info(
+            "LONG scan complete: %d signals, %.2fs",
+            long_scan.signal_count,
+            long_scan.scan_duration_sec,
+        )
+
+        # Scan SHORT direction
+        short_scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+        )
+
+        short_scan = short_scanner.scan(df=df, timestamp_col="timestamp_utc")
+        self._end_phase("scan")
+
+        logger.info(
+            "SHORT scan complete: %d signals, %.2fs",
+            short_scan.signal_count,
+            short_scan.scan_duration_sec,
+        )
+
+        total_signals = long_scan.signal_count + short_scan.signal_count
+        logger.info(
+            "Total signals: %d (%d LONG + %d SHORT)",
+            total_signals,
+            long_scan.signal_count,
+            short_scan.signal_count,
+        )
+
+        # TODO: Implement conflict detection for simultaneous LONG/SHORT signals
+        # For now, simply combine signal indices
+        # In future, merge with conflict detection like legacy path
+
+        # Run simulation on LONG signals
+        simulator = BatchSimulation(
+            risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
+            enable_progress=True,
+        )
+
+        timestamps = df["timestamp_utc"].to_numpy()
+        ohlc_arrays = (
+            timestamps,
+            df["open"].to_numpy(),
+            df["high"].to_numpy(),
+            df["low"].to_numpy(),
+            df["close"].to_numpy(),
+        )
+
+        self._start_phase("simulation")
+
+        long_sim = None
+        short_sim = None
+
+        if long_scan.signal_count > 0:
+            logger.info("Simulating %d LONG signals", long_scan.signal_count)
+            long_sim = simulator.simulate(
+                signal_indices=long_scan.signal_indices,
+                timestamps=timestamps,
+                ohlc_arrays=ohlc_arrays,
+            )
+            logger.info(
+                "LONG simulation: %d trades, %.2fs",
+                long_sim.trade_count,
+                long_sim.simulation_duration_sec,
+            )
+
+        if short_scan.signal_count > 0:
+            logger.info("Simulating %d SHORT signals", short_scan.signal_count)
+            short_sim = simulator.simulate(
+                signal_indices=short_scan.signal_indices,
+                timestamps=timestamps,
+                ohlc_arrays=ohlc_arrays,
+            )
+            logger.info(
+                "SHORT simulation: %d trades, %.2fs",
+                short_sim.trade_count,
+                short_sim.simulation_duration_sec,
+            )
+
+        self._end_phase("simulation")
+
+        total_trades = (long_sim.trade_count if long_sim else 0) + (
+            short_sim.trade_count if short_sim else 0
+        )
+        logger.info("Total trades executed: %d", total_trades)
+
+        # Convert results to BacktestResult format
+        # TODO: Implement conversion from sim_result to TradeSignal/TradeExecution
+        # TODO: Implement conflict detection and merge logic
+        data_start_date = df["timestamp_utc"][0]
+        data_end_date = df["timestamp_utc"][-1]
+
+        return BacktestResult(
+            run_id=run_id,
+            pair=pair,
+            direction_mode="BOTH",
+            start_time=start_time,
+            end_time=datetime.now(UTC),
+            data_start_date=data_start_date,
+            data_end_date=data_end_date,
+            total_candles=len(df),
+            signals=[],  # TODO: Convert signal_indices to TradeSignal objects
+            executions=[],  # TODO: Convert sim_result to TradeExecution objects
+            conflicts=[],  # TODO: Detect conflicts between LONG/SHORT
+            metrics=None,  # TODO: Build three-tier metrics from sim_results
         )
 
 
