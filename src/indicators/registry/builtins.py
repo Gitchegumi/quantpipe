@@ -141,7 +141,7 @@ def register_builtins() -> None:
     except ValueError:
         logger.debug("Indicator stoch_rsi already registered")
 
-    logger.info("Built-in indicators registered: ema20, ema50, atr14, stoch_rsi")
+    logger.debug("Built-in indicators registered: ema20, ema50, atr14, stoch_rsi")
 
 
 # Auto-register on module import

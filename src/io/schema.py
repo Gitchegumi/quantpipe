@@ -74,7 +74,7 @@ def restrict_to_core_schema(df: pd.DataFrame) -> pd.DataFrame:
     # Select only core columns in the specified order
     restricted_df = df[CORE_COLUMNS].copy()
 
-    logger.info(
+    logger.debug(
         "Restricted to core schema: %d columns -> %d columns",
         len(df.columns),
         len(CORE_COLUMNS),

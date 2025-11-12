@@ -2,6 +2,13 @@
 
 This module provides utilities for filling gaps in candle data using
 vectorized forward-fill operations and marking synthetic rows.
+
+**Important**: Gap filling creates synthetic price data and should be used
+sparingly. The primary use case is during **timeframe resampling** (e.g., 
+1-minute → 5-minute → 1-hour candles), not during raw data ingestion. 
+During ingestion, gaps should be preserved as they represent actual market 
+closures (weekends, holidays, illiquid periods). Future specification will 
+implement proper resampling with appropriate gap handling.
 """
 
 import logging

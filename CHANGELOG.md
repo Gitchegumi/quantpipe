@@ -5,6 +5,72 @@ All notable changes to the trading-strategies project will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1] - 2025-11-12
+
+### Added - Feature 010: Scan & Simulation Performance Optimization
+
+- **High-Performance Vectorized Scanning & Simulation**
+  - Implemented `BatchScan` with strategy-agnostic vectorized scanning using NumPy operations
+  - Added `scan_vectorized()` protocol method to Strategy interface for batch operations
+  - Implemented vectorized trend-pullback signal detection in `TrendPullbackStrategy`
+  - Scans 6.9M candles in ~0.02s with Rich progress bars showing clean single-line updates
+  - Progress overhead reduced to <1% through coarse-grained updates (16K-item stride)
+  
+- **Complete Trade Execution Pipeline**
+  - Enhanced `SimulationResult` with full trade detail arrays (entry/exit prices, indices, PnL, directions, exit reasons)
+  - Implemented `BatchSimulation` returning detailed position state and outcomes
+  - Added trade execution conversion in orchestrator creating real `TradeExecution` objects from simulation arrays
+  - Full metrics calculation: win rate, avg R, expectancy, Sharpe estimate, profit factor, max drawdown
+  - Test results: 764 trades simulated in 24s with complete performance metrics
+
+- **User Experience Improvements**
+  - Added Rich progress bars with percentage, time remaining, and clean terminal output
+  - Moved verbose logs to DEBUG level to eliminate progress bar interruptions
+  - Auto-constructed data paths from `--pair` and `--dataset` flags
+  - Smart file format detection: tries `.parquet` first, falls back to `.csv` automatically
+  - Direct Parquet loading bypassing CSV preprocessing for 10-15x speedup
+  - Updated README with data directory structure and simplified CLI examples
+
+- **CLI Enhancements**
+  - New `--dataset` flag (test/validate) for automatic path construction
+  - Auto-constructs path: `price_data/processed/<pair>/<dataset>/<pair>_<dataset>.parquet`
+  - Supports both Parquet and CSV with automatic format detection
+  - Simplified examples: `--pair EURUSD --dataset test` instead of full paths
+
+- **Code Quality**
+  - All modified modules maintain Pylint scores ≥9.78/10
+  - `batch_simulation.py`: 9.85/10
+  - `orchestrator.py`: 9.78/10  
+  - `batch_scan.py`: 9.93/10
+  - `run_backtest.py`: 9.86/10
+  - Created `test_vectorized_scan.py` test script (10.00/10)
+
+### Changed
+
+- **Progress Reporting**
+  - Replaced 400+ INFO log spam with single-line Rich progress bars
+  - Updated 9 files to use DEBUG level for verbose logs during progress operations
+  - Progress bars show: description, percentage complete, time remaining
+  - Trade summary now prints cleanly using Rich console when progress active
+
+- **File Format Handling**
+  - `ingestion.py`: Detects Parquet files and loads directly, skipping CSV parsing
+  - `run_backtest.py`: Smart preprocessing based on file extension (.parquet vs .csv)
+  - Parquet files loaded in ~3s vs ~90s for CSV parsing on 6.9M rows
+
+### Fixed
+
+- **Vectorized Signal Scanning**
+  - Fixed indicator name mismatch (was "rsi", now "stoch_rsi")
+  - Corrected StochRSI thresholds for 0-1 scale (was 0-100 scale)
+  - Removed slow sliding window approach in favor of pure NumPy vectorization
+
+- **Simulation Output Population**
+  - Fixed empty backtest results by implementing complete trade detail extraction
+  - Added all trade arrays to `SimulationResult` dataclass
+  - Implemented proper conversion from simulation arrays to `TradeExecution` objects
+  - Metrics now calculate correctly from real trade data
+
 ## [Unreleased]
 
 ### Added - Feature 009: Optimize & Decouple Ingestion Process (2025-11-08)

@@ -205,6 +205,58 @@ def aggregate_benchmarks(pattern: str = "benchmark_*.json") -> dict[str, Any]:
         "memory_metrics": aggregate_memory_metrics(benchmarks),
     }
 
+    # T049: Add Spec 010 scan/simulation specific metrics
+    scan_durations = [
+        b.get("phase_times", {}).get("scan", 0)
+        for b in benchmarks
+        if "phase_times" in b and "scan" in b.get("phase_times", {})
+    ]
+    sim_durations = [
+        b.get("phase_times", {}).get("simulate", 0)
+        for b in benchmarks
+        if "phase_times" in b and "simulate" in b.get("phase_times", {})
+    ]
+
+    if scan_durations:
+        summary["scan_performance"] = {
+            "mean": statistics.mean(scan_durations),
+            "median": statistics.median(scan_durations),
+            "min": min(scan_durations),
+            "max": max(scan_durations),
+            "target": 720.0,  # SCAN_MAX_SECONDS from Spec 010
+            "target_met": all(d <= 720.0 for d in scan_durations),
+        }
+
+    if sim_durations:
+        summary["simulation_performance"] = {
+            "mean": statistics.mean(sim_durations),
+            "median": statistics.median(sim_durations),
+            "min": min(sim_durations),
+            "max": max(sim_durations),
+            "target": 480.0,  # SIM_MAX_SECONDS from Spec 010
+            "target_met": all(d <= 480.0 for d in sim_durations),
+        }
+
+    # Calculate overall speedup if baseline is available
+    for benchmark in benchmarks:
+        if "baseline_runtime" in benchmark:
+            baseline = benchmark["baseline_runtime"]
+            current = benchmark.get("wall_clock_total", 0)
+            if baseline > 0:
+                speedup = baseline / current
+                if "speedup_metrics" not in summary:
+                    summary["speedup_metrics"] = []
+                summary["speedup_metrics"].append(speedup)
+
+    if "speedup_metrics" in summary and summary["speedup_metrics"]:
+        summary["speedup_summary"] = {
+            "mean_speedup": statistics.mean(summary["speedup_metrics"]),
+            "median_speedup": statistics.median(summary["speedup_metrics"]),
+            "min_speedup": min(summary["speedup_metrics"]),
+            "max_speedup": max(summary["speedup_metrics"]),
+        }
+        del summary["speedup_metrics"]  # Remove raw list, keep summary only
+
     return summary
 
 
@@ -239,6 +291,18 @@ def main() -> None:
         type=float,
         default=1.5,
         help="Maximum memory ratio multiplier (default: 1.5, SC-009)",
+    )
+    parser.add_argument(
+        "--scan-threshold",
+        type=float,
+        default=720.0,
+        help="Maximum scan duration in seconds (default: 720s, Spec 010)",
+    )
+    parser.add_argument(
+        "--simulation-threshold",
+        type=float,
+        default=480.0,
+        help="Maximum simulation duration in seconds (default: 480s, Spec 010)",
     )
 
     args = parser.parse_args()
@@ -287,6 +351,21 @@ def main() -> None:
                         f"Memory ratio exceeds threshold: {memory_ratio:.2f}× > {args.memory_threshold}× (SC-009)"
                     )
 
+            # T049: Check Spec 010 scan/simulation targets
+            phase_times = benchmark.get("phase_times", {})
+            scan_time = phase_times.get("scan", 0)
+            sim_time = phase_times.get("simulate", 0)
+
+            if scan_time > args.scan_threshold:
+                failures.append(
+                    f"Scan duration exceeds threshold: {scan_time:.1f}s > {args.scan_threshold}s (Spec 010)"
+                )
+
+            if sim_time > args.simulation_threshold:
+                failures.append(
+                    f"Simulation duration exceeds threshold: {sim_time:.1f}s > {args.simulation_threshold}s (Spec 010)"
+                )
+
         if failures:
             print("\n[FAIL] BENCHMARK REGRESSION DETECTED:")
             for failure in failures:
@@ -294,6 +373,32 @@ def main() -> None:
             sys.exit(1)  # Fail CI pipeline
         else:
             print("\n[PASS] All benchmarks passed success criteria")
+
+    # T049: Print Spec 010 summary if available
+    if "scan_performance" in summary or "simulation_performance" in summary:
+        print("\n=== Spec 010 Performance Summary ===")
+        if "scan_performance" in summary:
+            scan_perf = summary["scan_performance"]
+            print(
+                f"Scan: mean={scan_perf['mean']:.1f}s, "
+                f"median={scan_perf['median']:.1f}s, "
+                f"target={scan_perf['target']:.1f}s, "
+                f"met={scan_perf['target_met']}"
+            )
+        if "simulation_performance" in summary:
+            sim_perf = summary["simulation_performance"]
+            print(
+                f"Simulation: mean={sim_perf['mean']:.1f}s, "
+                f"median={sim_perf['median']:.1f}s, "
+                f"target={sim_perf['target']:.1f}s, "
+                f"met={sim_perf['target_met']}"
+            )
+        if "speedup_summary" in summary:
+            speedup = summary["speedup_summary"]
+            print(
+                f"Speedup: mean={speedup['mean_speedup']:.2f}×, "
+                f"median={speedup['median_speedup']:.2f}×"
+            )
 
 
 if __name__ == "__main__":

@@ -59,7 +59,7 @@ from ..io.formatters import (
     format_text_output,
     generate_output_filename,
 )
-from ..io.ingestion import ingest_ohlcv_data
+from ..io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
 from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
 
@@ -201,7 +201,17 @@ def main():
         nargs="+",
         default=["EURUSD"],
         help="Currency pair(s) to backtest (default: EURUSD). Supports multiple: \
-            --pair EURUSD GBPUSD",
+            --pair EURUSD GBPUSD. When used without --data, auto-constructs path from \
+            price_data/processed/<pair>/",
+    )
+
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=["test", "validate"],
+        default="test",
+        help="Dataset to use when --data not specified (default: test). \
+            Looks for price_data/processed/<pair>/<dataset>/<pair>_<dataset>.parquet",
     )
 
     parser.add_argument(
@@ -388,6 +398,16 @@ def main():
         ),
     )
 
+    parser.add_argument(
+        "--emit-perf-report",
+        action="store_true",
+        help=(
+            "Emit PerformanceReport JSON after backtest completion. "
+            "Captures scan/simulation timings, memory usage, signal/trade counts, "
+            "and dataset provenance for benchmark tracking (Feature 010: T077)"
+        ),
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -422,8 +442,9 @@ def main():
             print("Error: --strategy-module required for registration", file=sys.stderr)
             sys.exit(1)
 
-        from ..strategy.registry import StrategyRegistry
         import importlib
+
+        from ..strategy.registry import StrategyRegistry
 
         registry = StrategyRegistry()
 
@@ -479,8 +500,52 @@ Persistent storage not yet implemented."
     if args.data is None:
         # Data file required for backtest runs
         if not args.list_strategies and not args.register_strategy:
-            print("Error: --data required for backtest runs", file=sys.stderr)
-            sys.exit(1)
+            # Auto-construct data path from pair and dataset
+            # Try .parquet first, fallback to .csv
+            pair_lower = args.pair[0].lower()
+            base_path = (
+                Path("price_data")
+                / "processed"
+                / pair_lower
+                / args.dataset
+            )
+            filename_base = f"{pair_lower}_{args.dataset}"
+
+            # Try .parquet first (faster)
+            parquet_path = base_path / f"{filename_base}.parquet"
+            csv_path = base_path / f"{filename_base}.csv"
+
+            if parquet_path.exists():
+                data_path = parquet_path
+                logger.info(
+                    "Auto-constructed data path from --pair %s and --dataset %s: %s",
+                    args.pair[0],
+                    args.dataset,
+                    data_path,
+                )
+            elif csv_path.exists():
+                data_path = csv_path
+                logger.info(
+                    "Auto-constructed data path from --pair %s and --dataset %s: %s "
+                    "(Parquet not found, using CSV)",
+                    args.pair[0],
+                    args.dataset,
+                    data_path,
+                )
+            else:
+                print(
+                    f"Error: No data file found for --pair {args.pair[0]} "
+                    f"and --dataset {args.dataset}\n"
+                    f"Searched:\n"
+                    f"  - {parquet_path}\n"
+                    f"  - {csv_path}\n"
+                    f"Expected structure: price_data/processed/<pair>/<dataset>/"
+                    f"<pair>_<dataset>.[parquet|csv]\n"
+                    f"Use --data to specify a custom path.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            args.data = data_path
     elif not args.data.exists():
         print(f"Error: Data file not found: {args.data}", file=sys.stderr)
         sys.exit(1)
@@ -667,9 +732,24 @@ Persistent storage not yet implemented."
 
         profiler = ProfilingContext()
 
-    # Convert MetaTrader CSV if needed
-    logger.info("Preprocessing CSV data")
-    converted_csv = preprocess_metatrader_csv(args.data, args.output)
+    # Detect file type and preprocess if needed
+    data_path = Path(args.data)
+
+    if data_path.suffix.lower() == ".parquet":
+        logger.info("Detected Parquet file, skipping CSV preprocessing")
+        converted_csv = data_path
+        use_arrow = True  # Force Arrow backend for Parquet
+    elif data_path.suffix.lower() == ".csv":
+        logger.info("Preprocessing CSV data")
+        converted_csv = preprocess_metatrader_csv(args.data, args.output)
+        use_arrow = False  # Use standard backend for CSV
+    else:
+        logger.warning(
+            "Unknown file extension '%s', attempting to process as CSV",
+            data_path.suffix
+        )
+        converted_csv = preprocess_metatrader_csv(args.data, args.output)
+        use_arrow = False
 
     # Load strategy parameters (using defaults)
     parameters = StrategyParameters()
@@ -709,8 +789,9 @@ Persistent storage not yet implemented."
             timeframe_minutes=1,
             mode="columnar",
             downcast=False,
-            use_arrow=True,
+            use_arrow=use_arrow,
             strict_cadence=False,  # FX data has gaps (weekends/holidays)
+            fill_gaps=False,  # Preserve gaps - don't create synthetic price data
         )
         logger.info(
             "✓ Ingested %d rows in %.2fs",
@@ -733,63 +814,10 @@ Persistent storage not yet implemented."
             enrichment_result.runtime_seconds,
         )
 
-        # Stage 3: Convert DataFrame to Candle objects
-        logger.info("Stage 3/3: Converting to Candle objects...")
+        # Store enriched DataFrame for potential optimized path use
         enriched_df = enrichment_result.enriched
-        from ..models.core import Candle
 
-        # Vectorized conversion using list comprehension with to_dict
-        # Much faster than iterrows() for large datasets
-        records = enriched_df.to_dict('records')
-
-        candles = []
-        for record in records:
-            # Build indicators dict from indicator columns
-            indicators_dict = {
-                name: record[name]
-                for name in required_indicators
-                if name in record
-            }
-
-            candles.append(
-                Candle(
-                    timestamp_utc=record["timestamp_utc"],
-                    open=record["open"],
-                    high=record["high"],
-                    low=record["low"],
-                    close=record["close"],
-                    volume=record.get("volume", 0.0),
-                    indicators=indicators_dict,
-                    is_gap=record.get("is_gap", False),
-                )
-            )
-
-        logger.info("✓ Created %d Candle objects", len(candles))
-
-        if profiler:
-            profiler.end_phase("ingest")
-            profiler.end_phase("ingest")
-
-        # Slice dataset if fraction < 1.0 (Phase 5: US3, FR-002, SC-003)
-        if data_frac < 1.0:
-            from ..backtest.chunking import slice_dataset
-
-            total_candles = len(candles)
-            logger.info(
-                "Slicing dataset: fraction=%.2f, portion=%d, total_candles=%d",
-                data_frac,
-                portion,
-                total_candles,
-            )
-
-            candles = slice_dataset(candles, fraction=data_frac, portion=portion)
-            logger.info(
-                "Sliced to %d candles (%.1f%%)",
-                len(candles),
-                100 * len(candles) / total_candles,
-            )
-
-        # Create orchestrator
+        # Create orchestrator early to check for optimized path
         direction_mode = DirectionMode[args.direction]
 
         # Set default benchmark output path if profiling enabled
@@ -807,6 +835,77 @@ Persistent storage not yet implemented."
         # Attach profiler to orchestrator if profiling enabled
         if profiler:
             orchestrator.profiler = profiler
+
+        # Check if optimized path is available (Feature 010)
+        use_optimized_path = hasattr(orchestrator, "run_optimized_backtest")
+
+        # Stage 3: Convert DataFrame to Candle objects (only for legacy path)
+        if use_optimized_path:
+            logger.info(
+                "Stage 3/3: Skipping Candle conversion - using optimized DataFrame path"
+            )
+            candles = None  # Not needed for optimized path
+        else:
+            logger.info("Stage 3/3: Converting to Candle objects...")
+            from ..models.core import Candle
+
+            # Vectorized conversion using list comprehension with to_dict
+            # Much faster than iterrows() for large datasets
+            records = enriched_df.to_dict("records")
+
+            candles = []
+            for record in records:
+                # Build indicators dict from indicator columns
+                indicators_dict = {
+                    name: record[name]
+                    for name in required_indicators
+                    if name in record
+                }
+
+                candles.append(
+                    Candle(
+                        timestamp_utc=record["timestamp_utc"],
+                        open=record["open"],
+                        high=record["high"],
+                        low=record["low"],
+                        close=record["close"],
+                        volume=record.get("volume", 0.0),
+                        indicators=indicators_dict,
+                        is_gap=record.get("is_gap", False),
+                    )
+                )
+
+            logger.info("✓ Created %d Candle objects", len(candles))
+
+        if profiler:
+            profiler.end_phase("ingest")
+            profiler.end_phase("ingest")
+
+        # Slice dataset if fraction < 1.0 (Phase 5: US3, FR-002, SC-003)
+        if data_frac < 1.0:
+            total_rows = len(enriched_df)
+            logger.info(
+                "Slicing dataset: fraction=%.2f, portion=%d, total_rows=%d",
+                data_frac,
+                portion,
+                total_rows,
+            )
+
+            # Slice DataFrame for optimized path
+            slice_count = int(total_rows * data_frac)
+            enriched_df = enriched_df.iloc[:slice_count]
+
+            # Also slice candles if legacy path
+            if not use_optimized_path:
+                from ..backtest.chunking import slice_dataset
+
+                candles = slice_dataset(candles, fraction=data_frac, portion=portion)
+
+            logger.info(
+                "Sliced to %d rows (%.1f%%)",
+                len(enriched_df),
+                100 * len(enriched_df) / total_rows,
+            )
 
         # Check if multi-symbol mode should be used
         is_multi_symbol = len(args.pair) > 1
@@ -1017,21 +1116,45 @@ Persistent storage not yet implemented."
                 "target_r_mult": parameters.target_r_mult,
                 "cooldown_candles": parameters.cooldown_candles,
                 "rsi_length": parameters.rsi_length,
+                "risk_per_trade_pct": parameters.risk_per_trade_pct,
             }
 
-            result = orchestrator.run_backtest(
-                candles=candles,
-                pair=pair,
-                run_id=run_id,
-                **signal_params,
-            )
+            # Feature 010: Use optimized path if available (BatchScan/BatchSimulation)
+            if use_optimized_path:
+                logger.info(
+                    "Using optimized vectorized backtest path "
+                    "(Feature 010: BatchScan/BatchSimulation)"
+                )
 
-            logger.info("Backtest complete: %s", result.run_id)
+                from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
+
+                result = orchestrator.run_optimized_backtest(
+                    df=enriched_df,
+                    pair=pair,
+                    run_id=run_id,
+                    strategy=TREND_PULLBACK_STRATEGY,
+                    **signal_params,
+                )
+
+                logger.info("Optimized backtest complete: %s", result.run_id)
+            else:
+                # Fallback to legacy Candle-based path
+                logger.info("Using legacy Candle-based backtest path")
+
+                result = orchestrator.run_backtest(
+                    candles=candles,
+                    pair=pair,
+                    run_id=run_id,
+                    **signal_params,
+                )
+
+                logger.info("Backtest complete: %s", result.run_id)
 
         # Write benchmark artifact if profiling enabled
         if args.profile and benchmark_path:
-            from ..backtest.profiling import write_benchmark_record
             import tracemalloc
+
+            from ..backtest.profiling import write_benchmark_record
 
             # Get phase times from orchestrator if available
             phase_times = {}
@@ -1079,6 +1202,25 @@ Persistent storage not yet implemented."
             )
             logger.info("Benchmark artifact written to %s", benchmark_path)
 
+    # TODO(T045): Generate PerformanceReport after backtest completes
+    # NOTE: Currently orchestrator doesn't expose ScanResult/SimulationResult
+    # Full integration requires orchestrator refactoring to return:
+    # - ScanResult: scan timing, candle count, signal count, progress overhead
+    # - SimulationResult: simulation timing, trade count, memory stats
+    # Once available, uncomment:
+    # from ..backtest.report import create_report
+    # perf_report = create_report(
+    #     scan_result=scan_result,
+    #     sim_result=sim_result,
+    #     candle_count=len(candles),
+    #     equivalence_verified=True,
+    #     indicator_names=["ema_fast", "ema_slow", "atr", "rsi"],
+    #     duplicate_timestamps=0,
+    # )
+    # report_writer = ReportWriter(output_dir=args.output)
+    # report_path = report_writer.write_report(perf_report)
+    # logger.info("Performance report written to %s", report_path)
+
     # Format output (outside profiling context)
     output_format = (
         OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
@@ -1092,8 +1234,8 @@ Persistent storage not yet implemented."
     if is_multi_symbol_result:
         # Multi-symbol formatting (T025)
         from ..io.formatters import (
-            format_multi_symbol_text_output,
             format_multi_symbol_json_output,
+            format_multi_symbol_text_output,
         )
 
         if output_format == OutputFormat.JSON:
@@ -1127,6 +1269,58 @@ Persistent storage not yet implemented."
     # Write output file
     output_path.write_text(output_content)
     logger.info("Results written to %s", output_path)
+
+    # Emit PerformanceReport if requested (Feature 010: T077)
+    if args.emit_perf_report and use_optimized_path:
+        logger.info("Emitting PerformanceReport for optimized backtest")
+        from ..backtest.report_writer import ReportWriter
+        from ..models.performance_report import PerformanceReport
+
+        # Extract metrics from result
+        scan_duration = 0.0
+        simulation_duration = 0.0
+        signal_count = len(result.signals) if result.signals else 0
+        trade_count = len(result.executions) if result.executions else 0
+
+        # Try to extract timing from orchestrator phases if available
+        if hasattr(orchestrator, "_phase_times"):
+            scan_duration = orchestrator._phase_times.get("scan", 0.0)
+            simulation_duration = orchestrator._phase_times.get("simulation", 0.0)
+
+        # Create PerformanceReport
+        # Note: Some fields use placeholder values pending full instrumentation
+        perf_report = PerformanceReport(
+            scan_duration_sec=scan_duration,
+            simulation_duration_sec=simulation_duration,
+            peak_memory_mb=0.0,  # TODO: Add memory tracking
+            manifest_path="",  # TODO: Add manifest tracking
+            manifest_sha256="0" * 64,  # Placeholder
+            candle_count=result.total_candles,
+            signal_count=signal_count,
+            trade_count=trade_count,
+            equivalence_verified=False,  # Not applicable for optimized-only run
+            progress_emission_count=0,  # TODO: Track from progress dispatcher
+            progress_overhead_pct=None,
+            indicator_names=[],  # TODO: Extract from strategy metadata
+            deterministic_mode=False,
+            allocation_count_scan=None,
+            allocation_reduction_pct=None,
+            duplicate_timestamps_removed=0,
+            duplicate_first_ts=None,
+            duplicate_last_ts=None,
+            created_at=datetime.now(UTC),
+        )
+
+        # Write report to JSON
+        writer = ReportWriter(output_dir=str(args.output))
+        report_path = writer.write_report(perf_report)
+        logger.info("PerformanceReport written to %s", report_path)
+        print(f"Performance report: {report_path}")
+    elif args.emit_perf_report and not use_optimized_path:
+        logger.warning(
+            "PerformanceReport emission requested but optimized path not used. "
+            "Skipping report emission."
+        )
 
     # Print summary to console
     if output_format == OutputFormat.TEXT:

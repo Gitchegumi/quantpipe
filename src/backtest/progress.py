@@ -1,0 +1,174 @@
+"""Progress dispatcher for coarse-grained execution updates.
+
+This module provides a progress tracking dispatcher that emits updates at
+configurable intervals based on item count (stride) or elapsed time to
+maintain low overhead (≤1%) while providing user visibility.
+"""
+
+import logging
+import time
+from typing import Optional
+
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+
+from src.backtest.performance_targets import (
+    PROGRESS_MAX_INTERVAL_SECONDS,
+    PROGRESS_STRIDE_ITEMS,
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+class ProgressDispatcher:
+    """Coarse-grained progress dispatcher with stride and time-based emission.
+
+    Emits progress updates based on:
+    1. Item stride (default 16,384 items = 2^14)
+    2. Time fallback (default 120 seconds maximum between updates)
+
+    Tracks overhead to ensure ≤1% of total execution time spent on progress.
+
+    Example:
+        >>> dispatcher = ProgressDispatcher(total_items=1000000)
+        >>> dispatcher.start()
+        >>> for i in range(1000000):
+        ...     dispatcher.update(i)
+        >>> dispatcher.finish()
+    """
+
+    def __init__(
+        self,
+        total_items: int,
+        stride: int = PROGRESS_STRIDE_ITEMS,
+        time_fallback_sec: float = PROGRESS_MAX_INTERVAL_SECONDS,
+        description: str = "Scanning",
+    ):
+        """Initialize progress dispatcher.
+
+        Args:
+            total_items: Total number of items to process
+            stride: Emit progress every N items (default: 16384)
+            time_fallback_sec: Maximum seconds between updates (default: 120)
+            description: Description shown in progress bar (default: "Scanning")
+        """
+        self.total_items = total_items
+        self.stride = stride
+        self.time_fallback_sec = time_fallback_sec
+        self.description = description
+        self._start_time: Optional[float] = None
+        self._last_update_time: Optional[float] = None
+        self._update_count = 0
+        self._total_progress_time = 0.0
+        self._finished = False
+        self._progress: Optional[Progress] = None
+        self._task_id = None
+
+    def start(self) -> None:
+        """Start progress tracking.
+
+        Raises:
+            RuntimeError: If already started
+        """
+        if self._start_time is not None:
+            raise RuntimeError("Progress dispatcher already started")
+
+        self._start_time = time.perf_counter()
+        self._last_update_time = self._start_time
+        logger.debug("Progress tracking started for %d items", self.total_items)
+
+        # Create Rich progress bar
+        self._progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
+        )
+        self._progress.start()
+        self._task_id = self._progress.add_task(
+            self.description, total=self.total_items
+        )
+
+    def update(self, current_item: int) -> None:
+        """Update progress if stride or time threshold met.
+
+        Args:
+            current_item: Current item index (0-based)
+
+        Note:
+            Automatically determines whether to emit based on stride and time.
+            Does nothing if thresholds not met to minimize overhead.
+        """
+        if self._start_time is None or self._progress is None:
+            return
+
+        # Check stride threshold (modulo for efficiency)
+        should_emit_stride = (current_item % self.stride) == 0
+
+        # Check time threshold
+        now = time.perf_counter()
+        elapsed_since_last = now - self._last_update_time
+        should_emit_time = elapsed_since_last >= self.time_fallback_sec
+
+        if should_emit_stride or should_emit_time:
+            progress_start = time.perf_counter()
+
+            # Update Rich progress bar
+            self._progress.update(self._task_id, completed=current_item)
+
+            progress_end = time.perf_counter()
+            self._total_progress_time += progress_end - progress_start
+            self._last_update_time = now
+            self._update_count += 1
+
+    def finish(self) -> dict:
+        """Finalize progress tracking and emit final update.
+
+        Returns:
+            Dictionary containing:
+                - update_count: Number of progress updates emitted
+                - total_time_sec: Total execution time
+                - progress_overhead_sec: Time spent in progress updates
+                - progress_overhead_pct: Overhead as percentage of total time
+
+        Raises:
+            RuntimeError: If not started
+        """
+        if self._start_time is None:
+            raise RuntimeError("Progress dispatcher not started")
+
+        if self._finished:
+            raise RuntimeError("Progress dispatcher already finished")
+
+        now = time.perf_counter()
+        total_time = now - self._start_time
+
+        # Complete progress bar
+        progress_start = time.perf_counter()
+        if self._progress is not None:
+            self._progress.update(self._task_id, completed=self.total_items)
+            self._progress.stop()
+        progress_end = time.perf_counter()
+        self._total_progress_time += progress_end - progress_start
+
+        overhead_pct = (self._total_progress_time / total_time) * 100.0
+
+        self._finished = True
+
+        return {
+            "update_count": self._update_count,
+            "total_time_sec": total_time,
+            "progress_overhead_sec": self._total_progress_time,
+            "progress_overhead_pct": overhead_pct,
+        }
+
+    def __enter__(self):
+        """Context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        if not self._finished:
+            self.finish()
+        return False

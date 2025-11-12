@@ -11,6 +11,7 @@ simulation, and metrics aggregation.
 import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from rich.progress import (
     BarColumn,
@@ -32,6 +33,16 @@ from ..strategy.trend_pullback.signal_generator import (
     generate_long_signals,
     generate_short_signals,
 )
+
+
+if TYPE_CHECKING:
+    import numpy as np
+    import pandas as pd
+    import polars as pl
+
+    from ..backtest.batch_scan import ScanResult
+    from ..backtest.batch_simulation import SimulationResult
+    from ..strategy.base import Strategy
 
 
 logger = logging.getLogger(__name__)
@@ -1011,6 +1022,674 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             candles_by_strategy=candles_by_strategy,
             weights=weights,
             run_id=run_id,
+        )
+
+    def run_optimized_backtest(
+        self,
+        df: "pd.DataFrame",
+        pair: str,
+        run_id: str,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized backtest using BatchScan and BatchSimulation.
+
+        This method bypasses Candle object conversion and window-by-window iteration,
+        using vectorized operations on DataFrames for ≥50% scan speedup and
+        ≥55% simulation speedup (FR-001).
+
+        Args:
+            df: Enriched pandas DataFrame with OHLC and indicator columns
+            pair: Currency pair being backtested (e.g., "EURUSD")
+            run_id: Unique identifier for this backtest run
+            strategy: Strategy instance providing metadata and signal generation
+            **signal_params: Strategy parameters (ema_fast, ema_slow, etc.)
+
+        Returns:
+            BacktestResult with signals, executions, and metrics
+
+        Raises:
+            ValueError: If df is empty or missing required columns
+        """
+
+        if df.empty:
+            raise ValueError("DataFrame cannot be empty")
+
+        start_time = datetime.now(UTC)
+        logger.info(
+            "Starting optimized backtest run_id=%s, pair=%s, direction=%s",
+            run_id,
+            pair,
+            self.direction_mode.value,
+        )
+
+        # Convert pandas DataFrame to Polars for batch processing
+        import polars as pl
+
+        polars_df = pl.from_pandas(df)
+
+        # Route to direction-specific optimized workflow
+        if self.direction_mode == DirectionMode.LONG:
+            return self._run_optimized_long(
+                polars_df, pair, run_id, start_time, strategy, **signal_params
+            )
+        elif self.direction_mode == DirectionMode.SHORT:
+            return self._run_optimized_short(
+                polars_df, pair, run_id, start_time, strategy, **signal_params
+            )
+        else:  # BOTH
+            return self._run_optimized_both(
+                polars_df, pair, run_id, start_time, strategy, **signal_params
+            )
+
+    def _convert_scan_result_to_signals(
+        self,
+        scan_result: "ScanResult",
+        df: "pl.DataFrame",
+        pair: str,
+        direction: str,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> list[TradeSignal]:
+        """Convert BatchScan signal indices to TradeSignal objects.
+
+        Args:
+            scan_result: Result from BatchScan.scan()
+            df: Polars DataFrame with OHLC data
+            pair: Currency pair
+            direction: 'LONG' or 'SHORT'
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            List of TradeSignal objects
+        """
+        import hashlib
+
+        signals = []
+
+        if scan_result.signal_count == 0:
+            return signals
+
+        # Extract arrays for signal construction
+        timestamps = df["timestamp_utc"].to_numpy()
+        close_prices = df["close"].to_numpy()
+        atr_values = df["atr14"].to_numpy()
+
+        atr_stop_mult = signal_params.get("atr_stop_mult", 2.0)
+        risk_per_trade_pct = signal_params.get("risk_per_trade_pct", 0.01)
+
+        for idx in scan_result.signal_indices:
+            timestamp_utc = timestamps[idx]
+            entry_price = close_prices[idx]
+            atr = atr_values[idx]
+
+            # Calculate stop price based on direction
+            if direction == "LONG":
+                initial_stop_price = entry_price - (atr * atr_stop_mult)
+            else:  # SHORT
+                initial_stop_price = entry_price + (atr * atr_stop_mult)
+
+            # Generate deterministic signal ID
+            signal_data = (
+                f"{timestamp_utc}|{pair}|{direction}|"
+                f"{entry_price}|{strategy.metadata.version}"
+            )
+            signal_id = hashlib.sha256(signal_data.encode()).hexdigest()[:16]
+
+            # Placeholder position size (calculated from account equity normally)
+            calc_position_size = 10000.0
+
+            signal = TradeSignal(
+                id=signal_id,
+                pair=pair,
+                direction=direction,
+                entry_price=entry_price,
+                initial_stop_price=initial_stop_price,
+                risk_per_trade_pct=risk_per_trade_pct,
+                calc_position_size=calc_position_size,
+                tags=["batch_scan"],
+                version=strategy.metadata.version,
+                timestamp_utc=timestamp_utc,
+            )
+            signals.append(signal)
+
+        return signals
+
+    def _convert_simulation_result_to_executions(
+        self,
+        sim_result: "SimulationResult",
+        signals: list[TradeSignal],
+        timestamps: "np.ndarray",
+    ) -> list[TradeExecution]:
+        """Convert BatchSimulation result to TradeExecution objects.
+
+        Args:
+            sim_result: Result from BatchSimulation.simulate()
+            signals: List of TradeSignal objects that were simulated
+            timestamps: Array of candle timestamps
+
+        Returns:
+            List of TradeExecution objects
+        """
+        import numpy as np
+
+        executions = []
+
+        # Map exit reason codes to strings
+        EXIT_REASON_MAP = {
+            1: "STOP_LOSS",
+            2: "TARGET",
+            3: "EXPIRY",  # Timeout/max holding period
+        }
+
+        # Create TradeExecution for each trade
+        for i in range(sim_result.trade_count):
+            # Get timestamps from indices
+            entry_ts = timestamps[sim_result.entry_indices[i]]
+            exit_idx = sim_result.exit_indices[i]
+            if exit_idx >= 0 and exit_idx < len(timestamps):
+                exit_ts = timestamps[exit_idx]
+            else:
+                # Trade still open or invalid index - skip
+                continue
+
+            # Map direction code to string
+            direction_str = "LONG" if sim_result.directions[i] == 1 else "SHORT"
+
+            # Map exit reason code
+            exit_reason = EXIT_REASON_MAP.get(
+                int(sim_result.exit_reasons[i]), "UNKNOWN"
+            )
+
+            execution = TradeExecution(
+                signal_id=signals[i].id if i < len(signals) else f"sig_{i}",
+                direction=direction_str,
+                open_timestamp=entry_ts,
+                entry_fill_price=float(sim_result.entry_prices[i]),
+                close_timestamp=exit_ts,
+                exit_fill_price=float(sim_result.exit_prices[i]),
+                exit_reason=exit_reason,
+                pnl_r=float(sim_result.pnl_r[i]),
+                slippage_entry_pips=0.5,  # TODO: Calculate actual slippage
+                slippage_exit_pips=0.5,  # TODO: Calculate actual slippage
+                costs_total=0.0,  # TODO: Calculate actual costs
+            )
+            executions.append(execution)
+
+        logger.info(
+            "Converted %d/%d trades to TradeExecution objects",
+            len(executions),
+            sim_result.trade_count,
+        )
+
+        return executions
+
+    def _run_optimized_long(
+        self,
+        df: "pl.DataFrame",
+        pair: str,
+        run_id: str,
+        start_time: datetime,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized long-only backtest.
+
+        Args:
+            df: Polars DataFrame with OHLC and indicator columns
+            pair: Currency pair code
+            run_id: Backtest run identifier
+            start_time: Run start timestamp
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            BacktestResult with long signals and executions
+        """
+        from ..backtest.batch_scan import BatchScan
+
+        logger.info("Running optimized long-only scan for %s", pair)
+
+        # Initialize batch scanner with LONG direction
+        scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+            direction="LONG",
+            parameters=signal_params,
+        )
+
+        # Execute batch scan
+        self._start_phase("scan")
+        scan_result = scanner.scan(df, timestamp_col="timestamp_utc")
+        self._end_phase("scan")
+
+        logger.info(
+            "Scan complete: %d signals, %.2fs, %.1f%% progress overhead",
+            scan_result.signal_count,
+            scan_result.scan_duration_sec,
+            scan_result.progress_overhead_pct,
+        )
+
+        # If dry-run, return early with signals only
+        if self.dry_run:
+            # TODO: Convert signal_indices to TradeSignal objects for compatibility
+            # Placeholder implementation for Phase 8
+            data_start_date = df["timestamp_utc"][0]
+            data_end_date = df["timestamp_utc"][-1]
+
+            return BacktestResult(
+                run_id=run_id,
+                pair=pair,
+                direction_mode="LONG",
+                start_time=start_time,
+                end_time=datetime.now(UTC),
+                data_start_date=data_start_date,
+                data_end_date=data_end_date,
+                total_candles=len(df),
+                signals=[],  # TODO: Implement signal conversion
+                executions=[],
+                conflicts=[],
+                metrics=None,
+            )
+
+        # Execute batch simulation
+        from ..backtest.batch_simulation import BatchSimulation
+
+        logger.info(
+            "Running optimized simulation for %d signals", scan_result.signal_count
+        )
+
+        simulator = BatchSimulation(
+            risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
+            enable_progress=True,
+        )
+
+        # Extract OHLC arrays for simulation
+        timestamps = df["timestamp_utc"].to_numpy()
+        ohlc_arrays = (
+            timestamps,
+            df["open"].to_numpy(),
+            df["high"].to_numpy(),
+            df["low"].to_numpy(),
+            df["close"].to_numpy(),
+        )
+
+        self._start_phase("simulation")
+        sim_result = simulator.simulate(
+            signal_indices=scan_result.signal_indices,
+            timestamps=timestamps,
+            ohlc_arrays=ohlc_arrays,
+        )
+        self._end_phase("simulation")
+
+        logger.info(
+            "Simulation complete: %d trades, %.2fs, %.1f%% progress overhead",
+            sim_result.trade_count,
+            sim_result.simulation_duration_sec,
+            sim_result.progress_overhead_pct,
+        )
+
+        # Convert scan and simulation results to BacktestResult format
+        logger.info("Converting scan results to TradeSignal objects")
+        signals = self._convert_scan_result_to_signals(
+            scan_result, df, pair, "LONG", strategy, **signal_params
+        )
+
+        logger.info("Converting simulation results to TradeExecution objects")
+        executions = self._convert_simulation_result_to_executions(
+            sim_result, signals, timestamps
+        )
+
+        # Calculate metrics
+        metrics = None
+        if executions:
+            logger.info("Calculating metrics for %d executions", len(executions))
+            metrics = calculate_directional_metrics(executions, DirectionMode.LONG)
+
+        data_start_date = df["timestamp_utc"][0]
+        data_end_date = df["timestamp_utc"][-1]
+
+        return BacktestResult(
+            run_id=run_id,
+            pair=pair,
+            direction_mode="LONG",
+            start_time=start_time,
+            end_time=datetime.now(UTC),
+            data_start_date=data_start_date,
+            data_end_date=data_end_date,
+            total_candles=len(df),
+            signals=signals if not self.dry_run else None,
+            executions=executions if not self.dry_run else None,
+            conflicts=[],
+            metrics=metrics,
+        )
+
+    def _run_optimized_short(
+        self,
+        df: "pl.DataFrame",
+        pair: str,
+        run_id: str,
+        start_time: datetime,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized short-only backtest.
+
+        Args:
+            df: Polars DataFrame with OHLC and indicator columns
+            pair: Currency pair code
+            run_id: Backtest run identifier
+            start_time: Run start timestamp
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            BacktestResult with short signals and executions
+        """
+        from ..backtest.arrays import extract_indicator_arrays, extract_ohlc_arrays
+        from ..backtest.batch_scan import BatchScan
+        from ..backtest.batch_simulation import BatchSimulation
+
+        # Run scan for SHORT direction
+        logger.info("Running optimized BatchScan for SHORT direction")
+        scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+            direction="SHORT",
+            parameters=signal_params,
+        )
+
+        self._start_phase("scan")
+        scan_result = scanner.scan(df=df, timestamp_col="timestamp_utc")
+        self._end_phase("scan")
+
+        logger.info(
+            "SHORT scan complete: %d signals, %.2fs, %.1f%% progress overhead",
+            scan_result.signal_count,
+            scan_result.scan_duration_sec,
+            scan_result.progress_overhead_pct,
+        )
+
+        # Run simulation on signals
+        logger.info(
+            "Running optimized simulation for %d signals", scan_result.signal_count
+        )
+
+        simulator = BatchSimulation(
+            risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
+            enable_progress=True,
+        )
+
+        # Extract OHLC arrays for simulation
+        timestamps = df["timestamp_utc"].to_numpy()
+        ohlc_arrays = (
+            timestamps,
+            df["open"].to_numpy(),
+            df["high"].to_numpy(),
+            df["low"].to_numpy(),
+            df["close"].to_numpy(),
+        )
+
+        self._start_phase("simulation")
+        sim_result = simulator.simulate(
+            signal_indices=scan_result.signal_indices,
+            timestamps=timestamps,
+            ohlc_arrays=ohlc_arrays,
+        )
+        self._end_phase("simulation")
+
+        logger.info(
+            "Simulation complete: %d trades, %.2fs, %.1f%% progress overhead",
+            sim_result.trade_count,
+            sim_result.simulation_duration_sec,
+            sim_result.progress_overhead_pct,
+        )
+
+        # Convert scan and simulation results to BacktestResult format
+        logger.info("Converting scan results to TradeSignal objects")
+        signals = self._convert_scan_result_to_signals(
+            scan_result, df, pair, "SHORT", strategy, **signal_params
+        )
+
+        logger.info("Converting simulation results to TradeExecution objects")
+        executions = self._convert_simulation_result_to_executions(
+            sim_result, signals, timestamps
+        )
+
+        # Calculate metrics
+        metrics = None
+        if executions:
+            logger.info("Calculating metrics for %d executions", len(executions))
+            metrics = calculate_directional_metrics(executions, DirectionMode.SHORT)
+
+        data_start_date = df["timestamp_utc"][0]
+        data_end_date = df["timestamp_utc"][-1]
+
+        return BacktestResult(
+            run_id=run_id,
+            pair=pair,
+            direction_mode="SHORT",
+            start_time=start_time,
+            end_time=datetime.now(UTC),
+            data_start_date=data_start_date,
+            data_end_date=data_end_date,
+            total_candles=len(df),
+            signals=signals if not self.dry_run else None,
+            executions=executions if not self.dry_run else None,
+            conflicts=[],
+            metrics=metrics,
+        )
+
+    def _run_optimized_both(
+        self,
+        df: "pl.DataFrame",
+        pair: str,
+        run_id: str,
+        start_time: datetime,
+        strategy: "Strategy",
+        **signal_params: dict,
+    ) -> BacktestResult:
+        """Execute optimized BOTH-direction backtest.
+
+        Args:
+            df: Polars DataFrame with OHLC and indicator columns
+            pair: Currency pair code
+            run_id: Backtest run identifier
+            start_time: Run start timestamp
+            strategy: Strategy instance
+            **signal_params: Strategy parameters
+
+        Returns:
+            BacktestResult with long and short signals, executions, and conflicts
+        """
+        from ..backtest.arrays import extract_indicator_arrays, extract_ohlc_arrays
+        from ..backtest.batch_scan import BatchScan
+        from ..backtest.batch_simulation import BatchSimulation
+
+        logger.info("Running optimized BatchScan for BOTH directions")
+
+        # Scan LONG direction
+        long_scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+            direction="LONG",
+            parameters=signal_params,
+        )
+
+        self._start_phase("scan")
+        long_scan = long_scanner.scan(df=df, timestamp_col="timestamp_utc")
+        logger.info(
+            "LONG scan complete: %d signals, %.2fs",
+            long_scan.signal_count,
+            long_scan.scan_duration_sec,
+        )
+
+        # Scan SHORT direction
+        short_scanner = BatchScan(
+            strategy=strategy,
+            enable_progress=True,
+            direction="SHORT",
+            parameters=signal_params,
+        )
+
+        short_scan = short_scanner.scan(df=df, timestamp_col="timestamp_utc")
+        self._end_phase("scan")
+
+        logger.info(
+            "SHORT scan complete: %d signals, %.2fs",
+            short_scan.signal_count,
+            short_scan.scan_duration_sec,
+        )
+
+        total_signals = long_scan.signal_count + short_scan.signal_count
+        logger.info(
+            "Total signals: %d (%d LONG + %d SHORT)",
+            total_signals,
+            long_scan.signal_count,
+            short_scan.signal_count,
+        )
+
+        # TODO: Implement conflict detection for simultaneous LONG/SHORT signals
+        # For now, simply combine signal indices
+        # In future, merge with conflict detection like legacy path
+
+        # Run simulation on LONG signals
+        simulator = BatchSimulation(
+            risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
+            enable_progress=True,
+        )
+
+        timestamps = df["timestamp_utc"].to_numpy()
+        ohlc_arrays = (
+            timestamps,
+            df["open"].to_numpy(),
+            df["high"].to_numpy(),
+            df["low"].to_numpy(),
+            df["close"].to_numpy(),
+        )
+
+        self._start_phase("simulation")
+
+        long_sim = None
+        short_sim = None
+
+        if long_scan.signal_count > 0:
+            logger.info("Simulating %d LONG signals", long_scan.signal_count)
+            long_sim = simulator.simulate(
+                signal_indices=long_scan.signal_indices,
+                timestamps=timestamps,
+                ohlc_arrays=ohlc_arrays,
+            )
+            logger.info(
+                "LONG simulation: %d trades, %.2fs",
+                long_sim.trade_count,
+                long_sim.simulation_duration_sec,
+            )
+
+        if short_scan.signal_count > 0:
+            logger.info("Simulating %d SHORT signals", short_scan.signal_count)
+            short_sim = simulator.simulate(
+                signal_indices=short_scan.signal_indices,
+                timestamps=timestamps,
+                ohlc_arrays=ohlc_arrays,
+            )
+            logger.info(
+                "SHORT simulation: %d trades, %.2fs",
+                short_sim.trade_count,
+                short_sim.simulation_duration_sec,
+            )
+
+        self._end_phase("simulation")
+
+        total_trades = (long_sim.trade_count if long_sim else 0) + (
+            short_sim.trade_count if short_sim else 0
+        )
+        logger.info("Total trades executed: %d", total_trades)
+
+        # Convert scan results to TradeSignal objects
+        logger.info("Converting LONG scan results to TradeSignal objects")
+        long_signals = self._convert_scan_result_to_signals(
+            long_scan, df, pair, "LONG", strategy, **signal_params
+        )
+
+        logger.info("Converting SHORT scan results to TradeSignal objects")
+        short_signals = self._convert_scan_result_to_signals(
+            short_scan, df, pair, "SHORT", strategy, **signal_params
+        )
+
+        # Merge signals with conflict detection
+        logger.info("Merging signals with conflict detection")
+        merged_signals, conflicts = merge_signals(long_signals, short_signals, pair)
+        logger.info(
+            "Merged %d signals (%d conflicts detected)",
+            len(merged_signals),
+            len(conflicts),
+        )
+
+        # Convert simulation results to TradeExecution objects
+        logger.info("Converting simulation results to TradeExecution objects")
+        long_executions = (
+            self._convert_simulation_result_to_executions(
+                long_sim, long_signals, timestamps
+            )
+            if long_sim
+            else []
+        )
+        short_executions = (
+            self._convert_simulation_result_to_executions(
+                short_sim, short_signals, timestamps
+            )
+            if short_sim
+            else []
+        )
+
+        # Combine all executions
+        all_executions = long_executions + short_executions
+
+        # Calculate three-tier metrics
+        metrics = None
+        if all_executions:
+            logger.info(
+                "Calculating three-tier metrics for %d executions", len(all_executions)
+            )
+            metrics = calculate_directional_metrics(all_executions, DirectionMode.BOTH)
+
+            if metrics.long_only:
+                logger.info(
+                    "Long-only metrics: %d trades, %.2f%% win rate",
+                    metrics.long_only.trade_count,
+                    metrics.long_only.win_rate * 100,
+                )
+            if metrics.short_only:
+                logger.info(
+                    "Short-only metrics: %d trades, %.2f%% win rate",
+                    metrics.short_only.trade_count,
+                    metrics.short_only.win_rate * 100,
+                )
+            if metrics.combined:
+                logger.info(
+                    "Combined metrics: %d trades, %.2f%% win rate",
+                    metrics.combined.trade_count,
+                    metrics.combined.win_rate * 100,
+                )
+
+        data_start_date = df["timestamp_utc"][0]
+        data_end_date = df["timestamp_utc"][-1]
+
+        return BacktestResult(
+            run_id=run_id,
+            pair=pair,
+            direction_mode="BOTH",
+            start_time=start_time,
+            end_time=datetime.now(UTC),
+            data_start_date=data_start_date,
+            data_end_date=data_end_date,
+            total_candles=len(df),
+            signals=merged_signals if not self.dry_run else None,
+            executions=all_executions if not self.dry_run else None,
+            conflicts=conflicts,
+            metrics=metrics,
         )
 
 

@@ -5,7 +5,10 @@ including declaring their required indicators.
 """
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @dataclass(frozen=True)
@@ -51,4 +54,31 @@ class Strategy(Protocol):
 
         Returns:
             List of TradeSignal objects.
+        """
+
+    def scan_vectorized(
+        self,
+        close: "np.ndarray",
+        indicator_arrays: dict[str, "np.ndarray"],
+        parameters: dict,
+        direction: str,
+    ) -> "np.ndarray":
+        """Scan for signals using vectorized operations (optional, for performance).
+
+        This is an optional method that strategies can implement for high-performance
+        batch scanning. If not implemented, the backtester will fall back to calling
+        generate_signals() in a loop.
+
+        Args:
+            close: Close price array
+            indicator_arrays: Dictionary of indicator name -> NumPy array
+                (e.g., {"ema_20": array([...]), "rsi": array([...])})
+            parameters: Strategy-specific parameters
+            direction: Trading direction ("LONG", "SHORT", or "BOTH")
+
+        Returns:
+            NumPy array of indices where signals occur
+
+        Raises:
+            NotImplementedError: If strategy doesn't support vectorized scanning
         """
