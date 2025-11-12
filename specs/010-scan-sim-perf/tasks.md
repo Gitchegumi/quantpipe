@@ -101,8 +101,8 @@ Generated per speckit tasks prompt. Canonical stack: Python 3.11, Polars + Parqu
 - [X] T074 Add Parquet cache validation & invalidation logic `src/io/parquet_cache.py` (checksum validation, expiry)
 - [X] T075 Add end-to-end optimized pipeline integration test `tests/integration/test_optimized_pipeline.py` (CSV→Parquet→BatchScan→BatchSimulation) **MANUAL TEST COMPLETE**: Verified on 1% data slice (69k rows) - Parquet caching works (2s vs 51s), Candle conversion skipped, BatchScan/BatchSimulation execute successfully, no crashes
 - [X] T076 Replace orchestrator simulation with BatchSimulation calls `src/backtest/orchestrator.py` (eliminate trade-by-trade iteration) **COMPLETE**: Integrated in all three directions with signal/execution conversion, conflict detection (BOTH), and three-tier metrics (BOTH). Awaits BatchScan signal generation and BatchSimulation trade detail arrays for full functionality.
-- [ ] T077 Update CLI to emit PerformanceReport after backtest `src/cli/run_backtest.py` (integrate report_writer with orchestrator results)
-- [ ] T078 Add performance comparison script `scripts/ci/compare_baseline_optimized.py` (measure actual speedup achieved)
+- [X] T077 Update CLI to emit PerformanceReport after backtest `src/cli/run_backtest.py` (integrate report_writer with orchestrator results) **COMPLETE**: Added --emit-perf-report flag. Extracts scan/simulation durations from orchestrator phase times, candle/signal/trade counts from BacktestResult. Writes JSON reports to results/performance_report_TIMESTAMP.json. Only emits when use_optimized_path=True. Pylint 9.85/10.
+- [X] T078 Add performance comparison script `scripts/ci/compare_baseline_optimized.py` (measure actual speedup achieved) **COMPLETE**: Created 268-line benchmarking script with run_backtest() subprocess execution, extract_metrics() JSON parsing, print_comparison() detailed reporting. Supports --baseline-only/--optimized-only/--both modes. Calculates scan/simulation speedup percentages and throughput. Outputs results/performance_comparison.json. Pylint 9.79/10.
 
 ## Dependencies (User Story Order)
 
