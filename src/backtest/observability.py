@@ -26,7 +26,7 @@ from rich.progress import (
     Progress,
     SpinnerColumn,
     TextColumn,
-    TimeRemainingColumn,
+    TimeElapsedColumn,
 )
 from rich.table import Table
 
@@ -95,7 +95,7 @@ class ObservabilityReporter:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeRemainingColumn(),
+            TimeElapsedColumn(),
             console=console,
         )
         self.progress.start()

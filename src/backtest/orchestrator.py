@@ -20,7 +20,6 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
-    TimeRemainingColumn,
 )
 
 from ..backtest.metrics import calculate_directional_metrics
@@ -340,8 +339,6 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
             TimeElapsedColumn(),
-            TextColumn("•"),
-            TimeRemainingColumn(),
             TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
             refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
@@ -479,8 +476,6 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
             TimeElapsedColumn(),
-            TextColumn("•"),
-            TimeRemainingColumn(),
             TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
             refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
         )
@@ -622,8 +617,6 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             BarColumn(complete_style="green", finished_style="bold green"),
             TaskProgressColumn(),
             TimeElapsedColumn(),
-            TextColumn("•"),
-            TimeRemainingColumn(),
             TextColumn(
                 "• [bold yellow]{task.fields[longs]}[/] longs • "
                 "[bold magenta]{task.fields[shorts]}[/] shorts"

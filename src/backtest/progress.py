@@ -9,7 +9,7 @@ import logging
 import time
 from typing import Optional
 
-from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
 from src.backtest.performance_targets import (
     PROGRESS_MAX_INTERVAL_SECONDS,
@@ -82,7 +82,7 @@ class ProgressDispatcher:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeRemainingColumn(),
+            TimeElapsedColumn(),
         )
         self._progress.start()
         self._task_id = self._progress.add_task(
