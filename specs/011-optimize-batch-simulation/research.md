@@ -6,18 +6,29 @@ This document outlines the research tasks required to identify and implement per
 
 ## Research Tasks
 
-### Task 1: Profile the Existing Simulation Engine
+### Task 1: Profile Pandas Window Operations
 
-**Objective**: Identify the primary performance bottlenecks in the current backtesting implementation.
+**Objective**: Identify the performance bottlenecks related to legacy pandas window operations.
 
 **Approach**:
-1.  Use a profiling tool (e.g., `cProfile`, `py-spy`) to analyze the execution time and memory usage of the `src/backtest/` modules during a single simulation run.
-2.  Identify the functions and code sections that consume the most CPU time and memory.
+1.  Use a profiling tool (e.g., `cProfile`, `py-spy`) to analyze the execution time and memory usage of the pandas window operations in the `src/backtest/` modules.
+2.  Focus the profiling on the code that handles the 100-candle windows on the 6.9 million candle dataset.
 3.  Analyze the identified bottlenecks to understand the root cause of the performance issues.
 
-**Expected Outcome**: A detailed report on the performance bottlenecks, including call graphs, flame graphs, and memory usage profiles.
+**Expected Outcome**: A detailed report on the performance bottlenecks caused by the pandas window operations.
 
-### Task 2: Evaluate Parallelization Strategies
+### Task 2: Investigate Alternatives to Pandas Rolling Windows
+
+**Objective**: Research and evaluate methods to replace the slow pandas rolling windows with a more performant solution.
+
+**Approach**:
+1.  Investigate how to implement rolling window operations using vectorized methods in Polars or NumPy.
+2.  Explore other libraries that provide efficient rolling window implementations.
+3.  Prototype a solution to replace the pandas rolling windows and measure the performance improvement.
+
+**Expected Outcome**: A recommendation for the best approach to replace the pandas rolling windows, including a prototype and performance benchmarks.
+
+### Task 3: Evaluate Parallelization Strategies
 
 **Objective**: Research and compare different parallelization techniques for executing multiple simulations concurrently.
 
@@ -27,17 +38,6 @@ This document outlines the research tasks required to identify and implement per
 3.  Prototype a simple parallel execution loop using the most promising libraries to measure the potential performance gains.
 
 **Expected Outcome**: A recommendation for the most suitable parallelization library and a high-level design for its integration into the backtesting engine.
-
-### Task 3: Investigate High-Performance Data Manipulation Libraries
-
-**Objective**: Explore alternatives to `pandas` for data manipulation to improve performance.
-
-**Approach**:
-1.  Research high-performance data manipulation libraries such as `polars` and `vaex`.
-2.  Compare the performance of these libraries against `pandas` for the specific data manipulation tasks used in the simulation engine (e.g., filtering, aggregation, joining).
-3.  Assess the effort required to migrate the existing `pandas`-based code to a new library.
-
-**Expected Outcome**: A recommendation on whether to migrate to a new data manipulation library, including a cost-benefit analysis.
 
 ## Decisions
 
