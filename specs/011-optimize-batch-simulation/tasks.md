@@ -8,12 +8,12 @@ This document outlines the tasks required to optimize the batch simulation perfo
 
 ## Phase 1: Setup & Research
 
-- [ ] T001 Install profiling tools (`py-spy`, `cProfile`) using Poetry.
-- [ ] T002 Profile the existing simulation engine to identify performance bottlenecks related to pandas window operations in `src/backtest/`.
-- [ ] T003 Document the profiling results in `research.md`.
-- [ ] T004 Investigate and prototype alternatives to pandas rolling windows using Polars or NumPy in `research.md`.
-- [ ] T005 Evaluate parallelization libraries (`multiprocessing`, `joblib`, `dask`, `ray`) and document the findings in `research.md`.
-- [ ] T006 Based on the research, decide on the approach for replacing pandas rolling windows and the parallelization library to be used. Update `research.md` with the decision.
+- [X] T001 Install profiling tools (`py-spy`, `cProfile`) using Poetry.
+- [X] T002 Profile the existing simulation engine to identify performance bottlenecks related to pandas window operations in `src/backtest/`.
+- [X] T003 Document the profiling results in `research.md`.
+- [X] T004 Investigate and prototype alternatives to pandas rolling windows using Polars or NumPy in `research.md`.
+- [X] T005 Evaluate parallelization libraries (`multiprocessing`, `joblib`, `dask`, `ray`) and document the findings in `research.md`.
+- [X] T006 Based on the research, decide on the approach for replacing pandas rolling windows and the parallelization library to be used. Update `research.md` with the decision.
 
 ## Phase 2: Foundational Changes
 

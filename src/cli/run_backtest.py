@@ -1164,7 +1164,7 @@ Persistent storage not yet implemented."
                 hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
 
             # Calculate metrics
-            dataset_rows = len(candles)
+            dataset_rows = len(enriched_df) if use_optimized_path else len(candles)
             trades_simulated = 0
             if result.metrics:
                 if hasattr(result.metrics, "combined"):
