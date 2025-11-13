@@ -17,9 +17,9 @@ This document outlines the tasks required to optimize the batch simulation perfo
 
 ## Phase 2: Foundational Changes
 
-- [ ] T007 [P] Install the chosen parallelization library and add it to `pyproject.toml`.
-- [ ] T008 Create a new module `src/backtest/parallel_runner.py` to encapsulate the parallel execution logic.
-- [ ] T009 Create a new module `src/backtest/vectorized_rolling_window.py` for the new vectorized rolling window implementation.
+- [X] T007 [P] Install the chosen parallelization library and add it to `pyproject.toml`.
+- [X] T008 Create a new module `src/backtest/parallel_runner.py` to encapsulate the parallel execution logic.
+- [X] T009 Create a new module `src/backtest/vectorized_rolling_window.py` for the new vectorized rolling window implementation.
 
 ## Phase 3: User Story 1 - Faster Single Simulation Run
 
