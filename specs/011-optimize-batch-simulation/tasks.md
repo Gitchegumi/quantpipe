@@ -23,9 +23,9 @@ This document outlines the tasks required to optimize the batch simulation perfo
 
 ## Phase 3: User Story 1 - Faster Single Simulation Run
 
-- [ ] T010 [US1] Implement the vectorized rolling window logic in `src/backtest/vectorized_rolling_window.py`.
-- [ ] T011 [US1] Refactor the core simulation loop in `src/backtest/trade_sim_batch.py` to use the new vectorized rolling window implementation.
-- [ ] T012 [US1] Create a benchmark test to measure the execution time of a single simulation run in `tests/performance/test_single_simulation.py`.
+- [X] T010 [US1] Implement the vectorized rolling window logic in `src/backtest/vectorized_rolling_window.py`.
+- [X] T011 [US1] Refactor the core simulation loop in `src/backtest/trade_sim_batch.py` to use the new vectorized rolling window implementation.
+- [X] T012 [US1] Create a benchmark test to measure the execution time of a single simulation run in `tests/performance/test_single_simulation.py`.
 - [ ] T013 [US1] Run the benchmark test and verify that the execution time is reduced by at least 90%.
 
 ## Phase 4: User Story 2 - Efficient Multi-Experiment Execution

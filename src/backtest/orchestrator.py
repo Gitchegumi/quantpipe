@@ -75,6 +75,7 @@ class BacktestOrchestrator:
         dry_run: bool = False,
         enable_profiling: bool = False,
         log_frequency: int = 1000,
+        enable_progress: bool = True,
     ):
         """
         Initialize backtest orchestrator.
@@ -84,19 +85,21 @@ class BacktestOrchestrator:
             dry_run: If True, generate signals only without execution simulation.
             enable_profiling: If True, enable phase timing instrumentation.
             log_frequency: Log progress every N items (signals/trades). Default 1000.
+            enable_progress: If True, display rich progress bars.
         """
         self.direction_mode = direction_mode
         self.dry_run = dry_run
         self.enable_profiling = enable_profiling
         self.log_frequency = log_frequency
+        self.enable_progress = enable_progress
         self.profiler: ProfilingContext | None = None
         logger.info(
-            "Initialized BacktestOrchestrator: \
-direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
+            "Initialized BacktestOrchestrator: \ndirection=%s, dry_run=%s, profiling=%s, log_freq=%d, progress=%s",
             direction_mode.value,
             dry_run,
             enable_profiling,
             log_frequency,
+            enable_progress,
         )
 
     def _start_phase(self, phase_name: str) -> None:
@@ -213,7 +216,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
 
             signal = entry["signal"]
             entry_idx = result["entry_index"]
-            exit_idx = result["exit_index"]
+            exit_idx = result["exit_idx"]
 
             # Map exit reasons
             exit_reason_map = {
@@ -333,49 +336,54 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         total_windows = len(candles) - ema_slow
 
         # Create progress bar with minimal refresh for performance
-        progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[bold cyan]{task.description}"),
-            BarColumn(complete_style="green", finished_style="bold green"),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
-            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
-        )
-        progress.start()
-        task = progress.add_task(
-            f"Scanning {total_windows:,} windows for LONG signals",
-            total=total_windows,
-            signals=0,
-        )
-
-        for i in range(ema_slow, len(candles)):
-            window = candles[max(0, i - window_size) : i + 1]
-
-            # Generate signals for this window
-            window_signals = generate_long_signals(
-                candles=window, parameters=parameters
+        if self.enable_progress:
+            progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
+            progress.start()
+            task = progress.add_task(
+                f"Scanning {total_windows:,} windows for LONG signals",
+                total=total_windows,
+                signals=0,
+            )
+        else:
+            progress = nullcontext()
+            task = None
 
-            if window_signals:
-                # Only take the first signal from each window
-                signal = window_signals[0]
-                # Skip if we already have this signal (deduplication by timestamp)
-                if not any(
-                    s.timestamp_utc == signal.timestamp_utc for s in all_signals
-                ):
-                    all_signals.append(signal)
-                    progress.update(task, signals=len(all_signals))
+        with progress:
+            for i in range(ema_slow, len(candles)):
+                window = candles[max(0, i - window_size) : i + 1]
 
-                    # Throttled logging
-                    if len(all_signals) % self.log_frequency == 0:
-                        logger.debug(
-                            "LONG signal generation: %d signals found", len(all_signals)
-                        )
+                # Generate signals for this window
+                window_signals = generate_long_signals(
+                    candles=window, parameters=parameters
+                )
 
-            progress.update(task, advance=1)
+                if window_signals:
+                    # Only take the first signal from each window
+                    signal = window_signals[0]
+                    # Skip if we already have this signal (deduplication by timestamp)
+                    if not any(
+                        s.timestamp_utc == signal.timestamp_utc for s in all_signals
+                    ):
+                        all_signals.append(signal)
+                        if task:
+                            progress.update(task, signals=len(all_signals))
 
-        progress.stop()
+                        # Throttled logging
+                        if len(all_signals) % self.log_frequency == 0:
+                            logger.debug(
+                                "LONG signal generation: %d signals found", len(all_signals)
+                            )
+
+                if task:
+                    progress.update(task, advance=1)
 
         signals = all_signals
         self._end_phase("scan")
@@ -390,25 +398,31 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             )
 
             # Create progress bar for execution with minimal refresh
-            exec_progress = Progress(
-                SpinnerColumn(),
-                TextColumn("[bold cyan]{task.description}"),
-                BarColumn(complete_style="green", finished_style="bold green"),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
-            )
-            exec_progress.start()
-            exec_task = exec_progress.add_task(
-                f"Simulating {len(signals):,} trades (vectorized)",
-                total=100,
-            )
+            if self.enable_progress:
+                exec_progress = Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold cyan]{task.description}"),
+                    BarColumn(complete_style="green", finished_style="bold green"),
+                    TaskProgressColumn(),
+                    TimeElapsedColumn(),
+                    refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
+                )
+                exec_progress.start()
+                exec_task = exec_progress.add_task(
+                    f"Simulating {len(signals):,} trades (vectorized)",
+                    total=100,
+                )
+            else:
+                exec_progress = nullcontext()
+                exec_task = None
 
-            # Use batch simulation for performance
-            exec_progress.update(exec_task, advance=50)  # Processing signals
-            executions = self._simulate_batch(signals, candles)
-            exec_progress.update(exec_task, advance=50)  # Complete
-            exec_progress.stop()
+            with exec_progress:
+                # Use batch simulation for performance
+                if exec_task:
+                    exec_progress.update(exec_task, advance=50)  # Processing signals
+                executions = self._simulate_batch(signals, candles)
+                if exec_task:
+                    exec_progress.update(exec_task, advance=50)  # Complete
             self._end_phase("simulate")
 
             # Calculate wins/losses for logging
@@ -470,50 +484,55 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         total_windows = len(candles) - ema_slow
 
         # Create progress bar with minimal refresh for performance
-        progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[bold cyan]{task.description}"),
-            BarColumn(complete_style="green", finished_style="bold green"),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
-            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
-        )
-        progress.start()
-        task = progress.add_task(
-            f"Scanning {total_windows:,} windows for SHORT signals",
-            total=total_windows,
-            signals=0,
-        )
-
-        for i in range(ema_slow, len(candles)):
-            window = candles[max(0, i - window_size) : i + 1]
-
-            # Generate signals for this window
-            window_signals = generate_short_signals(
-                candles=window, parameters=parameters
+        if self.enable_progress:
+            progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                TextColumn("• [bold yellow]{task.fields[signals]}[/] signals"),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
+            progress.start()
+            task = progress.add_task(
+                f"Scanning {total_windows:,} windows for SHORT signals",
+                total=total_windows,
+                signals=0,
+            )
+        else:
+            progress = nullcontext()
+            task = None
 
-            if window_signals:
-                # Only take the first signal from each window
-                signal = window_signals[0]
-                # Skip if we already have this signal (deduplication by timestamp)
-                if not any(
-                    s.timestamp_utc == signal.timestamp_utc for s in all_signals
-                ):
-                    all_signals.append(signal)
-                    progress.update(task, signals=len(all_signals))
+        with progress:
+            for i in range(ema_slow, len(candles)):
+                window = candles[max(0, i - window_size) : i + 1]
 
-                    # Throttled logging
-                    if len(all_signals) % self.log_frequency == 0:
-                        logger.debug(
-                            "SHORT signal generation: %d signals found",
-                            len(all_signals),
-                        )
+                # Generate signals for this window
+                window_signals = generate_short_signals(
+                    candles=window, parameters=parameters
+                )
 
-            progress.update(task, advance=1)
+                if window_signals:
+                    # Only take the first signal from each window
+                    signal = window_signals[0]
+                    # Skip if we already have this signal (deduplication by timestamp)
+                    if not any(
+                        s.timestamp_utc == signal.timestamp_utc for s in all_signals
+                    ):
+                        all_signals.append(signal)
+                        if task:
+                            progress.update(task, signals=len(all_signals))
 
-        progress.stop()
+                        # Throttled logging
+                        if len(all_signals) % self.log_frequency == 0:
+                            logger.debug(
+                                "SHORT signal generation: %d signals found",
+                                len(all_signals),
+                            )
+
+                if task:
+                    progress.update(task, advance=1)
 
         signals = all_signals
         self._end_phase("scan")
@@ -528,25 +547,31 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             )
 
             # Create progress bar for execution with minimal refresh
-            exec_progress = Progress(
-                SpinnerColumn(),
-                TextColumn("[bold cyan]{task.description}"),
-                BarColumn(complete_style="green", finished_style="bold green"),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
-            )
-            exec_progress.start()
-            exec_task = exec_progress.add_task(
-                f"Simulating {len(signals):,} trades (vectorized)",
-                total=100,
-            )
+            if self.enable_progress:
+                exec_progress = Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold cyan]{task.description}"),
+                    BarColumn(complete_style="green", finished_style="bold green"),
+                    TaskProgressColumn(),
+                    TimeElapsedColumn(),
+                    refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
+                )
+                exec_progress.start()
+                exec_task = exec_progress.add_task(
+                    f"Simulating {len(signals):,} trades (vectorized)",
+                    total=100,
+                )
+            else:
+                exec_progress = nullcontext()
+                exec_task = None
 
-            # Use batch simulation for performance
-            exec_progress.update(exec_task, advance=50)  # Processing signals
-            executions = self._simulate_batch(signals, candles)
-            exec_progress.update(exec_task, advance=50)  # Complete
-            exec_progress.stop()
+            with exec_progress:
+                # Use batch simulation for performance
+                if exec_task:
+                    exec_progress.update(exec_task, advance=50)  # Processing signals
+                executions = self._simulate_batch(signals, candles)
+                if exec_task:
+                    exec_progress.update(exec_task, advance=50)  # Complete
             self._end_phase("simulate")
 
             # Calculate wins/losses for logging
@@ -611,69 +636,75 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         total_windows = len(candles) - ema_slow
 
         # Create progress bar with minimal refresh for performance
-        progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[bold cyan]{task.description}"),
-            BarColumn(complete_style="green", finished_style="bold green"),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            TextColumn(
-                "• [bold yellow]{task.fields[longs]}[/] longs • "
-                "[bold magenta]{task.fields[shorts]}[/] shorts"
-            ),
-            refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
-        )
-        progress.start()
-        task = progress.add_task(
-            f"Scanning {total_windows:,} windows for BOTH signals",
-            total=total_windows,
-            longs=0,
-            shorts=0,
-        )
-
-        for i in range(ema_slow, len(candles)):
-            window = candles[max(0, i - window_size) : i + 1]
-
-            # Generate LONG signals for this window
-            long_window_signals = generate_long_signals(
-                candles=window, parameters=parameters
+        if self.enable_progress:
+            progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[bold cyan]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bold green"),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                TextColumn(
+                    "• [bold yellow]{task.fields[longs]}[/] longs • "
+                    "[bold magenta]{task.fields[shorts]}[/] shorts"
+                ),
+                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
             )
-            if long_window_signals:
-                signal = long_window_signals[0]
-                if not any(
-                    s.timestamp_utc == signal.timestamp_utc for s in all_long_signals
-                ):
-                    all_long_signals.append(signal)
-                    progress.update(task, longs=len(all_long_signals))
-
-                    # Throttled logging for LONG signals
-                    if len(all_long_signals) % self.log_frequency == 0:
-                        logger.debug(
-                            "BOTH mode - LONG: %d signals found", len(all_long_signals)
-                        )
-
-            # Generate SHORT signals for this window
-            short_window_signals = generate_short_signals(
-                candles=window, parameters=parameters
+            progress.start()
+            task = progress.add_task(
+                f"Scanning {total_windows:,} windows for BOTH signals",
+                total=total_windows,
+                longs=0,
+                shorts=0,
             )
-            if short_window_signals:
-                signal = short_window_signals[0]
-                if not any(
-                    s.timestamp_utc == signal.timestamp_utc for s in all_short_signals
-                ):
-                    all_short_signals.append(signal)
-                    progress.update(task, shorts=len(all_short_signals))
+        else:
+            progress = nullcontext()
+            task = None
 
-                    # Throttled logging for SHORT signals
-                    if len(all_short_signals) % self.log_frequency == 0:
-                        logger.debug(
-                            "BOTH mode - SHORT: %d signals found",
-                            len(all_short_signals),
-                        )
+        with progress:
+            for i in range(ema_slow, len(candles)):
+                window = candles[max(0, i - window_size) : i + 1]
 
-            progress.update(task, advance=1)
+                # Generate LONG signals for this window
+                long_window_signals = generate_long_signals(
+                    candles=window, parameters=parameters
+                )
+                if long_window_signals:
+                    signal = long_window_signals[0]
+                    if not any(
+                        s.timestamp_utc == signal.timestamp_utc for s in all_long_signals
+                    ):
+                        all_long_signals.append(signal)
+                        if task:
+                            progress.update(task, longs=len(all_long_signals))
 
-        progress.stop()
+                        # Throttled logging for LONG signals
+                        if len(all_long_signals) % self.log_frequency == 0:
+                            logger.debug(
+                                "BOTH mode - LONG: %d signals found", len(all_long_signals)
+                            )
+
+                # Generate SHORT signals for this window
+                short_window_signals = generate_short_signals(
+                    candles=window, parameters=parameters
+                )
+                if short_window_signals:
+                    signal = short_window_signals[0]
+                    if not any(
+                        s.timestamp_utc == signal.timestamp_utc for s in all_short_signals
+                    ):
+                        all_short_signals.append(signal)
+                        if task:
+                            progress.update(task, shorts=len(all_short_signals))
+
+                        # Throttled logging for SHORT signals
+                        if len(all_short_signals) % self.log_frequency == 0:
+                            logger.debug(
+                                "BOTH mode - SHORT: %d signals found",
+                                len(all_short_signals),
+                            )
+
+                if task:
+                    progress.update(task, advance=1)
 
         long_signals = all_long_signals
         short_signals = all_short_signals
@@ -707,25 +738,31 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             )
 
             # Create progress bar for execution with minimal refresh
-            exec_progress = Progress(
-                SpinnerColumn(),
-                TextColumn("[bold cyan]{task.description}"),
-                BarColumn(complete_style="green", finished_style="bold green"),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
-            )
-            exec_progress.start()
-            exec_task = exec_progress.add_task(
-                f"Simulating {len(merged_signals):,} trades (vectorized)",
-                total=100,
-            )
+            if self.enable_progress:
+                exec_progress = Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold cyan]{task.description}"),
+                    BarColumn(complete_style="green", finished_style="bold green"),
+                    TaskProgressColumn(),
+                    TimeElapsedColumn(),
+                    refresh_per_second=4,  # Minimal refresh: 4 updates/sec (T051)
+                )
+                exec_progress.start()
+                exec_task = exec_progress.add_task(
+                    f"Simulating {len(merged_signals):,} trades (vectorized)",
+                    total=100,
+                )
+            else:
+                exec_progress = nullcontext()
+                exec_task = None
 
-            # Use batch simulation for performance
-            exec_progress.update(exec_task, advance=50)  # Processing signals
-            executions = self._simulate_batch(merged_signals, candles)
-            exec_progress.update(exec_task, advance=50)  # Complete
-            exec_progress.stop()
+            with exec_progress:
+                # Use batch simulation for performance
+                if exec_task:
+                    exec_progress.update(exec_task, advance=50)  # Processing signals
+                executions = self._simulate_batch(merged_signals, candles)
+                if exec_task:
+                    exec_progress.update(exec_task, advance=50)  # Complete
             self._end_phase("simulate")
 
             # Calculate wins/losses for logging
@@ -774,7 +811,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             metrics=metrics,
             signals=merged_signals if self.dry_run else None,
             executions=executions if not self.dry_run else None,
-            conflicts=conflicts,
+            conflicts=[],
             dry_run=self.dry_run,
             pair=pair,
         )
@@ -1247,7 +1284,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         # Initialize batch scanner with LONG direction
         scanner = BatchScan(
             strategy=strategy,
-            enable_progress=True,
+            enable_progress=self.enable_progress,
             direction="LONG",
             parameters=signal_params,
         )
@@ -1295,7 +1332,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
 
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
-            enable_progress=True,
+            enable_progress=self.enable_progress,
         )
 
         # Extract OHLC arrays for simulation
@@ -1388,7 +1425,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         logger.info("Running optimized BatchScan for SHORT direction")
         scanner = BatchScan(
             strategy=strategy,
-            enable_progress=True,
+            enable_progress=self.enable_progress,
             direction="SHORT",
             parameters=signal_params,
         )
@@ -1411,7 +1448,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
 
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
-            enable_progress=True,
+            enable_progress=self.enable_progress,
         )
 
         # Extract OHLC arrays for simulation
@@ -1505,7 +1542,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         # Scan LONG direction
         long_scanner = BatchScan(
             strategy=strategy,
-            enable_progress=True,
+            enable_progress=self.enable_progress,
             direction="LONG",
             parameters=signal_params,
         )
@@ -1521,7 +1558,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         # Scan SHORT direction
         short_scanner = BatchScan(
             strategy=strategy,
-            enable_progress=True,
+            enable_progress=self.enable_progress,
             direction="SHORT",
             parameters=signal_params,
         )
@@ -1550,7 +1587,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
         # Run simulation on LONG signals
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
-            enable_progress=True,
+            enable_progress=self.enable_progress,
         )
 
         timestamps = df["timestamp_utc"].to_numpy()
@@ -1681,7 +1718,7 @@ direction=%s, dry_run=%s, profiling=%s, log_freq=%d",
             total_candles=len(df),
             signals=merged_signals if not self.dry_run else None,
             executions=all_executions if not self.dry_run else None,
-            conflicts=conflicts,
+            conflicts=[],
             metrics=metrics,
         )
 

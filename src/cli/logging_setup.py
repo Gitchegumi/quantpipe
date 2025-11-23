@@ -8,6 +8,7 @@ and supports file-based JSON logs for production.
 
 import logging
 from pathlib import Path
+import sys
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -46,22 +47,33 @@ def setup_logging(
     # Remove existing handlers
     root_logger.handlers.clear()
 
-    # Add Rich handler for terminal output
-    console = Console(stderr=True)
-    rich_handler = RichHandler(
-        console=console,
-        show_time=True,
-        show_path=True,
-        markup=True,
-        rich_tracebacks=True,
-    )
-    rich_handler.setLevel(numeric_level)
-    rich_formatter = logging.Formatter(
-        "%(message)s",
-        datefmt="[%Y-%m-%d %H:%M:%S]",
-    )
-    rich_handler.setFormatter(rich_formatter)
-    root_logger.addHandler(rich_handler)
+    # Conditionally add Rich handler for terminal output or a basic StreamHandler
+    if sys.stderr.isatty():
+        console = Console(stderr=True)
+        rich_handler = RichHandler(
+            console=console,
+            show_time=True,
+            show_path=True,
+            markup=True,
+            rich_tracebacks=True,
+        )
+        rich_handler.setLevel(numeric_level)
+        rich_formatter = logging.Formatter(
+            "%(message)s",
+            datefmt="[%Y-%m-%d %H:%M:%S]",
+        )
+        rich_handler.setFormatter(rich_formatter)
+        root_logger.addHandler(rich_handler)
+    else:
+        # Use a basic StreamHandler for non-interactive environments
+        stream_handler = logging.StreamHandler(sys.stderr)
+        stream_handler.setLevel(numeric_level)
+        basic_formatter = logging.Formatter(
+            "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        stream_handler.setFormatter(basic_formatter)
+        root_logger.addHandler(stream_handler)
 
     # Add file handler if requested
     if log_file:

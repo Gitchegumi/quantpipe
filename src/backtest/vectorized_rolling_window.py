@@ -4,6 +4,7 @@ This module provides a vectorized rolling window implementation using Polars.
 
 import polars as pl
 
+
 def apply_rolling_window(df: pl.DataFrame, window_size: int):
     """
     Applies rolling window calculations to a Polars DataFrame.

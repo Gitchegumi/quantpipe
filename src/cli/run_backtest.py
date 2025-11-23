@@ -24,21 +24,22 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path>
 
     # With explicit strategy and pair
-    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \
         --strategy trend-pullback --pair EURUSD
 
     # Multiple pairs (future support)
-    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \
         --pair EURUSD GBPUSD USDJPY
 
     # JSON output
-    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \
         --output-format json
 
     # Dry-run (signals only)
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
+import io
 import argparse
 import json
 import logging
@@ -47,6 +48,10 @@ import sys
 from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
+
+# Force UTF-8 encoding for stdout and stderr
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 import pandas as pd
 
@@ -128,6 +133,7 @@ def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
     Returns:
         Path to converted CSV file.
     """
+    import polars as pl
     logger.info("Converting MetaTrader CSV format")
 
     # Check if file is already in correct format by reading first line
@@ -137,25 +143,25 @@ def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
         return csv_path
 
     # Read CSV (MetaTrader format: Date,Time,Open,High,Low,Close,Volume)
-    df = pd.read_csv(
+    df = pl.read_csv(
         csv_path,
-        header=None,
-        names=["date", "time", "open", "high", "low", "close", "volume"],
-        dtype=str,  # Read all as strings to avoid mixed type issues
+        has_header=False,
+        new_columns=["date", "time", "open", "high", "low", "close", "volume"],
+        try_parse_dates=False,
     )
 
-    # Combine date and time into timestamp (both are now strings)
-    df["timestamp_utc"] = pd.to_datetime(
-        df["date"] + " " + df["time"], format="%Y.%m.%d %H:%M"
+    # Combine date and time into timestamp
+    df = df.with_columns(
+        (pl.col("date") + " " + pl.col("time")).str.to_datetime("%Y.%m.%d %H:%M").alias("timestamp_utc")
     )
 
     # Select required columns
-    output_df = df[["timestamp_utc", "open", "high", "low", "close", "volume"]]
+    output_df = df.select(["timestamp_utc", "open", "high", "low", "close", "volume"])
 
     # Save converted file
     converted_filename = f"converted_{csv_path.name}"
     converted_path = output_dir / converted_filename
-    output_df.to_csv(converted_path, index=False)
+    output_df.write_csv(converted_path)
 
     logger.info("Converted CSV saved to %s", converted_path)
     return converted_path
@@ -406,6 +412,12 @@ def main():
             "Captures scan/simulation timings, memory usage, signal/trade counts, "
             "and dataset provenance for benchmark tracking (Feature 010: T077)"
         ),
+    )
+
+    parser.add_argument(
+        "--use-polars-backend",
+        action="store_true",
+        help="Use Polars backend for data processing.",
     )
 
     args = parser.parse_args()
@@ -710,8 +722,8 @@ Persistent storage not yet implemented."
         max_portions = int(1.0 / data_frac)
         if portion < 1 or portion > max_portions:
             print(
-                f"Error: --portion must be between 1 and {max_portions} "
-                f"for fraction {data_frac}. Got: {portion}",
+                f"Error: --portion must be between 1 and {max_portions}"
+                f" for fraction {data_frac}. Got: {portion}",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -784,15 +796,20 @@ Persistent storage not yet implemented."
 
         # Stage 1: Core ingestion (OHLCV only)
         logger.info("Stage 1/3: Loading OHLCV data from CSV...")
-        ingestion_result = ingest_ohlcv_data(
-            path=converted_csv,
-            timeframe_minutes=1,
-            mode="columnar",
-            downcast=False,
-            use_arrow=use_arrow,
-            strict_cadence=False,  # FX data has gaps (weekends/holidays)
-            fill_gaps=False,  # Preserve gaps - don't create synthetic price data
-        )
+        try:
+            ingestion_result = ingest_ohlcv_data(
+                path=converted_csv,
+                timeframe_minutes=1,
+                mode="columnar",
+                downcast=False,
+                use_arrow=use_arrow,
+                strict_cadence=False,  # FX data has gaps (weekends/holidays)
+                fill_gaps=False,  # Preserve gaps - don't create synthetic price data
+                return_polars=args.use_polars_backend,
+            )
+        except Exception as e:
+            logger.error("Error during data ingestion: %s", e, exc_info=True)
+            sys.exit(1)
         logger.info(
             "✓ Ingested %d rows in %.2fs",
             len(ingestion_result.data),
@@ -826,10 +843,13 @@ Persistent storage not yet implemented."
             timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
 
+        show_progress = sys.stdout.isatty()
+
         orchestrator = BacktestOrchestrator(
             direction_mode=direction_mode,
             dry_run=args.dry_run,
             enable_profiling=args.profile,
+            enable_progress=show_progress,
         )
 
         # Attach profiler to orchestrator if profiling enabled

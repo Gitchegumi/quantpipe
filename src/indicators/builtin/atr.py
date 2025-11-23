@@ -5,14 +5,16 @@ for efficient calculation of market volatility.
 """
 
 import logging
+from typing import Union
 
 import pandas as pd
+import polars as pl
 
 
 logger = logging.getLogger(__name__)
 
 
-def compute_atr(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
+def compute_atr(df: Union[pd.DataFrame, pl.DataFrame], period: int = 14) -> dict[str, Union[pd.Series, pl.Series]]:
     """Compute Average True Range (ATR).
 
     ATR measures market volatility by computing the average of true ranges
@@ -21,7 +23,7 @@ def compute_atr(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
     2. Absolute(Current High - Previous Close)
     3. Absolute(Current Low - Previous Close)
 
-    Uses pandas' rolling window for vectorized computation.
+    Uses pandas' rolling window or polars for vectorized computation.
 
     Args:
         df: DataFrame containing OHLCV data with 'high', 'low', 'close' columns.
@@ -56,19 +58,31 @@ def compute_atr(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
             f"Available: {list(df.columns)}"
         )
 
-    # Compute True Range components
-    high_low = df["high"] - df["low"]
-    high_prev_close = (df["high"] - df["close"].shift(1)).abs()
-    low_prev_close = (df["low"] - df["close"].shift(1)).abs()
+    if isinstance(df, pd.DataFrame):
+        # Compute True Range components
+        high_low = df["high"] - df["low"]
+        high_prev_close = (df["high"] - df["close"].shift(1)).abs()
+        low_prev_close = (df["low"] - df["close"].shift(1)).abs()
 
-    # True Range is the maximum of the three components
-    true_range = pd.concat([high_low, high_prev_close, low_prev_close], axis=1).max(
-        axis=1
-    )
+        # True Range is the maximum of the three components
+        true_range = pd.concat([high_low, high_prev_close, low_prev_close], axis=1).max(
+            axis=1
+        )
 
-    # ATR is the moving average of True Range
-    # Use exponential weighted moving average for smoothness
-    atr_values = true_range.ewm(span=period, adjust=False).mean()
+        # ATR is the moving average of True Range
+        # Use exponential weighted moving average for smoothness
+        atr_values = true_range.ewm(span=period, adjust=False).mean()
+    elif isinstance(df, pl.DataFrame):
+        high_low = df.select(pl.col("high") - pl.col("low")).to_series()
+        high_prev_close = df.select((pl.col("high") - pl.col("close").shift(1)).abs()).to_series()
+        low_prev_close = df.select((pl.col("low") - pl.col("close").shift(1)).abs()).to_series()
+
+        true_range = pl.concat([high_low, high_prev_close, low_prev_close], how="horizontal").max(axis=1)
+
+        atr_values = true_range.ewm_mean(span=period, adjust=False)
+    else:
+        raise TypeError(f"Unsupported DataFrame type: {type(df)}")
+
 
     indicator_name = f"atr{period}"
     logger.debug(
