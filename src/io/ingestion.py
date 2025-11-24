@@ -21,6 +21,8 @@ Performance Target: ≤120s for 6.9M rows (SC-001), stretch goal ≤90s (SC-012)
 Parquet caching reduces subsequent loads to ≤15s
 """
 
+# pylint: disable=unused-import
+
 from __future__ import annotations
 
 import logging
@@ -119,146 +121,47 @@ def ingest_ohlcv_data(
 ) -> IngestionResult:
 
     try:
-
-        """Ingest and normalize raw OHLCV candle data.
-
-
-
-
-
-        Implements the full ingestion pipeline with performance optimization
-
-
-        and comprehensive metrics collection. Supports both columnar DataFrame
-
-
-        and iterator output modes. Automatically caches CSV→Parquet for faster
-
-
-        subsequent loads.
-
-
-
-
-
-        Args:
-
-
-            path: Path to raw CSV file containing OHLCV data.
-
-
-            timeframe_minutes: Expected cadence in minutes (e.g., 1 for 1-minute).
-
-
-            mode: Output mode, either 'columnar' or 'iterator'.
-
-
-            downcast: If True, apply float64→float32 downcasting for memory savings.
-
-
-            use_arrow: If True, attempt to use Arrow backend for acceleration.
-
-
-            strict_cadence: If True, warn if deviation >50% (extreme gaps suggesting
-
-
-                data quality issues). If False, no warnings. Historical FX data naturally
-
-
-                has ~30% gaps (weekends).
-
-
-            use_parquet_cache: If True, use Parquet caching to skip CSV parsing on
-
-
-                subsequent loads (default: True for 10-15x speedup).
-
-
-            fill_gaps: If True, fill timestamp gaps with synthetic candles (forward-fill
-
-
-                close prices). If False (default), preserve gaps as they represent actual
-
-
-                market closures (weekends, holidays). When False, is_gap column is still
-
-
-                added but all values are False.
-
-
-
-
-
-                **Note**: Gap filling during ingestion is generally NOT recommended as it
-
-
-                creates synthetic price data that never occurred. The primary use case for
-
-
-                gap filling is during **resampling to higher timeframes** (e.g., 1-min →
-
-
-                5-min → 1-hour), which will be implemented in a future specification.
-
-
-                For raw ingestion, gaps should be preserved to maintain data integrity.
-
-
-
-
-
-        Returns:
-
-
-            IngestionResult: Contains processed data, metrics, and metadata.
-
-
-
-
-
-        Raises:
-
-
-            FileNotFoundError: If input file does not exist.
-
-
-            ValueError: If required columns missing, timestamps non-UTC,
-
-
-                or cadence deviation exceeds tolerance.
-
-
-            RuntimeError: If cadence validation fails with excessive gaps.
-
-
-
-
-
-        Examples:
-
-
-            >>> result = ingest_ohlcv_data(
-
-
-            ...     "price_data/eurusd/eurusd_1m.csv",
-
-
-            ...     timeframe_minutes=1,
-
-
-            ...     mode="columnar"
-
-
-            ... )
-
-
-            >>> print(f"Processed {result.metrics.total_rows_output} rows")
-
-
-            >>> print(f"Runtime: {result.metrics.runtime_seconds:.2f}s")
-
-
-        """
+        # Ingest and normalize raw OHLCV candle data.
+        # Implements the full ingestion pipeline with performance optimization
+        # and comprehensive metrics collection. Supports both columnar DataFrame
+        # and iterator output modes. Automatically caches CSV→Parquet for faster
+        # subsequent loads.
+        # Args:
+        #     path: Path to raw CSV file containing OHLCV data.
+        #     timeframe_minutes: Expected cadence in minutes (e.g., 1 for 1-minute).
+        #     mode: Output mode, either 'columnar' or 'iterator'.
+        #     downcast: If True, apply float64→float32 downcasting for memory savings.
+        #     use_arrow: If True, attempt to use Arrow backend for acceleration.
+        #     strict_cadence: If True, warn if deviation >50% (extreme gaps suggesting
+        #         data quality issues). If False, no warnings. Historical FX data
+        #         naturally has ~30% gaps (weekends).
+        #     use_parquet_cache: If True, use Parquet caching to skip CSV parsing on
+        #         subsequent loads (default: True for 10-15x speedup).
+        #     fill_gaps: If True, fill timestamp gaps with synthetic candles
+        #         (forward-fill close prices). If False (default), preserve gaps as they
+        #         represent actual market closures (weekends, holidays). When False,
+        #         is_gap column is still added but all values are False.
+        #         **Note**: Gap filling during ingestion is generally NOT recommended
+        #         as it creates synthetic price data that never occurred. The primary
+        #         use case for gap filling is during **resampling to higher
+        #         timeframes** (e.g., 1-min → 5-min → 1-hour), which will be
+        #         implemented in a future specification. For raw ingestion, gaps should
+        #         be preserved to maintain data integrity.
+        # Returns:
+        #     IngestionResult: Contains processed data, metrics, and metadata.
+        # Raises:
+        #     FileNotFoundError: If input file does not exist.
+        #     ValueError: If required columns missing, timestamps non-UTC,
+        #         or cadence deviation exceeds tolerance.
+        #     RuntimeError: If cadence validation fails with excessive gaps.
+        # Examples:
+        #     >>> result = ingest_ohlcv_data(
+        #     ...     "price_data/eurusd/eurusd_1m.csv",
+        #     ...     timeframe_minutes=1,
+        #     ...     mode="columnar"
+        #     ... )
+        #     >>> print(f"Processed {result.metrics.total_rows_output} rows")
+        #     >>> print(f"Runtime: {result.metrics.runtime_seconds:.2f}s")
 
         # Validate mode parameter
 
@@ -452,7 +355,8 @@ def ingest_ohlcv_data(
                             elif "timestamp_utc" not in df.columns:
 
                                 raise ValueError(
-                                    "Input must have 'timestamp' or 'timestamp_utc' column"
+                                    "Input must have 'timestamp' or",
+                                    " 'timestamp_utc' column",
                                 )
 
                             # Polars handles UTC automatically with time_unit="ns"
@@ -468,7 +372,8 @@ def ingest_ohlcv_data(
                             elif "timestamp_utc" not in df.columns:
 
                                 raise ValueError(
-                                    "Input must have 'timestamp' or 'timestamp_utc' column"
+                                    "Input must have 'timestamp' or",
+                                    " 'timestamp_utc' column",
                                 )
 
                             validate_utc_timezone(df, "timestamp_utc")
@@ -536,10 +441,9 @@ def ingest_ohlcv_data(
             else:
 
                 # Stage 4: Cadence analysis (informational only)
-
                 # Note: FX data naturally has gaps (weekends, holidays, low liquidity)
-
-                # This check just reports statistics - gap filling handles the actual gaps
+                # This check just reports statistics - gap filling handles the
+                # actual gaps
 
                 if return_polars:
 
