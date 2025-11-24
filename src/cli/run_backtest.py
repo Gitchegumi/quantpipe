@@ -46,12 +46,12 @@ import logging
 import math
 import sys
 from contextlib import nullcontext
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Force UTF-8 encoding for stdout and stderr
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 import pandas as pd
 
@@ -70,101 +70,6 @@ from ..models.enums import DirectionMode, OutputFormat
 
 
 logger = logging.getLogger(__name__)
-
-
-def format_backtest_results_as_json(
-    run_metadata: BacktestRun, metrics: MetricsSummary
-) -> str:
-    """
-    Format backtest run metadata and metrics as JSON.
-
-    Args:
-        run_metadata: BacktestRun object with run information.
-        metrics: MetricsSummary object with backtest metrics.
-
-    Returns:
-        JSON string with formatted results.
-    """
-
-    def _serialize_value(value):
-        """Convert NaN/Inf to None for JSON serialization."""
-        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-            return None
-        return value
-
-    data = {
-        "run_metadata": {
-            "run_id": run_metadata.run_id,
-            "parameters_hash": run_metadata.parameters_hash,
-            "manifest_ref": run_metadata.manifest_ref,
-            "start_time": run_metadata.start_time.isoformat(),
-            "end_time": run_metadata.end_time.isoformat(),
-            "total_candles_processed": run_metadata.total_candles_processed,
-            "reproducibility_hash": run_metadata.reproducibility_hash,
-        },
-        "metrics": {
-            "trade_count": metrics.trade_count,
-            "win_count": metrics.win_count,
-            "loss_count": metrics.loss_count,
-            "win_rate": _serialize_value(metrics.win_rate),
-            "avg_win_r": _serialize_value(metrics.avg_win_r),
-            "avg_loss_r": _serialize_value(metrics.avg_loss_r),
-            "avg_r": _serialize_value(metrics.avg_r),
-            "expectancy": _serialize_value(metrics.expectancy),
-            "sharpe_estimate": _serialize_value(metrics.sharpe_estimate),
-            "profit_factor": _serialize_value(metrics.profit_factor),
-            "max_drawdown_r": _serialize_value(metrics.max_drawdown_r),
-            "latency_p95_ms": _serialize_value(metrics.latency_p95_ms),
-            "latency_mean_ms": _serialize_value(metrics.latency_mean_ms),
-        },
-    }
-
-    return json.dumps(data, indent=2)
-
-
-def preprocess_metatrader_csv(csv_path: Path, output_dir: Path) -> Path:
-    """
-    Convert MetaTrader CSV format to expected format.
-
-    Args:
-        csv_path: Path to MetaTrader CSV (Date,Time,O,H,L,C,V).
-        output_dir: Directory to save converted CSV.
-
-    Returns:
-        Path to converted CSV file.
-    """
-    import polars as pl
-    logger.info("Converting MetaTrader CSV format")
-
-    # Check if file is already in correct format by reading first line
-    first_line = csv_path.read_text(encoding="utf-8").split("\n")[0].lower()
-    if "timestamp" in first_line:
-        logger.info("File already in correct format, skipping conversion")
-        return csv_path
-
-    # Read CSV (MetaTrader format: Date,Time,Open,High,Low,Close,Volume)
-    df = pl.read_csv(
-        csv_path,
-        has_header=False,
-        new_columns=["date", "time", "open", "high", "low", "close", "volume"],
-        try_parse_dates=False,
-    )
-
-    # Combine date and time into timestamp
-    df = df.with_columns(
-        (pl.col("date") + " " + pl.col("time")).str.to_datetime("%Y.%m.%d %H:%M").alias("timestamp_utc")
-    )
-
-    # Select required columns
-    output_df = df.select(["timestamp_utc", "open", "high", "low", "close", "volume"])
-
-    # Save converted file
-    converted_filename = f"converted_{csv_path.name}"
-    converted_path = output_dir / converted_filename
-    output_df.write_csv(converted_path)
-
-    logger.info("Converted CSV saved to %s", converted_path)
-    return converted_path
 
 
 def main():
@@ -515,12 +420,7 @@ Persistent storage not yet implemented."
             # Auto-construct data path from pair and dataset
             # Try .parquet first, fallback to .csv
             pair_lower = args.pair[0].lower()
-            base_path = (
-                Path("price_data")
-                / "processed"
-                / pair_lower
-                / args.dataset
-            )
+            base_path = Path("price_data") / "processed" / pair_lower / args.dataset
             filename_base = f"{pair_lower}_{args.dataset}"
 
             # Try .parquet first (faster)
@@ -744,24 +644,12 @@ Persistent storage not yet implemented."
 
         profiler = ProfilingContext()
 
-    # Detect file type and preprocess if needed
+    # Use data path directly
     data_path = Path(args.data)
+    converted_csv = data_path
+    use_arrow = data_path.suffix.lower() == ".parquet"
 
-    if data_path.suffix.lower() == ".parquet":
-        logger.info("Detected Parquet file, skipping CSV preprocessing")
-        converted_csv = data_path
-        use_arrow = True  # Force Arrow backend for Parquet
-    elif data_path.suffix.lower() == ".csv":
-        logger.info("Preprocessing CSV data")
-        converted_csv = preprocess_metatrader_csv(args.data, args.output)
-        use_arrow = False  # Use standard backend for CSV
-    else:
-        logger.warning(
-            "Unknown file extension '%s', attempting to process as CSV",
-            data_path.suffix
-        )
-        converted_csv = preprocess_metatrader_csv(args.data, args.output)
-        use_arrow = False
+    logger.info("Using data file: %s", converted_csv)
 
     # Load strategy parameters (using defaults)
     parameters = StrategyParameters()
@@ -792,10 +680,8 @@ Persistent storage not yet implemented."
         )
         logger.info("Required indicators: %s", required_indicators)
 
-        logger.info("Ingesting candles from %s", converted_csv)
-
-        # Stage 1: Core ingestion (OHLCV only)
-        logger.info("Stage 1/3: Loading OHLCV data from CSV...")
+        # Stage 1: Core ingestion (OHLCV only) - Force Polars for vectorized path
+        logger.info("Stage 1/2: Loading OHLCV data...")
         try:
             ingestion_result = ingest_ohlcv_data(
                 path=converted_csv,
@@ -805,7 +691,7 @@ Persistent storage not yet implemented."
                 use_arrow=use_arrow,
                 strict_cadence=False,  # FX data has gaps (weekends/holidays)
                 fill_gaps=False,  # Preserve gaps - don't create synthetic price data
-                return_polars=args.use_polars_backend,
+                return_polars=True,  # Always use Polars for vectorized path
             )
         except Exception as e:
             logger.error("Error during data ingestion: %s", e, exc_info=True)
@@ -816,23 +702,32 @@ Persistent storage not yet implemented."
             ingestion_result.metrics.runtime_seconds,
         )
 
-        # Stage 2: Indicator enrichment
-        logger.info("Stage 2/3: Computing technical indicators...")
-        from ..indicators.enrich import enrich
-
-        enrichment_result = enrich(
-            core_ref=ingestion_result,
-            indicators=required_indicators,
-            strict=True,
-        )
-        logger.info(
-            "✓ Applied %d indicators in %.2fs",
-            len(enrichment_result.indicators_applied),
-            enrichment_result.runtime_seconds,
+        # Stage 2: Vectorized indicator calculation
+        logger.info("Stage 2/2: Computing technical indicators (vectorized)...")
+        from ..backtest.vectorized_rolling_window import (
+            calculate_ema,
+            calculate_atr,
+            calculate_rsi,
+            calculate_stoch_rsi,
         )
 
-        # Store enriched DataFrame for potential optimized path use
-        enriched_df = enrichment_result.enriched
+        import polars as pl
+
+        enriched_df = ingestion_result.data  # This is already a Polars DataFrame
+
+        # Calculate indicators using vectorized functions
+        enriched_df = calculate_ema(
+            enriched_df, period=20, column="close", output_col="ema20"
+        )
+        enriched_df = calculate_ema(
+            enriched_df, period=50, column="close", output_col="ema50"
+        )
+        enriched_df = calculate_atr(enriched_df, period=14, output_col="atr14")
+        enriched_df = calculate_stoch_rsi(
+            enriched_df, period=14, output_col="stoch_rsi"
+        )
+
+        logger.info("✓ Computed indicators (EMA20, EMA50, ATR14, StochRSI)")
 
         # Create orchestrator early to check for optimized path
         direction_mode = DirectionMode[args.direction]
@@ -840,7 +735,7 @@ Persistent storage not yet implemented."
         # Set default benchmark output path if profiling enabled
         benchmark_path = args.benchmark_out
         if args.profile and not benchmark_path:
-            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
 
         show_progress = sys.stdout.isatty()
@@ -856,319 +751,46 @@ Persistent storage not yet implemented."
         if profiler:
             orchestrator.profiler = profiler
 
-        # Check if optimized path is available (Feature 010)
-        use_optimized_path = hasattr(orchestrator, "run_optimized_backtest")
+        # Single-symbol mode uses vectorized path
+        pair = args.pair[0]
+        strategy_name = args.strategy[0]  # Currently only trend-pullback supported
 
-        # Stage 3: Convert DataFrame to Candle objects (only for legacy path)
-        if use_optimized_path:
-            logger.info(
-                "Stage 3/3: Skipping Candle conversion - using optimized DataFrame path"
-            )
-            candles = None  # Not needed for optimized path
-        else:
-            logger.info("Stage 3/3: Converting to Candle objects...")
-            from ..models.core import Candle
+        run_id = (
+            f"{args.direction.lower()}_"
+            f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        )
+        logger.info(
+            "Running backtest with run_id=%s, pair=%s, strategy=%s",
+            run_id,
+            pair,
+            strategy_name,
+        )
 
-            # Vectorized conversion using list comprehension with to_dict
-            # Much faster than iterrows() for large datasets
-            records = enriched_df.to_dict("records")
+        # Build signal parameters from strategy config
+        signal_params = {
+            "ema_fast": parameters.ema_fast,
+            "ema_slow": parameters.ema_slow,
+            "atr_stop_mult": parameters.atr_stop_mult,
+            "target_r_mult": parameters.target_r_mult,
+            "cooldown_candles": parameters.cooldown_candles,
+            "rsi_length": parameters.rsi_length,
+            "risk_per_trade_pct": parameters.risk_per_trade_pct,
+        }
 
-            candles = []
-            for record in records:
-                # Build indicators dict from indicator columns
-                indicators_dict = {
-                    name: record[name]
-                    for name in required_indicators
-                    if name in record
-                }
+        # Call vectorized backtest with Polars DataFrame
+        logger.info("Using vectorized backtest path (Polars)")
 
-                candles.append(
-                    Candle(
-                        timestamp_utc=record["timestamp_utc"],
-                        open=record["open"],
-                        high=record["high"],
-                        low=record["low"],
-                        close=record["close"],
-                        volume=record.get("volume", 0.0),
-                        indicators=indicators_dict,
-                        is_gap=record.get("is_gap", False),
-                    )
-                )
+        from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
-            logger.info("✓ Created %d Candle objects", len(candles))
+        result = orchestrator.run_backtest(
+            data=enriched_df,
+            pair=pair,
+            run_id=run_id,
+            strategy=TREND_PULLBACK_STRATEGY,
+            **signal_params,
+        )
 
-        if profiler:
-            profiler.end_phase("ingest")
-            profiler.end_phase("ingest")
-
-        # Slice dataset if fraction < 1.0 (Phase 5: US3, FR-002, SC-003)
-        if data_frac < 1.0:
-            total_rows = len(enriched_df)
-            logger.info(
-                "Slicing dataset: fraction=%.2f, portion=%d, total_rows=%d",
-                data_frac,
-                portion,
-                total_rows,
-            )
-
-            # Slice DataFrame for optimized path
-            slice_count = int(total_rows * data_frac)
-            enriched_df = enriched_df.iloc[:slice_count]
-
-            # Also slice candles if legacy path
-            if not use_optimized_path:
-                from ..backtest.chunking import slice_dataset
-
-                candles = slice_dataset(candles, fraction=data_frac, portion=portion)
-
-            logger.info(
-                "Sliced to %d rows (%.1f%%)",
-                len(enriched_df),
-                100 * len(enriched_df) / total_rows,
-            )
-
-        # Check if multi-symbol mode should be used
-        is_multi_symbol = len(args.pair) > 1
-
-        if is_multi_symbol:
-            # Multi-symbol mode (Phase 4: US2, T020-T021 + Phase 6: US4, T041-T044)
-            from ..backtest.portfolio.independent_runner import IndependentRunner
-            from ..backtest.portfolio.validation import validate_symbol_list
-            from ..models.portfolio import CurrencyPair, PortfolioConfig
-
-            logger.info(
-                "Multi-symbol mode: %d pairs requested, mode=%s",
-                len(args.pair),
-                args.portfolio_mode,
-            )
-
-            # Create CurrencyPair objects
-            requested_pairs = [CurrencyPair(code=p.upper()) for p in args.pair]
-
-            # Apply --disable-symbol filtering (Phase 6: US4, T042)
-            if args.disable_symbol:
-                disabled_codes = {code.upper() for code in args.disable_symbol}
-                before_count = len(requested_pairs)
-                requested_pairs = [
-                    pair for pair in requested_pairs if pair.code not in disabled_codes
-                ]
-                after_count = len(requested_pairs)
-                if after_count < before_count:
-                    logger.info(
-                        "Filtered out %d disabled symbol(s): %s",
-                        before_count - after_count,
-                        ", ".join(disabled_codes),
-                    )
-
-            if not requested_pairs:
-                logger.error(
-                    "No symbols remaining after --disable-symbol filter. Aborting."
-                )
-                sys.exit(1)
-
-            # Validate symbols and skip missing ones with warnings (T021)
-            data_dir = Path("price_data/processed")
-            valid_pairs, errors = validate_symbol_list(requested_pairs, data_dir)
-
-            if errors:
-                logger.warning(
-                    "Symbol validation found %d error(s), skipping invalid symbols:",
-                    len(errors),
-                )
-                for error in errors:
-                    logger.warning("  - %s", error)
-
-            if not valid_pairs:
-                logger.error("No valid symbols found. Aborting multi-symbol run.")
-                sys.exit(1)
-
-            logger.info(
-                "Proceeding with %d valid symbol(s): %s",
-                len(valid_pairs),
-                ", ".join([p.code for p in valid_pairs]),
-            )
-
-            # Generate run ID
-            run_id = (
-                f"multi_{args.portfolio_mode}_{args.direction.lower()}_"
-                f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-            )
-
-            # Route to appropriate runner based on portfolio mode
-            # (Phase 6: US4, T041)
-            if args.portfolio_mode == "portfolio":
-                # Portfolio mode: shared capital, correlation tracking
-                # (T041, T043, T044)
-                from ..backtest.portfolio.orchestrator import (
-                    PortfolioOrchestrator,
-                )
-
-                logger.info(
-                    "Running portfolio multi-symbol backtest with run_id=%s",
-                    run_id,
-                )
-
-                # Create portfolio configuration
-                portfolio_config = PortfolioConfig(
-                    correlation_threshold=(
-                        args.correlation_threshold
-                        if args.correlation_threshold is not None
-                        else 0.7  # Default from spec FR-010
-                    ),
-                    per_pair_thresholds={},  # No per-pair overrides from CLI yet
-                )
-
-                # Create portfolio orchestrator
-                # pylint: disable=fixme
-                portfolio_orch = PortfolioOrchestrator(
-                    symbols=valid_pairs,
-                    portfolio_config=portfolio_config,
-                    initial_capital=10000.0,  # TODO: Make configurable
-                    data_dir=data_dir,
-                )
-
-                # Run portfolio backtest
-                # Note: PortfolioOrchestrator.run() raises NotImplementedError
-                # This is expected for Phase 6 (primitives complete,
-                # full execution pending)
-                try:
-                    # pylint: disable=assignment-from-no-return
-                    results = portfolio_orch.run(
-                        strategy_params=parameters,
-                        mode=direction_mode,
-                        output_dir=args.output,
-                        snapshot_interval=args.snapshot_interval,
-                    )
-                    # Create result object for output formatting
-                    result = type(
-                        "PortfolioResult",
-                        (),
-                        {
-                            "run_id": run_id,
-                            "direction_mode": direction_mode,
-                            "start_time": datetime.now(UTC),
-                            "total_candles": 0,
-                            "symbols": [p.code for p in valid_pairs],
-                            "results": results,
-                            "failures": portfolio_orch.get_failures(),
-                            "metrics": None,
-                            "is_multi_symbol": True,
-                            "is_portfolio_mode": True,
-                        },
-                    )()
-                except NotImplementedError as exc:
-                    logger.error(
-                        "Portfolio mode full execution not yet implemented: %s",
-                        exc,
-                    )
-                    logger.info(
-                        "Portfolio primitives (correlation, allocation, "
-                        "snapshots) are complete. Full orchestration pending "
-                        "future phase."
-                    )
-                    sys.exit(1)
-
-            else:
-                # Independent mode: isolated per-symbol execution (T041)
-                runner = IndependentRunner(
-                    symbols=valid_pairs,
-                    data_dir=data_dir,
-                )
-
-                logger.info(
-                    "Running independent multi-symbol backtest with run_id=%s",
-                    run_id,
-                )
-
-                results = runner.run(
-                    strategy_params=parameters,
-                    mode=direction_mode,
-                    output_dir=args.output,
-                )
-
-                # Create result object for output formatting
-                result = type(
-                    "MultiSymbolResult",
-                    (),
-                    {
-                        "run_id": run_id,
-                        "direction_mode": direction_mode,
-                        "start_time": datetime.now(UTC),
-                        "total_candles": 0,  # Sum from individual results
-                        "symbols": [p.code for p in valid_pairs],
-                        "results": results,
-                        "failures": runner.get_failures(),
-                        "metrics": None,  # No single metrics for multi-symbol
-                        "is_multi_symbol": True,
-                        "is_portfolio_mode": False,
-                    },
-                )()
-
-                logger.info(
-                    "Multi-symbol backtest complete: %d successful, %d failed",
-                    len(results),
-                    len(runner.get_failures()),
-                )
-
-        else:
-            # Single-symbol mode (backward compatibility)
-            # Future: multi-strategy support will loop over args.strategy
-            # For now, use first strategy from list
-            pair = args.pair[0]
-            strategy = args.strategy[0]  # Currently only trend-pullback supported
-
-            run_id = (
-                f"{args.direction.lower()}_"
-                f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-            )
-            logger.info(
-                "Running backtest with run_id=%s, pair=%s, strategy=%s",
-                run_id,
-                pair,
-                strategy,
-            )
-
-            # Build signal parameters from strategy config
-            signal_params = {
-                "ema_fast": parameters.ema_fast,
-                "ema_slow": parameters.ema_slow,
-                "atr_stop_mult": parameters.atr_stop_mult,
-                "target_r_mult": parameters.target_r_mult,
-                "cooldown_candles": parameters.cooldown_candles,
-                "rsi_length": parameters.rsi_length,
-                "risk_per_trade_pct": parameters.risk_per_trade_pct,
-            }
-
-            # Feature 010: Use optimized path if available (BatchScan/BatchSimulation)
-            if use_optimized_path:
-                logger.info(
-                    "Using optimized vectorized backtest path "
-                    "(Feature 010: BatchScan/BatchSimulation)"
-                )
-
-                from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
-                result = orchestrator.run_optimized_backtest(
-                    df=enriched_df,
-                    pair=pair,
-                    run_id=run_id,
-                    strategy=TREND_PULLBACK_STRATEGY,
-                    **signal_params,
-                )
-
-                logger.info("Optimized backtest complete: %s", result.run_id)
-            else:
-                # Fallback to legacy Candle-based path
-                logger.info("Using legacy Candle-based backtest path")
-
-                result = orchestrator.run_backtest(
-                    candles=candles,
-                    pair=pair,
-                    run_id=run_id,
-                    **signal_params,
-                )
-
-                logger.info("Backtest complete: %s", result.run_id)
+        logger.info("Backtest complete: %s", result.run_id)
 
         # Write benchmark artifact if profiling enabled
         if args.profile and benchmark_path:
@@ -1328,7 +950,7 @@ Persistent storage not yet implemented."
             duplicate_timestamps_removed=0,
             duplicate_first_ts=None,
             duplicate_last_ts=None,
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
         )
 
         # Write report to JSON

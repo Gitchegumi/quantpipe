@@ -9,6 +9,7 @@ All dataclasses are frozen to ensure immutability and thread-safety,
 supporting deterministic backtest reproducibility per Constitution Principle VI.
 """
 
+from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -263,6 +264,7 @@ class TradeSignal:
     tags: Sequence[str]
     version: str
     timestamp_utc: datetime
+    metadata: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -6,9 +6,10 @@ conflict tracking, directional metrics, backtest results, and
 partition-aware metrics for split-mode evaluation.
 """
 
+from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional, Union
 
 from .core import MetricsSummary, TradeSignal
 
@@ -242,8 +243,10 @@ class BacktestResult:
     data_start_date: datetime
     data_end_date: datetime
     total_candles: int
-    metrics: MetricsSummary | DirectionalMetrics
-    pair: str | None = None  # Single symbol identifier (FR-023); None for multi-symbol future aggregation
+    metrics: Optional[Union[MetricsSummary, DirectionalMetrics]] = None
+    pair: str | None = (
+        None  # Single symbol identifier (FR-023); None for multi-symbol future aggregation
+    )
     symbols: list[str] | None = None  # Multi-symbol runs (portfolio/independent batch)
     signals: list[TradeSignal] | None = None
     executions: list | None = None  # TradeExecution list (avoid circular import)

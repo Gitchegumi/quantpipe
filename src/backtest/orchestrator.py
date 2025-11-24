@@ -12,6 +12,7 @@ import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from black import nullcontext
 
 from rich.progress import (
     BarColumn,
@@ -94,7 +95,8 @@ class BacktestOrchestrator:
         self.enable_progress = enable_progress
         self.profiler: ProfilingContext | None = None
         logger.info(
-            "Initialized BacktestOrchestrator: \ndirection=%s, dry_run=%s, profiling=%s, log_freq=%d, progress=%s",
+            "Initialized BacktestOrchestrator: \n"
+            "direction=%s, dry_run=%s, profiling=%s, log_freq=%d, progress=%s",
             direction_mode.value,
             dry_run,
             enable_profiling,
@@ -379,7 +381,8 @@ class BacktestOrchestrator:
                         # Throttled logging
                         if len(all_signals) % self.log_frequency == 0:
                             logger.debug(
-                                "LONG signal generation: %d signals found", len(all_signals)
+                                "LONG signal generation: %d signals found",
+                                len(all_signals),
                             )
 
                 if task:
@@ -671,7 +674,8 @@ class BacktestOrchestrator:
                 if long_window_signals:
                     signal = long_window_signals[0]
                     if not any(
-                        s.timestamp_utc == signal.timestamp_utc for s in all_long_signals
+                        s.timestamp_utc == signal.timestamp_utc
+                        for s in all_long_signals
                     ):
                         all_long_signals.append(signal)
                         if task:
@@ -680,7 +684,8 @@ class BacktestOrchestrator:
                         # Throttled logging for LONG signals
                         if len(all_long_signals) % self.log_frequency == 0:
                             logger.debug(
-                                "BOTH mode - LONG: %d signals found", len(all_long_signals)
+                                "BOTH mode - LONG: %d signals found",
+                                len(all_long_signals),
                             )
 
                 # Generate SHORT signals for this window
@@ -690,7 +695,8 @@ class BacktestOrchestrator:
                 if short_window_signals:
                     signal = short_window_signals[0]
                     if not any(
-                        s.timestamp_utc == signal.timestamp_utc for s in all_short_signals
+                        s.timestamp_utc == signal.timestamp_utc
+                        for s in all_short_signals
                     ):
                         all_short_signals.append(signal)
                         if task:
