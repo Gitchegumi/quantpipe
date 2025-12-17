@@ -180,26 +180,6 @@ def main():
         ),
     )
 
-    # Partial dataset iteration flags (Phase 5: US3)
-    parser.add_argument(
-        "--data-frac",
-        type=float,
-        help=(
-            "Fraction of dataset to process (0.0-1.0). "
-            "Prompts interactively if omitted. Default: 1.0 (US3)"
-        ),
-    )
-
-    parser.add_argument(
-        "--portion",
-        type=int,
-        help=(
-            "Which portion to select when using --data-frac < 1.0 "
-            "(1-based index). Example: --data-frac 0.25 --portion 2 "
-            "selects second quartile (US3)"
-        ),
-    )
-
     # Multi-strategy support (Phase 4: US2)
     parser.add_argument(
         "--list-strategies",
@@ -541,99 +521,6 @@ Persistent storage not yet implemented."
         if args.snapshot_interval is not None and args.portfolio_mode == "portfolio":
             logger.info("Snapshot interval: %d bars", args.snapshot_interval)
 
-    # Fraction and portion validation/prompting (Phase 5: US3, FR-002, FR-012, FR-015)
-    data_frac = args.data_frac
-    portion = args.portion
-
-    # Interactive prompt if --data-frac not provided
-    if data_frac is None:
-        prompt_attempt = 0
-        max_attempts = 2
-        while prompt_attempt < max_attempts:
-            try:
-                user_input = input(
-                    "Enter dataset fraction to process "
-                    "(0.0-1.0, press Enter for 1.0): "
-                ).strip()
-                if not user_input:
-                    data_frac = 1.0
-                    logger.info("Using default fraction: 1.0 (full dataset)")
-                    break
-                data_frac = float(user_input)
-                if data_frac <= 0 or data_frac > 1.0:
-                    print(
-                        f"Invalid fraction: {data_frac}. "
-                        "Must be between 0.0 (exclusive) and 1.0 (inclusive)."
-                    )
-                    prompt_attempt += 1
-                    continue
-                break
-            except ValueError:
-                print(
-                    f"Invalid input: '{user_input}'. " "Please enter a numeric value."
-                )
-                prompt_attempt += 1
-
-        if prompt_attempt >= max_attempts:
-            print(
-                f"Error: Failed to get valid fraction after "
-                f"{max_attempts} attempts. Aborting.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-    else:
-        # Validate command-line fraction
-        if data_frac <= 0 or data_frac > 1.0:
-            print(
-                f"Error: --data-frac must be between 0.0 (exclusive) and "
-                f"1.0 (inclusive). Got: {data_frac}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    # Portion validation and interactive prompt (if fraction < 1.0)
-    if data_frac < 1.0 and portion is None:
-        # Calculate max portions
-        max_portions = int(1.0 / data_frac)
-        try:
-            user_input = input(
-                f"Enter portion index (1-{max_portions}, press Enter for 1): "
-            ).strip()
-            if not user_input:
-                portion = 1
-                logger.info("Using default portion: 1 (first portion)")
-            else:
-                portion = int(user_input)
-                if portion < 1 or portion > max_portions:
-                    print(
-                        f"Error: Portion must be between 1 and "
-                        f"{max_portions}. Got: {portion}",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-        except ValueError:
-            print(
-                f"Error: Invalid portion input '{user_input}'. " "Must be an integer.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-    elif data_frac < 1.0 and portion is not None:
-        # Validate command-line portion
-        max_portions = int(1.0 / data_frac)
-        if portion < 1 or portion > max_portions:
-            print(
-                f"Error: --portion must be between 1 and {max_portions}"
-                f" for fraction {data_frac}. Got: {portion}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-    elif data_frac == 1.0:
-        portion = 1  # Full dataset, single portion
-
-    logger.info("Dataset fraction: %.2f", data_frac)
-    if data_frac < 1.0:
-        logger.info("Portion selected: %d", portion)
-
     # Create output directory
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -704,12 +591,7 @@ Persistent storage not yet implemented."
 
         # Stage 2: Vectorized indicator calculation
         logger.info("Stage 2/2: Computing technical indicators (vectorized)...")
-        from ..backtest.vectorized_rolling_window import (
-            calculate_ema,
-            calculate_atr,
-            calculate_rsi,
-            calculate_stoch_rsi,
-        )
+        from ..indicators.dispatcher import calculate_indicators
 
         import polars as pl
 
@@ -721,20 +603,10 @@ Persistent storage not yet implemented."
         if "timestamp" in enriched_df.columns:
             enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
 
-        # Calculate indicators using vectorized functions
-        enriched_df = calculate_ema(
-            enriched_df, period=20, column="close", output_col="ema20"
-        )
-        enriched_df = calculate_ema(
-            enriched_df, period=50, column="close", output_col="ema50"
-        )
-        enriched_df = calculate_atr(enriched_df, period=14, output_col="atr14")
-        enriched_df = calculate_rsi(enriched_df, period=14, output_col="rsi")
-        enriched_df = calculate_stoch_rsi(
-            enriched_df, period=14, output_col="stoch_rsi"
-        )
+        # Calculate indicators dynamically based on strategy requirements
+        enriched_df = calculate_indicators(enriched_df, required_indicators)
 
-        logger.info("✓ Computed indicators (EMA20, EMA50, ATR14, StochRSI)")
+        logger.info("✓ Computed indicators: %s", required_indicators)
 
         # Create orchestrator early to check for optimized path
         direction_mode = DirectionMode[args.direction]
@@ -775,15 +647,8 @@ Persistent storage not yet implemented."
         )
 
         # Build signal parameters from strategy config
-        signal_params = {
-            "ema_fast": parameters.ema_fast,
-            "ema_slow": parameters.ema_slow,
-            "atr_stop_mult": parameters.atr_stop_mult,
-            "target_r_mult": parameters.target_r_mult,
-            "cooldown_candles": parameters.cooldown_candles,
-            "rsi_length": parameters.rsi_length,
-            "risk_per_trade_pct": parameters.risk_per_trade_pct,
-        }
+        # Build signal parameters from strategy config
+        signal_params = parameters.model_dump()
 
         # Call vectorized backtest with Polars DataFrame
         logger.info("Using vectorized backtest path (Polars)")
