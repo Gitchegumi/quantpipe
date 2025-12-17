@@ -69,7 +69,8 @@ def parse_indicator_string(indicator_str: str) -> tuple[str, dict]:
 
         if args_str:
             # Simple parsing of comma-separated args
-            # This is a basic parser; for complex cases, ast.literal_eval might be safer/better
+            # This is a basic parser; for complex cases, ast.literal_eval
+            # might be safer/better
             parts = [p.strip() for p in args_str.split(",")]
             for i, part in enumerate(parts):
                 if "=" in part:
@@ -81,7 +82,7 @@ def parse_indicator_string(indicator_str: str) -> tuple[str, dict]:
                         args["period"] = _parse_value(part)
                     else:
                         logger.warning(
-                            "Implicit positional argument index %d in '%s' might be ambiguous",
+                            "Implicit positional argument index %d in '%s' might be ambiguous",  # pylint: disable=line-too-long
                             i,
                             indicator_str,
                         )
@@ -142,7 +143,7 @@ def calculate_indicators(df: pl.DataFrame, indicators: list[str]) -> pl.DataFram
             func = REGISTRY[name]
             df = func(df, **kwargs)
 
-        except Exception as e:
+        except (ValueError, TypeError, pl.exceptions.PolarsError) as e:
             logger.error("Failed to calculate indicator '%s': %s", ind_str, e)
             continue
 
