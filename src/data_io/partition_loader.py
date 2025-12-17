@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Literal
 
-from ..io.legacy_ingestion import ingest_candles
+from ..data_io.legacy_ingestion import ingest_candles
 from ..models.core import Candle
 
 

@@ -14,7 +14,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-from ..io.dataset_builder import build_symbol_dataset, build_all_symbols
+from ..data_io.dataset_builder import build_symbol_dataset, build_all_symbols
 
 logger = logging.getLogger(__name__)
 console = Console()

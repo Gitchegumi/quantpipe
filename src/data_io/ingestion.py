@@ -33,27 +33,27 @@ import pandas as pd
 import polars as pl
 from polars import DataFrame as PolarsDataFrame
 
-from src.io.arrow_config import configure_arrow_backend
-from src.io.cadence import (
+from src.data_io.arrow_config import configure_arrow_backend
+from src.data_io.cadence import (
     compute_cadence_deviation,
     compute_expected_intervals,
 )
-from src.io.downcast import downcast_float_columns
-from src.io.duplicates import remove_duplicates
-from src.io.gap_fill import fill_gaps_vectorized
-from src.io.gaps import detect_gaps
-from src.io.hash_utils import compute_dataframe_hash
-from src.io.iterator_mode import DataFrameIteratorWrapper
-from src.io.logging_constants import IngestionStage
-from src.io.parquet_cache import load_with_cache
-from src.io.perf_utils import PerformanceTimer, calculate_throughput
-from src.io.progress import ProgressReporter
-from src.io.schema import (
+from src.data_io.downcast import downcast_float_columns
+from src.data_io.duplicates import remove_duplicates
+from src.data_io.gap_fill import fill_gaps_vectorized
+from src.data_io.gaps import detect_gaps
+from src.data_io.hash_utils import compute_dataframe_hash
+from src.data_io.iterator_mode import DataFrameIteratorWrapper
+from src.data_io.logging_constants import IngestionStage
+from src.data_io.parquet_cache import load_with_cache
+from src.data_io.perf_utils import PerformanceTimer, calculate_throughput
+from src.data_io.progress import ProgressReporter
+from src.data_io.schema import (
     CORE_COLUMNS,
     restrict_to_core_schema,
     validate_required_columns,
 )
-from src.io.timezone_validate import validate_utc_timezone
+from src.data_io.timezone_validate import validate_utc_timezone
 
 
 if TYPE_CHECKING:

@@ -55,12 +55,12 @@ from ..backtest.metrics import MetricsSummary
 from ..backtest.orchestrator import BacktestOrchestrator
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
-from ..io.formatters import (
+from ..data_io.formatters import (
     format_json_output,
     format_text_output,
     generate_output_filename,
 )
-from ..io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
+from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
 from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
 
@@ -881,7 +881,7 @@ Persistent storage not yet implemented."
 
     if is_multi_symbol_result:
         # Multi-symbol formatting (T025)
-        from ..io.formatters import (
+        from ..data_io.formatters import (
             format_multi_symbol_json_output,
             format_multi_symbol_text_output,
         )

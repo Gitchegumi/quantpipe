@@ -18,7 +18,7 @@ from ..backtest.metrics_ingest import MetricsIngestor
 from ..backtest.observability import ObservabilityReporter
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
-from ..io.legacy_ingestion import ingest_candles
+from ..data_io.legacy_ingestion import ingest_candles
 from ..strategy.trend_pullback.signal_generator import generate_long_signals
 
 

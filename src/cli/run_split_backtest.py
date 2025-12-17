@@ -32,8 +32,8 @@ from pathlib import Path
 from ..backtest.orchestrator import BacktestOrchestrator
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
-from ..io.formatters import format_split_mode_json, format_split_mode_text
-from ..io.partition_loader import check_partitions_exist, load_both_partitions
+from ..data_io.formatters import format_split_mode_json, format_split_mode_text
+from ..data_io.partition_loader import check_partitions_exist, load_both_partitions
 from ..models.directional import PartitionMetrics, SplitModeResult
 from ..models.enums import DirectionMode, OutputFormat
 
