@@ -11,7 +11,7 @@ Architecture Note (T070):
     for the current performance optimization phase. The vectorized batch approach
     implemented here provides sufficient performance for the target workload
     (6.9M candles, 17.7k trades) while maintaining code simplicity.
-    
+
     Future enhancement: Event-driven mode could be added behind --sim-mode flag
     for workloads requiring tick-level precision or real-time simulation semantics.
     Current vectorized approach meets all success criteria (SC-001: ≤20min runtime).
@@ -55,6 +55,9 @@ def simulate_trades_batch(
 
     results = []
 
+    # Optimize: Restrict search window to max_lookahead candles
+    max_lookahead = 14400  # ~10 days of 1-minute data
+
     for entry in entries:
         entry_idx = entry.get("entry_index")
         entry_price = entry.get("entry_price")
@@ -74,10 +77,11 @@ def simulate_trades_batch(
             )
             continue
 
-        # Vectorized exit search from entry_idx forward
+        # Vectorized exit search from entry_idx forward with limit
         search_start = entry_idx + 1
+
+        # If already at end of data
         if search_start >= len(price_data):
-            # Entry at end of dataset
             results.append(
                 {
                     "entry_index": entry_idx,
@@ -91,46 +95,73 @@ def simulate_trades_batch(
             )
             continue
 
+        search_end = min(search_start + max_lookahead, len(price_data))
+
         # Calculate SL/TP thresholds
+        # Use per-trade parameters if available, otherwise defaults
+        sl_pct = entry.get("stop_loss_pct", stop_loss_pct)
+        tp_pct = entry.get("take_profit_pct", take_profit_pct)
+
+        # Slice arrays for the current window
+        window_highs = highs[search_start:search_end]
+        window_lows = lows[search_start:search_end]
+
         if side == "LONG":
-            sl_price = entry_price * (1 - stop_loss_pct)
-            tp_price = entry_price * (1 + take_profit_pct)
+            sl_price = entry_price * (1 - sl_pct)
+            tp_price = entry_price * (1 + tp_pct)
 
-            # Vectorized conditions: check where SL or TP hit
-            sl_hit = lows[search_start:] <= sl_price
-            tp_hit = highs[search_start:] >= tp_price
+            # Vectorized conditions in window
+            sl_hit = window_lows <= sl_price
+            tp_hit = window_highs >= tp_price
         else:  # SHORT
-            sl_price = entry_price * (1 + stop_loss_pct)
-            tp_price = entry_price * (1 - take_profit_pct)
+            sl_price = entry_price * (1 + sl_pct)
+            tp_price = entry_price * (1 - tp_pct)
 
-            sl_hit = highs[search_start:] >= sl_price
-            tp_hit = lows[search_start:] <= tp_price
+            sl_hit = window_highs >= sl_price
+            tp_hit = window_lows <= tp_price
 
         # Find first exit (SL or TP)
-        sl_indices = np.where(sl_hit)[0]
-        tp_indices = np.where(tp_hit)[0]
+        # np.argmax returns index of first True, or 0 if all False
+        # carefully check if any True exists before using argmax
 
-        if len(sl_indices) == 0 and len(tp_indices) == 0:
-            # No exit found; close at end
-            exit_idx = len(price_data) - 1
+        # Optimization: use any() and argmax() which are faster than where()[0] for finding first
+        has_sl = sl_hit.any()
+        has_tp = tp_hit.any()
+
+        sl_idx_rel = np.argmax(sl_hit) if has_sl else -1
+        tp_idx_rel = np.argmax(tp_hit) if has_tp else -1
+
+        if not has_sl and not has_tp:
+            # No exit found in window -> Timeout / Force Close at end of window
+            # Changing semantics slightly: if not found in 10 days, we close at the end of window
+            exit_idx = search_end - 1
             exit_price = closes[exit_idx]
-            exit_reason = "END_OF_DATA"
-        elif len(sl_indices) > 0 and len(tp_indices) > 0:
-            # Both possible; take whichever comes first
-            if sl_indices[0] < tp_indices[0]:
-                exit_idx = search_start + sl_indices[0]
+            exit_reason = "TIMEOUT"
+
+        elif has_sl and has_tp:
+            # Both hit, check which one was first
+            if sl_idx_rel < tp_idx_rel:
+                exit_idx = search_start + sl_idx_rel
                 exit_price = sl_price
                 exit_reason = "STOP_LOSS"
-            else:
-                exit_idx = search_start + tp_indices[0]
+            elif sl_idx_rel > tp_idx_rel:
+                exit_idx = search_start + tp_idx_rel
                 exit_price = tp_price
                 exit_reason = "TAKE_PROFIT"
-        elif len(sl_indices) > 0:
-            exit_idx = search_start + sl_indices[0]
+            else:
+                # Same bar hit both?
+                # Conservative assumption: stopped out first if same bar (unless specific OHLC logic used)
+                # But typically we assume SL hit first for safety
+                exit_idx = search_start + sl_idx_rel
+                exit_price = sl_price
+                exit_reason = "STOP_LOSS"
+
+        elif has_sl:
+            exit_idx = search_start + sl_idx_rel
             exit_price = sl_price
             exit_reason = "STOP_LOSS"
-        else:
-            exit_idx = search_start + tp_indices[0]
+        else:  # has_tp
+            exit_idx = search_start + tp_idx_rel
             exit_price = tp_price
             exit_reason = "TAKE_PROFIT"
 

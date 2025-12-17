@@ -49,10 +49,6 @@ from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Force UTF-8 encoding for stdout and stderr
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
-
 import pandas as pd
 
 from ..backtest.metrics import MetricsSummary
@@ -67,6 +63,10 @@ from ..io.formatters import (
 from ..io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
 from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
+
+# Force UTF-8 encoding for stdout and stderr
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 
 logger = logging.getLogger(__name__)
@@ -693,7 +693,7 @@ Persistent storage not yet implemented."
                 fill_gaps=False,  # Preserve gaps - don't create synthetic price data
                 return_polars=True,  # Always use Polars for vectorized path
             )
-        except Exception as e:
+        except (FileNotFoundError, ValueError, RuntimeError) as e:
             logger.error("Error during data ingestion: %s", e, exc_info=True)
             sys.exit(1)
         logger.info(
@@ -713,7 +713,13 @@ Persistent storage not yet implemented."
 
         import polars as pl
 
-        enriched_df = ingestion_result.data  # This is already a Polars DataFrame
+        enriched_df = ingestion_result.data
+        if isinstance(enriched_df, pd.DataFrame):
+            enriched_df = pl.from_pandas(enriched_df)
+
+        # Renaming 'timestamp' to 'timestamp_utc' if needed
+        if "timestamp" in enriched_df.columns:
+            enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
 
         # Calculate indicators using vectorized functions
         enriched_df = calculate_ema(
@@ -723,6 +729,7 @@ Persistent storage not yet implemented."
             enriched_df, period=50, column="close", output_col="ema50"
         )
         enriched_df = calculate_atr(enriched_df, period=14, output_col="atr14")
+        enriched_df = calculate_rsi(enriched_df, period=14, output_col="rsi")
         enriched_df = calculate_stoch_rsi(
             enriched_df, period=14, output_col="stoch_rsi"
         )
@@ -731,6 +738,7 @@ Persistent storage not yet implemented."
 
         # Create orchestrator early to check for optimized path
         direction_mode = DirectionMode[args.direction]
+        use_optimized_path = True  # Always use vectorized path as per refactor
 
         # Set default benchmark output path if profiling enabled
         benchmark_path = args.benchmark_out
@@ -783,7 +791,7 @@ Persistent storage not yet implemented."
         from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
         result = orchestrator.run_backtest(
-            data=enriched_df,
+            candles=enriched_df,
             pair=pair,
             run_id=run_id,
             strategy=TREND_PULLBACK_STRATEGY,
@@ -806,7 +814,7 @@ Persistent storage not yet implemented."
                 hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
 
             # Calculate metrics
-            dataset_rows = len(enriched_df) if use_optimized_path else len(candles)
+            dataset_rows = len(enriched_df)
             trades_simulated = 0
             if result.metrics:
                 if hasattr(result.metrics, "combined"):
@@ -869,9 +877,7 @@ Persistent storage not yet implemented."
     )
 
     # Check if this is a multi-symbol result
-    is_multi_symbol_result = (
-        hasattr(result, "is_multi_symbol") and result.is_multi_symbol
-    )
+    is_multi_symbol_result = result.is_multi_symbol
 
     if is_multi_symbol_result:
         # Multi-symbol formatting (T025)

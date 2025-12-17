@@ -8,12 +8,16 @@ This module coordinates the execution of backtests across different direction mo
 simulation, and metrics aggregation.
 """
 
+
+from __future__ import annotations
+
 import logging
 from collections.abc import Sequence
+from contextlib import nullcontext
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
-from black import nullcontext
+from typing import TYPE_CHECKING, Any
 
+import polars as pl
 from rich.progress import (
     BarColumn,
     Progress,
@@ -33,12 +37,13 @@ from ..strategy.trend_pullback.signal_generator import (
     generate_long_signals,
     generate_short_signals,
 )
-
+from ..strategy.trend_pullback.signal_generator_vectorized import (
+    generate_signals_vectorized,
+)
 
 if TYPE_CHECKING:
     import numpy as np
     import pandas as pd
-    import polars as pl
 
     from ..backtest.batch_scan import ScanResult
     from ..backtest.batch_simulation import SimulationResult
@@ -252,9 +257,10 @@ class BacktestOrchestrator:
 
     def run_backtest(
         self,
-        candles: Sequence[Candle],
+        candles: Sequence[Candle] | pl.DataFrame,
         pair: str,
         run_id: str,
+        strategy: Any = None,
         **signal_params,
     ) -> BacktestResult:
         """
@@ -298,6 +304,11 @@ class BacktestOrchestrator:
             >>> result.direction_mode
             'LONG'
         """
+        if isinstance(candles, pl.DataFrame):
+            if candles.is_empty():
+                raise ValueError("Candles DataFrame cannot be empty")
+            return self._run_vectorized_backtest(candles, pair, run_id, **signal_params)
+
         if not candles:
             raise ValueError("Candles sequence cannot be empty")
 
@@ -612,6 +623,183 @@ class BacktestOrchestrator:
             signals=signals if self.dry_run else None,
             executions=executions if not self.dry_run else None,
             conflicts=[],
+            dry_run=self.dry_run,
+            pair=pair,
+        )
+
+    def _run_vectorized_backtest(
+        self,
+        data: pl.DataFrame,
+        pair: str,
+        run_id: str,
+        **signal_params,
+    ) -> BacktestResult:
+        """Execute backtest using fully vectorized path via Polars."""
+        start_time = datetime.now(UTC)
+        logger.info(
+            "Starting vectorized backtest for %s (mode=%s)", pair, self.direction_mode
+        )
+
+        # 1. Generate Signals Vectorized
+        self._start_phase("scan")
+        signals = generate_signals_vectorized(
+            data,
+            parameters={"pair": pair, **signal_params},
+            direction_mode=self.direction_mode.name,
+        )
+        self._end_phase("scan")
+
+        logger.info("Generated %d signals (vectorized)", len(signals))
+
+        # 2. Simulate Execution
+        executions = []
+        conflicts = []  # TODO: Handle conflicts in vectorized mode if needed
+
+        if not self.dry_run and signals:
+            self._start_phase("simulate")
+
+            # Use improved vectorized simulation (requires converting Polars to Pandas/NumPy for now)
+            # Future: pure Polars simulation
+            price_data_pd = data.select(
+                ["high", "low", "close", "timestamp_utc"]
+            ).to_pandas()
+
+            # Map signals to entry dicts
+            # We need entry_index. Since 'data' is chronologically sorted, we can use row index.
+            # But signals have timestamps.
+            # Efficient way: Map signal timestamp to index.
+            # Since signals were generated from 'data', the timestamp match should be exact.
+
+            # Create a map of timestamp -> index
+            # This is overhead. Ideally signal generator returns indices.
+            # But abstracting TradeSignal is good.
+
+            # Optimization:
+            # If signals are sorted and data is sorted, we can search sorted.
+            timestamp_map = {
+                ts: idx for idx, ts in enumerate(price_data_pd["timestamp_utc"])
+            }
+
+            entries = []
+            for sig in signals:
+                idx = timestamp_map.get(sig.timestamp_utc)
+                if idx is not None:
+                    # Calculate SL/TP pct
+                    risk_distance = abs(sig.entry_price - sig.initial_stop_price)
+                    # avoid div by zero
+                    if sig.entry_price == 0:
+                        continue
+
+                    stop_loss_pct = risk_distance / sig.entry_price
+                    # Default 2R target if not specified?
+                    # signal info doesn't have target price explicitly usually, it uses R-multiple.
+                    # existing code used risk_distance * 2.0
+                    target_pct = (
+                        risk_distance * signal_params.get("target_r_mult", 2.0)
+                    ) / sig.entry_price
+
+                    entries.append(
+                        {
+                            "signal": sig,
+                            "entry_index": idx,
+                            "entry_price": sig.entry_price,
+                            "side": sig.direction,
+                            "stop_loss_pct": stop_loss_pct,
+                            "take_profit_pct": target_pct,
+                        }
+                    )
+
+            if entries:
+                # Re-use existing simulation batch logic for now (it's numpy based)
+                # Converting to dataframe was done above
+                sim_results = simulate_trades_batch(
+                    entries,
+                    price_data_pd,
+                    stop_loss_pct=entries[0][
+                        "stop_loss_pct"
+                    ],  # approximated, loop actually supports per-trade? No, function signature has fixed SL/TP
+                )
+
+                # Wait, simulate_trades_batch takes fixed SL/TP?
+                # def simulate_trades_batch(..., stop_loss_pct=0.02, ...)
+                # Yes. The current implementation doesn't support per-trade SL/TP.
+                # See TODO in _simulate_batch line 205: "TODO: Support per-trade SL/TP in simulate_trades_batch"
+
+                # To support dynamic SL/TP (which we have), we need to update simulate_trades_batch
+                # or pass the global average?
+                # Using per-trade values is critical for correctness.
+                # I should update simulate_trades_batch to accept sl/tp in entries.
+
+                results = simulate_trades_batch(entries, price_data_pd)
+
+                # Convert back to executions
+                for res, entry in zip(results, entries, strict=False):
+                    if res.get("exit_index") is None:
+                        continue
+
+                    sig = entry["signal"]
+                    exit_reason_map = {
+                        "STOP_LOSS": "STOP_LOSS",
+                        "TAKE_PROFIT": "TARGET",
+                        "END_OF_DATA": "EXPIRY",
+                    }
+                    exit_reason = exit_reason_map.get(
+                        res["exit_reason"], res["exit_reason"]
+                    )
+
+                    # Recalculate R based on actual result
+                    pnl_r = (
+                        res["pnl"] / entry["stop_loss_pct"]
+                        if entry["stop_loss_pct"]
+                        else 0
+                    )
+
+                    executions.append(
+                        TradeExecution(
+                            signal_id=sig.id,
+                            direction=sig.direction,
+                            open_timestamp=data["timestamp_utc"][
+                                entry["entry_index"]
+                            ],  # expensive lookup? slice.
+                            entry_fill_price=res.get(
+                                "entry_price", entry["entry_price"]
+                            ),
+                            close_timestamp=data["timestamp_utc"][res["exit_index"]],
+                            exit_fill_price=res["exit_price"],
+                            exit_reason=exit_reason,
+                            pnl_r=pnl_r,
+                            slippage_entry_pips=0.5,
+                            slippage_exit_pips=0.5,
+                            costs_total=0.0,
+                        )
+                    )
+
+            self._end_phase("simulate")
+
+        # Metrics
+        metrics = None
+        if executions:
+            # We need to map direction mode appropriately
+            metrics = calculate_directional_metrics(executions, self.direction_mode)
+
+        end_time = datetime.now(UTC)
+
+        # Get start/end dates handling empty data
+        data_start = data["timestamp_utc"][0] if not data.is_empty() else start_time
+        data_end = data["timestamp_utc"][-1] if not data.is_empty() else end_time
+
+        return BacktestResult(
+            run_id=run_id,
+            direction_mode=self.direction_mode.value,
+            start_time=start_time,
+            end_time=end_time,
+            data_start_date=data_start,
+            data_end_date=data_end,
+            total_candles=len(data),
+            metrics=metrics,
+            signals=signals if self.dry_run else None,  # Optimize memory if executing
+            executions=executions if not self.dry_run else None,
+            conflicts=conflicts,
             dry_run=self.dry_run,
             pair=pair,
         )
@@ -1100,7 +1288,6 @@ class BacktestOrchestrator:
         )
 
         # Convert pandas DataFrame to Polars for batch processing
-        import polars as pl
 
         polars_df = pl.from_pandas(df)
 

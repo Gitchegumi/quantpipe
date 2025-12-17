@@ -3,6 +3,7 @@
 This module provides utilities for detecting and resolving duplicate
 timestamps in candle data using a keep-first strategy.
 """
+
 from __future__ import annotations
 
 import logging
@@ -13,7 +14,9 @@ from polars import DataFrame as PolarsDataFrame
 logger = logging.getLogger(__name__)
 
 
-def get_duplicate_mask(df: pd.DataFrame | PolarsDataFrame, is_polars: bool = False) -> pd.Series | pl.Series:
+def get_duplicate_mask(
+    df: pd.DataFrame | PolarsDataFrame, is_polars: bool = False
+) -> pd.Series | pl.Series:
     """Get boolean mask indicating which rows are duplicates.
 
     Args:
@@ -28,7 +31,9 @@ def get_duplicate_mask(df: pd.DataFrame | PolarsDataFrame, is_polars: bool = Fal
     return df["timestamp_utc"].duplicated(keep="first")
 
 
-def detect_duplicates(df: pd.DataFrame | PolarsDataFrame, is_polars: bool = False) -> pd.DataFrame | PolarsDataFrame:
+def detect_duplicates(
+    df: pd.DataFrame | PolarsDataFrame, is_polars: bool = False
+) -> pd.DataFrame | PolarsDataFrame:
     """Detect duplicate timestamps in candle data.
 
     Args:
@@ -39,10 +44,14 @@ def detect_duplicates(df: pd.DataFrame | PolarsDataFrame, is_polars: bool = Fals
         pd.DataFrame | PolarsDataFrame: Subset of rows that are duplicates (not the first occurrence).
     """
     duplicate_mask = get_duplicate_mask(df, is_polars)
+    if is_polars:
+        return df.filter(duplicate_mask)
     return df[duplicate_mask]
 
 
-def remove_duplicates(df: pd.DataFrame | PolarsDataFrame, is_polars: bool = False) -> tuple[pd.DataFrame | PolarsDataFrame, int]:
+def remove_duplicates(
+    df: pd.DataFrame | PolarsDataFrame, is_polars: bool = False
+) -> tuple[pd.DataFrame | PolarsDataFrame, int]:
     """Remove duplicate timestamps, keeping the first occurrence.
 
     Args:

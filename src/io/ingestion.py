@@ -23,7 +23,6 @@ Parquet caching reduces subsequent loads to ≤15s
 
 # pylint: disable=unused-import
 
-from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
@@ -237,6 +236,13 @@ def ingest_ohlcv_data(
 
                     raise RuntimeError(f"Failed to load Parquet file: {exc}") from exc
 
+                if not return_polars and isinstance(df, pl.DataFrame):
+                    print(
+                        f"DEBUG INGEST: Converting Polars to Pandas. Cols: {df.columns}"
+                    )
+                    df = df.to_pandas()
+                    print(f"DEBUG INGEST: Converted. Cols: {df.columns}")
+
             # Try Parquet cache for CSV files
 
             elif use_parquet_cache:
@@ -340,43 +346,27 @@ def ingest_ohlcv_data(
                                 "No data loaded, proceeding with empty DataFrame."
                             )
 
-                        # Parse and validate timestamps
-
-                        if return_polars:
-
-                            if "timestamp" in df.columns:
-
-                                df = df.with_columns(
-                                    pl.col("timestamp")
-                                    .str.to_datetime(time_unit="ns")
-                                    .alias("timestamp_utc")
-                                )
-
-                            elif "timestamp_utc" not in df.columns:
-
-                                raise ValueError(
-                                    "Input must have 'timestamp' or",
-                                    " 'timestamp_utc' column",
-                                )
-
-                            # Polars handles UTC automatically with time_unit="ns"
-
-                        else:
-
-                            if "timestamp" in df.columns:
-
-                                df["timestamp_utc"] = pd.to_datetime(
-                                    df["timestamp"], utc=True
-                                )
-
-                            elif "timestamp_utc" not in df.columns:
-
-                                raise ValueError(
-                                    "Input must have 'timestamp' or",
-                                    " 'timestamp_utc' column",
-                                )
-
-                            validate_utc_timezone(df, "timestamp_utc")
+            # Parse and validate timestamps
+            if return_polars:
+                if "timestamp" in df.columns:
+                    df = df.with_columns(
+                        pl.col("timestamp")
+                        .str.to_datetime(format="%Y-%m-%d %H:%M:%S%z")
+                        .alias("timestamp_utc")
+                    )
+                elif "timestamp_utc" not in df.columns:
+                    raise ValueError(
+                        "Input must have 'timestamp' or 'timestamp_utc' column"
+                    )
+                # Polars handles UTC automatically with time_unit="ns"
+            else:
+                if "timestamp" in df.columns:
+                    df["timestamp_utc"] = pd.to_datetime(df["timestamp"], utc=True)
+                elif "timestamp_utc" not in df.columns:
+                    raise ValueError(
+                        "Input must have 'timestamp' or 'timestamp_utc' column"
+                    )
+                validate_utc_timezone(df, "timestamp_utc")
 
             # Validate required columns present (after timestamp conversion)
 

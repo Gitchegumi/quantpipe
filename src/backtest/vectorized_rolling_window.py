@@ -5,7 +5,9 @@ This module provides a vectorized rolling window implementation using Polars.
 import polars as pl
 
 
-def calculate_ema(df: pl.DataFrame, period: int, column: str = "close") -> pl.DataFrame:
+def calculate_ema(
+    df: pl.DataFrame, period: int, column: str = "close", output_col: str | None = None
+) -> pl.DataFrame:
     """
     Calculate Exponential Moving Average (EMA).
 
@@ -13,22 +15,24 @@ def calculate_ema(df: pl.DataFrame, period: int, column: str = "close") -> pl.Da
         df: Input DataFrame.
         period: EMA period.
         column: Column to calculate EMA on.
-
-    Returns:
-        DataFrame with new column `ema_{period}`.
+        output_col: Optional name for output column.
     """
+    out_name = output_col or f"ema{period}"
     return df.with_columns(
-        pl.col(column).ewm_mean(span=period, adjust=False).alias(f"ema{period}")
+        pl.col(column).ewm_mean(span=period, adjust=False).alias(out_name)
     )
 
 
-def calculate_atr(df: pl.DataFrame, period: int) -> pl.DataFrame:
+def calculate_atr(
+    df: pl.DataFrame, period: int, output_col: str | None = None
+) -> pl.DataFrame:
     """
     Calculate Average True Range (ATR).
 
     Args:
         df: Input DataFrame with high, low, close columns.
         period: ATR period.
+        output_col: Optional output column name.
 
     Returns:
         DataFrame with new column `atr{period}`.
@@ -54,16 +58,17 @@ def calculate_atr(df: pl.DataFrame, period: int) -> pl.DataFrame:
     # The existing basic.py uses standard EMA (alpha=2/(period+1)).
     # We will stick to standard EMA to match basic.py unless specified otherwise.
 
+    out_name = output_col or f"atr{period}"
     return (
         df.with_columns(tr)
-        .with_columns(
-            pl.col("tr").ewm_mean(span=period, adjust=False).alias(f"atr{period}")
-        )
+        .with_columns(pl.col("tr").ewm_mean(span=period, adjust=False).alias(out_name))
         .drop("tr")
     )
 
 
-def calculate_rsi(df: pl.DataFrame, period: int, column: str = "close") -> pl.DataFrame:
+def calculate_rsi(
+    df: pl.DataFrame, period: int, column: str = "close", output_col: str | None = None
+) -> pl.DataFrame:
     """
     Calculate Relative Strength Index (RSI).
 
@@ -71,6 +76,7 @@ def calculate_rsi(df: pl.DataFrame, period: int, column: str = "close") -> pl.Da
         df: Input DataFrame.
         period: RSI period.
         column: Column to calculate RSI on.
+        output_col: Optional output name.
 
     Returns:
         DataFrame with new column `rsi`.
@@ -89,11 +95,15 @@ def calculate_rsi(df: pl.DataFrame, period: int, column: str = "close") -> pl.Da
     # Handle division by zero (if avg_loss is 0, RSI is 100)
     rsi = pl.when(avg_loss == 0).then(100).otherwise(rsi)
 
-    return df.with_columns(rsi.alias("rsi"))
+    out_name = output_col or "rsi"
+    return df.with_columns(rsi.alias(out_name))
 
 
 def calculate_stoch_rsi(
-    df: pl.DataFrame, period: int = 14, rsi_col: str = "rsi"
+    df: pl.DataFrame,
+    period: int = 14,
+    rsi_col: str = "rsi",
+    output_col: str | None = None,
 ) -> pl.DataFrame:
     """
     Calculate Stochastic RSI.
@@ -102,6 +112,7 @@ def calculate_stoch_rsi(
         df: Input DataFrame with RSI column.
         period: Lookback period.
         rsi_col: Name of the RSI column.
+        output_col: Optional output name.
 
     Returns:
         DataFrame with new column `stoch_rsi`.
@@ -115,4 +126,5 @@ def calculate_stoch_rsi(
     # Handle division by zero (flat RSI) -> 0.5
     stoch_rsi = pl.when(rsi_max == rsi_min).then(0.5).otherwise(stoch_rsi)
 
-    return df.with_columns(stoch_rsi.alias("stoch_rsi"))
+    out_name = output_col or "stoch_rsi"
+    return df.with_columns(stoch_rsi.alias(out_name))
