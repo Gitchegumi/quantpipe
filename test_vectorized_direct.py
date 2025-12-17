@@ -1,10 +1,20 @@
 """Direct test of vectorized backtest bypassing ingestion module."""
 
+import sys
+from pathlib import Path
+
 import polars as pl
 from datetime import datetime, timezone
 
+# Guard: Skip if test data not available (gitignored)
+DATA_PATH = Path("price_data/processed/eurusd/test/eurusd_test.parquet")
+if not DATA_PATH.exists():
+    print(f"⚠ Skipping: Test data not found at {DATA_PATH}")
+    print("  This file is gitignored. Run locally with price data to test.")
+    sys.exit(0)
+
 print("Step 1: Loading data directly with Polars...")
-df = pl.read_parquet("price_data/processed/eurusd/test/eurusd_test.parquet")
+df = pl.read_parquet(DATA_PATH)
 
 # Rename columns to match expected names
 if "timestamp" in df.columns and "timestamp_utc" not in df.columns:
@@ -51,7 +61,7 @@ print("\nStep 5: Running vectorized backtest...")
 start = datetime.now(timezone.utc)
 
 result = orch.run_backtest(
-    data=df,
+    candles=df,
     pair="EURUSD",
     run_id="test_vectorized_001",
     strategy=TREND_PULLBACK_STRATEGY,
