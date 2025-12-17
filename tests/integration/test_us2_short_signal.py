@@ -13,7 +13,7 @@ import pytest
 
 from src.backtest.execution import simulate_execution
 from src.backtest.metrics_ingest import MetricsIngestor
-from src.io.legacy_ingestion import ingest_candles
+from src.data_io.legacy_ingestion import ingest_candles
 from src.strategy.trend_pullback.signal_generator import (
     generate_short_signals,
 )

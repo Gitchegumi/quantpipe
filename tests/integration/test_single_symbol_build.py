@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.io.dataset_builder import build_symbol_dataset
+from src.data_io.dataset_builder import build_symbol_dataset
 from src.models.metadata import MetadataRecord
 
 

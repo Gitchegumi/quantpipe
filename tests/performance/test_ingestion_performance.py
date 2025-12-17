@@ -6,7 +6,7 @@ import time
 import pandas as pd
 import pytest
 
-from src.io.ingestion import ingest_ohlcv_data
+from src.data_io.ingestion import ingest_ohlcv_data
 
 
 @pytest.fixture()

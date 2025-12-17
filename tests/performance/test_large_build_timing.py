@@ -13,7 +13,7 @@ import time
 import pytest
 import pandas as pd
 
-from src.io.dataset_builder import build_symbol_dataset
+from src.data_io.dataset_builder import build_symbol_dataset
 
 
 @pytest.fixture

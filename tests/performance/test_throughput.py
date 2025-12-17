@@ -385,7 +385,7 @@ def test_columnar_throughput_sc002():
     This test validates the new ingest_ohlcv_data() function performance
     against the success criteria from spec 009-optimize-ingestion.
     """
-    from src.io.ingestion import ingest_ohlcv_data
+    from src.data_io.ingestion import ingest_ohlcv_data
 
     # Create synthetic dataset with 1M rows
     with tempfile.NamedTemporaryFile(

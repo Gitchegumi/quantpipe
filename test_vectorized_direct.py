@@ -4,7 +4,7 @@ import polars as pl
 from datetime import datetime, timezone
 
 print("Step 1: Loading data directly with Polars...")
-df = pl.read_parquet("price_data/processed/EURUSD/test/eurusd_test.parquet")
+df = pl.read_parquet("price_data/processed/eurusd/test/eurusd_test.parquet")
 
 # Rename columns to match expected names
 if "timestamp" in df.columns and "timestamp_utc" not in df.columns:

@@ -27,7 +27,7 @@ import pytest
 # NOTE: These imports are incorrect and need updating
 # from src.config.backtest_config import SimulationConfig
 # from src.config.strategy_config import StrategyConfig
-# from src.io.progress import ProgressConfig, ProgressDispatcher
+# from src.data_io.progress import ProgressConfig, ProgressDispatcher
 from src.backtest.batch_scan import BatchScan
 from src.backtest.batch_simulation import BatchSimulation
 from src.backtest.progress import ProgressDispatcher

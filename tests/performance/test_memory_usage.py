@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from src.backtest.metrics import compute_metrics
-from src.io.legacy_ingestion import ingest_candles
+from src.data_io.legacy_ingestion import ingest_candles
 from src.models.core import Candle, TradeExecution
 
 pytestmark = pytest.mark.performance

@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from src.indicators.enrich import enrich
-from src.io.ingestion import ingest_ohlcv_data
+from src.data_io.ingestion import ingest_ohlcv_data
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def test_ingest_then_enrich_pipeline(temp_raw_csv):
 @pytest.mark.integration
 def test_pipeline_immutability(temp_raw_csv):
     """Test that enrichment doesn't mutate core ingestion result."""
-    from src.io.hash_utils import compute_dataframe_hash
+    from src.data_io.hash_utils import compute_dataframe_hash
 
     CORE_COLUMNS = ["timestamp_utc", "open", "high", "low", "close", "volume", "is_gap"]
 

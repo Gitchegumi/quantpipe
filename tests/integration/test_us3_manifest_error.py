@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from src.io.manifest import load_manifest
+from src.data_io.manifest import load_manifest
 from src.models.exceptions import DataIntegrityError
 
 pytestmark = pytest.mark.integration

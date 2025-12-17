@@ -12,7 +12,7 @@ import pytest
 
 from src.backtest.orchestrator import BacktestOrchestrator
 from src.config.parameters import StrategyParameters
-from src.io.partition_loader import (
+from src.data_io.partition_loader import (
     check_partitions_exist,
     load_both_partitions,
     load_partition,
@@ -157,7 +157,7 @@ class TestBacktestSplitMode:
 
     def test_split_mode_formatters_exist(self):
         """Test split-mode formatters are available."""
-        from src.io.formatters import format_split_mode_text, format_split_mode_json
+        from src.data_io.formatters import format_split_mode_text, format_split_mode_json
 
         assert callable(format_split_mode_text)
         assert callable(format_split_mode_json)
