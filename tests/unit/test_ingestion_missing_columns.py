@@ -1,10 +1,11 @@
 """Unit tests for missing core columns error handling (T089, FR-020)."""
+
 # pylint: disable=redefined-outer-name  # pytest fixtures
 
 import pandas as pd
 import pytest
 
-from src.io.ingestion import ingest_ohlcv_data
+from src.data_io.ingestion import ingest_ohlcv_data
 
 
 @pytest.fixture()

@@ -2,8 +2,8 @@
 
 import logging
 
-from src.io.logging_constants import MAX_PROGRESS_UPDATES, IngestionStage
-from src.io.progress import ProgressReporter
+from src.data_io.logging_constants import MAX_PROGRESS_UPDATES, IngestionStage
+from src.data_io.progress import ProgressReporter
 
 
 def test_max_progress_updates_constant():

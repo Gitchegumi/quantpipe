@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.io.ingestion import ingest_ohlcv_data
+from src.data_io.ingestion import ingest_ohlcv_data
 
 
 def test_metrics_include_throughput():
@@ -167,7 +167,6 @@ def test_metrics_throughput_calculation():
 
     finally:
         csv_path.unlink(missing_ok=True)
-
 
 
 def test_metrics_backend_reflects_use_arrow_param():

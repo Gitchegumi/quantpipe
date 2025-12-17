@@ -9,7 +9,7 @@ import hashlib
 
 import pandas as pd
 
-from src.io.duplicates import get_duplicate_mask
+from src.data_io.duplicates import get_duplicate_mask
 
 
 class TestDuplicateHandlingDeterministic:
@@ -213,9 +213,7 @@ class TestDuplicateHandlingDeterministic:
         """Test scenario where all rows after first are duplicates."""
         df = pd.DataFrame(
             {
-                "timestamp_utc": pd.to_datetime(
-                    ["2025-01-01 00:00:00"] * 5, utc=True
-                ),
+                "timestamp_utc": pd.to_datetime(["2025-01-01 00:00:00"] * 5, utc=True),
                 "value": [1, 2, 3, 4, 5],
             }
         )

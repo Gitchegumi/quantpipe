@@ -7,7 +7,7 @@ and maintains the specified column order.
 import pandas as pd
 import pytest
 
-from src.io.schema import (
+from src.data_io.schema import (
     CORE_COLUMNS,
     restrict_to_core_schema,
     validate_required_columns,

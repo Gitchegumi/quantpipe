@@ -1,10 +1,11 @@
 """Unit tests for downcast precision guard (T091, FR-011)."""
+
 # pylint: disable=redefined-outer-name  # pytest fixtures
 
 import numpy as np
 import pandas as pd
 
-from src.io.downcast import check_precision_safe, downcast_numeric_columns
+from src.data_io.downcast import check_precision_safe, downcast_numeric_columns
 
 
 def test_precision_safe_for_integers():

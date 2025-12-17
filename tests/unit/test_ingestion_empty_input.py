@@ -1,10 +1,11 @@
 """Unit tests for empty input handling (T088, FR-013)."""
+
 # pylint: disable=redefined-outer-name  # pytest fixtures
 
 import pandas as pd
 import pytest
 
-from src.io.ingestion import ingest_ohlcv_data
+from src.data_io.ingestion import ingest_ohlcv_data
 
 
 @pytest.fixture()

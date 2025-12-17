@@ -122,7 +122,7 @@ def test_ingestion_module_no_gpu_references():
 
 def test_arrow_backend_independent_of_gpu():
     """Test that Arrow backend configuration works without GPU."""
-    from src.io.arrow_config import configure_arrow_backend, detect_backend
+    from src.data_io.arrow_config import configure_arrow_backend, detect_backend
 
     # Configure backend
     result = configure_arrow_backend()
@@ -137,7 +137,7 @@ def test_arrow_backend_independent_of_gpu():
 
 def test_downcast_works_without_gpu():
     """Test that downcast operations work without GPU."""
-    from src.io.downcast import downcast_numeric_columns
+    from src.data_io.downcast import downcast_numeric_columns
 
     df = pd.DataFrame(
         {
@@ -155,7 +155,7 @@ def test_downcast_works_without_gpu():
 
 def test_gap_detection_works_without_gpu():
     """Test that gap detection works without GPU."""
-    from src.io.gaps import detect_gaps
+    from src.data_io.gaps import detect_gaps
 
     timestamps = pd.date_range("2024-01-01", periods=10, freq="1min", tz="UTC")
 

@@ -1,11 +1,12 @@
 """Unit tests for Arrow fallback warning (T092, FR-025)."""
+
 # pylint: disable=redefined-outer-name  # pytest fixtures
 
 import logging
 
 import pandas as pd
 
-from src.io.arrow_config import configure_arrow_backend, detect_backend
+from src.data_io.arrow_config import configure_arrow_backend, detect_backend
 
 
 def test_backend_detection():

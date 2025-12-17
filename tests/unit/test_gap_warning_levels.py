@@ -13,7 +13,7 @@ import logging
 
 import pandas as pd
 
-from src.io.dataset_builder import detect_gaps_and_overlaps
+from src.data_io.dataset_builder import detect_gaps_and_overlaps
 
 
 class TestGapOverlapLogging:
