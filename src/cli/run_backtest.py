@@ -64,10 +64,6 @@ from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-
 from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
 
-# Force UTF-8 encoding for stdout and stderr
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
-
 
 logger = logging.getLogger(__name__)
 
@@ -861,4 +857,7 @@ Persistent storage not yet implemented."
 
 
 if __name__ == "__main__":
+    # Force UTF-8 encoding for stdout and stderr (only when run as script)
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
     sys.exit(main())
