@@ -1,17 +1,18 @@
 """Direct test of vectorized backtest bypassing ingestion module."""
 
-import sys
 from pathlib import Path
 
+import pytest
 import polars as pl
 from datetime import datetime, timezone
 
 # Guard: Skip if test data not available (gitignored)
 DATA_PATH = Path("price_data/processed/eurusd/test/eurusd_test.parquet")
 if not DATA_PATH.exists():
-    print(f"⚠ Skipping: Test data not found at {DATA_PATH}")
-    print("  This file is gitignored. Run locally with price data to test.")
-    sys.exit(0)
+    pytest.skip(
+        f"Test data not found at {DATA_PATH} (gitignored)",
+        allow_module_level=True,
+    )
 
 print("Step 1: Loading data directly with Polars...")
 df = pl.read_parquet(DATA_PATH)
