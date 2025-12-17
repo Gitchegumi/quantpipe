@@ -713,7 +713,6 @@ Persistent storage not yet implemented."
                 memory_peak_mb=memory_peak_mb,
                 memory_ratio=memory_ratio,
                 hotspots=hotspots,  # Include cProfile hotspots
-                fraction=data_frac,  # Phase 5: US3, FR-002
             )
             logger.info("Benchmark artifact written to %s", benchmark_path)
 
