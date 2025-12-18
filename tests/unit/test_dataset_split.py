@@ -3,6 +3,7 @@
 Feature: 004-timeseries-dataset
 Task: T018 - Test partition size logic
 """
+
 # pylint: disable=unused-import
 
 from datetime import datetime, timedelta, timezone
@@ -11,7 +12,7 @@ import pandas as pd
 import pytest
 
 
-from src.io.dataset_builder import partition_data, SPLIT_RATIO
+from src.data_io.dataset_builder import partition_data, SPLIT_RATIO
 
 
 class TestPartitionLogic:

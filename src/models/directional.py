@@ -6,9 +6,10 @@ conflict tracking, directional metrics, backtest results, and
 partition-aware metrics for split-mode evaluation.
 """
 
+from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal, Optional, Union
 
 from .core import MetricsSummary, TradeSignal
 
@@ -242,10 +243,21 @@ class BacktestResult:
     data_start_date: datetime
     data_end_date: datetime
     total_candles: int
-    metrics: MetricsSummary | DirectionalMetrics
-    pair: str | None = None  # Single symbol identifier (FR-023); None for multi-symbol future aggregation
+    metrics: Optional[Union[MetricsSummary, DirectionalMetrics]] = None
+    pair: str | None = (
+        None  # Single symbol identifier (FR-023); None for multi-symbol future aggregation
+    )
     symbols: list[str] | None = None  # Multi-symbol runs (portfolio/independent batch)
+    results: dict[str, BacktestResult] | None = (
+        None  # Per-symbol results for multi-symbol runs
+    )
+    failures: list[dict[str, Any]] | None = None  # Failed symbols in multi-symbol runs
     signals: list[TradeSignal] | None = None
     executions: list | None = None  # TradeExecution list (avoid circular import)
     conflicts: list[ConflictEvent] = field(default_factory=list)
     dry_run: bool = False
+
+    @property
+    def is_multi_symbol(self) -> bool:
+        """Check if result covers multiple symbols."""
+        return self.symbols is not None and len(self.symbols) > 1

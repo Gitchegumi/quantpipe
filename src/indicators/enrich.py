@@ -13,7 +13,7 @@ from typing import Any
 import pandas as pd
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-from src.io.hash_utils import compute_dataframe_hash
+from src.data_io.hash_utils import compute_dataframe_hash
 from src.indicators.errors import (
     DuplicateIndicatorError,
     ImmutabilityViolationError,
@@ -113,9 +113,7 @@ def enrich(
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
     ) as progress_bar:
-        task = progress_bar.add_task(
-            "Computing indicators...", total=len(indicators)
-        )
+        task = progress_bar.add_task("Computing indicators...", total=len(indicators))
 
         for indicator_name in indicators:
             spec = registry.get(indicator_name)
@@ -152,9 +150,7 @@ def enrich(
 
             # Compute indicator
             try:
-                progress_bar.update(
-                    task, description=f"Computing {indicator_name}..."
-                )
+                progress_bar.update(task, description=f"Computing {indicator_name}...")
                 indicator_params = params.get(indicator_name, spec.params)
                 result = spec.compute(enriched_df, indicator_params)
 

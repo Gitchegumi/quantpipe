@@ -43,6 +43,7 @@ class ProgressDispatcher:
         stride: int = PROGRESS_STRIDE_ITEMS,
         time_fallback_sec: float = PROGRESS_MAX_INTERVAL_SECONDS,
         description: str = "Scanning",
+        show_progress: bool = True,
     ):
         """Initialize progress dispatcher.
 
@@ -51,11 +52,13 @@ class ProgressDispatcher:
             stride: Emit progress every N items (default: 16384)
             time_fallback_sec: Maximum seconds between updates (default: 120)
             description: Description shown in progress bar (default: "Scanning")
+            show_progress: If True, display rich progress bars (default: True)
         """
         self.total_items = total_items
         self.stride = stride
         self.time_fallback_sec = time_fallback_sec
         self.description = description
+        self.show_progress = show_progress
         self._start_time: Optional[float] = None
         self._last_update_time: Optional[float] = None
         self._update_count = 0
@@ -77,17 +80,18 @@ class ProgressDispatcher:
         self._last_update_time = self._start_time
         logger.debug("Progress tracking started for %d items", self.total_items)
 
-        # Create Rich progress bar
-        self._progress = Progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeElapsedColumn(),
-        )
-        self._progress.start()
-        self._task_id = self._progress.add_task(
-            self.description, total=self.total_items
-        )
+        # Create Rich progress bar only if show_progress is True
+        if self.show_progress:
+            self._progress = Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TimeElapsedColumn(),
+            )
+            self._progress.start()
+            self._task_id = self._progress.add_task(
+                self.description, total=self.total_items
+            )
 
     def update(self, current_item: int) -> None:
         """Update progress if stride or time threshold met.
@@ -99,7 +103,7 @@ class ProgressDispatcher:
             Automatically determines whether to emit based on stride and time.
             Does nothing if thresholds not met to minimize overhead.
         """
-        if self._start_time is None or self._progress is None:
+        if self._start_time is None or not self.show_progress:
             return
 
         # Check stride threshold (modulo for efficiency)
@@ -114,7 +118,8 @@ class ProgressDispatcher:
             progress_start = time.perf_counter()
 
             # Update Rich progress bar
-            self._progress.update(self._task_id, completed=current_item)
+            if self._progress and self._task_id is not None:
+                self._progress.update(self._task_id, completed=current_item)
 
             progress_end = time.perf_counter()
             self._total_progress_time += progress_end - progress_start
@@ -145,7 +150,7 @@ class ProgressDispatcher:
 
         # Complete progress bar
         progress_start = time.perf_counter()
-        if self._progress is not None:
+        if self._progress and self._task_id is not None:
             self._progress.update(self._task_id, completed=self.total_items)
             self._progress.stop()
         progress_end = time.perf_counter()

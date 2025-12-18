@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import jsonschema
 
-from src.io.formatters import (
+from src.data_io.formatters import (
     format_json_output,
     format_text_output,
     generate_output_filename,

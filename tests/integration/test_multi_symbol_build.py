@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.io.dataset_builder import build_all_symbols
+from src.data_io.dataset_builder import build_all_symbols
 from src.models.metadata import BuildSummary, SkipReason
 
 

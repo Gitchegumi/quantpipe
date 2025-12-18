@@ -163,7 +163,10 @@ class BatchSimulation:
         # Initialize progress tracking
         progress: Optional[ProgressDispatcher] = None
         if self.enable_progress:
-            progress = ProgressDispatcher(total_items=n_signals)
+            progress = ProgressDispatcher(
+                total_items=n_signals,
+                show_progress=self.enable_progress,
+            )
             progress.start()
 
         # Initialize position state arrays

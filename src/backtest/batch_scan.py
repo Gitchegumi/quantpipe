@@ -155,7 +155,9 @@ class BatchScan:
         progress: Optional[ProgressDispatcher] = None
         if self.enable_progress:
             progress = ProgressDispatcher(
-                total_items=len(timestamps), description="Scanning signals"
+                total_items=len(timestamps),
+                description="Scanning signals",
+                show_progress=self.enable_progress,
             )
             progress.start()
 

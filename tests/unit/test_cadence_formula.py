@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from src.io.cadence import (
+from src.data_io.cadence import (
     compute_cadence_deviation,
     compute_expected_intervals,
     validate_cadence_uniformity,

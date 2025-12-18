@@ -12,7 +12,7 @@ from typing import Optional
 from src.backtest.orchestrator import BacktestOrchestrator
 from src.backtest.portfolio.errors import PortfolioError
 from src.config.parameters import StrategyParameters
-from src.io.legacy_ingestion import ingest_candles
+from src.data_io.legacy_ingestion import ingest_candles
 from src.models.directional import BacktestResult
 from src.models.enums import DirectionMode
 from src.models.portfolio import CurrencyPair, SymbolConfig

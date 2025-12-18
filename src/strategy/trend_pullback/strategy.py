@@ -28,7 +28,7 @@ class TrendPullbackStrategy(Strategy):
         return StrategyMetadata(
             name="trend-pullback",
             version="1.0.0",
-            required_indicators=["ema20", "ema50", "atr14", "stoch_rsi"],
+            required_indicators=["ema20", "ema50", "atr14", "rsi14", "stoch_rsi"],
             tags=["trend-following", "pullback", "momentum"],
         )
 

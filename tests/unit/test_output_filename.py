@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timezone
 
-from src.io.formatters import generate_output_filename, format_text_output
+from src.data_io.formatters import generate_output_filename, format_text_output
 from src.models.directional import BacktestResult
 from src.models.enums import DirectionMode, OutputFormat
 from src.models.core import MetricsSummary

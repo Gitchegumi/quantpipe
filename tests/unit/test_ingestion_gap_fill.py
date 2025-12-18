@@ -6,7 +6,7 @@ rows, with proper forward-fill logic and gap flagging.
 
 import pandas as pd
 
-from src.io.gap_fill import fill_gaps_vectorized
+from src.data_io.gap_fill import fill_gaps_vectorized
 
 
 class TestGapSynthesisCorrectness:
@@ -69,9 +69,7 @@ class TestGapSynthesisCorrectness:
 
         # Gap row should be at index 2
         gap_row = result[result["is_gap"]].iloc[0]
-        assert gap_row["timestamp_utc"] == pd.Timestamp(
-            "2025-01-01 00:02:00", tz="UTC"
-        )
+        assert gap_row["timestamp_utc"] == pd.Timestamp("2025-01-01 00:02:00", tz="UTC")
 
         # Gap row OHLC should match previous close
         assert gap_row["open"] == 1.11
@@ -210,9 +208,7 @@ class TestGapSynthesisCorrectness:
 
         # Gap should be at 00:05:00
         gap_row = result[result["is_gap"]].iloc[0]
-        assert gap_row["timestamp_utc"] == pd.Timestamp(
-            "2025-01-01 00:05:00", tz="UTC"
-        )
+        assert gap_row["timestamp_utc"] == pd.Timestamp("2025-01-01 00:05:00", tz="UTC")
 
     def test_gap_fill_zero_tolerance(self):
         """Test that gap filling has zero tolerance for missing intervals."""
@@ -270,9 +266,7 @@ class TestGapSynthesisCorrectness:
     def test_gap_fill_large_dataset_performance(self):
         """Test that gap filling scales efficiently with large datasets."""
         # Create dataset with 10,000 rows and scattered gaps
-        timestamps = pd.date_range(
-            "2025-01-01", periods=10000, freq="1min", tz="UTC"
-        )
+        timestamps = pd.date_range("2025-01-01", periods=10000, freq="1min", tz="UTC")
 
         # Remove some rows to create gaps
         keep_mask = pd.Series([True] * 10000)

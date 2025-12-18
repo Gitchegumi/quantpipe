@@ -49,7 +49,7 @@ def test_columnar_memory_within_sc006_limit(
     SC-006: Memory for 5M rows ≤650 MB (columnar mode).
     NFR-002: Memory footprint must stay within acceptable limits.
     """
-    from src.io.ingestion import ingest_ohlcv_data
+    from src.data_io.ingestion import ingest_ohlcv_data
 
     # Force garbage collection
     gc.collect()
@@ -90,7 +90,7 @@ def test_iterator_memory_constant(
 
     Iterator mode should not load entire dataset into memory.
     """
-    from src.io.ingestion import ingest_ohlcv_data
+    from src.data_io.ingestion import ingest_ohlcv_data
 
     gc.collect()
     memory_before = get_process_memory_mb()
@@ -129,7 +129,7 @@ def test_iterator_memory_constant(
 
 def test_downcast_reduces_memory():
     """Test that downcast=True reduces memory footprint."""
-    from src.io.ingestion import ingest_ohlcv_data
+    from src.data_io.ingestion import ingest_ohlcv_data
 
     # Create small dataset for comparison
     with tempfile.NamedTemporaryFile(
@@ -202,7 +202,7 @@ def test_downcast_reduces_memory():
 
 def test_memory_scales_linearly():
     """Test that memory usage scales linearly with dataset size."""
-    from src.io.ingestion import ingest_ohlcv_data
+    from src.data_io.ingestion import ingest_ohlcv_data
 
     sizes = [100_000, 500_000, 1_000_000]
     memory_per_row = []
@@ -268,7 +268,7 @@ def test_memory_scales_linearly():
 
 def test_memory_cleanup_after_ingestion():
     """Test that memory is properly released after ingestion completes."""
-    from src.io.ingestion import ingest_ohlcv_data
+    from src.data_io.ingestion import ingest_ohlcv_data
 
     # Create dataset
     with tempfile.NamedTemporaryFile(

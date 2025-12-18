@@ -111,7 +111,7 @@ class TestFlakinessSmoke:
 
         from src.backtest.orchestrator import BacktestOrchestrator
         from src.config.parameters import StrategyParameters
-        from src.io.legacy_ingestion import ingest_candles
+        from src.data_io.legacy_ingestion import ingest_candles
         from src.models.enums import DirectionMode
 
         data_path = Path("price_data/eurusd/DAT_MT_EURUSD_M1_2020.csv")

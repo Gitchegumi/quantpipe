@@ -9,8 +9,8 @@ import pytest
 
 from src.backtest.orchestrator import BacktestOrchestrator
 from src.config.parameters import StrategyParameters
-from src.io.formatters import format_json_output, format_text_output
-from src.io.legacy_ingestion import ingest_candles
+from src.data_io.formatters import format_json_output, format_text_output
+from src.data_io.legacy_ingestion import ingest_candles
 from src.models.enums import DirectionMode
 
 pytestmark = pytest.mark.integration

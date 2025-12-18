@@ -4,10 +4,11 @@ Feature: 008-multi-symbol
 Task: T015 - Verify filename pattern unchanged for single-symbol run
 User Story: US1 - Single Symbol Regression
 """
+
 import re
 from datetime import UTC, datetime
 
-from src.io.formatters import generate_output_filename
+from src.data_io.formatters import generate_output_filename
 from src.models.enums import DirectionMode, OutputFormat
 
 
@@ -32,9 +33,9 @@ class TestSingleSymbolFilenamePattern:
 
         # Should match: backtest_{direction}_{YYYYMMDD}_{HHMMSS}.txt
         pattern = r"^backtest_long_\d{8}_\d{6}\.txt$"
-        assert re.match(pattern, filename), (
-            f"Filename '{filename}' does not match expected pattern"
-        )
+        assert re.match(
+            pattern, filename
+        ), f"Filename '{filename}' does not match expected pattern"
         assert filename == "backtest_long_20251106_143045.txt"
 
     def test_filename_with_symbol_tag(self):
@@ -55,9 +56,9 @@ class TestSingleSymbolFilenamePattern:
 
         # Should match: backtest_{direction}_{symbol}_{YYYYMMDD}_{HHMMSS}.txt
         pattern = r"^backtest_both_eurusd_\d{8}_\d{6}\.txt$"
-        assert re.match(pattern, filename), (
-            f"Filename '{filename}' does not match expected pattern"
-        )
+        assert re.match(
+            pattern, filename
+        ), f"Filename '{filename}' does not match expected pattern"
         assert filename == "backtest_both_eurusd_20251106_143045.txt"
 
     def test_filename_directions(self):

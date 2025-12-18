@@ -5,8 +5,10 @@ and restricting output to only required columns.
 """
 
 import logging
+from typing import Union
 
 import pandas as pd
+from polars import DataFrame as PolarsDataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +34,19 @@ REQUIRED_INPUT_COLUMNS = [
 ]
 
 
-def validate_required_columns(df: pd.DataFrame) -> None:
+def validate_required_columns(df: Union[pd.DataFrame, PolarsDataFrame]) -> None:
     """Validate that all required columns are present.
 
     Args:
-        df: DataFrame to validate.
+        df: DataFrame to validate (Pandas or Polars).
 
     Raises:
         ValueError: If any required columns are missing.
     """
-    missing_columns = set(REQUIRED_INPUT_COLUMNS) - set(df.columns)
+    if isinstance(df, PolarsDataFrame):
+        missing_columns = set(REQUIRED_INPUT_COLUMNS) - set(df.columns)
+    else:
+        missing_columns = set(REQUIRED_INPUT_COLUMNS) - set(df.columns)
 
     if missing_columns:
         raise ValueError(
@@ -51,14 +56,15 @@ def validate_required_columns(df: pd.DataFrame) -> None:
     logger.debug("Required columns validation passed")
 
 
-def restrict_to_core_schema(df: pd.DataFrame) -> pd.DataFrame:
+def restrict_to_core_schema(df: Union[pd.DataFrame, PolarsDataFrame], is_polars: bool = False) -> Union[pd.DataFrame, PolarsDataFrame]:
     """Restrict DataFrame to core schema columns only.
 
     Args:
-        df: DataFrame to restrict.
+        df: DataFrame to restrict (Pandas or Polars).
+        is_polars: If True, df is a Polars DataFrame.
 
     Returns:
-        pd.DataFrame: DataFrame with only core columns.
+        pd.DataFrame | pl.DataFrame: DataFrame with only core columns.
 
     Raises:
         ValueError: If any core columns are missing.
@@ -72,7 +78,10 @@ def restrict_to_core_schema(df: pd.DataFrame) -> pd.DataFrame:
         )
 
     # Select only core columns in the specified order
-    restricted_df = df[CORE_COLUMNS].copy()
+    if is_polars:
+        restricted_df = df.select(CORE_COLUMNS)
+    else:
+        restricted_df = df[CORE_COLUMNS].copy()
 
     logger.debug(
         "Restricted to core schema: %d columns -> %d columns",

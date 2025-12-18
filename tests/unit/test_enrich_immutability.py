@@ -1,11 +1,12 @@
 """Unit tests for enrichment immutability - core hash unchanged after enrichment."""
+
 # pylint: disable=redefined-outer-name  # pytest fixtures
 
 import pandas as pd
 import pytest
 
 from src.indicators.enrich import enrich
-from src.io.hash_utils import compute_dataframe_hash
+from src.data_io.hash_utils import compute_dataframe_hash
 
 
 CORE_COLUMNS = ["timestamp_utc", "open", "high", "low", "close", "volume", "is_gap"]
@@ -128,9 +129,7 @@ def test_immutability_with_params(core_dataframe):
     hash_before = compute_dataframe_hash(core_dataframe, CORE_COLUMNS)
 
     params = {"ema20": {"period": 20, "column": "close"}}
-    result = enrich(
-        core_dataframe, indicators=["ema20"], params=params, strict=True
-    )
+    result = enrich(core_dataframe, indicators=["ema20"], params=params, strict=True)
 
     hash_after = compute_dataframe_hash(result.enriched, CORE_COLUMNS)
     assert hash_before == hash_after

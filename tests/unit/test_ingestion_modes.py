@@ -1,4 +1,5 @@
 """Unit tests for ingestion mode selection and validation (T064, T065)."""
+
 # pylint: disable=redefined-outer-name  # pytest fixtures
 
 from datetime import datetime
@@ -6,8 +7,8 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from src.io.ingestion import ingest_ohlcv_data
-from src.io.iterator_mode import CoreCandleRecord, DataFrameIteratorWrapper
+from src.data_io.ingestion import ingest_ohlcv_data
+from src.data_io.iterator_mode import CoreCandleRecord, DataFrameIteratorWrapper
 
 
 @pytest.fixture()

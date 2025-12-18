@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from src.io.ingestion.manifest import Manifest
+from src.data_io.ingestion.manifest import Manifest
 
 
 def test_manifest_required_fields():

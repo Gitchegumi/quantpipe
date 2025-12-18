@@ -7,7 +7,7 @@ and raises appropriate errors when deviation exceeds 2% tolerance.
 import pandas as pd
 import pytest
 
-from src.io.cadence import (
+from src.data_io.cadence import (
     compute_cadence_minutes,
     validate_cadence,
 )
@@ -100,9 +100,7 @@ class TestCadenceValidationErrors:
         )
 
         with pytest.raises(RuntimeError):
-            validate_cadence(
-                df["timestamp_utc"], expected_minutes=1, tolerance=0.02
-            )
+            validate_cadence(df["timestamp_utc"], expected_minutes=1, tolerance=0.02)
 
     def test_many_small_gaps_raise_error(self):
         """Test that many small gaps can accumulate to exceed tolerance."""

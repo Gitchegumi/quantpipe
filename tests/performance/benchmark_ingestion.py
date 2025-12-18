@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from src.io.ingestion import ingest_ohlcv_data
+from src.data_io.ingestion import ingest_ohlcv_data
 
 
 logger = logging.getLogger(__name__)

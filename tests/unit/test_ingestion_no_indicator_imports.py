@@ -32,7 +32,7 @@ def test_ingestion_has_no_indicator_imports():
         "src.indicators",
         "indicators.",
         "indicator",  # Catch generic indicator imports
-        "src.io.enrich",  # Enrichment should not be in ingestion
+        "src.data_io.enrich",  # Enrichment should not be in ingestion
     ]
 
     violations = []
@@ -110,34 +110,34 @@ def test_enrich_module_exists_separately():
 
 def test_ingestion_only_imports_core_utilities():
     """Test that ingestion only imports core utilities, not business logic."""
-    ingestion_file = Path("src/io/ingestion.py")
+    ingestion_file = Path("src/data_io/ingestion.py")
     content = ingestion_file.read_text(encoding="utf-8")
     tree = ast.parse(content, filename=str(ingestion_file))
 
-    # Collect all imports from src.io
+    # Collect all imports from src.data_io
     io_imports = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
-            if node.module and node.module.startswith("src.io"):
+            if node.module and node.module.startswith("src.data_io"):
                 for alias in node.names:
                     io_imports.append((node.module, alias.name))
 
     # Allowed core utilities
     allowed_modules = {
-        "src.io.arrow_config",
-        "src.io.cadence",
-        "src.io.duplicates",
-        "src.io.gaps",
-        "src.io.gap_fill",
-        "src.io.downcast",
-        "src.io.perf_utils",
-        "src.io.progress",
-        "src.io.schema",
-        "src.io.timezone_validate",
-        "src.io.hash_utils",
-        "src.io.iterator_mode",
-        "src.io.errors",
-        "src.io.logging_constants",  # Progress stage names
+        "src.data_io.arrow_config",
+        "src.data_io.cadence",
+        "src.data_io.duplicates",
+        "src.data_io.gaps",
+        "src.data_io.gap_fill",
+        "src.data_io.downcast",
+        "src.data_io.perf_utils",
+        "src.data_io.progress",
+        "src.data_io.schema",
+        "src.data_io.timezone_validate",
+        "src.data_io.hash_utils",
+        "src.data_io.iterator_mode",
+        "src.data_io.errors",
+        "src.data_io.logging_constants",  # Progress stage names
     }
 
     # Check for unexpected imports

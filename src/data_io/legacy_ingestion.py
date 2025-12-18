@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from ..indicators.enrich import enrich
-from ..io.ingestion import ingest_ohlcv_data
+from ..data_io.ingestion import ingest_ohlcv_data
 from ..models.core import Candle
 
 
