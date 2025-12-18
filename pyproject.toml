@@ -128,3 +128,6 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+markers = [
+    "local_data: marks tests requiring local gitignored data files (skipped in CI)",
+]
