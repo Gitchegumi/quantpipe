@@ -11,7 +11,7 @@ def test_ingestion_has_no_indicator_imports():
     This enforces architectural separation: ingestion produces core dataset only,
     indicators are added via separate enrichment step.
     """
-    ingestion_file = Path("src/io/ingestion.py")
+    ingestion_file = Path("src/data_io/ingestion.py")
     assert ingestion_file.exists(), f"File not found: {ingestion_file}"
 
     content = ingestion_file.read_text(encoding="utf-8")
@@ -49,7 +49,7 @@ def test_ingestion_has_no_indicator_imports():
 
 def test_ingestion_module_no_indicator_references():
     """Test that ingestion module has no string references to indicator names."""
-    ingestion_file = Path("src/io/ingestion.py")
+    ingestion_file = Path("src/data_io/ingestion.py")
     content = ingestion_file.read_text(encoding="utf-8")
 
     # Common indicator names that should NOT appear in ingestion
@@ -100,7 +100,7 @@ def test_enrich_module_exists_separately():
     """Test that enrichment functionality exists in separate module."""
     # Check for enrichment at either location
     enrich_locations = [
-        Path("src/io/enrich.py"),
+        Path("src/data_io/enrich.py"),
         Path("src/indicators/enrich.py"),
     ]
 
@@ -138,6 +138,7 @@ def test_ingestion_only_imports_core_utilities():
         "src.data_io.iterator_mode",
         "src.data_io.errors",
         "src.data_io.logging_constants",  # Progress stage names
+        "src.data_io.parquet_cache",  # Parquet caching for performance
     }
 
     # Check for unexpected imports
