@@ -642,11 +642,34 @@ class BacktestOrchestrator:
 
         # 1. Generate Signals Vectorized
         self._start_phase("scan")
-        signals = generate_signals_vectorized(
-            data,
-            parameters={"pair": pair, **signal_params},
-            direction_mode=self.direction_mode.name,
-        )
+
+        # Show progress spinner during signal generation
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            transient=True,  # Remove progress bar when done
+        ) as progress:
+            task = progress.add_task(
+                f"[cyan]Generating signals for {pair}...", total=None
+            )
+
+            signals = generate_signals_vectorized(
+                data,
+                parameters={"pair": pair, **signal_params},
+                direction_mode=self.direction_mode.name,
+            )
+
+            # Update with completion
+            progress.update(
+                task,
+                description=f"[green]Generated {len(signals):,} signals",
+                completed=100,
+                total=100,
+            )
+
         self._end_phase("scan")
 
         logger.info("Generated %d signals (vectorized)", len(signals))
@@ -658,121 +681,156 @@ class BacktestOrchestrator:
         if not self.dry_run and signals:
             self._start_phase("simulate")
 
-            # Use improved vectorized simulation (requires converting Polars to Pandas/NumPy for now)
-            # Future: pure Polars simulation
-            price_data_pd = data.select(
-                ["high", "low", "close", "timestamp_utc"]
-            ).to_pandas()
-
-            # Map signals to entry dicts
-            # We need entry_index. Since 'data' is chronologically sorted, we can use row index.
-            # But signals have timestamps.
-            # Efficient way: Map signal timestamp to index.
-            # Since signals were generated from 'data', the timestamp match should be exact.
-
-            # Create a map of timestamp -> index
-            # This is overhead. Ideally signal generator returns indices.
-            # But abstracting TradeSignal is good.
-
-            # Optimization:
-            # If signals are sorted and data is sorted, we can search sorted.
-            timestamp_map = {
-                ts: idx for idx, ts in enumerate(price_data_pd["timestamp_utc"])
-            }
-
-            entries = []
-            for sig in signals:
-                idx = timestamp_map.get(sig.timestamp_utc)
-                if idx is not None:
-                    # Calculate SL/TP pct
-                    risk_distance = abs(sig.entry_price - sig.initial_stop_price)
-                    # avoid div by zero
-                    if sig.entry_price == 0:
-                        continue
-
-                    stop_loss_pct = risk_distance / sig.entry_price
-                    # Default 2R target if not specified?
-                    # signal info doesn't have target price explicitly usually, it uses R-multiple.
-                    # existing code used risk_distance * 2.0
-                    target_pct = (
-                        risk_distance * signal_params.get("target_r_mult", 2.0)
-                    ) / sig.entry_price
-
-                    entries.append(
-                        {
-                            "signal": sig,
-                            "entry_index": idx,
-                            "entry_price": sig.entry_price,
-                            "side": sig.direction,
-                            "stop_loss_pct": stop_loss_pct,
-                            "take_profit_pct": target_pct,
-                        }
-                    )
-
-            if entries:
-                # Re-use existing simulation batch logic for now (it's numpy based)
-                # Converting to dataframe was done above
-                sim_results = simulate_trades_batch(
-                    entries,
-                    price_data_pd,
-                    stop_loss_pct=entries[0][
-                        "stop_loss_pct"
-                    ],  # approximated, loop actually supports per-trade? No, function signature has fixed SL/TP
+            # Show progress bar during simulation
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                transient=True,
+            ) as progress:
+                sim_task = progress.add_task(
+                    f"[cyan]Simulating {len(signals):,} trades...", total=len(signals)
                 )
 
-                # Wait, simulate_trades_batch takes fixed SL/TP?
-                # def simulate_trades_batch(..., stop_loss_pct=0.02, ...)
-                # Yes. The current implementation doesn't support per-trade SL/TP.
-                # See TODO in _simulate_batch line 205: "TODO: Support per-trade SL/TP in simulate_trades_batch"
+                # Use improved vectorized simulation (requires converting Polars to Pandas/NumPy for now)
+                # Future: pure Polars simulation
+                price_data_pd = data.select(
+                    ["high", "low", "close", "timestamp_utc"]
+                ).to_pandas()
 
-                # To support dynamic SL/TP (which we have), we need to update simulate_trades_batch
-                # or pass the global average?
-                # Using per-trade values is critical for correctness.
-                # I should update simulate_trades_batch to accept sl/tp in entries.
+                # Map signals to entry dicts
+                # We need entry_index. Since 'data' is chronologically sorted, we can use row index.
+                # But signals have timestamps.
+                # Efficient way: Map signal timestamp to index.
+                # Since signals were generated from 'data', the timestamp match should be exact.
 
-                results = simulate_trades_batch(entries, price_data_pd)
+                # Create a map of timestamp -> index
+                # This is overhead. Ideally signal generator returns indices.
+                # But abstracting TradeSignal is good.
 
-                # Convert back to executions
-                for res, entry in zip(results, entries, strict=False):
-                    if res.get("exit_index") is None:
-                        continue
+                # Optimization:
+                # If signals are sorted and data is sorted, we can search sorted.
+                timestamp_map = {
+                    ts: idx for idx, ts in enumerate(price_data_pd["timestamp_utc"])
+                }
 
-                    sig = entry["signal"]
-                    exit_reason_map = {
-                        "STOP_LOSS": "STOP_LOSS",
-                        "TAKE_PROFIT": "TARGET",
-                        "END_OF_DATA": "EXPIRY",
-                    }
-                    exit_reason = exit_reason_map.get(
-                        res["exit_reason"], res["exit_reason"]
-                    )
+                entries = []
+                for i, sig in enumerate(signals):
+                    idx = timestamp_map.get(sig.timestamp_utc)
+                    if idx is not None:
+                        # Calculate SL/TP pct
+                        risk_distance = abs(sig.entry_price - sig.initial_stop_price)
+                        # avoid div by zero
+                        if sig.entry_price == 0:
+                            progress.update(sim_task, advance=1)
+                            continue
 
-                    # Recalculate R based on actual result
-                    pnl_r = (
-                        res["pnl"] / entry["stop_loss_pct"]
-                        if entry["stop_loss_pct"]
-                        else 0
-                    )
+                        stop_loss_pct = risk_distance / sig.entry_price
+                        # Default 2R target if not specified?
+                        # signal info doesn't have target price explicitly usually, it uses R-multiple.
+                        # existing code used risk_distance * 2.0
+                        target_pct = (
+                            risk_distance * signal_params.get("target_r_mult", 2.0)
+                        ) / sig.entry_price
 
-                    executions.append(
-                        TradeExecution(
-                            signal_id=sig.id,
-                            direction=sig.direction,
-                            open_timestamp=data["timestamp_utc"][
-                                entry["entry_index"]
-                            ],  # expensive lookup? slice.
-                            entry_fill_price=res.get(
-                                "entry_price", entry["entry_price"]
-                            ),
-                            close_timestamp=data["timestamp_utc"][res["exit_index"]],
-                            exit_fill_price=res["exit_price"],
-                            exit_reason=exit_reason,
-                            pnl_r=pnl_r,
-                            slippage_entry_pips=0.5,
-                            slippage_exit_pips=0.5,
-                            costs_total=0.0,
+                        entries.append(
+                            {
+                                "signal": sig,
+                                "entry_index": idx,
+                                "entry_price": sig.entry_price,
+                                "side": sig.direction,
+                                "stop_loss_pct": stop_loss_pct,
+                                "take_profit_pct": target_pct,
+                            }
                         )
+
+                    # Update progress every 1000 signals to avoid overhead
+                    if i % 1000 == 0 or i == len(signals) - 1:
+                        progress.update(sim_task, completed=i + 1)
+
+                if entries:
+                    progress.update(
+                        sim_task,
+                        description=f"[cyan]Running batch simulation ({len(entries):,} trades)...",
                     )
+
+                    # Re-use existing simulation batch logic for now (it's numpy based)
+                    # Converting to dataframe was done above
+                    sim_results = simulate_trades_batch(
+                        entries,
+                        price_data_pd,
+                        stop_loss_pct=entries[0][
+                            "stop_loss_pct"
+                        ],  # approximated, loop actually supports per-trade? No, function signature has fixed SL/TP
+                    )
+
+                    # Wait, simulate_trades_batch takes fixed SL/TP?
+                    # def simulate_trades_batch(..., stop_loss_pct=0.02, ...)
+                    # Yes. The current implementation doesn't support per-trade SL/TP.
+                    # See TODO in _simulate_batch line 205: "TODO: Support per-trade SL/TP in simulate_trades_batch"
+
+                    # To support dynamic SL/TP (which we have), we need to update simulate_trades_batch
+                    # or pass the global average?
+                    # Using per-trade values is critical for correctness.
+                    # I should update simulate_trades_batch to accept sl/tp in entries.
+
+                    results = simulate_trades_batch(entries, price_data_pd)
+
+                    progress.update(
+                        sim_task, description="[cyan]Processing execution results..."
+                    )
+
+                    # Convert back to executions
+                    for res, entry in zip(results, entries, strict=False):
+                        if res.get("exit_index") is None:
+                            continue
+
+                        sig = entry["signal"]
+                        exit_reason_map = {
+                            "STOP_LOSS": "STOP_LOSS",
+                            "TAKE_PROFIT": "TARGET",
+                            "END_OF_DATA": "EXPIRY",
+                        }
+                        exit_reason = exit_reason_map.get(
+                            res["exit_reason"], res["exit_reason"]
+                        )
+
+                        # Recalculate R based on actual result
+                        pnl_r = (
+                            res["pnl"] / entry["stop_loss_pct"]
+                            if entry["stop_loss_pct"]
+                            else 0
+                        )
+
+                        executions.append(
+                            TradeExecution(
+                                signal_id=sig.id,
+                                direction=sig.direction,
+                                open_timestamp=data["timestamp_utc"][
+                                    entry["entry_index"]
+                                ],  # expensive lookup? slice.
+                                entry_fill_price=res.get(
+                                    "entry_price", entry["entry_price"]
+                                ),
+                                close_timestamp=data["timestamp_utc"][
+                                    res["exit_index"]
+                                ],
+                                exit_fill_price=res["exit_price"],
+                                exit_reason=exit_reason,
+                                pnl_r=pnl_r,
+                                slippage_entry_pips=0.5,
+                                slippage_exit_pips=0.5,
+                                costs_total=0.0,
+                            )
+                        )
+
+                progress.update(
+                    sim_task,
+                    description=f"[green]Completed {len(executions):,} executions",
+                    completed=len(signals),
+                )
 
             self._end_phase("simulate")
 
