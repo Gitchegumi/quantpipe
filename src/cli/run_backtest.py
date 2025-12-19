@@ -147,6 +147,123 @@ def construct_data_paths(
     return pair_paths
 
 
+def run_portfolio_backtest(
+    pair_paths: list[tuple[str, Path]],
+    direction_mode: DirectionMode,
+    strategy_params,
+    starting_equity: float = 2500.0,
+    dry_run: bool = False,
+    show_progress: bool = True,
+):
+    """Run time-synchronized portfolio backtest with shared equity.
+
+    All symbols trade against a shared running balance. Trades execute
+    chronologically, with wins/losses affecting capital available for
+    subsequent trades.
+
+    Args:
+        pair_paths: List of (pair, path) tuples from construct_data_paths()
+        direction_mode: Direction mode (LONG/SHORT/BOTH)
+        strategy_params: Strategy parameters to use
+        starting_equity: Starting portfolio capital ($2,500 default)
+        dry_run: If True, generate signals only without execution
+        show_progress: If True, show progress bars
+
+    Returns:
+        PortfolioResult with equity curve and trade breakdown
+    """
+    import polars as pl
+
+    from ..backtest.portfolio.portfolio_simulator import PortfolioSimulator
+    from ..indicators.dispatcher import calculate_indicators
+    from ..strategy.trend_pullback.signal_generator_vectorized import (
+        generate_signals_vectorized,
+    )
+    from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
+
+    logger.info(
+        "Portfolio backtest: Loading %d symbols with $%.2f starting capital",
+        len(pair_paths),
+        starting_equity,
+    )
+
+    # Phase 1: Load and enrich ALL symbol data first
+    symbol_data: dict[str, pl.DataFrame] = {}
+    for pair, data_path in pair_paths:
+        logger.info("Loading data for %s from %s", pair, data_path)
+
+        use_arrow = data_path.suffix.lower() == ".parquet"
+        ingestion_result = ingest_ohlcv_data(
+            path=data_path,
+            timeframe_minutes=1,
+            mode="columnar",
+            downcast=False,
+            use_arrow=use_arrow,
+            strict_cadence=False,
+            fill_gaps=False,
+            return_polars=True,
+        )
+
+        enriched_df = ingestion_result.data
+        if not isinstance(enriched_df, pl.DataFrame):
+            enriched_df = pl.from_pandas(enriched_df)
+
+        # Rename timestamp if needed
+        if "timestamp" in enriched_df.columns:
+            enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
+
+        # Calculate indicators
+        strategy = TREND_PULLBACK_STRATEGY
+        required_indicators = strategy.metadata.required_indicators
+        enriched_df = calculate_indicators(enriched_df, required_indicators)
+
+        symbol_data[pair] = enriched_df
+        logger.info(
+            "Loaded %s: %d bars, %s to %s",
+            pair,
+            len(enriched_df),
+            enriched_df["timestamp_utc"][0],
+            enriched_df["timestamp_utc"][-1],
+        )
+
+    # Phase 2: Generate signals for all symbols
+    symbol_signals: dict[str, list] = {}
+    for pair, df in symbol_data.items():
+        logger.info("Generating signals for %s", pair)
+
+        signals = generate_signals_vectorized(
+            df,
+            pair=pair,
+            direction_mode=direction_mode,
+            strategy=TREND_PULLBACK_STRATEGY,
+            **strategy_params.model_dump(),
+        )
+        symbol_signals[pair] = signals
+        logger.info("Generated %d signals for %s", len(signals), pair)
+
+    # Phase 3: Run portfolio simulation
+    simulator = PortfolioSimulator(
+        starting_equity=starting_equity,
+        risk_per_trade=0.0025,  # 0.25%
+        max_positions_per_symbol=1,
+        target_r_mult=strategy_params.target_r_mult,
+    )
+
+    run_id = (
+        f"portfolio_{direction_mode.value.lower()}_"
+        f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    )
+
+    result = simulator.simulate(
+        symbol_data=symbol_data,
+        symbol_signals=symbol_signals,
+        direction_mode=direction_mode.value,
+        run_id=run_id,
+    )
+
+    return result
+
+
 def run_multi_symbol_backtest(
     pair_paths: list[tuple[str, Path]],
     direction_mode: DirectionMode,
@@ -232,7 +349,6 @@ def run_multi_symbol_backtest(
             )
 
             # Run backtest
-            from datetime import datetime, timezone
 
             run_id = (
                 f"{pair.lower()}_{direction_mode.value.lower()}_"
@@ -516,6 +632,16 @@ def main():
 (default: True for multi-strategy)",
     )
 
+    # Multi-symbol portfolio mode (013-multi-symbol-backtest)
+    parser.add_argument(
+        "--portfolio-mode",
+        action="store_true",
+        help="Enable time-synchronized portfolio simulation with shared equity. "
+        "When enabled, all symbols trade against a shared running balance, "
+        "wins/losses affect capital available for subsequent trades. "
+        "Default: Independent mode (each symbol runs in isolation).",
+    )
+
     parser.add_argument(
         "--no-aggregate",
         action="store_true",
@@ -691,40 +817,81 @@ Persistent storage not yet implemented."
                 direction_mode = DirectionMode[args.direction]
                 show_progress = sys.stdout.isatty()
 
-                # Run multi-symbol backtest
-                result = run_multi_symbol_backtest(
-                    pair_paths=pair_paths,
-                    direction_mode=direction_mode,
-                    strategy_params=parameters,
-                    dry_run=args.dry_run,
-                    enable_profiling=args.profile,
-                    show_progress=show_progress,
-                )
+                # Check for portfolio mode (time-synchronized shared equity)
+                if hasattr(args, "portfolio_mode") and args.portfolio_mode:
+                    logger.info(
+                        "Portfolio mode ENABLED: time-synchronized with shared equity"
+                    )
+                    result = run_portfolio_backtest(
+                        pair_paths=pair_paths,
+                        direction_mode=direction_mode,
+                        strategy_params=parameters,
+                        starting_equity=DEFAULT_ACCOUNT_BALANCE,
+                        dry_run=args.dry_run,
+                        show_progress=show_progress,
+                    )
 
-                # Format and output multi-symbol results (T020)
-                from ..data_io.formatters import (
-                    format_multi_symbol_json_output,
-                    format_multi_symbol_text_output,
-                )
+                    # Format and output portfolio results
+                    from ..data_io.formatters import (
+                        format_portfolio_json_output,
+                        format_portfolio_text_output,
+                    )
 
-                output_format = (
-                    OutputFormat.JSON
-                    if args.output_format == "json"
-                    else OutputFormat.TEXT
-                )
+                    output_format = (
+                        OutputFormat.JSON
+                        if args.output_format == "json"
+                        else OutputFormat.TEXT
+                    )
 
-                if output_format == OutputFormat.JSON:
-                    output_content = format_multi_symbol_json_output(result)
+                    if output_format == OutputFormat.JSON:
+                        output_content = format_portfolio_json_output(result)
+                    else:
+                        output_content = format_portfolio_text_output(result)
+
+                    # Generate output filename
+                    output_filename = generate_output_filename(
+                        direction=direction_mode,
+                        output_format=output_format,
+                        timestamp=result.start_time,
+                        symbol_tag="portfolio",
+                    )
                 else:
-                    output_content = format_multi_symbol_text_output(result)
+                    # Independent mode (default) - run each symbol in isolation
+                    logger.info("Independent mode: each symbol runs in isolation")
+                    result = run_multi_symbol_backtest(
+                        pair_paths=pair_paths,
+                        direction_mode=direction_mode,
+                        strategy_params=parameters,
+                        dry_run=args.dry_run,
+                        enable_profiling=args.profile,
+                        show_progress=show_progress,
+                    )
 
-                # Generate output filename
-                output_filename = generate_output_filename(
-                    direction=direction_mode,
-                    output_format=output_format,
-                    timestamp=result.start_time,
-                    symbol_tag="multi",
-                )
+                    # Format and output multi-symbol results (T020)
+                    from ..data_io.formatters import (
+                        format_multi_symbol_json_output,
+                        format_multi_symbol_text_output,
+                    )
+
+                    output_format = (
+                        OutputFormat.JSON
+                        if args.output_format == "json"
+                        else OutputFormat.TEXT
+                    )
+
+                    if output_format == OutputFormat.JSON:
+                        output_content = format_multi_symbol_json_output(result)
+                    else:
+                        output_content = format_multi_symbol_text_output(result)
+
+                    # Generate output filename
+                    output_filename = generate_output_filename(
+                        direction=direction_mode,
+                        output_format=output_format,
+                        timestamp=result.start_time,
+                        symbol_tag="multi",
+                    )
+
                 output_path = args.output / output_filename
                 args.output.mkdir(parents=True, exist_ok=True)
                 output_path.write_text(output_content)

@@ -552,7 +552,7 @@ def format_multi_symbol_text_output(multi_result) -> str:
     lines.append(f"Direction Mode:   {multi_result.direction_mode}")
     lines.append(f"Symbols:          {', '.join(multi_result.symbols)}")
     lines.append(f"Start Time:       {multi_result.start_time.isoformat()}")
-    lines.append(f"Portfolio Capital: $2,500.00 (shared across all symbols)")
+    lines.append("Portfolio Capital: $2,500.00 (shared across all symbols)")
     lines.append("")
 
     # Aggregate portfolio summary
@@ -671,6 +671,232 @@ def format_multi_symbol_json_output(multi_result) -> str:
         },
         "per_symbol": per_symbol,
         "failures": multi_result.failures,
+    }
+
+    return json.dumps(data, indent=2)
+
+
+def format_portfolio_text_output(result) -> str:
+    """Format portfolio-mode backtest results as human-readable text.
+
+    Shows full aggregate metrics (same as per-symbol) plus equity curve and
+    per-symbol breakdown.
+
+    Args:
+        result: PortfolioResult from PortfolioSimulator
+
+    Returns:
+        Formatted text string
+    """
+    lines = []
+    lines.append("=" * 80)
+    lines.append("PORTFOLIO MODE BACKTEST RESULTS")
+    lines.append("=" * 80)
+    lines.append("")
+
+    # Run metadata
+    lines.append("RUN METADATA")
+    lines.append("-" * 80)
+    lines.append(f"Run ID:           {result.run_id}")
+    lines.append(f"Direction Mode:   {result.direction_mode}")
+    lines.append(f"Symbols:          {', '.join(result.symbols)}")
+    lines.append(f"Start Time:       {result.start_time.isoformat()}")
+    lines.append(f"End Time:         {result.end_time.isoformat()}")
+    duration = (result.end_time - result.start_time).total_seconds()
+    lines.append(f"Duration:         {duration:.2f} seconds")
+    lines.append("")
+
+    # Data range
+    lines.append("DATA RANGE")
+    lines.append("-" * 80)
+    if result.data_start_date:
+        lines.append(f"Start Date:       {result.data_start_date.isoformat()}")
+    if result.data_end_date:
+        lines.append(f"End Date:         {result.data_end_date.isoformat()}")
+    lines.append("")
+
+    # Portfolio summary
+    lines.append("PORTFOLIO SUMMARY")
+    lines.append("-" * 80)
+    lines.append(f"Starting Equity:  ${result.starting_equity:,.2f}")
+    lines.append(f"Final Equity:     ${result.final_equity:,.2f}")
+    pnl_pct = (result.final_equity / result.starting_equity - 1) * 100
+    lines.append(f"Portfolio P&L:    ${result.total_pnl:,.2f} ({pnl_pct:+.2f}%)")
+    lines.append(f"Position Sizing:  0.25% of current equity per trade")
+    lines.append("")
+
+    # Aggregate performance metrics (full metrics like single-symbol)
+    lines.append("AGGREGATE PERFORMANCE METRICS")
+    lines.append("-" * 80)
+
+    # Calculate aggregate metrics from closed trades
+    trades = result.closed_trades
+    total_trades = len(trades)
+    wins = [t for t in trades if t.pnl_r > 0]
+    losses = [t for t in trades if t.pnl_r <= 0]
+    win_count = len(wins)
+    loss_count = len(losses)
+
+    lines.append(f"  Trades:           {total_trades}")
+    lines.append(f"  Wins:             {win_count}")
+    lines.append(f"  Losses:           {loss_count}")
+
+    if total_trades > 0:
+        win_rate = win_count / total_trades
+        total_r = sum(t.pnl_r for t in trades)
+        avg_r = total_r / total_trades
+
+        avg_win_r = sum(t.pnl_r for t in wins) / win_count if wins else 0.0
+        avg_loss_r = sum(t.pnl_r for t in losses) / loss_count if losses else 0.0
+
+        # Expectancy
+        expectancy = avg_r
+
+        # Profit factor
+        gross_wins = sum(t.pnl_r for t in wins) if wins else 0.0
+        gross_losses = abs(sum(t.pnl_r for t in losses)) if losses else 0.001
+        profit_factor = gross_wins / gross_losses if gross_losses > 0 else 0.0
+
+        # Max drawdown from equity curve
+        max_equity = result.starting_equity
+        max_drawdown = 0.0
+        for ts, equity in result.equity_curve:
+            if equity > max_equity:
+                max_equity = equity
+            drawdown = (max_equity - equity) / max_equity if max_equity > 0 else 0
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+
+        lines.append(f"  Win Rate:         {win_rate:.2%}")
+        lines.append(f"  Avg Win (R):      {avg_win_r:.2f}")
+        lines.append(f"  Avg Loss (R):     {avg_loss_r:.2f}")
+        lines.append(f"  Avg R:            {avg_r:.2f}")
+        lines.append(f"  Expectancy (R):   {expectancy:.2f}")
+        lines.append(f"  Profit Factor:    {profit_factor:.2f}")
+        lines.append(f"  Max Drawdown:     {max_drawdown:.2%}")
+    lines.append("")
+
+    # Per-symbol breakdown
+    lines.append("=" * 80)
+    lines.append("PER-SYMBOL BREAKDOWN")
+    lines.append("=" * 80)
+
+    for symbol, stats in sorted(result.per_symbol_trades.items()):
+        lines.append("")
+        lines.append(f"SYMBOL: {symbol}")
+        lines.append("-" * 80)
+        lines.append(f"  Trades:         {stats['trade_count']}")
+        lines.append(f"  Wins:           {stats['win_count']}")
+        lines.append(f"  Losses:         {stats['loss_count']}")
+        if stats["trade_count"] > 0:
+            lines.append(f"  Win Rate:       {stats['win_rate']:.2%}")
+            lines.append(f"  Avg R:          {stats['avg_r']:.2f}")
+        lines.append(f"  Total P&L:      ${stats['total_pnl']:.2f}")
+
+    lines.append("")
+    lines.append("=" * 80)
+
+    return "\n".join(lines)
+
+
+def format_portfolio_json_output(result) -> str:
+    """Format portfolio-mode backtest results as JSON.
+
+    Args:
+        result: PortfolioResult from PortfolioSimulator
+
+    Returns:
+        JSON string
+    """
+    import math
+
+    # Calculate aggregate metrics from closed trades
+    trades = result.closed_trades
+    total_trades = len(trades)
+    wins = [t for t in trades if t.pnl_r > 0]
+    losses = [t for t in trades if t.pnl_r <= 0]
+    win_count = len(wins)
+    loss_count = len(losses)
+
+    metrics = {
+        "trade_count": total_trades,
+        "win_count": win_count,
+        "loss_count": loss_count,
+    }
+
+    if total_trades > 0:
+        win_rate = win_count / total_trades
+        total_r = sum(t.pnl_r for t in trades)
+        avg_r = total_r / total_trades
+        avg_win_r = sum(t.pnl_r for t in wins) / win_count if wins else 0.0
+        avg_loss_r = sum(t.pnl_r for t in losses) / loss_count if losses else 0.0
+        gross_wins = sum(t.pnl_r for t in wins) if wins else 0.0
+        gross_losses = abs(sum(t.pnl_r for t in losses)) if losses else 0.001
+        profit_factor = gross_wins / gross_losses if gross_losses > 0 else 0.0
+
+        # Max drawdown from equity curve
+        max_equity = result.starting_equity
+        max_drawdown = 0.0
+        for ts, equity in result.equity_curve:
+            if equity > max_equity:
+                max_equity = equity
+            drawdown = (max_equity - equity) / max_equity if max_equity > 0 else 0
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+
+        metrics.update(
+            {
+                "win_rate": win_rate,
+                "avg_win_r": avg_win_r,
+                "avg_loss_r": avg_loss_r,
+                "avg_r": avg_r,
+                "expectancy": avg_r,
+                "profit_factor": profit_factor,
+                "max_drawdown": max_drawdown,
+            }
+        )
+    else:
+        metrics.update(
+            {
+                "win_rate": 0.0,
+                "avg_win_r": 0.0,
+                "avg_loss_r": 0.0,
+                "avg_r": 0.0,
+                "expectancy": 0.0,
+                "profit_factor": 0.0,
+                "max_drawdown": 0.0,
+            }
+        )
+
+    data = {
+        "run_id": result.run_id,
+        "direction_mode": result.direction_mode,
+        "mode": "portfolio",
+        "start_time": result.start_time.isoformat(),
+        "end_time": result.end_time.isoformat(),
+        "data_start_date": (
+            result.data_start_date.isoformat() if result.data_start_date else None
+        ),
+        "data_end_date": (
+            result.data_end_date.isoformat() if result.data_end_date else None
+        ),
+        "symbols": result.symbols,
+        "portfolio": {
+            "starting_equity": result.starting_equity,
+            "final_equity": result.final_equity,
+            "total_pnl": result.total_pnl,
+            "total_pnl_pct": (
+                (result.final_equity / result.starting_equity - 1) * 100
+                if result.starting_equity > 0
+                else 0.0
+            ),
+        },
+        "metrics": metrics,
+        "per_symbol": result.per_symbol_trades,
+        "equity_curve": [
+            {"timestamp": ts.isoformat(), "equity": equity}
+            for ts, equity in result.equity_curve
+        ],
     }
 
     return json.dumps(data, indent=2)
