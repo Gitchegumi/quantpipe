@@ -648,19 +648,6 @@ def main():
         help="Disable aggregation, produce only per-strategy outputs",
     )
 
-    # Multi-symbol execution mode flags (Phase 6: US4)
-    parser.add_argument(
-        "--portfolio-mode",
-        type=str,
-        choices=["independent", "portfolio"],
-        default="independent",
-        help=(
-            "Multi-symbol execution mode: 'independent' (isolated per-symbol "
-            "backtests) or 'portfolio' (unified portfolio with shared capital, "
-            "correlation tracking, and portfolio metrics). Default: independent (US4)"
-        ),
-    )
-
     parser.add_argument(
         "--disable-symbol",
         type=str,
