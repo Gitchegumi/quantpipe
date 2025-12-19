@@ -34,9 +34,13 @@ def test_vectorized_backtest_direct():
     # Step 1: Load data directly with Polars
     df = pl.read_parquet(DATA_PATH)
 
-    # Rename columns to match expected names
+    # Rename columns to match expected names and convert timestamp to datetime
     if "timestamp" in df.columns and "timestamp_utc" not in df.columns:
-        df = df.rename({"timestamp": "timestamp_utc"})
+        df = df.with_columns(
+            pl.col("timestamp")
+            .str.to_datetime("%Y-%m-%d %H:%M:%S%z")
+            .alias("timestamp_utc")
+        ).drop("timestamp")
 
     assert len(df) > 0, "Data should have rows"
 

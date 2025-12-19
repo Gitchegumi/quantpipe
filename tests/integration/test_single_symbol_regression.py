@@ -7,6 +7,7 @@ User Story: US1 - Single Symbol Regression
 This test verifies that adding multi-symbol functionality does not break
 existing single-symbol backtesting behavior.
 """
+
 import json
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from src.data_io.legacy_ingestion import ingest_candles
 from src.models.enums import DirectionMode
 
 
+@pytest.mark.slow
+@pytest.mark.local_data
 class TestSingleSymbolRegression:
     """Test single-symbol backtest behavior is preserved."""
 
@@ -38,9 +41,7 @@ class TestSingleSymbolRegression:
             rsi_length=14,
         )
 
-    def test_single_symbol_metrics_stable(
-        self, eurusd_fixture_path, baseline_config
-    ):
+    def test_single_symbol_metrics_stable(self, eurusd_fixture_path, baseline_config):
         """Verify single-symbol backtest produces consistent metrics.
 
         This test ensures that the introduction of multi-symbol functionality
@@ -51,7 +52,7 @@ class TestSingleSymbolRegression:
             pytest.skip("EURUSD test fixture not found")
 
         # Load candles
-        candles = ingest_candles(eurusd_fixture_path)
+        candles = list(ingest_candles(eurusd_fixture_path))
 
         # Create orchestrator and run backtest
         orchestrator = BacktestOrchestrator(
@@ -103,7 +104,7 @@ class TestSingleSymbolRegression:
             pytest.skip("EURUSD test fixture not found")
 
         # Load candles
-        candles = ingest_candles(eurusd_fixture_path)
+        candles = list(ingest_candles(eurusd_fixture_path))
 
         # Create orchestrator and run backtest
         orchestrator = BacktestOrchestrator(
@@ -148,7 +149,7 @@ class TestSingleSymbolRegression:
             pytest.skip("EURUSD test fixture not found")
 
         # Load candles
-        candles = ingest_candles(eurusd_fixture_path)
+        candles = list(ingest_candles(eurusd_fixture_path))
 
         # Create orchestrator and run backtest
         orchestrator = BacktestOrchestrator(
@@ -193,7 +194,7 @@ class TestSingleSymbolRegression:
             pytest.skip("EURUSD test fixture not found")
 
         # Load candles
-        candles = ingest_candles(eurusd_fixture_path)
+        candles = list(ingest_candles(eurusd_fixture_path))
 
         # Run backtest twice with same parameters
         orchestrator1 = BacktestOrchestrator(

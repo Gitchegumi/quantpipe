@@ -83,39 +83,45 @@ def test_zero_trades_json_output_structure():
 
     Validates:
     - JSON structure is valid
-    - NaN values serialized appropriately
+    - NaN values serialized appropriately (converted to null)
     - No missing required fields
     """
+    import json
     from datetime import datetime
 
-    from src.cli.run_backtest import format_backtest_results_as_json
-    from src.models.core import BacktestRun
-
-    run_metadata = BacktestRun(
-        run_id="zero_trade_test",
-        parameters_hash="test_hash",
-        manifest_ref="test_manifest.json",
-        start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
-        end_time=datetime(2025, 1, 1, 13, 0, tzinfo=UTC),
-        total_candles_processed=1000,
-        reproducibility_hash="test_repro_hash",
-    )
+    from src.data_io.formatters import format_json_output
+    from src.models.directional import BacktestResult
 
     executions: list[TradeExecution] = []
     metrics = compute_metrics(executions)
 
+    # Create a BacktestResult with zero trades
+    result = BacktestResult(
+        run_id="zero_trade_test",
+        direction_mode="LONG",
+        start_time=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+        end_time=datetime(2025, 1, 1, 13, 0, tzinfo=UTC),
+        data_start_date=datetime(2025, 1, 1, 0, 0, tzinfo=UTC),
+        data_end_date=datetime(2025, 1, 1, 23, 59, tzinfo=UTC),
+        total_candles=1000,
+        metrics=metrics,
+        signals=[],
+        executions=[],
+        conflicts=[],
+        dry_run=False,
+    )
+
     # Should not raise exception
-    json_str = format_backtest_results_as_json(run_metadata, metrics)
+    json_str = format_json_output(result)
 
     # Verify it's valid JSON
-    import json
+    parsed = json.loads(json_str)
 
-    result = json.loads(json_str)
-
-    assert result["run_metadata"]["run_id"] == "zero_trade_test"
-    assert result["metrics"]["trade_count"] == 0
-    # NaN values should be serialized (as "NaN" string or null depending on implementation)
-    assert "win_rate" in result["metrics"]
+    assert parsed["run_id"] == "zero_trade_test"
+    assert parsed["metrics"]["trade_count"] == 0
+    # NaN values should be serialized as null
+    assert "win_rate" in parsed["metrics"]
+    assert parsed["metrics"]["win_rate"] is None  # NaN converted to null
 
 
 def test_zero_trades_ranging_market_scenario():

@@ -23,8 +23,8 @@
 
 **Purpose**: Capture baseline metrics before making changes
 
-- [ ] T001 Run baseline test collection and record total test count with `poetry run pytest --collect-only -q`
-- [ ] T002 Run full integration test suite and document current failures with `poetry run pytest tests/integration -v --tb=short`
+- [x] T001 Run baseline test collection and record total test count with `poetry run pytest --collect-only -q`
+- [x] T002 Run full integration test suite and document current failures with `poetry run pytest tests/integration -v --tb=short`
 
 ---
 
@@ -34,10 +34,10 @@
 
 **⚠️ CRITICAL**: Complete analysis before any file modifications
 
-- [ ] T003 Review existing inventory in tests/\_inventory_removed.txt and confirm tests to remove
-- [ ] T004 Analyze test_both_mode_backtest.py to confirm all 4 failing tests use legacy_ingestion pattern
-- [ ] T005 Identify exact tests to remove from test_indicators_basic.py (6 redundant tests)
-- [ ] T006 Identify exact tests to remove from test_risk_manager_rounding.py (3-4 redundant tests)
+- [x] T003 Review existing inventory in tests/\_inventory_removed.txt and confirm tests to remove
+- [x] T004 Analyze test_both_mode_backtest.py to confirm all 4 failing tests use legacy_ingestion pattern
+- [x] T005 Identify exact tests to remove from test_indicators_basic.py (6 redundant tests)
+- [x] T006 Identify exact tests to remove from test_risk_manager_rounding.py (3-4 redundant tests)
 
 **Checkpoint**: Analysis complete - implementation can now begin
 
@@ -56,7 +56,7 @@
 - [x] T009 [US1] Refactor test_both_backtest_dry_run in tests/integration/test_both_mode_backtest.py to use vectorized API
 - [x] T010 [US1] Refactor test_both_backtest_text_output in tests/integration/test_both_mode_backtest.py to use vectorized API
 - [x] T011 [US1] Refactor test_both_backtest_json_output in tests/integration/test_both_mode_backtest.py to use vectorized API
-- [ ] T012 [US1] Run integration tests to verify all pass with `poetry run pytest tests/integration -v --tb=short`
+- [/] T012 [US1] Run integration tests to verify all pass with `poetry run pytest tests/integration -v --tb=short`
 
 **Checkpoint**: All integration tests pass (SC-001 satisfied)
 

@@ -8,6 +8,7 @@ This test verifies that independent multi-symbol mode executes backtests
 for multiple currency pairs in isolation, with proper risk isolation and
 result aggregation.
 """
+
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,8 @@ from src.models.enums import DirectionMode
 from src.models.portfolio import CurrencyPair
 
 
+@pytest.mark.slow
+@pytest.mark.local_data
 class TestIndependentThreeSymbols:
     """Test independent multi-symbol backtest execution."""
 
