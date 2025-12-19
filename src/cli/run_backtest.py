@@ -71,6 +71,82 @@ logger = logging.getLogger(__name__)
 DEFAULT_ACCOUNT_BALANCE: float = 2500.0
 
 
+def construct_data_paths(
+    pairs: list[str],
+    dataset: str,
+    base_dir: Path = Path("price_data/processed"),
+) -> list[tuple[str, Path]]:
+    """Construct data paths for all specified pairs with validation.
+
+    Iterates over all pairs, constructs paths for each (Parquet preferred,
+    CSV fallback), and validates that at least one path exists.
+
+    Args:
+        pairs: List of currency pair codes (e.g., ['EURUSD', 'USDJPY'])
+        dataset: Dataset partition to use ('test' or 'validate')
+        base_dir: Base directory for processed data
+
+    Returns:
+        List of (pair, path) tuples for all valid pairs
+
+    Raises:
+        SystemExit: If no valid data paths found for any pair
+    """
+    pair_paths: list[tuple[str, Path]] = []
+    missing_pairs: list[str] = []
+
+    for pair in pairs:
+        pair_lower = pair.lower()
+        base_path = base_dir / pair_lower / dataset
+        filename_base = f"{pair_lower}_{dataset}"
+
+        # Try Parquet first (faster loading)
+        parquet_path = base_path / f"{filename_base}.parquet"
+        csv_path = base_path / f"{filename_base}.csv"
+
+        if parquet_path.exists():
+            pair_paths.append((pair, parquet_path))
+            logger.info(
+                "Constructed path for %s: %s",
+                pair,
+                parquet_path,
+            )
+        elif csv_path.exists():
+            pair_paths.append((pair, csv_path))
+            logger.info(
+                "Constructed path for %s: %s (Parquet not found, using CSV)",
+                pair,
+                csv_path,
+            )
+        else:
+            missing_pairs.append(pair)
+            logger.warning(
+                "No data file found for %s. Searched: %s, %s",
+                pair,
+                parquet_path,
+                csv_path,
+            )
+
+    # Fail-fast validation (FR-006): All pairs must have data
+    if missing_pairs and not pair_paths:
+        print(
+            f"Error: No data files found for any specified pairs: {missing_pairs}\n"
+            f"Expected structure: price_data/processed/<pair>/<dataset>/"
+            f"<pair>_<dataset>.[parquet|csv]\n"
+            f"Use --data to specify a custom path for single-pair runs.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if missing_pairs:
+        logger.warning(
+            "Some pairs have no data files and will be skipped: %s",
+            ", ".join(missing_pairs),
+        )
+
+    return pair_paths
+
+
 def main():
     """
     Main entry point for unified backtest CLI.

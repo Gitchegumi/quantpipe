@@ -48,10 +48,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Extract path construction logic into helper function `construct_data_paths()` in `src/cli/run_backtest.py`
-- [ ] T009 [US2] Modify `construct_data_paths()` to iterate over all pairs in `args.pair` in `src/cli/run_backtest.py`
-- [ ] T010 [US2] Add validation to check all pair paths exist before execution in `src/cli/run_backtest.py`
-- [ ] T011 [US2] Log constructed paths for each symbol at INFO level in `src/cli/run_backtest.py`
+- [x] T008 [US2] Extract path construction logic into helper function `construct_data_paths()` in `src/cli/run_backtest.py`
+- [x] T009 [US2] Modify `construct_data_paths()` to iterate over all pairs in `args.pair` in `src/cli/run_backtest.py`
+- [x] T010 [US2] Add validation to check all pair paths exist before execution in `src/cli/run_backtest.py`
+- [x] T011 [US2] Log constructed paths for each symbol at INFO level in `src/cli/run_backtest.py`
 
 ### Tests for User Story 2
 
