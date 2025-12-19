@@ -354,7 +354,15 @@ def ingest_ohlcv_data(
                         .str.to_datetime(format="%Y-%m-%d %H:%M:%S%z")
                         .alias("timestamp_utc")
                     )
-                elif "timestamp_utc" not in df.columns:
+                elif "timestamp_utc" in df.columns:
+                    # timestamp_utc exists but may be string from CSV - convert it
+                    if df["timestamp_utc"].dtype == pl.Utf8:
+                        df = df.with_columns(
+                            pl.col("timestamp_utc")
+                            .str.to_datetime(format="%Y-%m-%d %H:%M:%S")
+                            .dt.replace_time_zone("UTC")
+                        )
+                else:
                     raise ValueError(
                         "Input must have 'timestamp' or 'timestamp_utc' column"
                     )
@@ -362,7 +370,13 @@ def ingest_ohlcv_data(
             else:
                 if "timestamp" in df.columns:
                     df["timestamp_utc"] = pd.to_datetime(df["timestamp"], utc=True)
-                elif "timestamp_utc" not in df.columns:
+                elif "timestamp_utc" in df.columns:
+                    # timestamp_utc exists but may be string from CSV - convert it
+                    if not pd.api.types.is_datetime64_any_dtype(df["timestamp_utc"]):
+                        df["timestamp_utc"] = pd.to_datetime(
+                            df["timestamp_utc"], utc=True
+                        )
+                else:
                     raise ValueError(
                         "Input must have 'timestamp' or 'timestamp_utc' column"
                     )

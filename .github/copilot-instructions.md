@@ -17,6 +17,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - File-based time series (CSV inputs) and in-memory arrays; potential future Parquet/Arrow (out of current scope). (010-scan-sim-perf)
 - Python 3.11 (confirmed by constitution) + numpy, pandas, pydantic, rich (progress/logging), pytest; optional numba (defer until baseline measured); optional Polars (pilot ingestion & columnar transformation path, adoption gated by ROI criteria). (010-scan-sim-perf)
 - File-based time series (CSV inputs) and in-memory arrays; optional Polars DataFrame / LazyFrame for ingestion & preprocessing; potential future Parquet/Arrow (still deferred until Polars evaluation complete). (010-scan-sim-perf)
+- Python 3.11 + pytest, polars, pandas, numpy (012-cleanup-tests)
+- N/A (test cleanup, no data storage changes) (012-cleanup-tests)
 
 - Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests) (001-trend-pullback)
 - Poetry (mandatory package manager for dependency management and virtual environments)
@@ -81,9 +83,9 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - See Constitution Principle XI for full requirements
 
 ## Recent Changes
+- 012-cleanup-tests: Added Python 3.11 + pytest, polars, pandas, numpy
 - 010-scan-sim-perf: Added Python 3.11 (confirmed by constitution) + numpy, pandas, pydantic, rich (progress/logging), pytest; optional numba (defer until baseline measured); optional Polars (pilot ingestion & columnar transformation path, adoption gated by ROI criteria).
 - 010-scan-sim-perf: Added Python 3.11 (confirmed by constitution) + numpy, pandas, pydantic, rich (progress/logging), pytest; optional numba (TBD NEEDS CLARIFICATION: adopt now or defer) → default: defer numba until baseline vectorization measured.
-- 007-performance-optimization: Added Python 3.11 (confirmed by constitution) + numpy, pandas, pydantic, rich (existing). Optional: numba (JIT) [NEEDS CLARIFICATION: adopt as hard dependency or optional fallback?].
 
 
 <!-- MANUAL ADDITIONS START -->
