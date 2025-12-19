@@ -40,7 +40,7 @@ specs/013-multi-symbol-backtest/
 ├── research.md          ✅ Created (5 decisions)
 ├── data-model.md        ✅ Created
 ├── quickstart.md        ✅ Created
-└── tasks.md             🔜 Next: /speckit.tasks
+└── tasks.md             ✅ Created
 ```
 
 ### Source Code (repository root)
@@ -209,6 +209,47 @@ poetry run pylint src/cli/run_backtest.py src/backtest/portfolio/independent_run
 # Ruff check
 poetry run ruff check src/cli/ src/backtest/portfolio/
 ```
+
+---
+
+## Implementation Workflow
+
+> **MANDATORY**: Follow this workflow for all implementation work on this feature.
+
+### Task Execution Order
+
+1. **Always work from `tasks.md`** - Execute tasks in sequential order (T001 → T002 → T003...)
+2. **Respect phase dependencies** - Complete each phase before moving to the next unless tasks are marked `[P]` (parallel)
+3. **Update task status before committing**:
+   - Mark task as in-progress: `- [/] T001 ...`
+   - Mark task as complete: `- [x] T001 ...`
+
+### Commit Requirements
+
+Before every `git commit`:
+
+1. ✅ Verify the task being committed is next in sequence (or marked `[P]`)
+2. ✅ Update `tasks.md` to mark the task(s) as complete `[x]`
+3. ✅ Use semantic commit format: `feat(013): <Description> (T###)`
+4. ✅ Stage both the implementation files AND the updated `tasks.md`
+
+```bash
+# Example workflow for T001
+# 1. Implement the task
+# 2. Update tasks.md: change "- [ ] T001" to "- [x] T001"
+# 3. Stage and commit
+git add .
+git commit -m "feat(013): Add DEFAULT_ACCOUNT_BALANCE constant (T001)"
+```
+
+### Phase Checkpoints
+
+After completing each phase:
+
+1. Run tests: `poetry run pytest -v`
+2. Run linting: `poetry run pylint <modified_files> --score=yes`
+3. Verify checkpoint criteria in tasks.md are met
+4. Commit with phase summary if multiple tasks completed together
 
 ---
 

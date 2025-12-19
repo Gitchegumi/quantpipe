@@ -2,7 +2,7 @@
 
 **Feature Branch**: `013-multi-symbol-backtest`
 **Created**: 2025-12-18
-**Status**: Draft
+**Status**: Approved
 **Input**: Issue #28 - Fix multi-symbol pathing and run backtests on multiple pairs with concurrent PnL computation
 
 ## User Scenarios & Testing _(mandatory)_
