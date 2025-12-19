@@ -204,9 +204,38 @@ class PortfolioSimulator:
         # Record initial equity
         self.equity_curve.append((data_start, self.current_equity))
 
-        # Process each timestamp chronologically
-        for ts in all_timestamps:
-            self._process_bar(ts, symbol_data, signals_by_ts)
+        # Process each timestamp chronologically with Rich progress bar
+        try:
+            from rich.progress import (
+                Progress,
+                BarColumn,
+                TextColumn,
+                TimeRemainingColumn,
+                TaskProgressColumn,
+            )
+
+            use_rich = True
+        except ImportError:
+            use_rich = False
+
+        total_timestamps = len(all_timestamps)
+        if use_rich and total_timestamps > 1000:  # Only show for large datasets
+            with Progress(
+                TextColumn("[bold blue]Portfolio Simulation"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeRemainingColumn(),
+            ) as progress:
+                task = progress.add_task(
+                    "Processing bars...",
+                    total=total_timestamps,
+                )
+                for ts in all_timestamps:
+                    self._process_bar(ts, symbol_data, signals_by_ts)
+                    progress.update(task, advance=1)
+        else:
+            for ts in all_timestamps:
+                self._process_bar(ts, symbol_data, signals_by_ts)
 
         # Close any remaining open positions at end
         self._close_all_positions_at_end(symbol_data)
