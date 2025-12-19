@@ -147,6 +147,209 @@ def construct_data_paths(
     return pair_paths
 
 
+def run_multi_symbol_backtest(
+    pair_paths: list[tuple[str, Path]],
+    direction_mode: DirectionMode,
+    strategy_params,
+    dry_run: bool = False,
+    enable_profiling: bool = False,
+    show_progress: bool = True,
+):
+    """Run backtests on multiple symbols and aggregate results.
+
+    Executes independent backtests for each symbol, then aggregates results
+    into a multi-symbol BacktestResult with combined PnL calculation.
+
+    Args:
+        pair_paths: List of (pair, path) tuples from construct_data_paths()
+        direction_mode: Direction mode (LONG/SHORT/BOTH)
+        strategy_params: Strategy parameters to use
+        dry_run: If True, generate signals only without execution
+        enable_profiling: If True, enable performance profiling
+        show_progress: If True, show progress bars
+
+    Returns:
+        Multi-symbol BacktestResult with aggregated metrics
+    """
+    import polars as pl
+
+    from ..indicators.dispatcher import calculate_indicators
+    from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
+
+    results: dict[str, "BacktestResult"] = {}
+    failures: list[dict] = []
+    all_signals: list = []
+    all_executions: list = []
+    total_r_multiple = 0.0
+
+    # Equal capital allocation per symbol
+    num_symbols = len(pair_paths)
+    capital_per_symbol = DEFAULT_ACCOUNT_BALANCE / num_symbols
+
+    logger.info(
+        "Starting multi-symbol backtest for %d symbols with $%.2f each",
+        num_symbols,
+        capital_per_symbol,
+    )
+
+    # Run backtest for each symbol
+    for pair, data_path in pair_paths:
+        logger.info("Processing symbol: %s from %s", pair, data_path)
+
+        try:
+            # Load data using Polars
+            use_arrow = data_path.suffix.lower() == ".parquet"
+            ingestion_result = ingest_ohlcv_data(
+                path=data_path,
+                timeframe_minutes=1,
+                mode="columnar",
+                downcast=False,
+                use_arrow=use_arrow,
+                strict_cadence=False,
+                fill_gaps=False,
+                return_polars=True,
+            )
+
+            enriched_df = ingestion_result.data
+            if not isinstance(enriched_df, pl.DataFrame):
+                enriched_df = pl.from_pandas(enriched_df)
+
+            # Rename timestamp if needed
+            if "timestamp" in enriched_df.columns:
+                enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
+
+            # Calculate indicators
+            strategy = TREND_PULLBACK_STRATEGY
+            required_indicators = strategy.metadata.required_indicators
+            enriched_df = calculate_indicators(enriched_df, required_indicators)
+
+            # Create orchestrator
+            orchestrator = BacktestOrchestrator(
+                direction_mode=direction_mode,
+                dry_run=dry_run,
+                enable_profiling=enable_profiling,
+                enable_progress=show_progress,
+            )
+
+            # Run backtest
+            from datetime import datetime, timezone
+
+            run_id = (
+                f"{pair.lower()}_{direction_mode.value.lower()}_"
+                f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            )
+
+            result = orchestrator.run_backtest(
+                candles=enriched_df,
+                pair=pair,
+                run_id=run_id,
+                strategy=strategy,
+                **strategy_params.model_dump(),
+            )
+
+            results[pair] = result
+
+            # Aggregate signals and executions
+            if result.signals:
+                all_signals.extend(result.signals)
+            if result.executions:
+                all_executions.extend(result.executions)
+
+            # Calculate R-multiple contribution for this symbol
+            if result.metrics:
+                if hasattr(result.metrics, "combined"):
+                    total_r_multiple += result.metrics.combined.avg_r * (
+                        result.metrics.combined.trade_count or 0
+                    )
+                elif hasattr(result.metrics, "avg_r"):
+                    total_r_multiple += result.metrics.avg_r * (
+                        result.metrics.trade_count or 0
+                    )
+
+            logger.info(
+                "Completed %s: %d trades",
+                pair,
+                (
+                    (
+                        result.metrics.combined.trade_count
+                        if hasattr(result.metrics, "combined")
+                        else result.metrics.trade_count
+                    )
+                    if result.metrics
+                    else 0
+                ),
+            )
+
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            logger.warning("Backtest failed for %s: %s", pair, exc)
+            failures.append({"pair": pair, "error": str(exc)})
+            continue
+
+    # Aggregate into multi-symbol BacktestResult
+    from ..models.directional import BacktestResult
+
+    if not results:
+        raise RuntimeError("All symbol backtests failed")
+
+    # Get time bounds from first successful result
+    first_result = next(iter(results.values()))
+
+    # Build aggregated metrics
+    total_trades = sum(
+        (
+            r.metrics.combined.trade_count
+            if hasattr(r.metrics, "combined")
+            else r.metrics.trade_count
+        )
+        for r in results.values()
+        if r.metrics
+    )
+
+    avg_win_rate = (
+        sum(
+            (
+                r.metrics.combined.win_rate
+                if hasattr(r.metrics, "combined")
+                else r.metrics.win_rate
+            )
+            for r in results.values()
+            if r.metrics
+        )
+        / len(results)
+        if results
+        else 0.0
+    )
+
+    # Create aggregated result
+    multi_result = BacktestResult(
+        run_id=f"multi_{direction_mode.value.lower()}_"
+        f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
+        direction_mode=direction_mode.value,
+        start_time=first_result.start_time,
+        end_time=datetime.now(timezone.utc),
+        data_start_date=first_result.data_start_date,
+        data_end_date=first_result.data_end_date,
+        total_candles=sum(r.total_candles for r in results.values()),
+        metrics=first_result.metrics,  # Use first result's metrics structure
+        pair=None,  # Multi-symbol has no single pair
+        symbols=list(results.keys()),
+        results=results,
+        failures=failures if failures else None,
+        signals=all_signals if all_signals else None,
+        executions=all_executions if all_executions else None,
+        dry_run=dry_run,
+    )
+
+    logger.info(
+        "Multi-symbol backtest complete: %d symbols, %d trades, %d failures",
+        len(results),
+        total_trades,
+        len(failures),
+    )
+
+    return multi_result
+
+
 def main():
     """
     Main entry point for unified backtest CLI.
@@ -472,47 +675,65 @@ Persistent storage not yet implemented."
     if args.data is None:
         # Data file required for backtest runs
         if not args.list_strategies and not args.register_strategy:
-            # Auto-construct data path from pair and dataset
-            # Try .parquet first, fallback to .csv
-            pair_lower = args.pair[0].lower()
-            base_path = Path("price_data") / "processed" / pair_lower / args.dataset
-            filename_base = f"{pair_lower}_{args.dataset}"
+            # Use new construct_data_paths() for multi-pair support (T008-T011)
+            pair_paths = construct_data_paths(args.pair, args.dataset)
 
-            # Try .parquet first (faster)
-            parquet_path = base_path / f"{filename_base}.parquet"
-            csv_path = base_path / f"{filename_base}.csv"
+            # Multi-symbol path: use run_multi_symbol_backtest() (T019)
+            if len(pair_paths) > 1 or len(args.pair) > 1:
+                logger.info(
+                    "Multi-symbol mode: %d pairs specified, %d with data",
+                    len(args.pair),
+                    len(pair_paths),
+                )
 
-            if parquet_path.exists():
-                data_path = parquet_path
-                logger.info(
-                    "Auto-constructed data path from --pair %s and --dataset %s: %s",
-                    args.pair[0],
-                    args.dataset,
-                    data_path,
+                # Load strategy parameters
+                parameters = StrategyParameters()
+                direction_mode = DirectionMode[args.direction]
+                show_progress = sys.stdout.isatty()
+
+                # Run multi-symbol backtest
+                result = run_multi_symbol_backtest(
+                    pair_paths=pair_paths,
+                    direction_mode=direction_mode,
+                    strategy_params=parameters,
+                    dry_run=args.dry_run,
+                    enable_profiling=args.profile,
+                    show_progress=show_progress,
                 )
-            elif csv_path.exists():
-                data_path = csv_path
-                logger.info(
-                    "Auto-constructed data path from --pair %s and --dataset %s: %s "
-                    "(Parquet not found, using CSV)",
-                    args.pair[0],
-                    args.dataset,
-                    data_path,
+
+                # Format and output multi-symbol results (T020)
+                from ..data_io.formatters import (
+                    format_multi_symbol_json_output,
+                    format_multi_symbol_text_output,
                 )
-            else:
-                print(
-                    f"Error: No data file found for --pair {args.pair[0]} "
-                    f"and --dataset {args.dataset}\n"
-                    f"Searched:\n"
-                    f"  - {parquet_path}\n"
-                    f"  - {csv_path}\n"
-                    f"Expected structure: price_data/processed/<pair>/<dataset>/"
-                    f"<pair>_<dataset>.[parquet|csv]\n"
-                    f"Use --data to specify a custom path.",
-                    file=sys.stderr,
+
+                output_format = (
+                    OutputFormat.JSON
+                    if args.output_format == "json"
+                    else OutputFormat.TEXT
                 )
-                sys.exit(1)
-            args.data = data_path
+
+                if output_format == OutputFormat.JSON:
+                    output_content = format_multi_symbol_json_output(result)
+                else:
+                    output_content = format_multi_symbol_text_output(result)
+
+                # Generate output filename
+                output_filename = generate_output_filename(
+                    direction=direction_mode,
+                    output_format=output_format,
+                    timestamp=result.start_time,
+                    symbol_tag="multi",
+                )
+                output_path = args.output / output_filename
+                args.output.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(output_content)
+                logger.info("Results written to %s", output_path)
+
+                return 0
+
+            # Single-symbol path: use first (and only) pair
+            _, args.data = pair_paths[0]
     elif not args.data.exists():
         print(f"Error: Data file not found: {args.data}", file=sys.stderr)
         sys.exit(1)

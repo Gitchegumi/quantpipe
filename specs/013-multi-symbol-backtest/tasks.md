@@ -71,12 +71,12 @@
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Add `run_multi_symbol_backtest()` function in `src/cli/run_backtest.py`
-- [ ] T016 [US1] Implement per-symbol backtest loop calling `BacktestOrchestrator.run_backtest()` in `run_multi_symbol_backtest()`
-- [ ] T017 [US1] Aggregate results into multi-symbol `BacktestResult` with `symbols` and `results` fields
-- [ ] T018 [US1] Compute combined PnL with equal capital allocation ($2,500 / num_symbols) in `run_multi_symbol_backtest()`
-- [ ] T019 [US1] Add branching logic in `main()`: use `run_multi_symbol_backtest()` when `len(args.pair) > 1` in `src/cli/run_backtest.py`
-- [ ] T020 [US1] Wire formatters: use `format_multi_symbol_text_output()` / `format_multi_symbol_json_output()` for multi-symbol results
+- [x] T015 [US1] Add `run_multi_symbol_backtest()` function in `src/cli/run_backtest.py`
+- [x] T016 [US1] Implement per-symbol backtest loop calling `BacktestOrchestrator.run_backtest()` in `run_multi_symbol_backtest()`
+- [x] T017 [US1] Aggregate results into multi-symbol `BacktestResult` with `symbols` and `results` fields
+- [x] T018 [US1] Compute combined PnL with equal capital allocation ($2,500 / num_symbols) in `run_multi_symbol_backtest()`
+- [x] T019 [US1] Add branching logic in `main()`: use `run_multi_symbol_backtest()` when `len(args.pair) > 1` in `src/cli/run_backtest.py`
+- [x] T020 [US1] Wire formatters: use `format_multi_symbol_text_output()` / `format_multi_symbol_json_output()` for multi-symbol results
 
 ### Tests for User Story 1
 
