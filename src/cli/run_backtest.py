@@ -67,6 +67,9 @@ from ..models.enums import DirectionMode, OutputFormat
 
 logger = logging.getLogger(__name__)
 
+# Default account balance for multi-symbol concurrent PnL calculation (FR-003)
+DEFAULT_ACCOUNT_BALANCE: float = 2500.0
+
 
 def main():
     """

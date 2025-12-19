@@ -19,9 +19,9 @@
 
 **Purpose**: Add constants and project structure for multi-symbol support
 
-- [ ] T001 Add `DEFAULT_ACCOUNT_BALANCE = 2500.0` constant in `src/cli/run_backtest.py`
-- [ ] T002 [P] Create `tests/integration/test_multi_symbol_backtest.py` test file skeleton
-- [ ] T003 [P] Create `tests/unit/test_path_construction.py` test file skeleton
+- [x] T001 Add `DEFAULT_ACCOUNT_BALANCE = 2500.0` constant in `src/cli/run_backtest.py`
+- [x] T002 [P] Create `tests/integration/test_multi_symbol_backtest.py` test file skeleton
+- [x] T003 [P] Create `tests/unit/test_path_construction.py` test file skeleton
 
 ---
 
