@@ -233,10 +233,8 @@ def run_portfolio_backtest(
 
         signals = generate_signals_vectorized(
             df,
-            pair=pair,
-            direction_mode=direction_mode,
-            strategy=TREND_PULLBACK_STRATEGY,
-            **strategy_params.model_dump(),
+            parameters=strategy_params.model_dump(),
+            direction_mode=direction_mode.value,
         )
         symbol_signals[pair] = signals
         logger.info("Generated %d signals for %s", len(signals), pair)
