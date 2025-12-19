@@ -30,8 +30,8 @@ def generate_output_filename(
     backtest_{direction}_{symbol|multi}_{YYYYMMDD}_{HHMMSS}.{ext}
 
     If `symbol_tag` is provided it is used directly (expected lowercase, e.g. 'eurusd').
-    If `symbol_tag` is not provided the legacy format WITHOUT symbol is used for 
-    backward compatibility (will be deprecated). Callers implementing multi-symbol 
+    If `symbol_tag` is not provided the legacy format WITHOUT symbol is used for
+    backward compatibility (will be deprecated). Callers implementing multi-symbol
     MUST pass 'multi' for aggregated runs.
 
     Args:
@@ -527,6 +527,9 @@ def _serialize_single_metrics(metrics) -> dict:
 def format_multi_symbol_text_output(multi_result) -> str:
     """Format multi-symbol independent backtest results as text.
 
+    Shows full per-symbol metrics (identical to single-symbol runs) plus
+    aggregate portfolio summary.
+
     Args:
         multi_result: Object with attributes: run_id, direction_mode, start_time,
                      symbols, results (dict[str, BacktestResult]), failures
@@ -537,61 +540,103 @@ def format_multi_symbol_text_output(multi_result) -> str:
     from ..backtest.portfolio.results import MultiSymbolResultsAggregator
 
     lines = []
-    lines.append("=" * 60)
-    lines.append("INDEPENDENT MULTI-SYMBOL BACKTEST RESULTS")
-    lines.append("=" * 60)
+    lines.append("=" * 80)
+    lines.append("MULTI-SYMBOL PORTFOLIO BACKTEST RESULTS")
+    lines.append("=" * 80)
     lines.append("")
 
     # Run metadata
     lines.append("RUN METADATA")
-    lines.append("-" * 60)
+    lines.append("-" * 80)
     lines.append(f"Run ID:           {multi_result.run_id}")
     lines.append(f"Direction Mode:   {multi_result.direction_mode}")
     lines.append(f"Symbols:          {', '.join(multi_result.symbols)}")
     lines.append(f"Start Time:       {multi_result.start_time.isoformat()}")
+    lines.append(f"Portfolio Capital: $2,500.00 (shared across all symbols)")
     lines.append("")
 
-    # Summary statistics
+    # Aggregate portfolio summary
     aggregator = MultiSymbolResultsAggregator(multi_result.results)
     summary = aggregator.get_aggregate_summary()
 
-    lines.append("AGGREGATE SUMMARY")
-    lines.append("-" * 60)
+    lines.append("AGGREGATE PORTFOLIO SUMMARY")
+    lines.append("-" * 80)
     lines.append(f"Total Symbols:    {summary['total_symbols']}")
     lines.append(f"Total Trades:     {summary['total_trades']}")
     lines.append(f"Avg Win Rate:     {summary['average_win_rate']:.2%}")
-    lines.append(f"Total P&L:        ${summary['total_pnl']:.2f}")
+    lines.append(f"Portfolio P&L:    ${summary['total_pnl']:.2f}")
     lines.append("")
 
-    # Per-symbol breakdown
-    lines.append("PER-SYMBOL BREAKDOWN")
-    lines.append("-" * 60)
+    # Full per-symbol metrics (same format as single-symbol runs)
+    lines.append("=" * 80)
+    lines.append("PER-SYMBOL DETAILED METRICS")
+    lines.append("=" * 80)
 
     for symbol in sorted(multi_result.symbols):
         if symbol in multi_result.results:
-            symbol_summary = aggregator.get_symbol_summary(symbol)
+            result = multi_result.results[symbol]
+            lines.append("")
+            lines.append("=" * 80)
+            lines.append(f"SYMBOL: {symbol}")
+            lines.append("=" * 80)
+            lines.append("")
 
-            lines.append(f"\n{symbol}:")
-            lines.append(f"  Trades:         {symbol_summary['total_trades']}")
-            if symbol_summary['total_trades'] > 0:
-                lines.append(f"  Win Rate:       {symbol_summary['win_rate']:.2%}")
-            lines.append(f"  Final Balance:  ${symbol_summary['final_balance']:.2f}")
-        elif symbol in multi_result.failures:
-            lines.append(f"\n{symbol}:")
-            lines.append("  Status:         FAILED")
-            lines.append(f"  Error:          {multi_result.failures[symbol]}")
+            # Data range for this symbol
+            lines.append("DATA RANGE")
+            lines.append("-" * 80)
+            lines.append(f"Start Date:       {result.data_start_date.isoformat()}")
+            lines.append(f"End Date:         {result.data_end_date.isoformat()}")
+            lines.append(f"Total Candles:    {result.total_candles}")
+            lines.append("")
 
-    lines.append("")
+            # Full metrics for this symbol
+            if result.metrics is not None:
+                lines.append("PERFORMANCE METRICS")
+                lines.append("-" * 80)
+
+                # Check if directional metrics (BOTH mode)
+                if hasattr(result.metrics, "combined"):
+                    # DirectionalMetrics
+                    if result.metrics.long_only is not None:
+                        lines.append("LONG-ONLY METRICS:")
+                        lines.extend(_format_metrics_summary(result.metrics.long_only))
+                        lines.append("")
+
+                    if result.metrics.short_only is not None:
+                        lines.append("SHORT-ONLY METRICS:")
+                        lines.extend(_format_metrics_summary(result.metrics.short_only))
+                        lines.append("")
+
+                    if result.metrics.combined is not None:
+                        lines.append("COMBINED METRICS:")
+                        lines.extend(_format_metrics_summary(result.metrics.combined))
+                        lines.append("")
+                else:
+                    # Regular MetricsSummary
+                    lines.extend(_format_metrics_summary(result.metrics))
+                    lines.append("")
+            else:
+                lines.append("PERFORMANCE METRICS")
+                lines.append("-" * 80)
+                lines.append("(No metrics available)")
+                lines.append("")
 
     # Failures summary
     if multi_result.failures:
+        lines.append("")
+        lines.append("=" * 80)
         lines.append("FAILURES")
-        lines.append("-" * 60)
-        for symbol, error in multi_result.failures.items():
-            lines.append(f"  {symbol}: {error}")
+        lines.append("=" * 80)
+        for failure in multi_result.failures:
+            if isinstance(failure, dict):
+                lines.append(
+                    f"  {failure.get('pair', 'Unknown')}: {failure.get('error', 'Unknown error')}"
+                )
+            else:
+                lines.append(f"  {failure}")
         lines.append("")
 
-    lines.append("=" * 60)
+    lines.append("=" * 80)
 
     return "\n".join(lines)
 
@@ -619,10 +664,10 @@ def format_multi_symbol_json_output(multi_result) -> str:
         "symbols": multi_result.symbols,
         "mode": "independent",
         "summary": {
-            "total_symbols": summary['total_symbols'],
-            "total_trades": summary['total_trades'],
-            "average_win_rate": summary['average_win_rate'],
-            "total_pnl": summary['total_pnl'],
+            "total_symbols": summary["total_symbols"],
+            "total_trades": summary["total_trades"],
+            "average_win_rate": summary["average_win_rate"],
+            "total_pnl": summary["total_pnl"],
         },
         "per_symbol": per_symbol,
         "failures": multi_result.failures,
