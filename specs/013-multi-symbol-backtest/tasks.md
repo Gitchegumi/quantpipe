@@ -31,10 +31,10 @@
 
 **⚠️ CRITICAL**: US1 multi-symbol execution depends on modernized runner
 
-- [ ] T004 Update import in `src/backtest/portfolio/independent_runner.py` from legacy `ingest_candles` to `ingest_ohlcv_data`
-- [ ] T005 Modify `_run_symbol_backtest()` in `src/backtest/portfolio/independent_runner.py` to use Polars vectorized path
-- [ ] T006 Update `_get_dataset_path()` in `src/backtest/portfolio/independent_runner.py` to support Parquet with CSV fallback
-- [ ] T007 Add `dataset` parameter to `IndependentRunner.run()` in `src/backtest/portfolio/independent_runner.py`
+- [x] T004 Update import in `src/backtest/portfolio/independent_runner.py` from legacy `ingest_candles` to `ingest_ohlcv_data`
+- [x] T005 Modify `_run_symbol_backtest()` in `src/backtest/portfolio/independent_runner.py` to use Polars vectorized path
+- [x] T006 Update `_get_dataset_path()` in `src/backtest/portfolio/independent_runner.py` to support Parquet with CSV fallback
+- [x] T007 Add `dataset` parameter to `IndependentRunner.run()` in `src/backtest/portfolio/independent_runner.py`
 
 **Checkpoint**: IndependentRunner ready for vectorized multi-symbol execution
 
