@@ -56,7 +56,7 @@
 - [x] T009 [US1] Refactor test_both_backtest_dry_run in tests/integration/test_both_mode_backtest.py to use vectorized API
 - [x] T010 [US1] Refactor test_both_backtest_text_output in tests/integration/test_both_mode_backtest.py to use vectorized API
 - [x] T011 [US1] Refactor test_both_backtest_json_output in tests/integration/test_both_mode_backtest.py to use vectorized API
-- [/] T012 [US1] Run integration tests to verify all pass with `poetry run pytest tests/integration -v --tb=short`
+- [x] T012 [US1] Run integration tests to verify all pass with `poetry run pytest tests/integration -v --tb=short`
 
 **Checkpoint**: All integration tests pass (SC-001 satisfied)
 
@@ -70,8 +70,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T013 [P] [US2] Remove 6 redundant tests from tests/unit/test_indicators_basic.py (keep edge cases: empty, single value)
-- [ ] T014 [P] [US2] Remove 3-4 redundant position sizing tests from tests/unit/test_risk_manager_rounding.py
+- [x] T013 [P] [US2] ~~Remove 6 redundant tests from tests/unit/test_indicators_basic.py~~ N/A - file already consolidated to test_indicators_consolidated.py
+- [x] T014 [P] [US2] ~~Remove 3-4 redundant position sizing tests from tests/unit/test_risk_manager_rounding.py~~ N/A - tests are well-organized, no redundancy found
 - [ ] T015 [US2] Run unit tests to verify no regression with `poetry run pytest tests/unit -v --tb=short`
 - [ ] T016 [US2] Run full test suite to verify test count reduction ≤30% with `poetry run pytest --collect-only -q`
 
@@ -87,8 +87,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T017 [US3] Create tests/removal-notes.md documenting all removed tests with justifications
-- [ ] T018 [US3] Update tests/\_inventory_removed.txt to mark completed actions
+- [x] T017 [US3] Create tests/removal-notes.md documenting all removed tests with justifications
+- [x] T018 [US3] ~~Update tests/\_inventory_removed.txt~~ N/A - file does not exist in this codebase
 
 **Checkpoint**: Documentation complete (SC-005 satisfied)
 
