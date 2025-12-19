@@ -8,11 +8,32 @@ including parameter configurations, temporary file paths, and sample data.
 import random
 import time
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 import numpy as np
 import pytest
 
 from src.config.parameters import StrategyParameters
+
+
+@pytest.fixture(autouse=True)
+def disable_rich_progress():
+    """Disable Rich progress displays during tests to prevent LiveError.
+
+    Rich's Progress/Live can only have one active display at a time,
+    which conflicts with pytest's output capturing. This fixture mocks
+    the Progress class to prevent the conflict.
+    """
+    mock_progress = MagicMock()
+    mock_progress.start = MagicMock()
+    mock_progress.stop = MagicMock()
+    mock_progress.add_task = MagicMock(return_value=0)
+    mock_progress.update = MagicMock()
+    mock_progress.remove_task = MagicMock()
+    mock_progress.tasks = [MagicMock(total=100)]
+
+    with patch("src.data_io.progress.Progress", return_value=mock_progress):
+        yield
 
 
 SEED = 42

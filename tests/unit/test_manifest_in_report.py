@@ -9,6 +9,7 @@ Test Coverage:
 - Manifest metadata matches source file
 - Missing manifest handling
 """
+
 # pylint: disable=redefined-outer-name,no-member
 # Justification:
 # - redefined-outer-name: pytest fixtures intentionally shadow names
@@ -16,9 +17,14 @@ Test Coverage:
 
 import hashlib
 import tempfile
+from datetime import datetime, UTC
 from pathlib import Path
 
 from src.models.performance_report import PerformanceReport
+
+
+# Helper constant for test creation
+TEST_CREATED_AT = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 
 def calculate_file_sha256(file_path: Path) -> str:
@@ -61,6 +67,7 @@ def test_manifest_path_captured():
         progress_overhead_pct=0.5,
         indicator_names=["ema20", "ema50"],
         deterministic_mode=True,
+        created_at=TEST_CREATED_AT,
     )
 
     assert report.manifest_path == manifest_path
@@ -90,6 +97,7 @@ def test_manifest_checksum_format():
         progress_overhead_pct=0.5,
         indicator_names=["ema20"],
         deterministic_mode=False,
+        created_at=TEST_CREATED_AT,
     )
 
     # Verify checksum format
@@ -128,6 +136,7 @@ def test_manifest_provenance_validation_match():
             progress_overhead_pct=0.5,
             indicator_names=["ema20"],
             deterministic_mode=True,
+            created_at=TEST_CREATED_AT,
         )
 
         # Verify stored checksum matches actual
@@ -174,6 +183,7 @@ def test_manifest_provenance_validation_mismatch():
             progress_overhead_pct=0.5,
             indicator_names=["ema20"],
             deterministic_mode=True,
+            created_at=TEST_CREATED_AT,
         )
 
         # Verify stored checksum does NOT match actual
@@ -214,6 +224,7 @@ def test_manifest_path_relative():
         progress_overhead_pct=0.5,
         indicator_names=["ema20"],
         deterministic_mode=True,
+        created_at=TEST_CREATED_AT,
     )
 
     # Verify path is relative (no drive letter, no leading slash)
@@ -246,6 +257,7 @@ def test_manifest_metadata_serialization():
         progress_overhead_pct=0.5,
         indicator_names=["ema20"],
         deterministic_mode=True,
+        created_at=TEST_CREATED_AT,
     )
 
     # Serialize to dict
@@ -283,6 +295,7 @@ def test_manifest_candle_count_consistency():
         progress_overhead_pct=0.5,
         indicator_names=["ema20"],
         deterministic_mode=True,
+        created_at=TEST_CREATED_AT,
     )
 
     # Verify candle count stored correctly

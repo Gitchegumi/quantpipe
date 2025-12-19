@@ -6,7 +6,7 @@ signal generation, execution simulation, and metrics computation for short-only
 trend pullback strategy.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -55,9 +55,7 @@ class TestUS2ShortSignalIntegration:
                 f"{open_price:.5f},{high:.5f},{low:.5f},"
                 f"{close_price:.5f},1000"
             )
-            timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-            if timestamp.hour == 0:
-                timestamp = timestamp.replace(day=timestamp.day + 1)
+            timestamp += timedelta(hours=1)
 
         # Next 15 candles: strong pullback up (rising prices to trigger
         # RSI > 70)
@@ -73,9 +71,7 @@ class TestUS2ShortSignalIntegration:
                 f"{open_price:.5f},{high:.5f},{low:.5f},"
                 f"{close_price:.5f},1000"
             )
-            timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-            if timestamp.hour == 0:
-                timestamp = timestamp.replace(day=timestamp.day + 1)
+            timestamp += timedelta(hours=1)
 
         # Candles 96-97: Momentum turning down (2 small bearish candles)
         for _ in range(2):
@@ -89,7 +85,7 @@ class TestUS2ShortSignalIntegration:
                 f"{open_price:.5f},{high:.5f},{low:.5f},"
                 f"{close_price:.5f},1000"
             )
-            timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
+            timestamp += timedelta(hours=1)
 
         # Candle 98: Small bullish candle (last gasp before reversal)
         open_price = close_price
@@ -101,7 +97,7 @@ class TestUS2ShortSignalIntegration:
             f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},{open_price:.5f},{high:.5f},"
             f"{low:.5f},{close_price:.5f},800"
         )
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
+        timestamp += timedelta(hours=1)
 
         # Candle 99: Large bearish engulfing pattern to confirm reversal
         prev_open_price = open_price
@@ -115,7 +111,7 @@ class TestUS2ShortSignalIntegration:
             f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')},{open_price:.5f},{high:.5f},"
             f"{low:.5f},{close_price:.5f},5000"
         )
-        timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
+        timestamp += timedelta(hours=1)
 
         # Final 101 candles: continuation downtrend
         for _ in range(101):
@@ -129,9 +125,7 @@ class TestUS2ShortSignalIntegration:
                 f"{open_price:.5f},{high:.5f},{low:.5f},"
                 f"{close_price:.5f},1000"
             )
-            timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-            if timestamp.hour == 0:
-                timestamp = timestamp.replace(day=timestamp.day + 1)
+            timestamp += timedelta(hours=1)
 
         csv_path.write_text("\n".join(rows))
         return csv_path
@@ -332,9 +326,7 @@ class TestUS2ShortSignalIntegration:
                 f"{open_price:.5f},{high:.5f},{low:.5f},"
                 f"{close_price:.5f},1000"
             )
-            timestamp = timestamp.replace(hour=(timestamp.hour + 1) % 24)
-            if timestamp.hour == 0:
-                timestamp = timestamp.replace(day=timestamp.day + 1)
+            timestamp += timedelta(hours=1)
 
         csv_path.write_text("\n".join(rows))
 

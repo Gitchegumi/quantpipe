@@ -9,6 +9,7 @@ import pytest
 from src.backtest.stream_writer import StreamWriter, write_results_streaming
 
 
+@pytest.mark.slow
 class TestStreamWriterMemory:
     """Integration tests for stream writer memory bounds."""
 
@@ -132,9 +133,9 @@ class TestStreamWriterMemory:
 
                 # FR-007: Buffer ≤ 1.1× raw dataset (this is conservative)
                 # In practice, buffer is much smaller (≈batch_size/total_rows × raw)
-                assert memory_ratio < 0.2, (
-                    f"Buffer memory ratio {memory_ratio:.2%} exceeds 20% threshold"
-                )
+                assert (
+                    memory_ratio < 0.2
+                ), f"Buffer memory ratio {memory_ratio:.2%} exceeds 20% threshold"
 
             # Validate all rows written
             df_output = pd.read_csv(output_path)
@@ -201,9 +202,7 @@ class TestStreamWriterMemory:
         try:
             rows = [{"index": i, "value": i * 2.5} for i in range(10_000)]
 
-            total_written = write_results_streaming(
-                rows, output_path, batch_size=1000
-            )
+            total_written = write_results_streaming(rows, output_path, batch_size=1000)
 
             # Validate return value
             assert total_written == 10_000

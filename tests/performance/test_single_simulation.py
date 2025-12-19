@@ -18,8 +18,6 @@ def test_single_simulation_performance(benchmark):
         "LONG",
         "--data",  # Changed from --dataset to --data to match CLI
         "price_data/processed/EURUSD/test/eurusd_test.parquet",  # Point to actual file
-        "--data-frac",
-        "1.0",
     ]
 
     def run_backtest():

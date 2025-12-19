@@ -1,10 +1,12 @@
-# Trading Strategies
+# QuantPipe
 
-Algorithmic FX trading strategies with a reproducible backtesting framework.
+QuantPipe is an open-source FOREX automated trading infrastructure designed for strategy backtesting, forward testing, and live execution using MetaTrader (MT4/MT5). It allows traders and developers to research strategies offline and deploy the same logic into automated trading environments.
 
 ## Overview
 
-Implements a trend pullback continuation strategy: identify prevailing trend, wait for a measured retracement (pullback), confirm with reversal + momentum context, then evaluate R‑multiple risk-managed entries. The repository also provides a general-purpose backtesting harness, dataset partition tooling (test/validation), and risk management primitives.
+QuantPipe provides a modular framework for developing, testing, and deploying algorithmic trading strategies in the FOREX market. It includes a general-purpose backtesting engine, dataset partitioning tools for test and validation workflows, and reusable risk management components.
+
+The project is motivated in part by the requirements of proprietary trading firms such as City Traders Imperium (CTI), where U.S.-based traders are required to use Match-Trader rather than MetaTrader. As a result, QuantPipe is designed to support multiple execution platforms, including MetaTrader (MT4/MT5) and Match-Trader, while maintaining a single, consistent strategy and risk management codebase across backtesting, forward testing, and live trading.
 
 ## Quick Start (3 Commands)
 
@@ -68,14 +70,14 @@ poetry run python -m src.cli.run_backtest --data custom/path/data.csv --directio
 
 ## Basic CLI Usage
 
-| Flag              | Values                | Default    | Purpose                                               |
-| ----------------- | --------------------- | ---------- | ----------------------------------------------------- |
+| Flag              | Values                | Default    | Purpose                                                     |
+| ----------------- | --------------------- | ---------- | ----------------------------------------------------------- |
 | `--pair`          | EURUSD, USDJPY, etc.  | EURUSD     | Currency pair (auto-constructs data path if --data omitted) |
-| `--dataset`       | `test` `validate`     | `test`     | Dataset partition when using auto-constructed path    |
-| `--data`          | PATH                  | (optional) | Custom data file path (overrides auto-construction)   |
-| `--direction`     | `LONG` `SHORT` `BOTH` | `LONG`     | Trade direction mode                                  |
-| `--output-format` | `text` `json`         | `text`     | Output format                                         |
-| `--dry-run`       | (flag)                | off        | Emit signals only (no execution)                      |
+| `--dataset`       | `test` `validate`     | `test`     | Dataset partition when using auto-constructed path          |
+| `--data`          | PATH                  | (optional) | Custom data file path (overrides auto-construction)         |
+| `--direction`     | `LONG` `SHORT` `BOTH` | `LONG`     | Trade direction mode                                        |
+| `--output-format` | `text` `json`         | `text`     | Output format                                               |
+| `--dry-run`       | (flag)                | off        | Emit signals only (no execution)                            |
 
 ### Multi-Strategy Support
 
@@ -167,13 +169,13 @@ Invalid symbols (missing datasets) are automatically skipped with warnings.
 
 ### CLI Flags Reference
 
-| Flag                      | Values                 | Default     | Purpose                            |
-| ------------------------- | ---------------------- | ----------- | ---------------------------------- |
-| `--pair`                  | EURUSD GBPUSD ...      | (required)  | Currency pairs to backtest         |
-| `--portfolio-mode`        | independent, portfolio | independent | Execution mode                     |
-| `--disable-symbol`        | EURUSD ...             | (none)      | Exclude symbols from execution     |
-| `--correlation-threshold` | 0.0-1.0                | 0.8         | Portfolio correlation warning level|
-| `--snapshot-interval`     | integer                | 50          | Snapshot frequency (candles)       |
+| Flag                      | Values                 | Default     | Purpose                             |
+| ------------------------- | ---------------------- | ----------- | ----------------------------------- |
+| `--pair`                  | EURUSD GBPUSD ...      | (required)  | Currency pairs to backtest          |
+| `--portfolio-mode`        | independent, portfolio | independent | Execution mode                      |
+| `--disable-symbol`        | EURUSD ...             | (none)      | Exclude symbols from execution      |
+| `--correlation-threshold` | 0.0-1.0                | 0.8         | Portfolio correlation warning level |
+| `--snapshot-interval`     | integer                | 50          | Snapshot frequency (candles)        |
 
 See `specs/008-multi-symbol/quickstart.md` for detailed examples and output formats.
 

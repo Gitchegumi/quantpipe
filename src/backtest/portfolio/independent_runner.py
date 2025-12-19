@@ -143,7 +143,7 @@ class IndependentRunner:
 
         # Load candles using existing ingestion
         logger.debug("Loading dataset for %s", pair.code)
-        candles = ingest_candles(dataset_path)
+        candles = list(ingest_candles(dataset_path))
 
         # Create orchestrator
         orchestrator = BacktestOrchestrator(
