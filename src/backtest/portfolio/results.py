@@ -103,17 +103,17 @@ class MultiSymbolResultsAggregator:
 
         total_pnl = 0.0
         for result in self.results.values():
-            # Get expectancy_r and trade_count
+            # Get expectancy and trade_count
             if hasattr(result.metrics, "combined"):
                 # DirectionalMetrics (BOTH mode)
-                expectancy = result.metrics.combined.expectancy_r
+                expectancy = result.metrics.combined.expectancy
                 trade_count = result.metrics.combined.trade_count
             else:
                 # MetricsSummary (LONG/SHORT mode)
-                expectancy = result.metrics.expectancy_r
+                expectancy = result.metrics.expectancy
                 trade_count = result.metrics.trade_count
 
-            # P&L = expectancy_r × trade_count × risk_per_trade
+            # P&L = expectancy × trade_count × risk_per_trade
             symbol_pnl = expectancy * trade_count * risk_per_trade
             total_pnl += symbol_pnl
 
