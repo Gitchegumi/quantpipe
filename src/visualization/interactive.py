@@ -114,10 +114,68 @@ def plot_backtest_results(
     # T006: Add Indicators
     indicators = _prepare_indicator_data(data)
     for name, series in indicators.items():
+        logger.debug("Adding indicator series: %s", name)
         line = chart.create_line(name=name)
         line.set(series)
 
-    # TODO: T010 Add Trades
+    # T010: Add Trades
+    _add_trade_markers(chart, result)
 
     if show_plot:
         chart.show(block=True)
+
+
+def _add_trade_markers(chart: Chart, result: BacktestResult) -> None:
+    """
+    Extract executions from BacktestResult and add them as markers to the chart.
+    """
+    if not result.executions:
+        logger.info("No executions found to visualize.")
+        return
+
+    markers = []
+    for trade in result.executions:
+        # trade is typically a dictionary or object with timestamp, price, side
+        # Adjust access based on actual trade object structure in src/backtest/engine
+
+        # Checking implementation of trade execution recording in backtest engine
+        # Assuming trade is a dict for now, based on JSON output standards
+        try:
+            ts = trade.get("timestamp")
+            if not ts:
+                continue
+
+            # Convert timestamp to string if needed
+            time_str = str(ts)
+
+            side = trade.get("side", "").upper()
+            price = trade.get("price")
+
+            if side == "BUY":
+                markers.append(
+                    {
+                        "time": time_str,
+                        "position": "belowBar",
+                        "color": "#2196F3",  # Blue
+                        "shape": "arrowUp",
+                        "text": f"Buy @ {price}",
+                    }
+                )
+            elif side == "SELL":
+                markers.append(
+                    {
+                        "time": time_str,
+                        "position": "aboveBar",
+                        "color": "#E91E63",  # Pink
+                        "shape": "arrowDown",
+                        "text": f"Sell @ {price}",
+                    }
+                )
+        except Exception as e:
+            logger.warning("Failed to parse trade for visualization: %s", e)
+            continue
+
+    if markers:
+        # Sort markers by time (required by library)
+        markers.sort(key=lambda x: x["time"])
+        chart.marker(markers)

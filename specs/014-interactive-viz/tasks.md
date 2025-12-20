@@ -26,11 +26,11 @@
 
 **Goal**: Visual verification of backtest results with indicators.
 
-- [ ] T009 [US1] Update `plot_backtest_results` to loop through indicators and add line series in `src/visualization/interactive.py`
-- [ ] T010 [US1] Implement `_add_trade_markers` helper to convert `BacktestResult.executions` to marker data (gracefully handle no trades)
-- [ ] T011 [US1] Integration: Integrate `plot_backtest_results` into `src/cli/run_backtest.py` behind `--visualize` flag
-- [ ] T012 [US1] Manual Verify: Run `backtest --visualize` and confirm chart opens with candles, indicators, and markers
-- [ ] T019 [US1] Verify that layer visibility can be toggled via legend (FR-007)
+- [x] T009 [US1] Update `plot_backtest_results` to loop through indicators and add line series in `src/visualization/interactive.py`
+- [x] T010 [US1] Implement `_add_trade_markers` helper to convert `BacktestResult.executions` to marker data (gracefully handle no trades)
+- [x] T011 [US1] Integration: Integrate `plot_backtest_results` into `src/cli/run_backtest.py` behind `--visualize` flag
+- [x] T012 [US1] Manual Verify: Run `backtest --visualize` and confirm chart opens with candles, indicators, and markers
+- [x] T019 [US1] Verify that layer visibility can be toggled via legend (FR-007)
 
 ## Phase 4: User Story 2 (Interactive Analysis)
 

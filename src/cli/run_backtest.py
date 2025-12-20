@@ -643,6 +643,12 @@ def main():
     )
 
     parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Open interactive chart with results (requires GUI environment)",
+    )
+
+    parser.add_argument(
         "--disable-symbol",
         type=str,
         nargs="*",
@@ -1132,6 +1138,30 @@ Persistent storage not yet implemented."
                     trades_simulated = result.metrics.trade_count
 
             wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
+
+            # T011 Integration: Interactive Visualization
+            if args.visualize:
+                if result.is_multi_symbol:
+                    logger.warning(
+                        "Visualization skipped for multi-symbol result (not yet supported)."
+                    )
+                else:
+                    try:
+                        from ..visualization.interactive import plot_backtest_results
+
+                        logger.info("Generating interactive visualization...")
+                        plot_backtest_results(
+                            data=enriched_df, result=result, pair=pair, show_plot=True
+                        )
+                    except ImportError as e:
+                        logger.error(
+                            "Visualization module not found or dependency missing: %s",
+                            e,
+                        )
+                    except Exception as e:
+                        logger.error(
+                            "Failed to generate visualization: %s", e, exc_info=True
+                        )
 
             # Memory metrics (approximate if tracemalloc not used)
             memory_peak_mb = 0.0
