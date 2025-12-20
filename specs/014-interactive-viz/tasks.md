@@ -17,7 +17,7 @@
 **Goal**: Implement the core visualization engine capable of rendering a chart.
 
 - [ ] T004 [P] Create `src/visualization/interactive.py` with basic `plot_backtest_results` signature
-- [ ] T005 [P] Implement `_prepare_candle_data` helper in `interactive.py` to convert Polars DF to pandas OHLC format
+- [ ] T005 [P] Implement `_prepare_candle_data` helper in `interactive.py` to convert Polars DF to pandas OHLC format (handle missing/gap data)
 - [ ] T006 [P] Implement `_prepare_indicator_data` helper in `interactive.py` to extraction indicator series
 - [ ] T007 Implement basic chart rendering in `plot_backtest_results` (candles only) in `src/visualization/interactive.py`
 - [ ] T008 Add `test_plot_backtest_results_calls` to `tests/visualization/test_interactive.py` (mocked)
@@ -27,16 +27,17 @@
 **Goal**: Visual verification of backtest results with indicators.
 
 - [ ] T009 [US1] Update `plot_backtest_results` to loop through indicators and add line series in `src/visualization/interactive.py`
-- [ ] T010 [US1] Implement `_add_trade_markers` helper to convert `BacktestResult.executions` to marker data
+- [ ] T010 [US1] Implement `_add_trade_markers` helper to convert `BacktestResult.executions` to marker data (gracefully handle no trades)
 - [ ] T011 [US1] Integration: Integrate `plot_backtest_results` into `src/cli/run_backtest.py` behind `--visualize` flag
 - [ ] T012 [US1] Manual Verify: Run `backtest --visualize` and confirm chart opens with candles, indicators, and markers
+- [ ] T019 [US1] Verify that layer visibility can be toggled via legend (FR-007)
 
 ## Phase 4: User Story 2 (Interactive Analysis)
 
 **Goal**: Zoom, pan, and inspect data points.
 
 - [ ] T013 [US2] Verify and fine-tune zoom/pan settings in `lightweight-charts` configuration (default usually suffices)
-- [ ] T014 [US2] Customize tooltip/crosshair behavior if needed in `src/visualization/interactive.py`
+- [ ] T014 [US2] Customize tooltip/crosshair behavior to satisfy FR-006 (strict requirement)
 - [ ] T015 [US2] Manual Verify: Check zoom/pan responsiveness on a large dataset
 
 ## Phase 5: Polish & Cross-Cutting
