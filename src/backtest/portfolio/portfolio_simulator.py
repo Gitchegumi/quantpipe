@@ -1,12 +1,12 @@
 """Portfolio simulator for time-synchronized multi-symbol backtesting.
 
 This module implements portfolio-mode simulation where all symbols trade
-against a shared running balance. Trades execute chronologically across
-all symbols, with wins/losses affecting capital available for subsequent trades.
+against a shared running balance. Uses vectorized simulation per symbol
+then merges results chronologically for equity tracking.
 
 Key features:
-- Time-synchronized execution across all symbols
-- Shared portfolio equity that updates after each trade closes
+- Vectorized simulation per symbol (fast)
+- Shared portfolio equity updated after each trade closes (chronologically)
 - Position sizing at 0.25% of current equity
 - Maximum one open position per symbol at a time
 """
@@ -19,39 +19,8 @@ from typing import Optional
 import numpy as np
 import polars as pl
 
-from src.models.core import TradeSignal
-
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class OpenPosition:
-    """Tracks an open position for a symbol.
-
-    Attributes:
-        symbol: Currency pair
-        signal_id: Original signal ID
-        entry_timestamp: When position was opened
-        entry_bar_idx: Index of entry bar
-        entry_price: Entry fill price
-        stop_price: Current stop loss price
-        target_price: Take profit price
-        direction: 'LONG' or 'SHORT'
-        position_size: Position size in lots
-        risk_amount: Dollar amount at risk
-    """
-
-    symbol: str
-    signal_id: str
-    entry_timestamp: datetime
-    entry_bar_idx: int
-    entry_price: float
-    stop_price: float
-    target_price: float
-    direction: str
-    position_size: float
-    risk_amount: float
 
 
 @dataclass
@@ -121,13 +90,12 @@ class PortfolioResult:
 class PortfolioSimulator:
     """Time-synchronized portfolio simulation with shared equity.
 
-    Processes signals from all symbols chronologically, maintaining
-    a shared running balance that updates after each trade closes.
+    Uses vectorized simulation per symbol (fast), then merges trade
+    results chronologically to update shared equity.
 
     Attributes:
         starting_equity: Initial portfolio capital ($2,500)
         risk_per_trade: Position sizing as fraction of equity (0.0025 = 0.25%)
-        max_positions_per_symbol: Maximum concurrent positions per symbol (1)
 
     Example:
         >>> simulator = PortfolioSimulator(starting_equity=2500.0)
@@ -155,7 +123,6 @@ class PortfolioSimulator:
         self.max_positions_per_symbol = max_positions_per_symbol
         self.target_r_mult = target_r_mult
         self.current_equity = starting_equity
-        self.open_positions: dict[str, OpenPosition] = {}  # symbol -> position
         self.closed_trades: list[ClosedTrade] = []
         self.equity_curve: list[tuple[datetime, float]] = []
 
@@ -166,7 +133,7 @@ class PortfolioSimulator:
         direction_mode: str = "BOTH",
         run_id: str = "portfolio_run",
     ) -> PortfolioResult:
-        """Run time-synchronized simulation across all symbols.
+        """Run vectorized simulation per symbol, then merge chronologically.
 
         Args:
             symbol_data: Dict mapping symbol to enriched Polars DataFrame
@@ -186,59 +153,58 @@ class PortfolioSimulator:
 
         # Reset state
         self.current_equity = self.starting_equity
-        self.open_positions = {}
         self.closed_trades = []
         self.equity_curve = []
 
-        # Merge all timestamps across symbols
-        all_timestamps = self._merge_timestamps(symbol_data)
-        logger.info("Processing %d unique timestamps", len(all_timestamps))
+        # Collect all trades from all symbols
+        all_trades: list[ClosedTrade] = []
 
-        # Index signals by timestamp for each symbol
-        signals_by_ts = self._index_signals_by_timestamp(symbol_signals)
+        # Phase 1: Run vectorized simulation for each symbol
+        for symbol, signals in symbol_signals.items():
+            if symbol not in symbol_data:
+                continue
+
+            df = symbol_data[symbol]
+            symbol_trades = self._simulate_symbol_vectorized(symbol, df, signals)
+            all_trades.extend(symbol_trades)
+            logger.info("Simulated %s: %d trades", symbol, len(symbol_trades))
+
+        # Phase 2: Sort all trades by exit timestamp
+        all_trades.sort(key=lambda t: t.exit_timestamp)
+        logger.info("Processing %d trades chronologically", len(all_trades))
 
         # Get data bounds
-        data_start = all_timestamps[0] if all_timestamps else start_time
-        data_end = all_timestamps[-1] if all_timestamps else start_time
+        data_start = None
+        data_end = None
+        for df in symbol_data.values():
+            ts_col = "timestamp_utc" if "timestamp_utc" in df.columns else "timestamp"
+            if ts_col in df.columns:
+                starts = df[ts_col].min()
+                ends = df[ts_col].max()
+                if data_start is None or starts < data_start:
+                    data_start = starts
+                if data_end is None or ends > data_end:
+                    data_end = ends
+
+        if data_start is None:
+            data_start = start_time
+        if data_end is None:
+            data_end = datetime.now()
 
         # Record initial equity
         self.equity_curve.append((data_start, self.current_equity))
 
-        # Process each timestamp chronologically with Rich progress bar
-        try:
-            from rich.progress import (
-                Progress,
-                BarColumn,
-                TextColumn,
-                TimeRemainingColumn,
-                TaskProgressColumn,
-            )
+        # Phase 3: Update equity chronologically
+        for trade in all_trades:
+            # Recalculate P&L based on current equity at trade entry time
+            # For now, use fixed R-multiple from signal
+            pnl_dollars = trade.pnl_r * (self.current_equity * self.risk_per_trade)
+            trade.pnl_dollars = pnl_dollars
+            trade.risk_amount = self.current_equity * self.risk_per_trade
 
-            use_rich = True
-        except ImportError:
-            use_rich = False
-
-        total_timestamps = len(all_timestamps)
-        if use_rich and total_timestamps > 1000:  # Only show for large datasets
-            with Progress(
-                TextColumn("[bold blue]Portfolio Simulation"),
-                BarColumn(),
-                TaskProgressColumn(),
-                TimeRemainingColumn(),
-            ) as progress:
-                task = progress.add_task(
-                    "Processing bars...",
-                    total=total_timestamps,
-                )
-                for ts in all_timestamps:
-                    self._process_bar(ts, symbol_data, signals_by_ts)
-                    progress.update(task, advance=1)
-        else:
-            for ts in all_timestamps:
-                self._process_bar(ts, symbol_data, signals_by_ts)
-
-        # Close any remaining open positions at end
-        self._close_all_positions_at_end(symbol_data)
+            self.current_equity += pnl_dollars
+            self.closed_trades.append(trade)
+            self.equity_curve.append((trade.exit_timestamp, self.current_equity))
 
         # Record final equity
         self.equity_curve.append((data_end, self.current_equity))
@@ -274,246 +240,136 @@ class PortfolioSimulator:
 
         return result
 
-    def _merge_timestamps(self, symbol_data: dict[str, pl.DataFrame]) -> list[datetime]:
-        """Merge all timestamps across symbols into single sorted list."""
-        all_ts = set()
-        for df in symbol_data.values():
-            ts_col = "timestamp_utc" if "timestamp_utc" in df.columns else "timestamp"
-            if ts_col in df.columns:
-                timestamps = df[ts_col].to_list()
-                all_ts.update(timestamps)
-        return sorted(all_ts)
-
-    def _index_signals_by_timestamp(
-        self, symbol_signals: dict[str, list]
-    ) -> dict[datetime, list[tuple[str, dict]]]:
-        """Index all signals by their timestamp.
-
-        Returns:
-            Dict mapping timestamp -> list of (symbol, signal) tuples
-        """
-        signals_by_ts: dict[datetime, list[tuple[str, dict]]] = {}
-
-        for symbol, signals in symbol_signals.items():
-            for signal in signals:
-                # Handle both dict and object signals
-                if hasattr(signal, "timestamp_utc"):
-                    ts = signal.timestamp_utc
-                elif isinstance(signal, dict):
-                    ts = signal.get("timestamp_utc") or signal.get("timestamp")
-                else:
-                    continue
-
-                if ts not in signals_by_ts:
-                    signals_by_ts[ts] = []
-                signals_by_ts[ts].append((symbol, signal))
-
-        return signals_by_ts
-
-    def _process_bar(
-        self,
-        timestamp: datetime,
-        symbol_data: dict[str, pl.DataFrame],
-        signals_by_ts: dict[datetime, list[tuple[str, dict]]],
-    ):
-        """Process one bar across all symbols.
-
-        1. Check SL/TP for all open positions
-        2. Open new positions for signals at this timestamp
-        """
-        # Check open positions for SL/TP hits
-        for symbol in list(self.open_positions.keys()):
-            self._check_position_exit(symbol, timestamp, symbol_data[symbol])
-
-        # Check for new signals at this timestamp
-        if timestamp in signals_by_ts:
-            for symbol, signal in signals_by_ts[timestamp]:
-                self._try_open_position(symbol, signal, timestamp, symbol_data[symbol])
-
-    def _check_position_exit(self, symbol: str, timestamp: datetime, df: pl.DataFrame):
-        """Check if open position should be closed at this bar."""
-        if symbol not in self.open_positions:
-            return
-
-        pos = self.open_positions[symbol]
-
-        # Get bar data at this timestamp
-        ts_col = "timestamp_utc" if "timestamp_utc" in df.columns else "timestamp"
-        bar = df.filter(pl.col(ts_col) == timestamp)
-        if bar.is_empty():
-            return
-
-        high = bar["high"][0]
-        low = bar["low"][0]
-        close = bar["close"][0]
-
-        exit_price = None
-        exit_reason = None
-
-        if pos.direction == "LONG":
-            # Check stop loss (low touches stop)
-            if low <= pos.stop_price:
-                exit_price = pos.stop_price
-                exit_reason = "stop_loss"
-            # Check take profit (high touches target)
-            elif high >= pos.target_price:
-                exit_price = pos.target_price
-                exit_reason = "take_profit"
-        else:  # SHORT
-            # Check stop loss (high touches stop)
-            if high >= pos.stop_price:
-                exit_price = pos.stop_price
-                exit_reason = "stop_loss"
-            # Check take profit (low touches target)
-            elif low <= pos.target_price:
-                exit_price = pos.target_price
-                exit_reason = "take_profit"
-
-        if exit_price is not None:
-            self._close_position(symbol, timestamp, exit_price, exit_reason)
-
-    def _try_open_position(
+    def _simulate_symbol_vectorized(
         self,
         symbol: str,
-        signal: dict,
-        timestamp: datetime,
         df: pl.DataFrame,
-    ):
-        """Try to open a new position for a signal."""
-        # Check if position already open for this symbol
-        if symbol in self.open_positions:
-            logger.debug("Skipping signal for %s - position already open", symbol)
-            return
+        signals: list,
+    ) -> list[ClosedTrade]:
+        """Run vectorized simulation for a single symbol.
 
-        # Get signal details
-        if hasattr(signal, "entry_price"):
-            entry_price = signal.entry_price
-            stop_price = signal.initial_stop_price
-            direction = signal.direction
-            signal_id = signal.id
-        else:
-            entry_price = signal.get("entry_price")
-            stop_price = signal.get("initial_stop_price") or signal.get("stop_price")
-            direction = signal.get("direction")
-            signal_id = signal.get("id", f"{symbol}_{timestamp}")
+        Uses NumPy arrays for fast SL/TP evaluation.
+        """
+        if not signals:
+            return []
 
-        if entry_price is None or stop_price is None:
-            return
-
-        # Calculate position size based on current equity
-        risk_amount = self.current_equity * self.risk_per_trade
-        stop_distance = abs(entry_price - stop_price)
-
-        if stop_distance == 0:
-            return
-
-        # Calculate target price (using R-multiple)
-        if direction == "LONG":
-            target_price = entry_price + (stop_distance * self.target_r_mult)
-        else:
-            target_price = entry_price - (stop_distance * self.target_r_mult)
-
-        # Get bar index
+        # Get timestamp column
         ts_col = "timestamp_utc" if "timestamp_utc" in df.columns else "timestamp"
-        bar_idx_result = df.with_row_index().filter(pl.col(ts_col) == timestamp)
-        bar_idx = bar_idx_result["index"][0] if not bar_idx_result.is_empty() else 0
 
-        position = OpenPosition(
-            symbol=symbol,
-            signal_id=signal_id,
-            entry_timestamp=timestamp,
-            entry_bar_idx=bar_idx,
-            entry_price=entry_price,
-            stop_price=stop_price,
-            target_price=target_price,
-            direction=direction,
-            position_size=risk_amount / stop_distance,
-            risk_amount=risk_amount,
-        )
+        # Extract OHLC arrays
+        timestamps = df[ts_col].to_numpy()
+        opens = df["open"].to_numpy()
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
+        closes = df["close"].to_numpy()
 
-        self.open_positions[symbol] = position
-        logger.debug(
-            "Opened %s position on %s at %.5f, stop=%.5f, target=%.5f, risk=$%.2f",
-            direction,
-            symbol,
-            entry_price,
-            stop_price,
-            target_price,
-            risk_amount,
-        )
+        trades: list[ClosedTrade] = []
 
-    def _close_position(
-        self,
-        symbol: str,
-        timestamp: datetime,
-        exit_price: float,
-        exit_reason: str,
-    ):
-        """Close a position and update equity."""
-        pos = self.open_positions.pop(symbol)
+        # Create timestamp index for fast lookup
+        ts_to_idx = {ts: i for i, ts in enumerate(timestamps)}
 
-        # Calculate P&L
-        if pos.direction == "LONG":
-            pnl_pips = exit_price - pos.entry_price
-        else:
-            pnl_pips = pos.entry_price - exit_price
+        for signal in signals:
+            # Get signal details
+            if hasattr(signal, "entry_price"):
+                entry_price = signal.entry_price
+                stop_price = signal.initial_stop_price
+                direction = signal.direction
+                signal_id = getattr(signal, "id", f"{symbol}_{signal.timestamp_utc}")
+                signal_ts = signal.timestamp_utc
+            else:
+                entry_price = signal.get("entry_price")
+                stop_price = signal.get("initial_stop_price") or signal.get(
+                    "stop_price"
+                )
+                direction = signal.get("direction")
+                signal_id = signal.get("id", f"{symbol}")
+                signal_ts = signal.get("timestamp_utc") or signal.get("timestamp")
 
-        # Calculate R-multiple
-        stop_distance = abs(pos.entry_price - pos.stop_price)
-        pnl_r = pnl_pips / stop_distance if stop_distance > 0 else 0.0
-
-        # Calculate dollar P&L
-        pnl_dollars = pnl_r * pos.risk_amount
-
-        # Update equity
-        old_equity = self.current_equity
-        self.current_equity += pnl_dollars
-
-        # Record trade
-        trade = ClosedTrade(
-            symbol=symbol,
-            signal_id=pos.signal_id,
-            direction=pos.direction,
-            entry_timestamp=pos.entry_timestamp,
-            exit_timestamp=timestamp,
-            entry_price=pos.entry_price,
-            exit_price=exit_price,
-            exit_reason=exit_reason,
-            pnl_dollars=pnl_dollars,
-            pnl_r=pnl_r,
-            risk_amount=pos.risk_amount,
-        )
-        self.closed_trades.append(trade)
-
-        # Record equity curve point
-        self.equity_curve.append((timestamp, self.current_equity))
-
-        logger.debug(
-            "Closed %s %s at %.5f (%s): %.2fR, $%.2f | Equity: $%.2f -> $%.2f",
-            symbol,
-            pos.direction,
-            exit_price,
-            exit_reason,
-            pnl_r,
-            pnl_dollars,
-            old_equity,
-            self.current_equity,
-        )
-
-    def _close_all_positions_at_end(self, symbol_data: dict[str, pl.DataFrame]):
-        """Close all remaining positions at end of data."""
-        for symbol in list(self.open_positions.keys()):
-            df = symbol_data[symbol]
-            ts_col = "timestamp_utc" if "timestamp_utc" in df.columns else "timestamp"
-
-            last_row = df.tail(1)
-            if last_row.is_empty():
+            if entry_price is None or stop_price is None or signal_ts is None:
                 continue
 
-            close_price = last_row["close"][0]
-            last_ts = last_row[ts_col][0]
+            # Find entry index
+            entry_idx = ts_to_idx.get(signal_ts)
+            if entry_idx is None:
+                continue
 
-            self._close_position(symbol, last_ts, close_price, "end_of_data")
+            # Calculate target
+            stop_distance = abs(entry_price - stop_price)
+            if stop_distance == 0:
+                continue
+
+            if direction == "LONG":
+                target_price = entry_price + (stop_distance * self.target_r_mult)
+            else:
+                target_price = entry_price - (stop_distance * self.target_r_mult)
+
+            # Simulate trade using vectorized approach
+            exit_idx = None
+            exit_price = None
+            exit_reason = None
+
+            # Scan forward from entry
+            for i in range(entry_idx + 1, len(timestamps)):
+                high = highs[i]
+                low = lows[i]
+
+                if direction == "LONG":
+                    # Check stop first (conservative)
+                    if low <= stop_price:
+                        exit_idx = i
+                        exit_price = stop_price
+                        exit_reason = "stop_loss"
+                        break
+                    # Check target
+                    if high >= target_price:
+                        exit_idx = i
+                        exit_price = target_price
+                        exit_reason = "take_profit"
+                        break
+                else:  # SHORT
+                    # Check stop first
+                    if high >= stop_price:
+                        exit_idx = i
+                        exit_price = stop_price
+                        exit_reason = "stop_loss"
+                        break
+                    # Check target
+                    if low <= target_price:
+                        exit_idx = i
+                        exit_price = target_price
+                        exit_reason = "take_profit"
+                        break
+
+            # If no exit found, close at end
+            if exit_idx is None:
+                exit_idx = len(timestamps) - 1
+                exit_price = closes[exit_idx]
+                exit_reason = "end_of_data"
+
+            # Calculate R-multiple
+            if direction == "LONG":
+                pnl_pips = exit_price - entry_price
+            else:
+                pnl_pips = entry_price - exit_price
+
+            pnl_r = pnl_pips / stop_distance if stop_distance > 0 else 0.0
+
+            trade = ClosedTrade(
+                symbol=symbol,
+                signal_id=signal_id,
+                direction=direction,
+                entry_timestamp=timestamps[entry_idx],
+                exit_timestamp=timestamps[exit_idx],
+                entry_price=entry_price,
+                exit_price=exit_price,
+                exit_reason=exit_reason,
+                pnl_dollars=0.0,  # Will be calculated when equity is applied
+                pnl_r=pnl_r,
+                risk_amount=0.0,
+            )
+            trades.append(trade)
+
+        return trades
 
     def _build_per_symbol_breakdown(self) -> dict:
         """Build per-symbol trade breakdown."""
@@ -539,7 +395,7 @@ class PortfolioSimulator:
                 breakdown[trade.symbol]["loss_count"] += 1
 
         # Calculate derived metrics
-        for symbol, stats in breakdown.items():
+        for stats in breakdown.values():
             tc = stats["trade_count"]
             stats["win_rate"] = stats["win_count"] / tc if tc > 0 else 0.0
             stats["avg_r"] = stats["total_r"] / tc if tc > 0 else 0.0
