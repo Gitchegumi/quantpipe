@@ -55,9 +55,9 @@
 
 ### Tests for User Story 2
 
-- [ ] T012 [P] [US2] Add `test_path_construction_single_pair()` in `tests/unit/test_path_construction.py`
-- [ ] T013 [P] [US2] Add `test_path_construction_multi_pair()` in `tests/unit/test_path_construction.py`
-- [ ] T014 [P] [US2] Add `test_path_parquet_preferred_over_csv()` in `tests/unit/test_path_construction.py`
+- [x] T012 [P] [US2] Add `test_path_construction_single_pair()` in `tests/unit/test_path_construction.py`
+- [x] T013 [P] [US2] Add `test_path_construction_multi_pair()` in `tests/unit/test_path_construction.py`
+- [x] T014 [P] [US2] Add `test_path_parquet_preferred_over_csv()` in `tests/unit/test_path_construction.py`
 
 **Checkpoint**: Path construction works for multiple pairs
 
@@ -80,10 +80,10 @@
 
 ### Tests for User Story 1
 
-- [ ] T021 [P] [US1] Add `test_multi_symbol_both_pairs_executed()` in `tests/integration/test_multi_symbol_backtest.py`
-- [ ] T022 [P] [US1] Add `test_multi_symbol_aggregated_pnl()` in `tests/integration/test_multi_symbol_backtest.py`
-- [ ] T023 [P] [US1] Add `test_multi_symbol_default_balance()` in `tests/integration/test_multi_symbol_backtest.py`
-- [ ] T024 [P] [US1] Add `test_single_symbol_unchanged()` regression test in `tests/integration/test_multi_symbol_backtest.py`
+- [x] T021 [P] [US1] Add `test_multi_symbol_both_pairs_executed()` in `tests/integration/test_multi_symbol_backtest.py`
+- [x] T022 [P] [US1] Add `test_multi_symbol_aggregated_pnl()` in `tests/integration/test_multi_symbol_backtest.py`
+- [x] T023 [P] [US1] Add `test_multi_symbol_default_balance()` in `tests/integration/test_multi_symbol_backtest.py`
+- [x] T024 [P] [US1] Add `test_single_symbol_unchanged()` regression test in `tests/integration/test_multi_symbol_backtest.py`
 
 **Checkpoint**: Multi-symbol backtest runs on all pairs with concurrent PnL
 
@@ -97,9 +97,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Add `test_parquet_end_to_end_pipeline()` in `tests/integration/test_multi_symbol_backtest.py`
-- [ ] T026 [US3] Add `test_parquet_fallback_to_csv()` in `tests/integration/test_multi_symbol_backtest.py`
-- [ ] T027 [US3] Add `test_progress_bars_clean_display()` in `tests/integration/test_multi_symbol_backtest.py`
+- [x] T025 [US3] Add `test_parquet_end_to_end_pipeline()` in `tests/integration/test_multi_symbol_backtest.py`
+- [x] T026 [US3] Add `test_parquet_fallback_to_csv()` in `tests/integration/test_multi_symbol_backtest.py`
+- [x] T027 [US3] Add `test_progress_bars_clean_display()` in `tests/integration/test_multi_symbol_backtest.py`
 
 **Checkpoint**: Parquet pipeline verified end-to-end
 
