@@ -107,6 +107,21 @@ def plot_backtest_results(
     chart.legend(visible=True)
     chart.topbar.textbox("pair", pair)
 
+    # T013/T014: Interactive Configuration
+    # Enable Crosshair with magnet mode for exact data reading
+    chart.crosshair(
+        mode="normal",
+        vert_line_visible=True,
+        vert_line_label_visible=True,
+        horz_line_visible=True,
+        horz_line_label_visible=True,
+    )
+
+    # Optimize TimeScale
+    chart.time_scale(
+        right_offset=5, bar_spacing=6, time_visible=True, seconds_visible=False
+    )
+
     # Set Candles
     # lightweight-charts-python expects a dataframe with time, open, high, low, close
     chart.set(candles)

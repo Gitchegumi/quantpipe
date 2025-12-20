@@ -36,9 +36,9 @@
 
 **Goal**: Zoom, pan, and inspect data points.
 
-- [ ] T013 [US2] Verify and fine-tune zoom/pan settings in `lightweight-charts` configuration (default usually suffices)
-- [ ] T014 [US2] Customize tooltip/crosshair behavior to satisfy FR-006 (strict requirement)
-- [ ] T015 [US2] Manual Verify: Check zoom/pan responsiveness on a large dataset
+- [x] T013 [US2] Verify and fine-tune zoom/pan settings in `lightweight-charts` configuration (default usually suffices)
+- [x] T014 [US2] Customize tooltip/crosshair behavior to satisfy FR-006 (strict requirement)
+- [x] T015 [US2] Manual Verify: Check zoom/pan responsiveness on a large dataset
 
 ## Phase 5: Polish & Cross-Cutting
 
