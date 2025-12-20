@@ -8,9 +8,9 @@
 
 **Goal**: Initialize dependencies and prepare the environment for visualization.
 
-- [ ] T001 Install `lightweight-charts-python` dependency in pyproject.toml
-- [ ] T002 Update poetry lock file and install environment
-- [ ] T003 Create `src/visualization` module structure with `__init__.py`
+- [x] T001 Install `lightweight-charts-python` dependency in pyproject.toml
+- [x] T002 Update poetry lock file and install environment
+- [x] T003 Create `src/visualization` module structure with `__init__.py`
 
 ## Phase 2: Foundational Implementation
 
