@@ -22,6 +22,10 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - Python 3.11 + Polars, Pandas, Rich (progress bars) (013-multi-symbol-backtest)
 - Parquet files (`price*data/processed/<pair>/<dataset>/<pair>*<dataset>.parquet`) (013-multi-symbol-backtest)
 - Python 3.13 + Polars, Pandas, Rich (progress bars) (013-multi-symbol-backtest)
+- Python 3.11 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility) (014-interactive-viz)
+- N/A (Transient visualization) (014-interactive-viz)
+- Python 3.133 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility) (014-interactive-viz)
+- Python 3.13 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility) (014-interactive-viz)
 
 - Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests) (001-trend-pullback)
 - Poetry (mandatory package manager for dependency management and virtual environments)
@@ -86,9 +90,9 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - See Constitution Principle XI for full requirements
 
 ## Recent Changes
-- 013-multi-symbol-backtest: Added Python 3.13 + Polars, Pandas, Rich (progress bars)
-- 013-multi-symbol-backtest: Added Python 3.11 + Polars, Pandas, Rich (progress bars)
-- 012-cleanup-tests: Added Python 3.11 + pytest, polars, pandas, numpy
+- 014-interactive-viz: Added Python 3.13 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility)
+- 014-interactive-viz: Added Python 3.133 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility)
+- 014-interactive-viz: Added Python 3.11 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility)
 
 
 <!-- MANUAL ADDITIONS START -->
