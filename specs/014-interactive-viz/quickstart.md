@@ -17,17 +17,20 @@ poetry install
 Run a backtest with the `--visualize` flag:
 
 ```bash
-poetry run backtest --pair EURUSD --visualize
+poetry run python -m src.cli.run_backtest --pair EURUSD --visualize
 ```
+
+For multi-symbol backtests, currently only the first symbol will be visualized, or you can use `--pair` to select a specific one.
 
 ## Features
 
 - **Zoom/Pan**: Use mouse wheel and drag to navigate.
-- **Trade Markers**: Triangles indicate Buy (Up) and Sell (Down) entries.
-- **Indicators**: Moving averages and other indicators from the strategy are overlayed.
-- **Performance**: Capable of handling millions of data points smoothly.
+- **Crosshair**: Magnet mode enabled for precise OHL reading.
+- **Layer Control**: Toggle indicators via the legend.
+- **Trade Markers**: Blue (Buy) and Pink (Sell) arrows indicating entry points.
+- **Performance**: High-frame rate rendering via TradingView engine.
 
 ## Troubleshooting
 
-- **No Window**: Ensure you are running in a GUI environment (desktop). WSL requires X server configuration.
+- **No Window**: Ensure you are running in a GUI environment (desktop). WSL requires X server configuration (e.g., VcXsrv).
 - **Slow Load**: For extreme datasets (>10 years), the initial load might take a few seconds.

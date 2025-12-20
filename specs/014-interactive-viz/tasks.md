@@ -42,9 +42,9 @@
 
 ## Phase 5: Polish & Cross-Cutting
 
-- [ ] T016 Validate performance with 10-year dataset (load time check)
-- [ ] T017 Finalize documentation in `docs/` or `quickstart.md` updates
-- [ ] T018 Cleanup: Ensure no heavy imports in main path if `--visualize` is not used
+- [x] T016 Validate performance with 10-year dataset (load time check)
+- [x] T017 Finalize documentation in `docs/` or `quickstart.md` updates
+- [x] T018 Cleanup: Ensure no heavy imports in main path if `--visualize` is not used
 
 ## Dependencies
 
