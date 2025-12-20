@@ -256,8 +256,9 @@ class PortfolioSimulator:
         # Get timestamp column
         ts_col = "timestamp_utc" if "timestamp_utc" in df.columns else "timestamp"
 
-        # Extract OHLC arrays
-        timestamps = df[ts_col].to_numpy()
+        # Extract OHLC arrays (NumPy for fast simulation)
+        # Use to_list() for timestamps to preserve Python datetime types
+        timestamps = df[ts_col].to_list()
         opens = df["open"].to_numpy()
         highs = df["high"].to_numpy()
         lows = df["low"].to_numpy()
