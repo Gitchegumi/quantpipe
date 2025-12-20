@@ -16,11 +16,11 @@
 
 **Goal**: Implement the core visualization engine capable of rendering a chart.
 
-- [ ] T004 [P] Create `src/visualization/interactive.py` with basic `plot_backtest_results` signature
-- [ ] T005 [P] Implement `_prepare_candle_data` helper in `interactive.py` to convert Polars DF to pandas OHLC format (handle missing/gap data)
-- [ ] T006 [P] Implement `_prepare_indicator_data` helper in `interactive.py` to extraction indicator series
-- [ ] T007 Implement basic chart rendering in `plot_backtest_results` (candles only) in `src/visualization/interactive.py`
-- [ ] T008 Add `test_plot_backtest_results_calls` to `tests/visualization/test_interactive.py` (mocked)
+- [x] T004 [P] Create `src/visualization/interactive.py` with basic `plot_backtest_results` signature
+- [x] T005 [P] Implement `_prepare_candle_data` helper in `interactive.py` to convert Polars DF to pandas OHLC format (handle missing/gap data)
+- [x] T006 [P] Implement `_prepare_indicator_data` helper in `interactive.py` to extraction indicator series
+- [x] T007 Implement basic chart rendering in `plot_backtest_results` (candles only) in `src/visualization/interactive.py`
+- [x] T008 Add `test_plot_backtest_results_calls` to `tests/visualization/test_interactive.py` (mocked)
 
 ## Phase 3: User Story 1 (View Results)
 
