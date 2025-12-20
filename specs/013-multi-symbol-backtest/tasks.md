@@ -112,9 +112,9 @@
 - [x] T028 Run Pylint on modified files: `poetry run pylint src/cli/run_backtest.py src/backtest/portfolio/independent_runner.py --score=yes` (target ≥9.5/10)
 - [x] T029 Run Ruff check: `poetry run ruff check src/cli/ src/backtest/portfolio/`
 - [x] T030 [P] Run all new tests: `poetry run pytest tests/integration/test_multi_symbol_backtest.py tests/unit/test_path_construction.py -v`
-- [ ] T031 [P] Run existing multi-symbol tests for regression: `poetry run pytest tests/integration/test_multi_symbol_build.py -v`
-- [ ] T032 Validate quickstart.md examples work manually
-- [ ] T033 Update documentation if any path logic changes
+- [x] T031 [P] Run existing multi-symbol tests for regression: `poetry run pytest tests/integration/test_multi_symbol_build.py -v`
+- [x] T032 Validate quickstart.md examples work manually
+- [x] T033 Update documentation if any path logic changes (no changes needed)
 
 ---
 
