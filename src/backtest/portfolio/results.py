@@ -90,17 +90,33 @@ class MultiSymbolResultsAggregator:
     def get_total_pnl(self) -> float:
         """Get total P&L across all symbols.
 
-        Sums final balance deltas (final_balance - initial_capital).
+        Calculates dollar P&L from expectancy_r × trade_count × risk_per_trade.
+        Uses $2,500 starting capital with 0.25% risk per trade = $6.25 initial risk.
 
         Returns:
-            Total P&L across all symbols
+            Total P&L across all symbols (approximate)
         """
+        # Default capital and risk per trade
+        starting_capital = 2500.0
+        risk_fraction = 0.0025  # 0.25%
+        risk_per_trade = starting_capital * risk_fraction  # $6.25
+
         total_pnl = 0.0
         for result in self.results.values():
-            # Assuming BacktestResult has final_balance and initial_capital
-            if hasattr(result, "final_balance"):
-                pnl = result.final_balance - getattr(result, "initial_capital", 10000.0)
-                total_pnl += pnl
+            # Get expectancy_r and trade_count
+            if hasattr(result.metrics, "combined"):
+                # DirectionalMetrics (BOTH mode)
+                expectancy = result.metrics.combined.expectancy_r
+                trade_count = result.metrics.combined.trade_count
+            else:
+                # MetricsSummary (LONG/SHORT mode)
+                expectancy = result.metrics.expectancy_r
+                trade_count = result.metrics.trade_count
+
+            # P&L = expectancy_r × trade_count × risk_per_trade
+            symbol_pnl = expectancy * trade_count * risk_per_trade
+            total_pnl += symbol_pnl
+
         return total_pnl
 
     def get_symbol_summary(self, symbol: str) -> Optional[dict]:
