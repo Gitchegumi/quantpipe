@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-import numpy as np
 import polars as pl
 
 
@@ -259,7 +258,7 @@ class PortfolioSimulator:
         # Extract OHLC arrays (NumPy for fast simulation)
         # Use to_list() for timestamps to preserve Python datetime types
         timestamps = df[ts_col].to_list()
-        opens = df["open"].to_numpy()
+        _opens = df["open"].to_numpy()  # Reserved for future use
         highs = df["high"].to_numpy()
         lows = df["low"].to_numpy()
         closes = df["close"].to_numpy()

@@ -41,9 +41,7 @@ Usage:
 
 import io
 import argparse
-import json
 import logging
-import math
 import sys
 from contextlib import nullcontext
 from datetime import datetime, timezone
@@ -51,7 +49,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..backtest.metrics import MetricsSummary
 from ..backtest.orchestrator import BacktestOrchestrator
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
@@ -61,7 +58,6 @@ from ..data_io.formatters import (
     generate_output_filename,
 )
 from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
-from ..models.core import BacktestRun
 from ..models.enums import DirectionMode, OutputFormat
 
 
@@ -419,7 +415,7 @@ def run_multi_symbol_backtest(
         if r.metrics
     )
 
-    avg_win_rate = (
+    _avg_win_rate = (  # Reserved for future aggregate reporting
         sum(
             (
                 r.metrics.combined.win_rate
