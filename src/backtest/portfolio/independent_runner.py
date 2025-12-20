@@ -9,13 +9,17 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import polars as pl
+
 from src.backtest.orchestrator import BacktestOrchestrator
 from src.backtest.portfolio.errors import PortfolioError
 from src.config.parameters import StrategyParameters
-from src.data_io.legacy_ingestion import ingest_candles
+from src.data_io.ingestion import ingest_ohlcv_data
+from src.indicators.dispatcher import calculate_indicators
 from src.models.directional import BacktestResult
 from src.models.enums import DirectionMode
 from src.models.portfolio import CurrencyPair, SymbolConfig
+from src.strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +55,7 @@ class IndependentRunner:
         strategy_params: StrategyParameters,
         mode: DirectionMode,
         output_dir: Path,
+        dataset: str = "test",
     ) -> dict[str, BacktestResult]:
         """Run independent backtests for all enabled symbols.
 
@@ -58,10 +63,12 @@ class IndependentRunner:
             strategy_params: Strategy parameters to use
             mode: Directional mode (LONG/SHORT/BOTH)
             output_dir: Directory for output files
+            dataset: Dataset partition to use ('test' or 'validate')
 
         Returns:
             Dictionary mapping symbol codes to backtest results
         """
+        self._dataset = dataset
         logger.info(
             "Starting independent multi-symbol run for %d symbols",
             len(self.symbols),
@@ -114,11 +121,11 @@ class IndependentRunner:
         mode: DirectionMode,
         output_dir: Path,
     ) -> BacktestResult:
-        """Run backtest for a single symbol.
+        """Run backtest for a single symbol using vectorized Polars path.
 
         Args:
             pair: Currency pair to backtest
-            strategy_config: Strategy configuration
+            strategy_params: Strategy configuration parameters
             mode: Directional mode
             output_dir: Output directory
 
@@ -127,9 +134,9 @@ class IndependentRunner:
 
         Raises:
             FileNotFoundError: If dataset not found
-            Exception: If backtest execution fails
+            RuntimeError: If backtest execution fails
         """
-        # Construct dataset path
+        # Construct dataset path with Parquet/CSV fallback
         dataset_path = self._get_dataset_path(pair)
 
         if not dataset_path.exists():
@@ -141,9 +148,33 @@ class IndependentRunner:
         symbol_output_dir = output_dir / pair.code.lower()
         symbol_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Load candles using existing ingestion
-        logger.debug("Loading dataset for %s", pair.code)
-        candles = list(ingest_candles(dataset_path))
+        # Load data using vectorized Polars ingestion (T004/T005)
+        logger.debug("Loading dataset for %s from %s", pair.code, dataset_path)
+        use_arrow = dataset_path.suffix.lower() == ".parquet"
+
+        ingestion_result = ingest_ohlcv_data(
+            path=dataset_path,
+            timeframe_minutes=1,
+            mode="columnar",
+            downcast=False,
+            use_arrow=use_arrow,
+            strict_cadence=False,
+            fill_gaps=False,
+            return_polars=True,
+        )
+
+        enriched_df = ingestion_result.data
+        if not isinstance(enriched_df, pl.DataFrame):
+            enriched_df = pl.from_pandas(enriched_df)
+
+        # Rename timestamp if needed
+        if "timestamp" in enriched_df.columns:
+            enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
+
+        # Calculate indicators for strategy
+        strategy = TREND_PULLBACK_STRATEGY
+        required_indicators = strategy.metadata.required_indicators
+        enriched_df = calculate_indicators(enriched_df, required_indicators)
 
         # Create orchestrator
         orchestrator = BacktestOrchestrator(
@@ -151,37 +182,44 @@ class IndependentRunner:
             dry_run=False,
         )
 
-        # Run backtest
+        # Run backtest with Polars DataFrame
         run_id = f"{pair.code.lower()}_{mode.value.lower()}"
         logger.debug("Running backtest for %s with run_id %s", pair.code, run_id)
 
         result = orchestrator.run_backtest(
-            candles=candles,
+            candles=enriched_df,
             pair=pair.code,
             run_id=run_id,
-            ema_fast=strategy_params.ema_fast,
-            ema_slow=strategy_params.ema_slow,
-            atr_stop_mult=strategy_params.atr_stop_mult,
-            target_r_mult=strategy_params.target_r_mult,
-            cooldown_candles=strategy_params.cooldown_candles,
-            rsi_length=strategy_params.rsi_length,
+            strategy=strategy,
+            **strategy_params.model_dump(),
         )
 
         return result
 
     def _get_dataset_path(self, pair: CurrencyPair) -> Path:
-        """Get path to processed dataset for a symbol.
+        """Get path to processed dataset for a symbol with Parquet/CSV fallback.
+
+        Prefers Parquet format for performance, falls back to CSV if not found.
 
         Args:
             pair: Currency pair
 
         Returns:
-            Path to processed CSV file
+            Path to processed data file (Parquet preferred, CSV fallback)
         """
-        # Standard path: price_data/processed/{symbol}/test/{symbol}_test.csv
-        return (
-            self.data_dir / pair.code.lower() / "test" / f"{pair.code.lower()}_test.csv"
-        )
+        dataset = getattr(self, "_dataset", "test")
+        pair_lower = pair.code.lower()
+        base_path = self.data_dir / pair_lower / dataset
+        filename_base = f"{pair_lower}_{dataset}"
+
+        # Try Parquet first (faster loading)
+        parquet_path = base_path / f"{filename_base}.parquet"
+        if parquet_path.exists():
+            return parquet_path
+
+        # Fallback to CSV
+        csv_path = base_path / f"{filename_base}.csv"
+        return csv_path
 
     def get_results(self) -> dict[str, BacktestResult]:
         """Get successful backtest results.

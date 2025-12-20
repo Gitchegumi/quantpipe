@@ -1,23 +1,18 @@
 <!--
 Sync Impact Report:
-- Version change: 1.7.0 → 1.8.0
+- Version change: 1.8.0 → 1.9.0
 - Modified principles:
-  - Principle XI (NEW) - Commit Message Standards (semantic commit format)
-  - Milestone Commit Messages section removed (superseded by Principle XI)
+  - Principle XII (NEW) - Task Tracking & Progress Requirements
 - Added sections:
-  - Principle XI: Commit Message Standards (semantic format with spec/task tracking)
-  - Acceptable semantic tags: docs, test, feat, fix, break, chore
-  - Required format: <semantic-tag>(<spec-number>): <Descriptive Title>(<Task-number>)
-- Removed sections:
-  - Milestone Commit Messages (Development Workflow section) - consolidated into Principle XI
-- Validated through implementation:
-  - Spec 008-multi-symbol: All commits follow new format
-  - Examples: "test(008): Add unknown symbol validation tests (T046)"
-  - Examples: "docs(008): Add CLI filtering examples to quickstart (T047)"
+  - Principle XII: Task Tracking & Progress Requirements
+  - Task status markers: [ ] pending, [/] in-progress, [x] complete
+  - Pre-commit requirement: tasks.md MUST be updated before any commit
+  - Execution order: tasks MUST be completed in sequential order unless they are marked as `[P]` for parallel execution
+- Removed sections: None
 - Templates requiring updates:
-  ✅ plan-template.md - Compatible (no commit guidance in template)
-  ✅ spec-template.md - Compatible (no commit guidance in template)
-  ✅ tasks-template.md - Compatible (task IDs match commit format)
+  ✅ plan-template.md - Compatible (references tasks.md)
+  ✅ spec-template.md - Compatible (no changes needed)
+  ✅ tasks-template.md - Compatible (checkbox format already used)
   ✅ agent-file-template.md - Compatible (no changes needed)
 - Follow-up TODOs: None
 -->
@@ -170,7 +165,7 @@ All Python code MUST be validated using automated quality tools before merge. Al
   - MUST fix all W1203 (logging-fstring-interpolation) warnings
   - Score improvement encouraged but not blocking
 - **Markdownlint**: Markdown linter (markdownlint-cli2)
-  - MUST validate all Markdown files (*.md)
+  - MUST validate all Markdown files (\*.md)
   - Configuration in `.markdownlint.json` or `.markdownlintrc`
   - Enforces consistent formatting, heading hierarchy, and style
   - Common rules: MD032 (blanks-around-lists), MD024 (no-duplicate-heading), MD031 (blanks-around-fences)
@@ -261,6 +256,44 @@ feat(008): Add --portfolio-mode and multi-symbol CLI flags (T041)
 
 **Rationale**: Structured commit messages provide clear change history, facilitate code review, enable efficient navigation of project evolution, and maintain traceability between specifications, tasks, and implementation. The semantic tag system enables automated changelog generation and release management.
 
+### Principle XII: Task Tracking & Progress Requirements
+
+All feature implementation MUST follow the task list defined in `tasks.md`. Tasks MUST be executed in sequential order unless explicitly marked as parallelizable `[P]`. The `tasks.md` file MUST be updated before any code is committed to reflect current progress.
+
+**Task Status Markers:**
+
+- `- [ ]` Pending: Task not yet started
+- `- [/]` In Progress: Task currently being worked on
+- `- [x]` Complete: Task finished and verified
+
+**Mandatory Workflow:**
+
+1. Before starting a task, mark it as in-progress: `- [/] T###`
+2. Complete the implementation work
+3. Before committing, mark the task as complete: `- [x] T###`
+4. Stage BOTH the implementation files AND the updated `tasks.md`
+5. Commit using the semantic format from Principle XI
+
+**Pre-Commit Requirements:**
+
+- The `tasks.md` file MUST be updated to reflect completed work before any `git commit`
+- Tasks MUST be completed in order unless marked `[P]` (parallelizable)
+- Skipping tasks or committing out-of-order is PROHIBITED without documented justification
+- Phase checkpoints in `tasks.md` MUST be verified before proceeding to next phase
+
+**Example Workflow:**
+
+```bash
+# 1. Mark task in-progress in tasks.md: "- [/] T001 ..."
+# 2. Implement the task
+# 3. Mark task complete in tasks.md: "- [x] T001 ..."
+# 4. Stage and commit
+git add .
+git commit -m "feat(013): Add DEFAULT_ACCOUNT_BALANCE constant (T001)"
+```
+
+**Rationale**: Sequential task execution with mandatory progress tracking ensures orderly implementation, prevents skipped requirements, maintains clear project history, and enables accurate progress reporting. The pre-commit checkpoint prevents orphaned or undocumented changes.
+
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -303,6 +336,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.8.0
+**Version:** 1.9.0
 **Ratified:** October 25, 2025
-**Last Amended:** November 6, 2025
+**Last Amended:** December 19, 2025
