@@ -66,15 +66,43 @@ Markers: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.performa
 
 This repository uses a structured feature specification workflow.
 
-1. Create a feature branch via script:
+### GitHub Templates
+
+All contributions MUST use the provided templates:
+
+| Action          | Template                                    |
+| --------------- | ------------------------------------------- |
+| Feature Request | `.github/ISSUE_TEMPLATE/feature_request.md` |
+| Bug Report      | `.github/ISSUE_TEMPLATE/bug_report.md`      |
+| Pull Request    | `.github/pull_request_template.md`          |
+
+Use `gh issue create` or `gh pr create` to auto-populate templates from CLI.
+
+### Creating a Feature Branch
+
+#### Option A: Using AI Agents (Gemini CLI, Copilot, Antigravity)
+
+This repo is set up with `/speckit` commands. Simply run:
+
+```text
+/speckit.specify Add concise description of your feature here
+```
+
+This auto-generates the feature branch, spec file, and checklist.
+
+> **Note**: To learn more about GitHub Spec Kit, check out [their repo](https://github.com/Glavin001/spec-kit).
+
+#### Option B: Manual Script
 
 ```powershell
 \.specify\scripts\powershell\create-new-feature.ps1 -Json "Add concise description here"
 ```
 
-- Complete `specs/<NNN-short-name>/spec.md` (if template not already filled)
-- Plan & implement
-- Open PR referencing feature number (e.g. `005`)
+### Workflow Steps
+
+1. Complete `specs/<NNN-short-name>/spec.md` (if template not already filled)
+2. Plan & implement
+3. Open PR referencing feature number (e.g. `005`)
 
 Branch naming pattern: `NNN-short-slug` (e.g. `005-docs-restructure`).
 
