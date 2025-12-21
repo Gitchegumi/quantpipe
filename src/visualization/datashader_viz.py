@@ -308,15 +308,13 @@ def _create_candlestick_chart(pdf: pd.DataFrame, pair: str) -> Any:
     pdf = pdf.copy()
     pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M")
 
-    # Set initial zoom to last ~3h14m (11,640 seconds / 194 minutes)
-    # This corresponds to about 194 1-minute candles
-    INITIAL_WINDOW = pd.Timedelta(microseconds=11_640_000_000)  # ~3.2 hours
+    # Set initial zoom to last 60 candles (works for any timeframe)
+    INITIAL_CANDLE_COUNT = 60
 
     last_time = pdf.index[-1]
-    initial_start = last_time - INITIAL_WINDOW
-
-    # Ensure initial_start is within data range
-    if initial_start < pdf.index[0]:
+    if len(pdf) > INITIAL_CANDLE_COUNT:
+        initial_start = pdf.index[-INITIAL_CANDLE_COUNT]
+    else:
         initial_start = pdf.index[0]
 
     xlim = (initial_start, last_time)
