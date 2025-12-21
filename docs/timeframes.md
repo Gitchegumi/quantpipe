@@ -73,7 +73,7 @@ Use with: `--config backtest_config.yaml`
 
 Resampled data is automatically cached to `.time_cache/` directory:
 
-```
+```text
 .time_cache/
 ├── EURUSD_15m_20000602_20210113_abc12345.parquet
 ├── EURUSD_1h_20000602_20210113_abc12345.parquet
