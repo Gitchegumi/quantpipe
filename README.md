@@ -44,7 +44,18 @@ price_data/
 │   └── usdjpy/
 │       ├── test/
 │       └── validate/
-└── raw/
+├── raw/
+│   ├── eurusd/
+│   │   ├── DAT_MT_EURUSD_M1_2000.csv
+│   │   ├── DAT_MT_EURUSD_M1_2001.csv
+│   │   ├── ...
+│   │   └── DAT_MT_EURUSD_M1_2024.csv
+│   └── usdjpy/
+│       ├── DAT_MT_USDJPY_M1_2000.csv
+│       ├── DAT_MT_USDJPY_M1_2001.csv
+│       ├── ...
+│       └── DAT_MT_USDJPY_M1_2024.csv
+└── raw_converted/                       # Raw MetaTrader data converted to add headers
     ├── eurusd/
     │   ├── DAT_MT_EURUSD_M1_2000.csv
     │   ├── DAT_MT_EURUSD_M1_2001.csv
