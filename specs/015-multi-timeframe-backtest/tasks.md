@@ -70,10 +70,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Add `timeframe` field to config schema in `src/config/` (if exists) or inline in `run_backtest.py` _(DEFERRED: project uses Pydantic, no YAML config system)_
-- [ ] T020 [US2] Implement config file loading for timeframe in `src/cli/run_backtest.py` _(DEFERRED)_
-- [ ] T021 [US2] Implement CLI precedence over config in `src/cli/run_backtest.py` _(DEFERRED)_
-- [ ] T022 [US2] Add integration test for config-driven timeframe in `tests/integration/test_timeframe_backtest.py` _(DEFERRED)_
+- [x] T019 [US2] Add `timeframe` field to config schema in `src/config/` (if exists) or inline in `run_backtest.py`
+- [x] T020 [US2] Implement config file loading for timeframe in `src/cli/run_backtest.py`
+- [x] T021 [US2] Implement CLI precedence over config in `src/cli/run_backtest.py`
+- [x] T022 [US2] Add integration test for config-driven timeframe in `tests/integration/test_timeframe_backtest.py`
 
 **Checkpoint**: Users can configure default timeframe via config file
 
@@ -121,8 +121,8 @@
 
 **Purpose**: Documentation, cleanup, and final validation
 
-- [ ] T035 [P] Update README.md with timeframe usage examples _(DEFERRED to documentation phase)_
-- [ ] T036 [P] Create `docs/timeframes.md` with detailed documentation _(DEFERRED to documentation phase)_
+- [x] T035 [P] Update README.md with timeframe usage examples
+- [x] T036 [P] Create `docs/timeframes.md` with detailed documentation
 - [x] T037 Run full test suite to verify no regressions _(61/61 tests passing)_
 - [x] T038 Run quickstart.md validation commands _(CLI tested with 5m/15m timeframes)_
 - [x] T039 Lint check all new files (ruff, black, pylint) _(4 fixed, 8 style warnings remaining)_

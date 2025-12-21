@@ -1,0 +1,20 @@
+# Backtest Configuration File
+# 
+# This file allows setting default values for backtest parameters.
+# CLI arguments take precedence over config file values.
+#
+# Location: Place in project root as 'backtest_config.yaml'
+#           or specify with --config flag
+
+# Default timeframe for resampling (FR-002)
+# Supported formats: Xm, Xh, Xd where X is a positive integer
+# Examples: 1m, 5m, 15m, 1h, 4h, 1d, 7m, 90m
+timeframe: "1m"
+
+# Default trading direction
+# Options: LONG, SHORT, BOTH
+direction: "LONG"
+
+# Default dataset to use
+# Options: test, validate
+dataset: "test"

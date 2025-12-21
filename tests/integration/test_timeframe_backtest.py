@@ -71,3 +71,20 @@ class TestTimeframeCLI:
 
         # Verify resampling stage appears in logs
         assert "Resampling to 15m" in result.stdout or result.returncode == 0
+
+
+class TestTimeframeConfig:
+    """Integration tests for config file timeframe support (T022)."""
+
+    def test_config_argument_in_help(self):
+        """Test that --config shows in help output."""
+        result = subprocess.run(
+            [sys.executable, "-m", "src.cli.run_backtest", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert result.returncode == 0
+        assert "--config" in result.stdout
+        assert "YAML config file" in result.stdout

@@ -720,10 +720,43 @@ def main():
         help="Use Polars backend for data processing.",
     )
 
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help="Path to YAML config file for default values. "
+        "CLI arguments take precedence over config values. "
+        "Example: --config backtest_config.yaml",
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
+
+    # Load config file if specified (T020: Config file support)
+    if args.config:
+        import yaml
+
+        if args.config.exists():
+            with open(args.config, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+
+            logger.info("Loaded config from %s", args.config)
+
+            # Apply config values only if CLI didn't override (T021: CLI precedence)
+            # Check if user explicitly passed --timeframe (not using default)
+            cli_timeframe_default = "1m"
+            if args.timeframe == cli_timeframe_default and "timeframe" in config:
+                args.timeframe = config["timeframe"]
+                logger.info("Using timeframe from config: %s", args.timeframe)
+
+            # Apply other config defaults
+            if "direction" in config and args.direction == "LONG":
+                args.direction = config["direction"]
+            if "dataset" in config and args.dataset == "test":
+                args.dataset = config["dataset"]
+        else:
+            logger.warning("Config file not found: %s", args.config)
 
     # Handle --list-strategies (FR-017: List strategies without running backtest)
     if args.list_strategies:
