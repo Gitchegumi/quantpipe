@@ -26,6 +26,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - N/A (Transient visualization) (014-interactive-viz)
 - Python 3.133 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility) (014-interactive-viz)
 - Python 3.13 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility) (014-interactive-viz)
+- Python 3.11 + Polars (for vectorized resampling), existing pandas/numpy (015-multi-timeframe-backtest)
+- `.time_cache/` directory for resampled Parquet files (015-multi-timeframe-backtest)
 
 - Python 3.11 (chosen for ecosystem breadth, numerical libs, readability) + numpy (vector math), pandas (time series handling), ta-lib or custom EMA/ATR/RSI fallback implementation, pydantic (config validation), rich/logging (structured logs), pytest (tests) (001-trend-pullback)
 - Poetry (mandatory package manager for dependency management and virtual environments)
@@ -90,9 +92,9 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - See Constitution Principle XI for full requirements
 
 ## Recent Changes
+- 015-multi-timeframe-backtest: Added Python 3.11 + Polars (for vectorized resampling), existing pandas/numpy
 - 014-interactive-viz: Added Python 3.13 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility)
 - 014-interactive-viz: Added Python 3.133 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility)
-- 014-interactive-viz: Added Python 3.11 + `lightweight-charts`, `polars` (data), `pandas` (view compatibility)
 
 
 <!-- MANUAL ADDITIONS START -->

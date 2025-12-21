@@ -93,8 +93,29 @@ poetry run python -m src.cli.run_backtest --data custom/path/data.csv --directio
 | `--dataset`       | `test` `validate`     | `test`     | Dataset partition when using auto-constructed path          |
 | `--data`          | PATH                  | (optional) | Custom data file path (overrides auto-construction)         |
 | `--direction`     | `LONG` `SHORT` `BOTH` | `LONG`     | Trade direction mode                                        |
+| `--timeframe`     | `1m` `15m` `1h` etc.  | `1m`       | Resample to target timeframe (see below)                    |
 | `--output-format` | `text` `json`         | `text`     | Output format                                               |
 | `--dry-run`       | (flag)                | off        | Emit signals only (no execution)                            |
+| `--config`        | PATH                  | (optional) | YAML config file for defaults                               |
+
+### Multi-Timeframe Backtesting
+
+Run strategies on higher timeframes by resampling from 1-minute data:
+
+```powershell
+# 15-minute bars
+poetry run python -m src.cli.run_backtest --pair EURUSD --direction BOTH --timeframe 15m
+
+# 1-hour bars
+poetry run python -m src.cli.run_backtest --pair EURUSD --direction LONG --timeframe 1h
+
+# Arbitrary timeframes (7m, 90m, etc.)
+poetry run python -m src.cli.run_backtest --pair EURUSD --timeframe 7m --direction BOTH
+```
+
+Supported formats: `Xm` (minutes), `Xh` (hours), `Xd` (days). Any positive integer works.
+
+Resampled data is cached in `.time_cache/` for faster repeated runs. See `docs/timeframes.md` for details.
 
 ### Multi-Strategy Support
 

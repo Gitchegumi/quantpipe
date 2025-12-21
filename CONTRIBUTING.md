@@ -6,10 +6,10 @@ This guide contains everything needed to set up a development environment, pass 
 
 ## 1. Prerequisites
 
-| Requirement | Version / Notes |
-|-------------|-----------------|
-| Python      | 3.11.x (deterministic fixtures depend on this) |
-| Poetry      | Latest stable (dependency + virtualenv management) |
+| Requirement | Version / Notes                                                   |
+| ----------- | ----------------------------------------------------------------- |
+| Python      | 3.13.x (deterministic fixtures depend on this)                    |
+| Poetry      | Latest stable (dependency + virtualenv management)                |
 | OS          | Windows, macOS, Linux supported (examples show PowerShell + bash) |
 
 Install Poetry (see: [Poetry Installation Guide](https://python-poetry.org/docs/#installation)).
@@ -38,13 +38,13 @@ poetry lock --no-update   # lock refresh without version bumps
 
 All changes must satisfy:
 
-| Gate | Command | Pass Criteria |
-|------|---------|---------------|
-| Formatting | `poetry run black src/ tests/` | No diffs after run |
-| Fast Lint | `poetry run ruff check src/ tests/` | 0 errors |
-| Deep Lint | `poetry run pylint src/ --score=yes` | Score ≥ 8.0/10 |
-| Unit Tests | `poetry run pytest -m unit` | 100% pass <5s |
-| Full Suite (pre-PR) | `poetry run pytest` | Green |
+| Gate                | Command                              | Pass Criteria      |
+| ------------------- | ------------------------------------ | ------------------ |
+| Formatting          | `poetry run black src/ tests/`       | No diffs after run |
+| Fast Lint           | `poetry run ruff check src/ tests/`  | 0 errors           |
+| Deep Lint           | `poetry run pylint src/ --score=yes` | Score ≥ 8.0/10     |
+| Unit Tests          | `poetry run pytest -m unit`          | 100% pass <5s      |
+| Full Suite (pre-PR) | `poetry run pytest`                  | Green              |
 
 Optional coverage:
 
@@ -54,11 +54,11 @@ poetry run pytest --cov=src --cov-report=term-missing
 
 ## 4. Test Tiers
 
-| Tier | Path | Target Runtime | Data Size | Purpose |
-|------|------|----------------|-----------|---------|
-| Unit | `tests/unit/` | <5s | <100 rows | Core logic & indicators |
-| Integration | `tests/integration/` | <30s | 100–10k rows | Multi-module behavior |
-| Performance | `tests/performance/` | <120s | >10k rows | Throughput & scaling |
+| Tier        | Path                 | Target Runtime | Data Size    | Purpose                 |
+| ----------- | -------------------- | -------------- | ------------ | ----------------------- |
+| Unit        | `tests/unit/`        | <5s            | <100 rows    | Core logic & indicators |
+| Integration | `tests/integration/` | <30s           | 100–10k rows | Multi-module behavior   |
+| Performance | `tests/performance/` | <120s          | >10k rows    | Throughput & scaling    |
 
 Markers: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.performance`.
 
@@ -66,32 +66,60 @@ Markers: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.performa
 
 This repository uses a structured feature specification workflow.
 
-1. Create a feature branch via script:
+### GitHub Templates
+
+All contributions MUST use the provided templates:
+
+| Action          | Template                                    |
+| --------------- | ------------------------------------------- |
+| Feature Request | `.github/ISSUE_TEMPLATE/feature_request.md` |
+| Bug Report      | `.github/ISSUE_TEMPLATE/bug_report.md`      |
+| Pull Request    | `.github/pull_request_template.md`          |
+
+Use `gh issue create` or `gh pr create` to auto-populate templates from CLI.
+
+### Creating a Feature Branch
+
+#### Option A: Using AI Agents (Gemini CLI, Copilot, Antigravity)
+
+This repo is set up with `/speckit` commands. Simply run:
+
+```text
+/speckit.specify Add concise description of your feature here
+```
+
+This auto-generates the feature branch, spec file, and checklist.
+
+> **Note**: To learn more about GitHub Spec Kit, check out [their repo](https://github.com/Glavin001/spec-kit).
+
+#### Option B: Manual Script
 
 ```powershell
 \.specify\scripts\powershell\create-new-feature.ps1 -Json "Add concise description here"
 ```
 
-* Complete `specs/<NNN-short-name>/spec.md` (if template not already filled)
-* Plan & implement
-* Open PR referencing feature number (e.g. `005`)
+### Workflow Steps
+
+1. Complete `specs/<NNN-short-name>/spec.md` (if template not already filled)
+2. Plan & implement
+3. Open PR referencing feature number (e.g. `005`)
 
 Branch naming pattern: `NNN-short-slug` (e.g. `005-docs-restructure`).
 
 ## 6. Logging Standards
 
-| Rule | Example |
-|------|---------|
-| Use lazy `%` formatting | `logger.info("Processed %d rows", count)` |
-| Avoid f-strings in logs | `# BAD logger.info(f"Processed {count} rows")` |
-| Structured context | Prefer key=value in message or enrich via adapter |
+| Rule                    | Example                                           |
+| ----------------------- | ------------------------------------------------- |
+| Use lazy `%` formatting | `logger.info("Processed %d rows", count)`         |
+| Avoid f-strings in logs | `# BAD logger.info(f"Processed {count} rows")`    |
+| Structured context      | Prefer key=value in message or enrich via adapter |
 
 ## 7. Code Style
 
-* PEP 8 + enforced by Black (88 char lines)
-* Type hints required on all public functions/classes
-* Docstrings (PEP 257) required for modules, classes, functions
-* Prefer pure functions for indicator math
+- PEP 8 + enforced by Black (88 char lines)
+- Type hints required on all public functions/classes
+- Docstrings (PEP 257) required for modules, classes, functions
+- Prefer pure functions for indicator math
 
 ## 8. Adding Tests
 
@@ -104,40 +132,40 @@ Branch naming pattern: `NNN-short-slug` (e.g. `005-docs-restructure`).
 
 End-user details sit in `docs/backtesting.md`; here only contributor notes:
 
-* Dataset builder lives in `src/cli/build_dataset.py`
-* Split-mode command: `src.cli.run_split_backtest`
-* Keep partition logic chronological (no random shuffle)
+- Dataset builder lives in `src/cli/build_dataset.py`
+- Split-mode command: `src.cli.run_split_backtest`
+- Keep partition logic chronological (no random shuffle)
 
 ## 10. Strategy Docs & Specs
 
-* High-level strategy summaries: `docs/strategies.md`
-* Full specification history: `specs/` directory (one folder per feature)
-* Avoid duplicating detailed logic here—link instead
+- High-level strategy summaries: `docs/strategies.md`
+- Full specification history: `specs/` directory (one folder per feature)
+- Avoid duplicating detailed logic here—link instead
 
 ## 11. Commit Hygiene
 
-| Aspect | Guideline |
-|--------|-----------|
-| Scope | One logical change per commit |
-| Message Subject | Imperative, ≤72 chars (e.g. `Refactor risk sizing calc`) |
-| Body | Explain why (if non-trivial) |
-| Referencing Spec | Include feature number: `Refs 005` |
+| Aspect           | Guideline                                                |
+| ---------------- | -------------------------------------------------------- |
+| Scope            | One logical change per commit                            |
+| Message Subject  | Imperative, ≤72 chars (e.g. `Refactor risk sizing calc`) |
+| Body             | Explain why (if non-trivial)                             |
+| Referencing Spec | Include feature number: `Refs 005`                       |
 
 ## 12. Opening a Pull Request
 
 Checklist before pushing:
 
-* [ ] Black & Ruff clean
-* [ ] Pylint ≥ 8.0
-* [ ] Unit tests green
-* [ ] Added/updated tests for new logic
-* [ ] Updated spec / docs if behavior or usage changed
+- [ ] Black & Ruff clean
+- [ ] Pylint ≥ 8.0
+- [ ] Unit tests green
+- [ ] Added/updated tests for new logic
+- [ ] Updated spec / docs if behavior or usage changed
 
 ## 13. Security & Data Integrity
 
-* No external network calls in tests
-* Deterministic seeds for reproducibility
-* Validate OHLC columns on ingestion (exceptions on missing columns)
+- No external network calls in tests
+- Deterministic seeds for reproducibility
+- Validate OHLC columns on ingestion (exceptions on missing columns)
 
 ## 14. License & Compliance
 
@@ -145,17 +173,18 @@ Code is proprietary. Do not copy external code without license review.
 
 ## 15. FAQ
 
-| Question | Answer |
-|----------|--------|
-| Why Poetry? | Reproducibility + lockfile discipline |
-| Can I add dependencies? | Only if justified in spec / PR description |
+| Question                   | Answer                                     |
+| -------------------------- | ------------------------------------------ |
+| Why Poetry?                | Reproducibility + lockfile discipline      |
+| Can I add dependencies?    | Only if justified in spec / PR description |
 | Add a docs site generator? | Future consideration; not in current scope |
 
 ## 16. Future Improvements (Non-blocking)
 
-* Automated link checker in CI
-* Pre-commit hook running Black + Ruff
-* MkDocs or Sphinx site if docs volume grows
+- Automated link checker in CI
+- Pre-commit hook running Black + Ruff
+- MkDocs or Sphinx site if docs volume grows
 
 ---
+
 Happy building—open a draft PR early for feedback.
