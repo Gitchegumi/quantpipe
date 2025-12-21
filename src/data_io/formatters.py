@@ -728,7 +728,7 @@ def format_portfolio_text_output(result) -> str:
     lines.append(f"Final Equity:     ${result.final_equity:,.2f}")
     pnl_pct = (result.final_equity / result.starting_equity - 1) * 100
     lines.append(f"Portfolio P&L:    ${result.total_pnl:,.2f} ({pnl_pct:+.2f}%)")
-    lines.append(f"Position Sizing:  0.25% of current equity per trade")
+    lines.append("Position Sizing:  0.25% of current equity per trade")
     lines.append("")
 
     # Aggregate performance metrics (full metrics like single-symbol)
@@ -814,7 +814,6 @@ def format_portfolio_json_output(result) -> str:
     Returns:
         JSON string
     """
-    import math
 
     # Calculate aggregate metrics from closed trades
     trades = result.closed_trades
