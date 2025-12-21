@@ -70,10 +70,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Add `timeframe` field to config schema in `src/config/` (if exists) or inline in `run_backtest.py`
-- [ ] T020 [US2] Implement config file loading for timeframe in `src/cli/run_backtest.py`
-- [ ] T021 [US2] Implement CLI precedence over config in `src/cli/run_backtest.py`
-- [ ] T022 [US2] Add integration test for config-driven timeframe in `tests/integration/test_timeframe_backtest.py`
+- [ ] T019 [US2] Add `timeframe` field to config schema in `src/config/` (if exists) or inline in `run_backtest.py` _(DEFERRED: project uses Pydantic, no YAML config system)_
+- [ ] T020 [US2] Implement config file loading for timeframe in `src/cli/run_backtest.py` _(DEFERRED)_
+- [ ] T021 [US2] Implement CLI precedence over config in `src/cli/run_backtest.py` _(DEFERRED)_
+- [ ] T022 [US2] Add integration test for config-driven timeframe in `tests/integration/test_timeframe_backtest.py` _(DEFERRED)_
 
 **Checkpoint**: Users can configure default timeframe via config file
 
@@ -87,14 +87,14 @@
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Implement `get_cache_path()` in `src/data_io/resample_cache.py`
-- [ ] T024 [US3] Implement `load_cached_resample()` in `src/data_io/resample_cache.py`
-- [ ] T025 [US3] Implement `save_cached_resample()` in `src/data_io/resample_cache.py`
-- [ ] T026 [US3] Implement `resample_with_cache()` wrapper in `src/data_io/resample_cache.py`
-- [ ] T027 [US3] Integrate cache into orchestrator resampling flow in `src/backtest/orchestrator.py`
-- [ ] T028 [US3] Add telemetry logging (resample time, cache hits/misses) in `src/backtest/orchestrator.py`
-- [ ] T029 [US3] Add unit tests for cache behavior in `tests/unit/test_resample_cache.py`
-- [ ] T030 [US3] Add incomplete bar warning when threshold exceeded (10%) in `src/backtest/orchestrator.py`
+- [x] T023 [US3] Implement `get_cache_path()` in `src/data_io/resample_cache.py`
+- [x] T024 [US3] Implement `load_cached_resample()` in `src/data_io/resample_cache.py`
+- [x] T025 [US3] Implement `save_cached_resample()` in `src/data_io/resample_cache.py`
+- [x] T026 [US3] Implement `resample_with_cache()` wrapper in `src/data_io/resample_cache.py`
+- [x] T027 [US3] Integrate cache into orchestrator resampling flow in `src/backtest/orchestrator.py`
+- [x] T028 [US3] Add telemetry logging (resample time, cache hits/misses) in `src/backtest/orchestrator.py`
+- [x] T029 [US3] Add unit tests for cache behavior in `tests/unit/test_resample_cache.py`
+- [x] T030 [US3] Add incomplete bar warning when threshold exceeded (10%) in `src/backtest/orchestrator.py`
 
 **Checkpoint**: Caching reduces repeated backtest runtime significantly
 

@@ -59,6 +59,7 @@ from ..data_io.formatters import (
 )
 from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
 from ..data_io.resample import resample_ohlcv
+from ..data_io.resample_cache import resample_with_cache
 from ..data_io.timeframe import parse_timeframe
 from ..models.enums import DirectionMode, OutputFormat
 
@@ -1088,7 +1089,16 @@ Persistent storage not yet implemented."
                 timeframe_minutes,
             )
             original_rows = len(enriched_df)
-            enriched_df = resample_ohlcv(enriched_df, timeframe_minutes)
+
+            # Use caching for resampled data (T027)
+            pair = args.pair[0] if args.pair else "UNKNOWN"
+            enriched_df = resample_with_cache(
+                df=enriched_df,
+                instrument=pair,
+                tf_minutes=timeframe_minutes,
+                resample_fn=resample_ohlcv,
+            )
+
             logger.info(
                 "✓ Resampled %d → %d bars (%dm)",
                 original_rows,
@@ -1096,7 +1106,7 @@ Persistent storage not yet implemented."
                 timeframe_minutes,
             )
 
-            # Check for incomplete bar warning (FR-015)
+            # Check for incomplete bar warning (FR-015, T030)
             if "bar_complete" in enriched_df.columns:
                 incomplete_count = enriched_df.filter(
                     pl.col("bar_complete") == False  # noqa: E712
