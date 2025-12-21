@@ -20,7 +20,6 @@ Performance Target:
 """
 
 import logging
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import polars as pl

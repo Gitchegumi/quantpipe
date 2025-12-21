@@ -19,6 +19,7 @@ Where X is a positive integer >= 1.
 import re
 from dataclasses import dataclass
 
+
 # Regex pattern for valid timeframe formats: Xm, Xh, or Xd where X >= 1
 TIMEFRAME_PATTERN = re.compile(r"^(\d+)(m|h|d)$", re.IGNORECASE)
 
