@@ -46,9 +46,15 @@ price_data/
 │       └── validate/
 └── raw/
     ├── eurusd/
-    │   └── eurusd_2024.csv
+    │   ├── DAT_MT_EURUSD_M1_2000.csv
+    │   ├── DAT_MT_EURUSD_M1_2001.csv
+    │   ├── ...
+    │   └── DAT_MT_EURUSD_M1_2024.csv
     └── usdjpy/
-        └── usdjpy_2024.csv
+        ├── DAT_MT_USDJPY_M1_2000.csv
+        ├── DAT_MT_USDJPY_M1_2001.csv
+        ├── ...
+        └── DAT_MT_USDJPY_M1_2024.csv
 ```
 
 **Default Paths**: When `--data` is omitted, the CLI auto-constructs the path using `--pair` and `--dataset`. The CLI automatically tries `.parquet` first (faster), then falls back to `.csv` if Parquet is not available:
