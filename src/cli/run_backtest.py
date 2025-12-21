@@ -58,6 +58,8 @@ from ..data_io.formatters import (
     generate_output_filename,
 )
 from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
+from ..data_io.resample import resample_ohlcv
+from ..data_io.timeframe import parse_timeframe
 from ..models.enums import DirectionMode, OutputFormat
 
 
@@ -511,6 +513,15 @@ def main():
         default="test",
         help="Dataset to use when --data not specified (default: test). \
             Looks for price_data/processed/<pair>/<dataset>/<pair>_<dataset>.parquet",
+    )
+
+    parser.add_argument(
+        "--timeframe",
+        type=str,
+        default="1m",
+        help="Timeframe for backtesting (default: 1m). Resamples 1-minute data to "
+        "target timeframe. Supports: Xm (minutes), Xh (hours), Xd (days). "
+        "Examples: 1m, 5m, 15m, 1h, 4h, 1d, 7m, 90m",
     )
 
     parser.add_argument(
@@ -1051,10 +1062,16 @@ Persistent storage not yet implemented."
             ingestion_result.metrics.runtime_seconds,
         )
 
-        # Stage 2: Vectorized indicator calculation
-        logger.info("Stage 2/2: Computing technical indicators (vectorized)...")
-        from ..indicators.dispatcher import calculate_indicators
+        # Parse and validate timeframe (T013)
+        try:
+            timeframe = parse_timeframe(args.timeframe)
+            timeframe_minutes = timeframe.period_minutes
+            logger.info("Timeframe: %s (%d minutes)", args.timeframe, timeframe_minutes)
+        except ValueError as e:
+            logger.error("Invalid timeframe: %s", e)
+            sys.exit(1)
 
+        # Stage 1.5: Resample to target timeframe if not 1m (T014)
         import polars as pl
 
         enriched_df = ingestion_result.data
@@ -1064,6 +1081,39 @@ Persistent storage not yet implemented."
         # Renaming 'timestamp' to 'timestamp_utc' if needed
         if "timestamp" in enriched_df.columns:
             enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
+
+        if timeframe_minutes > 1:
+            logger.info(
+                "Stage 1.5: Resampling to %dm timeframe...",
+                timeframe_minutes,
+            )
+            original_rows = len(enriched_df)
+            enriched_df = resample_ohlcv(enriched_df, timeframe_minutes)
+            logger.info(
+                "✓ Resampled %d → %d bars (%dm)",
+                original_rows,
+                len(enriched_df),
+                timeframe_minutes,
+            )
+
+            # Check for incomplete bar warning (FR-015)
+            if "bar_complete" in enriched_df.columns:
+                incomplete_count = enriched_df.filter(
+                    pl.col("bar_complete") == False  # noqa: E712
+                ).height
+                total_bars = len(enriched_df)
+                if total_bars > 0:
+                    incomplete_pct = (incomplete_count / total_bars) * 100
+                    if incomplete_pct > 10.0:
+                        logger.warning(
+                            "%.1f%% of bars are incomplete (threshold: 10%%). "
+                            "This indicates data gaps in the source data.",
+                            incomplete_pct,
+                        )
+
+        # Stage 2: Vectorized indicator calculation
+        logger.info("Stage 2/2: Computing technical indicators (vectorized)...")
+        from ..indicators.dispatcher import calculate_indicators
 
         # Calculate indicators dynamically based on strategy requirements
         enriched_df = calculate_indicators(enriched_df, required_indicators)

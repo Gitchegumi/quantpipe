@@ -17,10 +17,10 @@
 
 **Purpose**: Create new module structure and foundational files
 
-- [ ] T001 Create `src/data_io/timeframe.py` with module docstring and imports
-- [ ] T002 [P] Create `src/data_io/resample.py` with module docstring and imports
-- [ ] T003 [P] Create `src/data_io/resample_cache.py` with module docstring and imports
-- [ ] T004 Create `.time_cache/.gitkeep` and add `.time_cache/` to `.gitignore`
+- [x] T001 Create `src/data_io/timeframe.py` with module docstring and imports
+- [x] T002 [P] Create `src/data_io/resample.py` with module docstring and imports
+- [x] T003 [P] Create `src/data_io/resample_cache.py` with module docstring and imports
+- [x] T004 Create `.time_cache/.gitkeep` and add `.time_cache/` to `.gitignore`
 
 ---
 
@@ -30,10 +30,10 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement `Timeframe` dataclass in `src/data_io/timeframe.py`
-- [ ] T006 Implement `parse_timeframe(tf_str: str) -> Timeframe` in `src/data_io/timeframe.py`
-- [ ] T007 Implement `validate_timeframe(tf: Timeframe) -> None` in `src/data_io/timeframe.py`
-- [ ] T008 Add unit tests for timeframe parsing in `tests/unit/test_timeframe.py`
+- [x] T005 Implement `Timeframe` dataclass in `src/data_io/timeframe.py`
+- [x] T006 Implement `parse_timeframe(tf_str: str) -> Timeframe` in `src/data_io/timeframe.py`
+- [x] T007 Implement `validate_timeframe(tf: Timeframe) -> None` in `src/data_io/timeframe.py`
+- [x] T008 Add unit tests for timeframe parsing in `tests/unit/test_timeframe.py`
 
 **Checkpoint**: Timeframe parsing ready - user story implementation can now begin
 
@@ -47,16 +47,16 @@
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Implement `resample_ohlcv(df, target_minutes)` core aggregation in `src/data_io/resample.py`
-- [ ] T010 [US1] Add `bar_complete` column computation in `src/data_io/resample.py`
-- [ ] T011 [US1] Implement incomplete leading/trailing bar dropping in `src/data_io/resample.py`
-- [ ] T012 [US1] Add `--timeframe` argument to argparse in `src/cli/run_backtest.py`
-- [ ] T013 [US1] Parse and validate timeframe in `main()` of `src/cli/run_backtest.py`
-- [ ] T014 [US1] Pass `timeframe_minutes` to data pipeline in `src/cli/run_backtest.py`
-- [ ] T015 [US1] Add `timeframe_minutes` parameter to `run_vectorized_backtest()` in `src/backtest/orchestrator.py`
-- [ ] T016 [US1] Integrate resampling call before indicator computation in `src/backtest/orchestrator.py`
-- [ ] T017 [US1] Add unit tests for resampling correctness in `tests/unit/test_resample.py`
-- [ ] T018 [US1] Add integration test for CLI timeframe argument in `tests/integration/test_timeframe_backtest.py`
+- [x] T009 [US1] Implement `resample_ohlcv(df, target_minutes)` core aggregation in `src/data_io/resample.py`
+- [x] T010 [US1] Add `bar_complete` column computation in `src/data_io/resample.py`
+- [x] T011 [US1] Implement incomplete leading/trailing bar dropping in `src/data_io/resample.py`
+- [x] T012 [US1] Add `--timeframe` argument to argparse in `src/cli/run_backtest.py`
+- [x] T013 [US1] Parse and validate timeframe in `main()` of `src/cli/run_backtest.py`
+- [x] T014 [US1] Pass `timeframe_minutes` to data pipeline in `src/cli/run_backtest.py`
+- [x] T015 [US1] Add `timeframe_minutes` parameter to `run_vectorized_backtest()` in `src/backtest/orchestrator.py`
+- [x] T016 [US1] Integrate resampling call before indicator computation in `src/backtest/orchestrator.py`
+- [x] T017 [US1] Add unit tests for resampling correctness in `tests/unit/test_resample.py`
+- [x] T018 [US1] Add integration test for CLI timeframe argument in `tests/integration/test_timeframe_backtest.py`
 
 **Checkpoint**: User can run backtests on any timeframe via CLI - core feature complete
 
