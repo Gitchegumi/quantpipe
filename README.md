@@ -1,5 +1,7 @@
 # QuantPipe
 
+![Banner](./images/QuantPipe_banner.png)
+
 QuantPipe is an open-source FOREX automated trading infrastructure designed for strategy backtesting, forward testing, and live execution using MetaTrader (MT4/MT5). It allows traders and developers to research strategies offline and deploy the same logic into automated trading environments.
 
 ## Overview
@@ -235,6 +237,27 @@ poetry run pytest tests/performance/test_progress_overhead.py -v # Overhead ≤1
 
 See `docs/performance.md` for complete optimization guide, architecture details, and lessons learned.
 
+## Interactive Visualization
+
+Add `--visualize` to any backtest command for interactive charting:
+
+```powershell
+poetry run python -m src.cli.run_backtest --pair EURUSD --direction BOTH --visualize
+```
+
+**Features:**
+
+- OHLC candlestick chart with linked panning
+- EMA overlays (20/50/200)
+- Stochastic RSI panel (0-1 scale with 0.5 center line)
+- Trade entry/exit markers with TP/SL level lines
+- Portfolio value curve
+- Metrics panel with win rate, expectancy, profit factor
+
+**Navigation:** Drag to pan, scroll to zoom, double-click to reset. All charts share x-axis.
+
+See `docs/visualization.md` for complete guide and troubleshooting.
+
 ## Ingestion Architecture
 
 The data ingestion layer is designed for high performance and modularity, separating core data loading from optional indicator computation.
@@ -307,6 +330,8 @@ See `specs/009-optimize-ingestion/` for detailed architecture documentation.
 | ------------------------------ | ---------------------------------- |
 | Deeper strategy rationale      | `docs/strategies.md`               |
 | Backtesting & dataset workflow | `docs/backtesting.md`              |
+| Interactive visualization      | `docs/visualization.md`            |
+| Performance optimization       | `docs/performance.md`              |
 | Repository layout overview     | `docs/structure.md`                |
 | Contributing / dev setup       | `CONTRIBUTING.md`                  |
 | Full original specification    | `specs/001-trend-pullback/spec.md` |

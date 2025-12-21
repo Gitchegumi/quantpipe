@@ -507,7 +507,7 @@ def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[A
             markers = markers * loser_markers if markers else loser_markers
 
     # Add connecting lines between entry and exit (limited for performance)
-    MAX_LINES = 200
+    MAX_LINES = 100
     num_trades = min(len(entries), MAX_LINES)
 
     if num_trades > 0:
