@@ -22,14 +22,16 @@ def generate_output_filename(
     output_format: OutputFormat,
     timestamp: datetime,
     symbol_tag: str | None = None,
+    timeframe_tag: str | None = None,
 ) -> str:
     """
     Generate standardized filename for backtest output.
 
     Produces filenames in the format:
-    backtest_{direction}_{symbol|multi}_{YYYYMMDD}_{HHMMSS}.{ext}
+    backtest_{direction}_{symbol}_{timeframe}_{YYYYMMDD}_{HHMMSS}.{ext}
 
     If `symbol_tag` is provided it is used directly (expected lowercase, e.g. 'eurusd').
+    If `timeframe_tag` is provided it is included after the symbol (e.g. '15m', '1h').
     If `symbol_tag` is not provided the legacy format WITHOUT symbol is used for
     backward compatibility (will be deprecated). Callers implementing multi-symbol
     MUST pass 'multi' for aggregated runs.
@@ -38,6 +40,8 @@ def generate_output_filename(
         direction: Direction mode of the backtest (LONG/SHORT/BOTH).
         output_format: Output format (TEXT/JSON).
         timestamp: Timestamp to use for filename generation.
+        symbol_tag: Optional symbol identifier (e.g., 'eurusd', 'multi').
+        timeframe_tag: Optional timeframe identifier (e.g., '15m', '1h').
 
     Returns:
         Formatted filename string.
@@ -47,15 +51,17 @@ def generate_output_filename(
         >>> ts = datetime(2025, 1, 15, 14, 30, 45, tzinfo=timezone.utc)
         >>> generate_output_filename(DirectionMode.LONG, OutputFormat.TEXT, ts)
         'backtest_long_20250115_143045.txt'
-        >>> generate_output_filename(DirectionMode.BOTH, OutputFormat.JSON, ts)
-        'backtest_both_20250115_143045.json'
+        >>> generate_output_filename(DirectionMode.BOTH, OutputFormat.JSON, ts, 'eurusd', '15m')
+        'backtest_both_eurusd_15m_20250115_143045.json'
     """
     direction_str = direction.value.lower()
     date_str = timestamp.strftime("%Y%m%d")
     time_str = timestamp.strftime("%H%M%S")
     ext = "json" if output_format == OutputFormat.JSON else "txt"
 
-    if symbol_tag:
+    if symbol_tag and timeframe_tag:
+        filename = f"backtest_{direction_str}_{symbol_tag}_{timeframe_tag}_{date_str}_{time_str}.{ext}"
+    elif symbol_tag:
         filename = f"backtest_{direction_str}_{symbol_tag}_{date_str}_{time_str}.{ext}"
     else:
         # Legacy fallback (pre-FR-023) - no symbol component

@@ -68,6 +68,7 @@ def plot_backtest_results(
     end_date: Optional[str] = None,
     initial_balance: float = DEFAULT_INITIAL_BALANCE,
     risk_per_trade: float = DEFAULT_RISK_PER_TRADE,
+    timeframe: str = "1m",
 ) -> Optional[Any]:
     """
     Render interactive backtest visualization using Datashader.
@@ -82,6 +83,7 @@ def plot_backtest_results(
         end_date: Optional end date filter (YYYY-MM-DD).
         initial_balance: Starting portfolio balance in dollars.
         risk_per_trade: Dollar amount risked per 1R.
+        timeframe: Timeframe of the data (e.g., '15m', '1h').
 
     Returns:
         HoloViews layout object, or None if dependencies missing.
@@ -109,6 +111,7 @@ def plot_backtest_results(
             risk_per_trade,
             show_plot,
             output_file,
+            timeframe,
         )
 
     # Single symbol visualization
@@ -122,6 +125,7 @@ def plot_backtest_results(
         risk_per_trade,
         show_plot,
         output_file,
+        timeframe,
     )
 
 
@@ -135,6 +139,7 @@ def _create_single_symbol_layout(
     risk_per_trade: float,
     show_plot: bool,
     output_file: Optional[Union[str, Path]],
+    timeframe: str = "1m",
 ) -> Optional[Any]:
     """Create visualization for a single symbol."""
     # Prepare data
@@ -172,7 +177,11 @@ def _create_single_symbol_layout(
     else:
         layout = combined
 
-    layout = layout.opts(title=f"Backtest: {pair}")
+    # Title includes pair and timeframe (e.g., "Backtest: EURUSD (15m)")
+    title = (
+        f"Backtest: {pair}" if timeframe == "1m" else f"Backtest: {pair} ({timeframe})"
+    )
+    layout = layout.opts(title=title)
 
     # Save and show
     _save_and_show(layout, result.run_id, output_file, show_plot, result)
@@ -189,6 +198,7 @@ def _create_multi_symbol_layout(
     risk_per_trade: float,
     show_plot: bool,
     output_file: Optional[Union[str, Path]],
+    timeframe: str = "1m",
 ) -> Optional[Any]:
     """Create visualization with separate chart per symbol."""
     charts = []
@@ -232,7 +242,13 @@ def _create_multi_symbol_layout(
     if portfolio_curve:
         layout = layout + portfolio_curve
 
-    layout = layout.opts(title="Multi-Symbol Backtest", shared_axes=False)
+    # Title includes timeframe (e.g., "Multi-Symbol Backtest (15m)")
+    title = (
+        "Multi-Symbol Backtest"
+        if timeframe == "1m"
+        else f"Multi-Symbol Backtest ({timeframe})"
+    )
+    layout = layout.opts(title=title, shared_axes=False)
 
     _save_and_show(layout, result.run_id, output_file, show_plot)
 

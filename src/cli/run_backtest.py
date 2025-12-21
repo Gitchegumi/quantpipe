@@ -1292,6 +1292,7 @@ Persistent storage not yet implemented."
                             show_plot=True,
                             start_date=args.viz_start,
                             end_date=args.viz_end,
+                            timeframe=args.timeframe,
                         )
 
                 except ImportError as e:
@@ -1363,6 +1364,7 @@ Persistent storage not yet implemented."
         output_format=output_format,
         timestamp=result.start_time,
         symbol_tag=symbol_tag,
+        timeframe_tag=args.timeframe if args.timeframe != "1m" else None,
     )
     output_path = args.output / output_filename
 
