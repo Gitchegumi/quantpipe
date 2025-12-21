@@ -1,4 +1,4 @@
-# QuantPipe
+# QuantPipe ![Logo](./images/QuantPipe_logo.png)
 
 ![Banner](./images/QuantPipe_banner.png)
 
