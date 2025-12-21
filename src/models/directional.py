@@ -247,6 +247,7 @@ class BacktestResult:
     pair: str | None = (
         None  # Single symbol identifier (FR-023); None for multi-symbol future aggregation
     )
+    timeframe: str | None = None  # Timeframe (e.g., '1m', '15m', '1h') for FR-015
     symbols: list[str] | None = None  # Multi-symbol runs (portfolio/independent batch)
     results: dict[str, BacktestResult] | None = (
         None  # Per-symbol results for multi-symbol runs

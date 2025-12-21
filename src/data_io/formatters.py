@@ -110,9 +110,12 @@ def format_text_output(result: BacktestResult) -> str:
     # Symbol(s) line (FR-023) - BacktestResult may have attribute 'pair' or 'symbols'
     if hasattr(result, "symbols") and isinstance(getattr(result, "symbols"), list):
         syms = getattr(result, "symbols")
-        lines.append(f"Symbols:         {', '.join(syms)}")
+        lines.append(f"Symbols:          {', '.join(syms)}")
     elif hasattr(result, "pair"):
-        lines.append(f"Symbol:          {getattr(result, 'pair')}")
+        lines.append(f"Symbol:           {getattr(result, 'pair')}")
+    # Timeframe line (FR-015)
+    if hasattr(result, "timeframe") and result.timeframe:
+        lines.append(f"Timeframe:        {result.timeframe}")
     lines.append(f"Start Time:       {result.start_time.isoformat()}")
     lines.append(f"End Time:         {result.end_time.isoformat()}")
     duration = (result.end_time - result.start_time).total_seconds()

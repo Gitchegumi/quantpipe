@@ -1218,6 +1218,11 @@ Persistent storage not yet implemented."
             **signal_params,
         )
 
+        # Add timeframe to result for output formatting (FR-015)
+        from dataclasses import replace
+
+        result = replace(result, timeframe=args.timeframe)
+
         logger.info("Backtest complete: %s", result.run_id)
 
         # Calculate metrics (Moved up for availability)
