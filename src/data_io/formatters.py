@@ -560,6 +560,9 @@ def format_multi_symbol_text_output(multi_result) -> str:
     lines.append(f"Run ID:           {multi_result.run_id}")
     lines.append(f"Direction Mode:   {multi_result.direction_mode}")
     lines.append(f"Symbols:          {', '.join(multi_result.symbols)}")
+    # Timeframe line (FR-015)
+    if hasattr(multi_result, "timeframe") and multi_result.timeframe:
+        lines.append(f"Timeframe:        {multi_result.timeframe}")
     lines.append(f"Start Time:       {multi_result.start_time.isoformat()}")
     lines.append("Portfolio Capital: $2,500.00 (shared across all symbols)")
     lines.append("")

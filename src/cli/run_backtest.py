@@ -268,6 +268,7 @@ def run_multi_symbol_backtest(
     dry_run: bool = False,
     enable_profiling: bool = False,
     show_progress: bool = True,
+    timeframe: str = "1m",
 ):
     """Run backtests on multiple symbols and aggregate results.
 
@@ -445,6 +446,7 @@ def run_multi_symbol_backtest(
         total_candles=sum(r.total_candles for r in results.values()),
         metrics=first_result.metrics,  # Use first result's metrics structure
         pair=None,  # Multi-symbol has no single pair
+        timeframe=timeframe,  # FR-015: Include timeframe in output
         symbols=list(results.keys()),
         results=results,
         failures=failures if failures else None,
@@ -898,6 +900,9 @@ Persistent storage not yet implemented."
                         output_format=output_format,
                         timestamp=result.start_time,
                         symbol_tag="portfolio",
+                        timeframe_tag=(
+                            args.timeframe if args.timeframe != "1m" else None
+                        ),
                     )
                 else:
                     # Independent mode (default) - run each symbol in isolation
@@ -909,6 +914,7 @@ Persistent storage not yet implemented."
                         dry_run=args.dry_run,
                         enable_profiling=args.profile,
                         show_progress=show_progress,
+                        timeframe=args.timeframe,
                     )
 
                     # Format and output multi-symbol results (T020)
@@ -934,6 +940,9 @@ Persistent storage not yet implemented."
                         output_format=output_format,
                         timestamp=result.start_time,
                         symbol_tag="multi",
+                        timeframe_tag=(
+                            args.timeframe if args.timeframe != "1m" else None
+                        ),
                     )
 
                 output_path = args.output / output_filename
