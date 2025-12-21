@@ -22,6 +22,15 @@ psutil = "^6.1.0"
 tqdm = "^4.67.1"
 py-spy = "^0.4.1"
 joblib = "^1.5.2"
+lightweight-charts = "^2.0.0"
+
+# Datashader visualization stack (for large dataset backtest analysis)
+holoviews = "^1.19.0"
+hvplot = "^0.10.0"
+datashader = "^0.16.0"
+panel = "^1.4.0"
+bokeh = "^3.4.0"
+dask = "^2024.1.0"  # Pin to 2024.x for Datashader compatibility (2025.x has breaking changes)
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
