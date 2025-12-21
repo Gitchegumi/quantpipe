@@ -125,7 +125,7 @@ Over-parameterized models or redundant indicators are prohibited unless explicit
 
 Code MUST be self-documenting. Every module, class, method, and function SHALL include complete docstrings (PEP 257). Type hints MUST be used for all function signatures. Code comments MUST explain "why", not "what". Line length MUST NOT exceed 88 characters (Black standard). Variable and function names MUST be descriptive and unambiguous.
 
-**Python 3.11 Requirements:**
+**Python 3.13 Requirements:**
 
 - MUST follow PEP 8 style guidelines
 - MUST include complete docstrings (PEP 257) for all modules, classes, methods, functions
