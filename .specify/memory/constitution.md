@@ -1,18 +1,18 @@
 <!--
 Sync Impact Report:
-- Version change: 1.8.0 → 1.9.0
+- Version change: 1.9.0 → 1.10.0
 - Modified principles:
-  - Principle XII (NEW) - Task Tracking & Progress Requirements
+  - Principle XIII (NEW) - GitHub Workflow Templates
 - Added sections:
-  - Principle XII: Task Tracking & Progress Requirements
-  - Task status markers: [ ] pending, [/] in-progress, [x] complete
-  - Pre-commit requirement: tasks.md MUST be updated before any commit
-  - Execution order: tasks MUST be completed in sequential order unless they are marked as `[P]` for parallel execution
+  - Principle XIII: GitHub Workflow Templates
+  - Issue template requirements: feature_request.md, bug_report.md
+  - PR template requirements: pull_request_template.md
+  - gh CLI usage for issue/PR creation
 - Removed sections: None
 - Templates requiring updates:
-  ✅ plan-template.md - Compatible (references tasks.md)
+  ✅ plan-template.md - Compatible (no changes needed)
   ✅ spec-template.md - Compatible (no changes needed)
-  ✅ tasks-template.md - Compatible (checkbox format already used)
+  ✅ tasks-template.md - Compatible (no changes needed)
   ✅ agent-file-template.md - Compatible (no changes needed)
 - Follow-up TODOs: None
 -->
@@ -294,6 +294,47 @@ git commit -m "feat(013): Add DEFAULT_ACCOUNT_BALANCE constant (T001)"
 
 **Rationale**: Sequential task execution with mandatory progress tracking ensures orderly implementation, prevents skipped requirements, maintains clear project history, and enables accurate progress reporting. The pre-commit checkpoint prevents orphaned or undocumented changes.
 
+### Principle XIII: GitHub Workflow Templates
+
+All GitHub issues and pull requests MUST use the project's standardized templates to ensure consistency, traceability, and complete information capture.
+
+**Issue Templates:**
+
+Issues MUST be created using templates located in `.github/ISSUE_TEMPLATE/`:
+
+- `feature_request.md`: For new feature proposals
+- `bug_report.md`: For bug reports and defect tracking
+
+**Pull Request Template:**
+
+All PRs MUST use the template at `.github/pull_request_template.md` which includes:
+
+- Summary section
+- Changes breakdown by component
+- Testing checklist
+- Code quality verification
+- Related issues linkage
+
+**gh CLI Usage:**
+
+When creating issues or PRs via command line, use the GitHub CLI with template content:
+
+```bash
+# Create issue from template
+gh issue create --title "[FEATURE] Feature Name" --body-file .github/ISSUE_TEMPLATE/feature_request.md
+
+# Create PR (template auto-populates)
+gh pr create --title "feat(XXX): Description" --body "..." --base main
+```
+
+**Template Maintenance:**
+
+- Templates MUST be updated when new required fields are identified
+- Template changes require constitution version bump (PATCH)
+- All team members MUST be notified of template changes
+
+**Rationale**: Standardized templates ensure complete information capture, reduce back-and-forth clarification, enable automated processing (labels, assignments), and maintain consistent project documentation standards.
+
 ## Risk Management Standards
 
 All trading strategies MUST comply with the following risk management requirements:
@@ -336,6 +377,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.9.0
+**Version:** 1.10.0
 **Ratified:** October 25, 2025
-**Last Amended:** December 19, 2025
+**Last Amended:** December 21, 2025
