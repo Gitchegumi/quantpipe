@@ -15,10 +15,13 @@ Successfully implemented an interactive backtest visualization feature using `li
   - Overlays trade markers (Buy/Sell arrows).
   - Configures "magnet" crosshair and optimized zoom/pan interactions.
 
-### 2. CLI Integration (`src/cli/run_backtest.py`)
+### 3. CLI Integration
 
-- Added `--visualize` flag.
-- Integrated lazy loading of the visualization module to prevent performance impact on headless runs.
+- [x] Added `--visualize` flag.
+- [x] **New Feature**: Added `--viz-start` and `--viz-end` for precise time window inspection (replaces truncation).
+- [x] **Bug Fix**: Resolved indentation issue in `run_backtest.py`.
+- [x] **Bug Fix**: Fixed `TradeExecution` parsing and marker synchronization.
+- [x] **Improvement**: Added `rich` spinner. to prevent performance impact on headless runs.
 
 ### 3. Documentation
 

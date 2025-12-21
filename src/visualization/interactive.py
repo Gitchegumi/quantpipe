@@ -72,7 +72,7 @@ def _prepare_indicator_data(data: pl.DataFrame) -> dict[str, pd.DataFrame]:
 
         # Combine with time
         combined = pd.concat([time_series, series], axis=1)
-        combined.columns = ["time", "value"]
+        combined.columns = ["time", col]
 
         # Drop NaNs for line series (gaps are handled by not plotting points)
         combined = combined.dropna()
@@ -89,18 +89,92 @@ def plot_backtest_results(
     pair: str,
     output_file: Optional[Union[str, Path]] = None,
     show_plot: bool = True,
-) -> None:
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Optional[Chart]:
     """
     Render interactive chart with backtest results.
+
+    Args:
+        start_date: ISO start date string (e.g. '2023-01-01').
+        end_date: ISO end date string.
     """
     logger.info("Preparing visualization for %s...", pair)
 
     # T005: Prepare Candle Data
     try:
         candles = _prepare_candle_data(data)
+        if candles.empty:
+            logger.error("No candle data available for visualization.")
+            return None
     except ValueError as e:
         logger.error("Failed to prepare candle data: %s", e)
-        return
+        return None
+
+    # Determine Time Window
+    # Ensure 'time' column is datetime
+    if not pd.api.types.is_datetime64_any_dtype(candles["time"]):
+        candles["time"] = pd.to_datetime(candles["time"])
+
+    # Default to last 3 months (approx 90 days) if no range specified
+    if not start_date and not end_date:
+        last_date = candles["time"].max()
+        cutoff_date = last_date - pd.Timedelta(days=90)
+        start_date_ts = cutoff_date
+        end_date_ts = last_date
+        logger.info(
+            "No window specified. Defaulting to last 3 months (%s to %s)",
+            cutoff_date.date(),
+            last_date.date(),
+        )
+    else:
+        # Parse user inputs
+        start_date_ts = (
+            pd.to_datetime(start_date).tz_localize(None)
+            if start_date
+            else candles["time"].min().tz_localize(None)
+        )
+        end_date_ts = (
+            pd.to_datetime(end_date).tz_localize(None)
+            if end_date
+            else candles["time"].max().tz_localize(None)
+        )
+
+        # Handle timezone naive vs aware mismatch
+        # Candles are likely aware (UTC). Arguments converted to naive or aware?
+        # If candles are aware, localize user inputs to UTC?
+        if candles["time"].dt.tz is not None:
+            if start_date_ts.tzinfo is None:
+                start_date_ts = start_date_ts.tz_localize("UTC")
+            if end_date_ts.tzinfo is None:
+                end_date_ts = end_date_ts.tz_localize("UTC")
+
+    # Apply Filtering
+    # Filter candles
+    mask = (candles["time"] >= start_date_ts) & (candles["time"] <= end_date_ts)
+    candles = candles.loc[mask]
+
+    if candles.empty:
+        logger.error(
+            "No data found in specified range: %s to %s", start_date_ts, end_date_ts
+        )
+        return None
+
+    # Max Size Safety Check
+    MAX_CANDLES = (
+        50_000  # Lowered to 50k to prevent System.OverflowException in pywebview
+    )
+
+    if len(candles) > MAX_CANDLES:
+        logger.warning(
+            "Selected range too large (%d rows). Truncating to first %d candles of selection.",
+            len(candles),
+            MAX_CANDLES,
+        )
+        candles = candles.head(MAX_CANDLES)
+
+    start_time = candles.iloc[0]["time"]
+    end_time = candles.iloc[-1]["time"]
 
     # Initialize Chart
     chart = Chart(toolbox=True)
@@ -108,39 +182,43 @@ def plot_backtest_results(
     chart.topbar.textbox("pair", pair)
 
     # T013/T014: Interactive Configuration
-    # Enable Crosshair with magnet mode for exact data reading
-    chart.crosshair(
-        mode="normal",
-        vert_line_visible=True,
-        vert_line_label_visible=True,
-        horz_line_visible=True,
-        horz_line_label_visible=True,
-    )
-
-    # Optimize TimeScale
-    chart.time_scale(
-        right_offset=5, bar_spacing=6, time_visible=True, seconds_visible=False
-    )
+    chart.crosshair(mode="normal")
 
     # Set Candles
-    # lightweight-charts-python expects a dataframe with time, open, high, low, close
     chart.set(candles)
 
     # T006: Add Indicators
     indicators = _prepare_indicator_data(data)
     for name, series in indicators.items():
+        # Match truncation
+        if len(candles) < len(data):
+            # Filter series >= start_time
+            # Assuming 'time' column in series matches
+            if not series.empty:
+                series = series[
+                    (series["time"] >= start_time) & (series["time"] <= end_time)
+                ]
+
         logger.debug("Adding indicator series: %s", name)
         line = chart.create_line(name=name)
         line.set(series)
 
     # T010: Add Trades
-    _add_trade_markers(chart, result)
+    series_start_time = candles.iloc[0]["time"] if not candles.empty else None
+    series_end_time = candles.iloc[-1]["time"] if not candles.empty else None
+    _add_trade_markers(
+        chart, result, min_time=series_start_time, max_time=series_end_time
+    )
 
     if show_plot:
         chart.show(block=True)
 
+    return chart
 
-def _add_trade_markers(chart: Chart, result: BacktestResult) -> None:
+
+def _add_trade_markers(
+    chart: Chart, result: BacktestResult, min_time: Any = None, max_time: Any = None
+) -> None:
     """
     Extract executions from BacktestResult and add them as markers to the chart.
     """
@@ -150,36 +228,72 @@ def _add_trade_markers(chart: Chart, result: BacktestResult) -> None:
 
     markers = []
     for trade in result.executions:
-        # trade is typically a dictionary or object with timestamp, price, side
-        # Adjust access based on actual trade object structure in src/backtest/engine
-
-        # Checking implementation of trade execution recording in backtest engine
-        # Assuming trade is a dict for now, based on JSON output standards
         try:
-            ts = trade.get("timestamp")
+            # Handle TradeExecution object
+            if hasattr(trade, "open_timestamp"):
+                ts = trade.open_timestamp
+                side = trade.direction
+                price = trade.entry_fill_price
+            elif isinstance(trade, dict):
+                # Fallback for legacy/dict structures
+                ts = trade.get("timestamp")
+                side = trade.get("side")
+                price = trade.get("price")
+            else:
+                # Unknown type
+                logger.warning("Unknown trade object type: %s", type(trade))
+                continue
+
             if not ts:
                 continue
 
-            # Convert timestamp to string if needed
-            time_str = str(ts)
+            # T028: Filter out trades outside the visualized data range
+            # Use strict type alignment (pd.Timestamp) and timezone synchronization
+            if min_time is not None:
+                t_comp = pd.to_datetime(ts)
+                min_comp = pd.to_datetime(min_time)
 
-            side = trade.get("side", "").upper()
-            price = trade.get("price")
+                # Handle timezone naive vs aware mismatch (assume UTC if one is missing)
+                if t_comp.tzinfo is not None and min_comp.tzinfo is None:
+                    min_comp = min_comp.tz_localize("UTC")
+                elif t_comp.tzinfo is None and min_comp.tzinfo is not None:
+                    t_comp = t_comp.tz_localize("UTC")
 
-            if side == "BUY":
+                # REJECT if trade is strictly before start (or essentially equal, to avoid edge cases)
+                # Adding 1 microsecond buffer to be safe against floating point equality issues in library
+                if t_comp < min_comp:
+                    continue
+
+            if max_time is not None:
+                t_comp = pd.to_datetime(ts)
+                max_comp = pd.to_datetime(max_time)
+
+                if t_comp.tzinfo is not None and max_comp.tzinfo is None:
+                    max_comp = max_comp.tz_localize("UTC")
+                elif t_comp.tzinfo is None and max_comp.tzinfo is not None:
+                    t_comp = t_comp.tz_localize("UTC")
+
+                # Strict check for max
+                if t_comp > max_comp:
+                    continue
+
+            # Ensure side is normalized
+            side = side.upper() if side else ""
+
+            if side == "LONG" or side == "BUY":
                 markers.append(
                     {
-                        "time": time_str,
+                        "time": ts,
                         "position": "belowBar",
                         "color": "#2196F3",  # Blue
                         "shape": "arrowUp",
                         "text": f"Buy @ {price}",
                     }
                 )
-            elif side == "SELL":
+            elif side == "SHORT" or side == "SELL":
                 markers.append(
                     {
-                        "time": time_str,
+                        "time": ts,
                         "position": "aboveBar",
                         "color": "#E91E63",  # Pink
                         "shape": "arrowDown",
@@ -193,4 +307,7 @@ def _add_trade_markers(chart: Chart, result: BacktestResult) -> None:
     if markers:
         # Sort markers by time (required by library)
         markers.sort(key=lambda x: x["time"])
-        chart.marker(markers)
+        try:
+            chart.marker(markers)
+        except Exception as e:
+            logger.error("\nFailed to add markers: %s", e)

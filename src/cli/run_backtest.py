@@ -649,6 +649,18 @@ def main():
     )
 
     parser.add_argument(
+        "--viz-start",
+        type=str,
+        help="Start date for visualization (YYYY-MM-DD). If omitted, defaults to last 3 months.",
+    )
+
+    parser.add_argument(
+        "--viz-end",
+        type=str,
+        help="End date for visualization (YYYY-MM-DD).",
+    )
+
+    parser.add_argument(
         "--disable-symbol",
         type=str,
         nargs="*",
@@ -1115,53 +1127,27 @@ Persistent storage not yet implemented."
 
         logger.info("Backtest complete: %s", result.run_id)
 
+        # Calculate metrics (Moved up for availability)
+        dataset_rows = len(enriched_df)
+        trades_simulated = 0
+        if result.metrics:
+            if hasattr(result.metrics, "combined"):
+                trades_simulated = result.metrics.combined.trade_count
+            elif hasattr(result.metrics, "trade_count"):
+                trades_simulated = result.metrics.trade_count
+
         # Write benchmark artifact if profiling enabled
+        phase_times = {}
         if args.profile and benchmark_path:
             import tracemalloc
 
             from ..backtest.profiling import write_benchmark_record
 
             # Get phase times from orchestrator if available
-            phase_times = {}
             hotspots = []
             if profiler:
                 phase_times = profiler.get_phase_times()
                 hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
-
-            # Calculate metrics
-            dataset_rows = len(enriched_df)
-            trades_simulated = 0
-            if result.metrics:
-                if hasattr(result.metrics, "combined"):
-                    trades_simulated = result.metrics.combined.trade_count
-                elif hasattr(result.metrics, "trade_count"):
-                    trades_simulated = result.metrics.trade_count
-
-            wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
-
-            # T011 Integration: Interactive Visualization
-            if args.visualize:
-                if result.is_multi_symbol:
-                    logger.warning(
-                        "Visualization skipped for multi-symbol result (not yet supported)."
-                    )
-                else:
-                    try:
-                        from ..visualization.interactive import plot_backtest_results
-
-                        logger.info("Generating interactive visualization...")
-                        plot_backtest_results(
-                            data=enriched_df, result=result, pair=pair, show_plot=True
-                        )
-                    except ImportError as e:
-                        logger.error(
-                            "Visualization module not found or dependency missing: %s",
-                            e,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to generate visualization: %s", e, exc_info=True
-                        )
 
             # Memory metrics (approximate if tracemalloc not used)
             memory_peak_mb = 0.0
@@ -1175,8 +1161,7 @@ Persistent storage not yet implemented."
                 )  # 8 bytes per float, 6 columns (OHLC+V+T)
                 memory_ratio = peak / raw_bytes if raw_bytes > 0 else 1.0
 
-            # Create benchmark directory
-            benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+            wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
 
             write_benchmark_record(
                 output_path=benchmark_path,
@@ -1189,6 +1174,42 @@ Persistent storage not yet implemented."
                 hotspots=hotspots,  # Include cProfile hotspots
             )
             logger.info("Benchmark artifact written to %s", benchmark_path)
+
+        # T011 Integration: Interactive Visualization
+        if args.visualize:
+            if result.is_multi_symbol:
+                logger.warning(
+                    "Visualization skipped for multi-symbol result (not yet supported)."
+                )
+            else:
+                try:
+                    from ..visualization.datashader_viz import plot_backtest_results
+                    from rich.console import Console
+
+                    console = Console()
+                    logger.info("Generating Datashader visualization...")
+
+                    with console.status(
+                        "[bold green]Preparing visualization (Datashader)...[/bold green]"
+                    ):
+                        plot_backtest_results(
+                            data=enriched_df,
+                            result=result,
+                            pair=pair,
+                            show_plot=True,
+                            start_date=args.viz_start,
+                            end_date=args.viz_end,
+                        )
+
+                except ImportError as e:
+                    logger.error(
+                        "Visualization module not found or dependency missing: %s",
+                        e,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to generate visualization: %s", e, exc_info=True
+                    )
 
     # TODO(T045): Generate PerformanceReport after backtest completes
     # NOTE: Currently orchestrator doesn't expose ScanResult/SimulationResult

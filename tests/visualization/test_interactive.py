@@ -57,12 +57,25 @@ def test_plot_backtest_results_calls(mock_chart_cls, mock_ohlcv_data, mock_resul
     mock_chart_instance = mock_chart_cls.return_value
     mock_line = mock_chart_instance.create_line.return_value
 
+    # Mock executions in result
+    mock_result.executions = [
+        {"timestamp": "2023-01-01 10:00:00", "side": "BUY", "price": 1.1},
+        {"timestamp": "2023-01-01 10:01:00", "side": "SELL", "price": 1.2},
+    ]
+
     plot_backtest_results(mock_ohlcv_data, mock_result, "EURUSD", show_plot=False)
 
     mock_chart_cls.assert_called()
     mock_chart_instance.set.assert_called()  # Set candles
     mock_chart_instance.create_line.assert_called_with(name="ema_50")
     mock_line.set.assert_called()  # Set indicator data
+
+    # Verify markers
+    mock_chart_instance.marker.assert_called()
+    call_args = mock_chart_instance.marker.call_args[0][0]
+    assert len(call_args) == 2
+    assert call_args[0]["shape"] == "arrowUp"
+    assert call_args[1]["shape"] == "arrowDown"
 
     # show_plot=False should prevent show call
     mock_chart_instance.show.assert_not_called()
