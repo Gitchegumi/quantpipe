@@ -1584,6 +1584,9 @@ class BacktestOrchestrator:
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
             enable_progress=self.enable_progress,
+            max_concurrent_positions=getattr(
+                strategy.metadata, "max_concurrent_positions", 1
+            ),
         )
 
         # Extract OHLC arrays for simulation
@@ -1700,6 +1703,9 @@ class BacktestOrchestrator:
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
             enable_progress=self.enable_progress,
+            max_concurrent_positions=getattr(
+                strategy.metadata, "max_concurrent_positions", 1
+            ),
         )
 
         # Extract OHLC arrays for simulation
@@ -1839,6 +1845,9 @@ class BacktestOrchestrator:
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
             enable_progress=self.enable_progress,
+            max_concurrent_positions=getattr(
+                strategy.metadata, "max_concurrent_positions", 1
+            ),
         )
 
         timestamps = df["timestamp_utc"].to_numpy()

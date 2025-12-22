@@ -115,15 +115,19 @@ class BatchSimulation:
         self,
         risk_per_trade: float = 0.01,
         enable_progress: bool = True,
+        max_concurrent_positions: int | None = 1,
     ):
         """Initialize batch simulator.
 
         Args:
             risk_per_trade: Risk per trade as fraction of account (default: 0.01)
             enable_progress: Whether to emit progress updates (default: True)
+            max_concurrent_positions: Maximum concurrent positions (default: 1).
+                Set to None for unlimited positions.
         """
         self.risk_per_trade = risk_per_trade
         self.enable_progress = enable_progress
+        self.max_concurrent_positions = max_concurrent_positions
 
     def simulate(
         self,
@@ -168,6 +172,22 @@ class BatchSimulation:
                 show_progress=self.enable_progress,
             )
             progress.start()
+
+        # Apply position filtering BEFORE initializing positions (FR-001)
+        if (
+            self.max_concurrent_positions is not None
+            and self.max_concurrent_positions > 0
+        ):
+            signal_indices = self._filter_signals_sequential(
+                signal_indices, ohlc_arrays
+            )
+            n_signals = len(signal_indices)
+            if n_signals == 0:
+                if progress is not None:
+                    progress.finish()
+                sim_duration = time.perf_counter() - sim_start
+                logger.info("All signals filtered by position limit - no trades")
+                return self._create_zero_result(sim_duration)
 
         # Initialize position state arrays
         position_state = self._initialize_positions(
@@ -273,6 +293,112 @@ class BatchSimulation:
             directions=np.array([], dtype=np.int8),
             exit_reasons=np.array([], dtype=np.int8),
         )
+
+    def _filter_signals_sequential(
+        self,
+        signal_indices: np.ndarray,
+        ohlc_arrays: tuple[np.ndarray, ...],
+    ) -> np.ndarray:
+        """Filter signals to enforce one-trade-at-a-time (FR-001).
+
+        Simulates a quick forward scan for each signal to estimate when
+        the trade would exit, then only keeps signals that don't overlap.
+
+        Args:
+            signal_indices: Original signal indices
+            ohlc_arrays: OHLC price arrays for exit estimation
+
+        Returns:
+            Filtered signal indices respecting max_concurrent_positions
+        """
+        if len(signal_indices) == 0:
+            return signal_indices
+
+        n_candles = len(ohlc_arrays[0])
+        _, open_prices, high_prices, low_prices, _ = ohlc_arrays
+
+        kept_signals = []
+        current_exit_idx = -1  # Track when current position exits
+
+        for signal_idx in signal_indices:
+            # Skip if this signal occurs before current position exits
+            if signal_idx <= current_exit_idx:
+                continue
+
+            # This signal is valid - estimate its exit point
+            entry_price = open_prices[signal_idx]
+            stop_price = entry_price * 0.99  # 1% stop placeholder
+            target_price = entry_price * 1.02  # 2% target placeholder
+
+            # Quick scan forward to find exit
+            exit_idx = self._quick_exit_scan(
+                signal_idx,
+                entry_price,
+                stop_price,
+                target_price,
+                high_prices,
+                low_prices,
+                n_candles,
+            )
+
+            kept_signals.append(signal_idx)
+            current_exit_idx = exit_idx
+
+        original_count = len(signal_indices)
+        filtered_count = len(kept_signals)
+
+        if filtered_count < original_count:
+            logger.info(
+                "Position filter (one-at-a-time): %d -> %d signals "
+                "(removed %d overlapping)",
+                original_count,
+                filtered_count,
+                original_count - filtered_count,
+            )
+
+        return np.array(kept_signals, dtype=np.int64)
+
+    def _quick_exit_scan(
+        self,
+        entry_idx: int,
+        entry_price: float,
+        stop_price: float,
+        target_price: float,
+        high_prices: np.ndarray,
+        low_prices: np.ndarray,
+        n_candles: int,
+        max_bars: int = 1000,
+    ) -> int:
+        """Quick forward scan to estimate trade exit point.
+
+        Args:
+            entry_idx: Entry candle index
+            entry_price: Entry price
+            stop_price: Stop loss price
+            target_price: Target price
+            high_prices: High price array
+            low_prices: Low price array
+            n_candles: Total number of candles
+            max_bars: Maximum bars to scan forward
+
+        Returns:
+            Estimated exit candle index
+        """
+        # Assume LONG direction for now (most common)
+        for candle_idx in range(entry_idx + 1, min(entry_idx + max_bars, n_candles)):
+            curr_high = high_prices[candle_idx]
+            curr_low = low_prices[candle_idx]
+
+            # Check stop hit (LONG: low <= stop)
+            if curr_low <= stop_price:
+                return candle_idx
+
+            # Check target hit (LONG: high >= target)
+            if curr_high >= target_price:
+                return candle_idx
+
+        # If no exit found within max_bars, assume exit at max_bars
+        return min(entry_idx + max_bars, n_candles - 1)
 
     def _initialize_positions(
         self,
