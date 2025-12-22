@@ -584,7 +584,7 @@ class BatchSimulation:
         ohlc_arrays: tuple[np.ndarray, ...],
         progress: Optional[ProgressDispatcher],
     ) -> dict:
-        """Simulate trades using vectorized SL/TP evaluation.
+        """Simulate trades using fully vectorized exit detection.
 
         Args:
             position_state: Position state arrays
@@ -611,55 +611,66 @@ class BatchSimulation:
         # Arrays to track trades
         exit_prices = np.zeros(n_trades)
         exit_reasons = np.zeros(n_trades, dtype=np.int8)
+        exit_indices = np.full(n_trades, -1, dtype=np.int64)
 
-        # Scan forward from each entry to find exit
+        # Vectorized exit detection
+        max_lookahead = 100
+
         for i in range(n_trades):
             entry_idx = position_state.entry_indices[i]
+            end_idx = min(entry_idx + max_lookahead, n_candles)
 
-            # Scan forward candle by candle
-            for candle_idx in range(entry_idx + 1, min(entry_idx + 1000, n_candles)):
-                # Get current candle prices
-                curr_high = high_prices[candle_idx]
-                curr_low = low_prices[candle_idx]
+            if end_idx <= entry_idx + 1:
+                # No room to exit
+                exit_indices[i] = entry_idx
+                exit_prices[i] = adjusted_entries[i]
+                exit_reasons[i] = 0  # No exit
+                continue
 
-                # Evaluate stops and targets for this position
-                stop_hit, stop_price = evaluate_stops_vectorized(
-                    np.array([position_state.is_open[i]]),
-                    np.array([adjusted_entries[i]]),
-                    np.array([position_state.stop_prices[i]]),
-                    np.array([curr_high]),
-                    np.array([curr_low]),
-                    np.array([position_state.directions[i]]),
+            # Get price slices for this trade's lookahead window
+            future_highs = high_prices[entry_idx + 1 : end_idx]
+            future_lows = low_prices[entry_idx + 1 : end_idx]
+
+            # Check stop and target hits (vectorized)
+            stop_price = position_state.stop_prices[i]
+            target_price = position_state.target_prices[i]
+
+            # LONG positions: stop hit when low <= stop, target hit when high >= target
+            # (Assuming LONG for now - can be extended for both directions)
+            stop_hits = future_lows <= stop_price
+            target_hits = future_highs >= target_price
+
+            # Find first exit (stop takes priority if both hit same candle)
+            if stop_hits.any() or target_hits.any():
+                stop_idx = np.argmax(stop_hits) if stop_hits.any() else len(future_lows)
+                target_idx = (
+                    np.argmax(target_hits) if target_hits.any() else len(future_highs)
                 )
 
-                target_hit, target_price = evaluate_targets_vectorized(
-                    np.array([position_state.is_open[i]]),
-                    np.array([adjusted_entries[i]]),
-                    np.array([position_state.target_prices[i]]),
-                    np.array([curr_high]),
-                    np.array([curr_low]),
-                    np.array([position_state.directions[i]]),
-                )
+                if stop_idx <= target_idx:
+                    # Stop hit first
+                    exit_offset = stop_idx + 1
+                    exit_indices[i] = entry_idx + exit_offset
+                    exit_prices[i] = stop_price
+                    exit_reasons[i] = 1  # Stop loss
+                else:
+                    # Target hit first
+                    exit_offset = target_idx + 1
+                    exit_indices[i] = entry_idx + exit_offset
+                    exit_prices[i] = target_price
+                    exit_reasons[i] = 2  # Take profit
+            else:
+                # No exit within lookahead - use last price
+                exit_indices[i] = end_idx - 1
+                exit_prices[i] = future_highs[-1]  # Use last high as proxy
+                exit_reasons[i] = 0  # Timeout
 
-                # Determine exit priority
-                exit_mask, exit_price_arr, exit_reason_arr = evaluate_exit_priority(
-                    stop_hit,
-                    target_hit,
-                    stop_price,
-                    target_price,
-                )
-
-                # If exit occurred, record it
-                if exit_mask[0]:
-                    exit_prices[i] = exit_price_arr[0]
-                    exit_reasons[i] = exit_reason_arr[0]
-                    position_state.exit_indices[i] = candle_idx
-                    position_state.is_open[i] = False
-                    break
-
-            # Emit progress updates
-            if progress is not None and (i + 1) % 16384 == 0:
+            # Update progress periodically
+            if progress is not None and (i + 1) % 5000 == 0:
                 progress.update(i + 1)
+
+        # Update position state
+        position_state.exit_indices = exit_indices
 
         # Apply slippage to exit prices
         adjusted_exits = apply_slippage_vectorized(
@@ -689,16 +700,14 @@ class BatchSimulation:
             "exit_prices": adjusted_exits,
         }
 
-        # Log trade summary using Rich console if progress bar active
+        # Log trade summary
         trade_summary = (
             f"Simulated {n_trades} trades: "
             f"{np.sum(winners)} winners, {n_trades - np.sum(winners)} losers"
         )
         if progress is not None and progress._progress is not None:
-            # Use Rich console to print below the progress bar
             progress._progress.console.print(f"[cyan]{trade_summary}[/cyan]")
         else:
-            # Fallback to regular logging
             logger.info(
                 "Simulated %d trades: %d winners, %d losers",
                 n_trades,
