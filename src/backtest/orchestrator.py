@@ -1348,9 +1348,8 @@ class BacktestOrchestrator:
             self.direction_mode.value,
         )
 
-        # Convert pandas DataFrame to Polars for batch processing
-
-        polars_df = pl.from_pandas(df)
+        # df is already a Polars DataFrame from the CLI, no conversion needed
+        polars_df = df
 
         # Route to direction-specific optimized workflow
         if self.direction_mode == DirectionMode.LONG:
