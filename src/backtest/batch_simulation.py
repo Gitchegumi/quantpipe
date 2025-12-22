@@ -372,6 +372,11 @@ class BatchSimulation:
                 filtered_count,
                 original_count - filtered_count,
             )
+        else:
+            logger.info(
+                "Position filter: All %d signals kept (no overlaps detected)",
+                original_count,
+            )
 
         return np.array(kept_signals, dtype=np.int64)
 
@@ -384,7 +389,7 @@ class BatchSimulation:
         high_prices: np.ndarray,
         low_prices: np.ndarray,
         n_candles: int,
-        max_bars: int = 1000,
+        max_bars: int = 100,  # Reduced from 1000 to 100 for more realistic forex durations
     ) -> int:
         """Quick forward scan to estimate trade exit point.
 
@@ -396,7 +401,7 @@ class BatchSimulation:
             high_prices: High price array
             low_prices: Low price array
             n_candles: Total number of candles
-            max_bars: Maximum bars to scan forward
+            max_bars: Maximum bars to scan forward (default 100 = ~1.5 hours for 1m bars)
 
         Returns:
             Estimated exit candle index
