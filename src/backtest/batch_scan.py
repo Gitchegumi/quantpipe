@@ -226,28 +226,33 @@ class BatchScan:
         """
         max_concurrent = getattr(self.strategy.metadata, "max_concurrent_positions", 1)
 
-        # None or negative means unlimited
-        if max_concurrent is None or max_concurrent <= 0:
-            return signal_indices
+        # Position filtering is now handled in BatchSimulation with proper exit detection
+        # This simple window-based filter was too aggressive (filtered 34859 -> 1)
+        # Disabled in favor of BatchSimulation._filter_signals_sequential()
+        return signal_indices
 
-        # Apply filter
-        original_count = len(signal_indices)
-        filtered = filter_overlapping_signals(
-            signal_indices,
-            exit_indices=None,  # Will be refined in batch simulation
-            max_concurrent=max_concurrent,
-        )
-
-        if len(filtered) < original_count:
-            logger.info(
-                "Position filter: %d -> %d signals (removed %d) (max_concurrent=%d)",
-                original_count,
-                len(filtered),
-                original_count - len(filtered),
-                max_concurrent,
-            )
-
-        return filtered
+        # Old code (disabled):
+        # if max_concurrent is None or max_concurrent <= 0:
+        #     return signal_indices
+        #
+        # # Apply filter
+        # original_count = len(signal_indices)
+        # filtered = filter_overlapping_signals(
+        #     signal_indices,
+        #     exit_indices=None,  # Will be refined in batch simulation
+        #     max_concurrent=max_concurrent,
+        # )
+        #
+        # if len(filtered) < original_count:
+        #     logger.info(
+        #         "Position filter: %d -> %d signals (removed %d) (max_concurrent=%d)",
+        #         original_count,
+        #         len(filtered),
+        #         original_count - len(filtered),
+        #         max_concurrent,
+        #     )
+        #
+        # return filtered
 
     def _scan_signals(
         self,

@@ -332,9 +332,16 @@ class BatchSimulation:
         kept_signals = []
         current_exit_idx = -1  # Track when current position exits
 
-        for signal_idx in signal_indices:
+        for i, signal_idx in enumerate(signal_indices):
             # Skip if this signal occurs before current position exits
             if signal_idx <= current_exit_idx:
+                if i < 10:  # Log first 10 rejections for debugging
+                    logger.debug(
+                        "Signal %d at idx %d REJECTED (current_exit_idx=%d)",
+                        i,
+                        signal_idx,
+                        current_exit_idx,
+                    )
                 continue
 
             # This signal is valid - estimate its exit point
@@ -357,6 +364,15 @@ class BatchSimulation:
                 low_prices,
                 n_candles,
             )
+
+            if i < 10:  # Log first 10 acceptances for debugging
+                logger.debug(
+                    "Signal %d at idx %d ACCEPTED (exit_idx=%d, duration=%d bars)",
+                    i,
+                    signal_idx,
+                    exit_idx,
+                    exit_idx - signal_idx,
+                )
 
             kept_signals.append(signal_idx)
             current_exit_idx = exit_idx
