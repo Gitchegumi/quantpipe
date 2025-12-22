@@ -184,7 +184,7 @@ class BatchSimulation:
             and self.max_concurrent_positions > 0
         ):
             original_count = len(signal_indices)
-            signal_indices = self._filter_signals_sequential(
+            signal_indices = self._filter_signals_vectorized(
                 signal_indices, ohlc_arrays
             )
             n_signals = len(signal_indices)
