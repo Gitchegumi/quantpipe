@@ -33,11 +33,21 @@ try:
         "ignore", message="out of range integer", category=UserWarning
     )
 
+    # Initialize HoloViews with Bokeh backend and dark theme
+    hv.extension("bokeh")
+    hv.renderer("bokeh").theme = "dark_minimal"
+
     HAS_DATASHADER = True
 except ImportError:
     HAS_DATASHADER = False
 
 from src.models.directional import BacktestResult
+from src.models.visualization_config import (
+    VisualizationConfig,
+    NON_MA_INDICATOR_COLOR,
+    get_ma_color,
+    get_oscillator_color,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -351,7 +361,7 @@ def _prepare_data(
 ) -> Optional[pl.DataFrame]:
     """Filter and prepare data for visualization."""
     # Maximum candles OHLC chart can handle efficiently
-    MAX_CANDLES = 500_000
+    MAX_CANDLES = 100_000
 
     required_cols = ["timestamp_utc", "open", "high", "low", "close"]
     missing = [c for c in required_cols if c not in data.columns]
@@ -715,46 +725,25 @@ def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[A
 
 
 def _create_indicator_overlays(
-    pdf: pd.DataFrame, pair: str, xlim: tuple = None
+    pdf: pd.DataFrame,
+    _pair: str,  # Kept for API compatibility, may be used in future logging
+    xlim: tuple = None,
+    viz_config: Optional[VisualizationConfig] = None,
 ) -> tuple:
     """Create indicator overlays and oscillator panels.
+
+    Args:
+        pdf: DataFrame with indicator columns.
+        pair: Symbol name for logging.
+        xlim: Optional x-axis limits tuple.
+        viz_config: Optional VisualizationConfig from strategy.
+            If provided, uses configured indicators and colors.
+            If None, falls back to auto-detection.
 
     Returns tuple of (price_overlays, oscillator_panel).
     - price_overlays: EMAs, etc. to overlay on price chart
     - oscillator_panel: RSI, StochRSI, etc. to show below price chart
     """
-    # Identify indicator columns (non-OHLC)
-    exclude = {
-        "time_str",
-        "timestamp_utc",
-        "open",
-        "high",
-        "low",
-        "close",
-        "time",
-        "symbol",
-        "date",
-        "volume",
-    }
-    indicator_cols = [c for c in pdf.columns if c.lower() not in exclude]
-
-    if not indicator_cols:
-        return None, None
-
-    # Separate price-scale indicators from oscillators
-    oscillator_patterns = ["rsi", "stoch"]
-    price_indicator_patterns = ["ema", "sma", "ma", "atr"]
-
-    price_indicators = []
-    oscillators = []
-
-    for col in indicator_cols:
-        col_lower = col.lower()
-        if any(p in col_lower for p in oscillator_patterns):
-            oscillators.append(col)
-        elif any(p in col_lower for p in price_indicator_patterns):
-            price_indicators.append(col)
-
     # Always build 'time' from real timestamps (NOT the RangeIndex)
     ind_df = pdf.copy()
 
@@ -764,25 +753,115 @@ def _create_indicator_overlays(
         ind_df = ind_df.reset_index()
         ind_df["time"] = pd.to_datetime(ind_df["time"]).dt.tz_localize(None)
     else:
-        # Last resort: try index, but this is usually wrong for your workflow
+        # Last resort: try index
         ind_df["time"] = pd.to_datetime(ind_df.index).tz_localize(None)
 
-    # Create price overlays (EMAs, etc.) using time column
-    overlays = None
-    ema_colors = {"ema20": "yellow", "ema50": "cyan", "ema200": "magenta"}
+    # Determine indicators to display
+    if viz_config is not None and not viz_config.is_empty():
+        # T008: Use strategy-provided configuration
+        price_indicators = []
+        oscillators = []
 
-    for col in price_indicators[:3]:  # Limit to 3 for clarity
+        for i, indicator in enumerate(viz_config.price_overlays):
+            if indicator.name in ind_df.columns:
+                color = viz_config.get_overlay_color(i, indicator)
+                price_indicators.append((indicator.name, color, indicator.get_label()))
+            else:
+                # T010: Log warning for missing indicator columns
+                logger.warning(
+                    "Indicator '%s' from visualization config not found in data columns",
+                    indicator.name,
+                )
+
+        for i, indicator in enumerate(viz_config.oscillators):
+            if indicator.name in ind_df.columns:
+                color = viz_config.get_oscillator_color(i, indicator)
+                oscillators.append((indicator.name, color, indicator.get_label()))
+            else:
+                logger.warning(
+                    "Oscillator '%s' from visualization config not found in data columns",
+                    indicator.name,
+                )
+
+        logger.info(
+            "Using strategy visualization config: %d overlays, %d oscillators",
+            len(price_indicators),
+            len(oscillators),
+        )
+    else:
+        # T012 (US2): Fall back to auto-detection when no config provided
+        exclude = {
+            "time_str",
+            "timestamp_utc",
+            "open",
+            "high",
+            "low",
+            "close",
+            "time",
+            "symbol",
+            "date",
+            "volume",
+        }
+        indicator_cols = [c for c in pdf.columns if c.lower() not in exclude]
+
+        if not indicator_cols:
+            return None, None
+
+        # Separate price-scale indicators from oscillators by pattern matching
+        oscillator_patterns = ["rsi", "stoch"]
+        ma_patterns = ["ema", "sma", "wma", "dema", "tema"]
+        other_price_patterns = ["atr", "bollinger", "band", "keltner"]
+
+        price_indicators = []
+        oscillators = []
+
+        ma_cols = []
+        other_price_cols = []
+        osc_cols = []
+
+        for col in indicator_cols:
+            col_lower = col.lower()
+            if any(p in col_lower for p in oscillator_patterns):
+                osc_cols.append(col)
+            elif any(p in col_lower for p in ma_patterns):
+                ma_cols.append(col)
+            elif any(p in col_lower for p in other_price_patterns):
+                other_price_cols.append(col)
+
+        # Assign MA colors using new gradient distribution
+        ma_count = min(len(ma_cols), 3)  # Limit to 3 for clarity
+        for i, col in enumerate(ma_cols[:3]):
+            color = get_ma_color(i, ma_count)
+            price_indicators.append((col, color, col))
+
+        # Non-MA price indicators get cyan
+        for col in other_price_cols[:2]:  # Limit to 2 for clarity
+            price_indicators.append((col, NON_MA_INDICATOR_COLOR, col))
+
+        for i, col in enumerate(osc_cols[:2]):  # Limit to 2 oscillators
+            color = get_oscillator_color(i)
+            oscillators.append((col, color, col))
+
+        if ma_cols or other_price_cols or osc_cols:
+            logger.info(
+                "Auto-detected indicators: %d price overlays, %d oscillators",
+                len(price_indicators),
+                len(oscillators),
+            )
+
+    # Create price overlays using time column
+    overlays = None
+    for col, color, label in price_indicators:
         if col in ind_df.columns:
             # Filter out NaN values for clean line rendering
-            ema_df = ind_df[["time", col]].dropna()
-            if ema_df.empty:
+            line_df = ind_df[["time", col]].dropna()
+            if line_df.empty:
                 continue
 
-            color = ema_colors.get(col.lower(), "white")
-            line = ema_df.hvplot.line(
+            line = line_df.hvplot.line(
                 x="time",
                 y=col,
-                label=col,
+                label=label,
                 line_width=1.5,
                 color=color,
                 alpha=0.9,
@@ -790,41 +869,25 @@ def _create_indicator_overlays(
             )
             overlays = overlays * line if overlays else line
             logger.debug(
-                "EMA %s has %d points, range: %.5f - %.5f",
-                col,
-                len(ema_df),
-                ema_df[col].min(),
-                ema_df[col].max(),
+                "Added overlay %s (%s) with %d points",
+                label,
+                color,
+                len(line_df),
             )
 
-    if price_indicators:
-        logger.info(
-            "Added %d price indicator overlays: %s",
-            len(price_indicators[:3]),
-            price_indicators[:3],
-        )
-
-    # Create oscillator panel (RSI, StochRSI) using time column
+    # Create oscillator panel using time column
     oscillator_panel = None
-    osc_colors = {
-        "rsi14": "yellow",
-        "stoch_rsi": "cyan",
-        "stoch_rsi_k": "cyan",
-        "stoch_rsi_d": "magenta",
-    }
-
-    for col in oscillators[:2]:  # Limit to 2 oscillators
+    for col, color, label in oscillators:
         if col in ind_df.columns:
             # Filter out NaN values for clean line rendering
             osc_df = ind_df[["time", col]].dropna()
             if osc_df.empty:
                 continue
 
-            color = osc_colors.get(col.lower(), "white")
             line = osc_df.hvplot.line(
                 x="time",
                 y=col,
-                label=col,
+                label=label,
                 line_width=1,
                 color=color,
                 alpha=0.8,
@@ -855,11 +918,11 @@ def _create_indicator_overlays(
         )
         oscillator_panel = oscillator_panel * center_line
 
-        opts_dict = {"ylabel": "Stoch RSI", "ylim": (-0.01, 1.01)}
+        opts_dict = {"ylabel": "Oscillator", "ylim": (-0.5, 1.5)}
         if xlim:
             opts_dict["xlim"] = xlim
         oscillator_panel = oscillator_panel.opts(**opts_dict)
-        logger.info("Added oscillator panel with: %s", oscillators[:2])
+        logger.info("Added oscillator panel with %d indicators", len(oscillators))
 
     return overlays, oscillator_panel
 
@@ -973,23 +1036,74 @@ def _save_and_show(
     show_plot: bool,
     result: Optional[BacktestResult] = None,
 ) -> None:
-    """Display dashboard in browser."""
-    # Note: HTML save is currently disabled due to datetime/float serialization issues
-    # TODO: Re-enable once HoloViews datetime handling is fixed
+    """Save dashboard to HTML and/or display in browser with dark theme."""
+    # Save to HTML if output file specified
+    if output_file:
+        try:
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            hv.save(layout, str(output_path), backend="bokeh")
+            logger.info("Visualization saved to %s", output_path)
+        except Exception as e:
+            logger.warning("Failed to save HTML: %s", e)
 
     # Show in browser
     if show_plot:
+        # Dark theme CSS - applied globally via raw_css config
+        dark_css = """
+        :root {
+            --bg-color: #1a1a2e;
+            --text-color: #e0e0e0;
+        }
+        html, body {
+            background-color: var(--bg-color) !important;
+            color: var(--text-color) !important;
+            margin: 0;
+            padding: 0;
+        }
+        * {
+            background-color: inherit;
+        }
+        .bk-root, .bk, .bk-Column, .bk-Row {
+            background-color: var(--bg-color) !important;
+        }
+        .markdown, .markdown *, p, span, div {
+            color: var(--text-color) !important;
+        }
+        """
+
+        # Apply CSS globally before extension
+        pn.config.raw_css.append(dark_css)
         pn.extension()
 
-        # Create layout with chart (75% width) and metrics panel on the right
+        # Create layout with chart and metrics panel on the right
         chart_panel = pn.pane.HoloViews(layout, sizing_mode="stretch_width")
+
+        # Header
+        header = pn.pane.Markdown(
+            "## 📊 Backtest Visualization",
+            styles={"color": "#e0e0e0", "background": "#1a1a2e"},
+        )
 
         if result:
             metrics_panel = _create_metrics_panel(result)
-            # Row layout: chart takes 75%, metrics takes remaining
-            dashboard = pn.Row(chart_panel, metrics_panel, sizing_mode="stretch_width")
+            # Main content: chart and metrics side by side
+            content = pn.Row(
+                chart_panel,
+                metrics_panel,
+                sizing_mode="stretch_width",
+                styles={"background": "#1a1a2e"},
+            )
         else:
-            dashboard = chart_panel
+            content = chart_panel
+
+        # Full dashboard with header and content
+        dashboard = pn.Column(
+            header,
+            content,
+            sizing_mode="stretch_width",
+            styles={"background": "#1a1a2e"},
+        )
 
         pn.serve(dashboard, show=True, threaded=True)
         logger.info("Visualization server started. Close browser tab to continue.")
