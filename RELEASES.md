@@ -12,23 +12,99 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.0.1
+### Current Version: 0.1.1
 
 - **Status**: Released
-- **Date**: 2025-11-12
-- **Branch**: 010-scan-sim-perf
-- **Commit**: a723ed0
-- **PR**: #27
-
-### Next Version: 0.0.2 (Planned)
-
-- **Focus**: Dataset pathing fixes and Parquet compatibility verification
-- **Tracking**: Issue #28
-- **Target**: TBD
+- **Date**: 2025-12-21
+- **Branch**: 015-multi-timeframe-backtest
+- **PR**: #43
 
 ---
 
 ## Released Versions
+
+### [v0.1.1] - 2025-12-21
+
+**Theme**: Multi-Timeframe Backtesting
+
+**Highlights**:
+
+- Run backtests on any timeframe (5m, 15m, 1h, 4h, etc.)
+- OHLCV resampling with caching for fast repeated runs
+- Timeframe in output filenames and visualization titles
+- Config file support with `--config` flag
+
+**Key Features**:
+
+- `--timeframe` CLI argument (default: 1m, supports Xm/Xh/Xd formats)
+- Polars-based resampling with `bar_complete` data quality flag
+- Disk caching in `.time_cache/` directory
+- YAML config file defaults with CLI precedence
+- Visualization zoom shows last 60 candles (works for any timeframe)
+
+**Documentation**:
+
+- `docs/timeframes.md` usage guide
+- `backtest_config.yaml.example`
+- GitHub issue/PR templates
+- Constitution v1.10.0 (Principle XIII: GitHub Workflow Templates)
+
+**Related**:
+
+- Feature Spec: 015-multi-timeframe-backtest
+- Pull Request: #43
+- Closes Issue: #18
+
+---
+
+### [v0.1.0] - 2025-12-20
+
+**Theme**: Interactive Visualization & Multi-Symbol Portfolio Support
+
+**Highlights**:
+
+- **Interactive Visualization**: Full backtest charting with HoloViews/Bokeh
+- **Multi-Symbol Backtesting**: Run portfolios across multiple currency pairs
+- **500,000+ Candle Support**: High-performance rendering with Datashader
+- **Comprehensive Metrics Panel**: Win rate, expectancy, profit factor, drawdown
+
+**Key Features**:
+
+Visualization (`--visualize`):
+
+- OHLC candlestick chart with custom hover tooltips
+- EMA overlays (20/50/200) on price chart
+- StochRSI oscillator panel (0-1 scale with center line)
+- Trade markers: entry triangles, exit diamonds
+- TP/SL level lines (last 100 trades)
+- Portfolio value curve
+- Linked x-axis panning across all charts
+
+Multi-Symbol Portfolio:
+
+- Independent and portfolio execution modes
+- Correlation tracking with configurable thresholds
+- Dynamic position allocation
+- Symbol filtering at runtime
+
+Performance:
+
+- Vectorized scanning (6.9M candles in ~0.02s)
+- Direct Parquet loading (10-15x speedup)
+- Trade lines limited to 100 for rendering performance
+
+**Documentation**:
+
+- New: `docs/visualization.md` - Complete visualization guide
+- Updated: README.md with Interactive Visualization section
+
+**Related**:
+
+- Feature Specs: 011-optimize-batch-simulation, 014-interactive-viz
+- Issues Closed: #32
+- Pull Request: #36
+
+---
 
 ### [v0.0.1] - 2025-11-12
 
@@ -66,19 +142,11 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Planning
 
-### v0.0.x (Patch Releases)
+### v0.2.0 (Next Minor Release)
 
-- Bug fixes and minor improvements
-- Documentation updates
-- Performance optimizations
-- No breaking changes
-
-### v0.1.0 (Next Minor Release)
-
-- Multi-symbol portfolio support (#28)
-- Enhanced metrics and reporting
+- Multi-symbol visualization support (#42)
+- Enhanced reporting and export formats
 - Additional strategy implementations
-- Possible API refinements
 
 ### v1.0.0 (Future Major Release)
 
