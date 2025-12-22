@@ -212,14 +212,21 @@ class BatchSimulation:
         logger.info("Starting position initialization with %d signals...", n_signals)
 
         # Initialize position state arrays
+        init_start = time_module.perf_counter()
         position_state = self._initialize_positions(
             signal_indices, timestamps, ohlc_arrays
         )
+        init_elapsed = time_module.perf_counter() - init_start
+        logger.info("Position initialization complete in %.2fs", init_elapsed)
 
         # Simulate trades (placeholder implementation)
+        sim_start_trade = time_module.perf_counter()
+        logger.info("Starting trade simulation for %d positions...", n_signals)
         trade_outcomes = self._simulate_trades(
             position_state, timestamps, ohlc_arrays, progress
         )
+        sim_elapsed = time_module.perf_counter() - sim_start_trade
+        logger.info("Trade simulation complete in %.2fs", sim_elapsed)
 
         # Step 6: Finalize progress tracking
         progress_overhead_pct = 0.0
