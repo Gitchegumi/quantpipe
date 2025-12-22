@@ -19,6 +19,7 @@ from src.backtest.arrays import (
 )
 from src.backtest.dedupe import DedupeResult, dedupe_timestamps_polars
 from src.backtest.progress import ProgressDispatcher
+from src.backtest.signal_filter import filter_overlapping_signals
 from src.strategy.base import Strategy
 
 
@@ -169,6 +170,9 @@ class BatchScan:
             progress=progress,
         )
 
+        # Step 5a: Apply strategy's max concurrent positions filter (FR-001)
+        signal_indices = self._apply_position_filter(signal_indices)
+
         # Step 6: Finalize progress tracking
         progress_overhead_pct = 0.0
         if progress is not None:
@@ -207,6 +211,43 @@ class BatchScan:
             Tuple of (deduplicated DataFrame, DedupeResult)
         """
         return dedupe_timestamps_polars(df, timestamp_col)
+
+    def _apply_position_filter(self, signal_indices: np.ndarray) -> np.ndarray:
+        """Apply strategy's max concurrent positions filter.
+
+        Uses the strategy's metadata.max_concurrent_positions setting to
+        filter overlapping signals and enforce position limits (FR-001).
+
+        Args:
+            signal_indices: Array of signal indices from scan
+
+        Returns:
+            Filtered array respecting strategy's position limit
+        """
+        max_concurrent = getattr(self.strategy.metadata, "max_concurrent_positions", 1)
+
+        # None or negative means unlimited
+        if max_concurrent is None or max_concurrent <= 0:
+            return signal_indices
+
+        # Apply filter
+        original_count = len(signal_indices)
+        filtered = filter_overlapping_signals(
+            signal_indices,
+            exit_indices=None,  # Will be refined in batch simulation
+            max_concurrent=max_concurrent,
+        )
+
+        if len(filtered) < original_count:
+            logger.info(
+                "Position filter: %d -> %d signals (removed %d) (max_concurrent=%d)",
+                original_count,
+                len(filtered),
+                original_count - len(filtered),
+                max_concurrent,
+            )
+
+        return filtered
 
     def _scan_signals(
         self,

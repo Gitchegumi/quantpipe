@@ -36,6 +36,7 @@ class TrendPullbackStrategy(Strategy):
             version="1.0.0",
             required_indicators=["ema20", "ema50", "atr14", "rsi14", "stoch_rsi"],
             tags=["trend-following", "pullback", "momentum"],
+            max_concurrent_positions=1,  # One trade at a time per FR-001
         )
 
     def get_visualization_config(self) -> Optional[VisualizationConfig]:
@@ -61,6 +62,7 @@ class TrendPullbackStrategy(Strategy):
             oscillators=[
                 # Oscillators use distinct cycling palette
                 IndicatorDisplayConfig(name="stoch_rsi", label="Stoch RSI"),
+                IndicatorDisplayConfig(name="rsi14", label="RSI 14"),  # FR-003
             ],
         )
 

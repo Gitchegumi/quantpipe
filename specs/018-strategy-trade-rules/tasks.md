@@ -15,7 +15,7 @@
 
 **Purpose**: Strategy metadata enhancement needed by all user stories
 
-- [ ] T001 Add `max_concurrent_positions` field to `StrategyMetadata` in `src/strategy/base.py`
+- [x] T001 Add `max_concurrent_positions` field to `StrategyMetadata` in `src/strategy/base.py`
 
 ---
 
@@ -23,9 +23,9 @@
 
 **Purpose**: Core utilities that MUST be complete before user story implementation
 
-- [ ] T002 Create signal filtering module `src/backtest/signal_filter.py` with `filter_overlapping_signals()` function
-- [ ] T003 [P] Create unit tests for signal filtering in `tests/unit/test_signal_filtering.py`
-- [ ] T004 [P] Create unit tests for strategy metadata in `tests/unit/test_strategy_metadata.py`
+- [x] T002 Create signal filtering module `src/backtest/signal_filter.py` with `filter_overlapping_signals()` function
+- [x] T003 [P] Create unit tests for signal filtering in `tests/unit/test_signal_filtering.py`
+- [x] T004 [P] Create unit tests for strategy metadata in `tests/unit/test_strategy_metadata.py`
 
 **Checkpoint**: Foundational utilities ready - user story implementation can begin
 
@@ -39,10 +39,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] Update `TrendPullbackStrategy.metadata` to set `max_concurrent_positions=1` in `src/strategy/trend_pullback/strategy.py`
-- [ ] T006 [US1] Integrate signal filter into backtest orchestrator (call after `scan_vectorized()`)
-- [ ] T007 [US1] Create integration tests for one-trade-at-a-time rule in `tests/integration/test_one_trade_at_time.py`
-- [ ] T008 [US1] Run existing backtest tests to verify no regression: `poetry run pytest tests/integration/test_directional_backtesting.py -v`
+- [x] T005 [US1] Update `TrendPullbackStrategy.metadata` to set `max_concurrent_positions=1` in `src/strategy/trend_pullback/strategy.py`
+- [x] T006 [US1] Integrate signal filter into backtest orchestrator (call after `scan_vectorized()`)
+- [x] T007 [US1] Create integration tests for one-trade-at-a-time rule in `tests/integration/test_one_trade_at_time.py`
+- [x] T008 [US1] Run existing backtest tests to verify no regression: `poetry run pytest tests/integration/test_directional_backtesting.py -v`
 
 **Checkpoint**: User Story 1 complete - backtests respect one trade at a time per strategy config
 
@@ -56,9 +56,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Add `rsi14` to oscillators in `get_visualization_config()` in `src/strategy/trend_pullback/strategy.py`
-- [ ] T010 [US2] Run visualization config tests: `poetry run pytest tests/unit/test_visualization_config.py -v`
-- [ ] T011 [US2] Manual verification: Run `poetry run python -m src.cli.run_backtest --pair EURUSD --dataset test --visualize` and verify RSI14 oscillator panel appears
+- [x] T009 [US2] Add `rsi14` to oscillators in `get_visualization_config()` in `src/strategy/trend_pullback/strategy.py`
+- [x] T010 [US2] Run visualization config tests: `poetry run pytest tests/unit/test_visualization_config.py -v`
+- [x] T011 [US2] Manual verification: Run `poetry run python -m src.cli.run_backtest --pair EURUSD --dataset test --visualize` and verify RSI14 oscillator panel appears
 
 **Checkpoint**: User Story 2 complete - all strategy indicators visible in visualization
 
@@ -72,8 +72,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] Verify `required_indicators` in strategy metadata includes all used indicators (ema20, ema50, atr14, rsi14, stoch_rsi) - update if needed
-- [ ] T013 [US3] Add consistency documentation comment in `src/strategy/trend_pullback/strategy.py`
+- [x] T012 [US3] Verify `required_indicators` in strategy metadata includes all used indicators (ema20, ema50, atr14, rsi14, stoch_rsi) - update if needed
+- [x] T013 [US3] Add consistency documentation comment in `src/strategy/trend_pullback/strategy.py`
 
 **Checkpoint**: User Story 3 complete - indicator consistency verified
 
@@ -83,10 +83,10 @@
 
 **Purpose**: Final verification and documentation
 
-- [ ] T014 Run full test suite: `poetry run pytest tests/ -v --tb=short`
-- [ ] T015 [P] Run linting: `poetry run ruff check src/ tests/`
-- [ ] T016 [P] Run formatting check: `poetry run black --check src/ tests/`
-- [ ] T017 Create walkthrough.md documenting completed changes
+- [x] T014 Run full test suite: `poetry run pytest tests/ -v --tb=short`
+- [x] T015 [P] Run linting: `poetry run ruff check src/ tests/`
+- [x] T016 [P] Run formatting check: `poetry run black --check src/ tests/`
+- [x] T017 Create walkthrough.md documenting completed changes
 
 ---
 
