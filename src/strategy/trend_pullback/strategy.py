@@ -97,7 +97,7 @@ class TrendPullbackStrategy(Strategy):
         indicator_arrays: dict[str, np.ndarray],
         parameters: dict,
         direction: str,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Scan for signals using vectorized operations.
 
         Implements trend-pullback logic using NumPy array operations:
@@ -112,16 +112,21 @@ class TrendPullbackStrategy(Strategy):
             direction: "LONG", "SHORT", or "BOTH"
 
         Returns:
-            NumPy array of indices where signals occur
+            Tuple of (signal_indices, stop_prices, target_prices) arrays
         """
         # Extract required indicators (using actual registered names)
         ema20 = indicator_arrays["ema20"]
         ema50 = indicator_arrays["ema50"]
         stoch_rsi = indicator_arrays["stoch_rsi"]
+        atr14 = indicator_arrays.get(
+            "atr14", indicator_arrays.get("atr")
+        )  # Handle both names
 
         # Get parameters with defaults (stoch_rsi is 0-1, not 0-100)
         rsi_oversold = parameters.get("rsi_oversold", 0.3)
         rsi_overbought = parameters.get("rsi_overbought", 0.7)
+        stop_atr_mult = parameters.get("stop_loss_atr_multiplier", 2.0)
+        target_atr_mult = parameters.get("target_profit_atr_multiplier", 4.0)  # 2:1 R:R
 
         # Vectorized trend classification
         trend_up = ema20 > ema50
@@ -154,7 +159,43 @@ class TrendPullbackStrategy(Strategy):
             short_signals = trend_down & pullback_short & cross_below
             signal_mask = long_signals | short_signals
 
-        return np.where(signal_mask)[0]
+        signal_indices = np.where(signal_mask)[0]
+
+        # Calculate stop/target prices from ATR (strategy logic, not backtester!)
+        if len(signal_indices) == 0:
+            return signal_indices, np.array([]), np.array([])
+
+        entry_prices = close[signal_indices]
+        atr_values = (
+            atr14[signal_indices]
+            if atr14 is not None
+            else np.full(len(signal_indices), 0.002)
+        )
+
+        # LONG: stop below, target above
+        # SHORT: stop above, target below
+        # For now assume LONG (can be extended based on signal_mask)
+        if direction == "LONG":
+            stop_prices = entry_prices - (atr_values * stop_atr_mult)
+            target_prices = entry_prices + (atr_values * target_atr_mult)
+        elif direction == "SHORT":
+            stop_prices = entry_prices + (atr_values * stop_atr_mult)
+            target_prices = entry_prices - (atr_values * target_atr_mult)
+        else:  # BOTH - need to determine direction per signal
+            # Use the signal_mask to determine which are LONG vs SHORT
+            is_long = (trend_up & pullback_long & cross_above)[signal_indices]
+            stop_prices = np.where(
+                is_long,
+                entry_prices - (atr_values * stop_atr_mult),
+                entry_prices + (atr_values * stop_atr_mult),
+            )
+            target_prices = np.where(
+                is_long,
+                entry_prices + (atr_values * target_atr_mult),
+                entry_prices - (atr_values * target_atr_mult),
+            )
+
+        return signal_indices, stop_prices, target_prices
 
 
 # Global instance for easy access

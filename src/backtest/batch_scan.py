@@ -291,7 +291,8 @@ class BatchScan:
 
         # Delegate to strategy's vectorized scan method
         try:
-            signal_indices = self.strategy.scan_vectorized(
+            # Strategy returns (indices, stop_prices, target_prices)
+            signal_indices, stop_prices, target_prices = self.strategy.scan_vectorized(
                 close=close_arr,
                 indicator_arrays=indicator_arrays,
                 parameters=self.parameters,
@@ -308,7 +309,7 @@ class BatchScan:
                 n_candles,
             )
 
-            return signal_indices
+            return signal_indices, stop_prices, target_prices
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error(
