@@ -16,17 +16,17 @@ Features:
 import logging
 import warnings
 from pathlib import Path
-from typing import Optional, Union, Any, Dict, List
+from typing import Any, Optional, Union
 
-import polars as pl
 import pandas as pd
-import numpy as np
+import polars as pl
+
 
 try:
     import holoviews as hv
     import hvplot.pandas  # noqa: F401 - Required for hvplot extension
     import panel as pn
-    from bokeh.models import HoverTool
+    from bokeh.models import CrosshairTool, HoverTool
 
     # Suppress Bokeh integer precision warnings (from nanosecond timestamps)
     warnings.filterwarnings(
@@ -39,11 +39,34 @@ except ImportError:
 
 from src.models.directional import BacktestResult
 
+
 logger = logging.getLogger(__name__)
 
 # Default configuration
 DEFAULT_INITIAL_BALANCE = 2_500.0
 DEFAULT_RISK_PER_TRADE = 6.25  # $6.25 per 1R (0.25% of $2,500)
+
+
+def _create_linked_crosshair_hook(crosshair: "CrosshairTool"):
+    """Create a HoloViews hook to add a shared CrosshairTool to a plot.
+
+    Args:
+        crosshair: A Bokeh CrosshairTool instance to be shared across panels.
+
+    Returns:
+        A hook function that adds the crosshair to the plot.
+
+    Example:
+        >>> shared_crosshair = CrosshairTool(dimensions="height")
+        >>> hook = _create_linked_crosshair_hook(shared_crosshair)
+        >>> chart.opts(hooks=[hook])
+    """
+
+    def hook(plot, _element):
+        """Hook function to add crosshair tool to Bokeh plot."""
+        plot.state.add_tools(crosshair)
+
+    return hook
 
 
 def _to_naive_datetime(ts) -> pd.Timestamp:
@@ -200,8 +223,32 @@ def _create_multi_symbol_layout(
     output_file: Optional[Union[str, Path]],
     timeframe: str = "1m",
 ) -> Optional[Any]:
-    """Create visualization with separate chart per symbol."""
+    """Create visualization with separate chart per symbol.
+
+    Args:
+        data: Polars DataFrame with OHLC data (must have 'symbol' column for filtering).
+        result: BacktestResult with is_multi_symbol=True and results dict.
+        start_date: Optional start date filter (YYYY-MM-DD).
+        end_date: Optional end date filter (YYYY-MM-DD).
+        initial_balance: Starting portfolio balance in dollars.
+        risk_per_trade: Dollar amount risked per 1R.
+        show_plot: Whether to display interactive plot.
+        output_file: Optional path to save as HTML.
+        timeframe: Timeframe of the data (e.g., '15m', '1h').
+
+    Returns:
+        HoloViews Layout object with synchronized price charts per symbol.
+    """
+    # FR-015: Warn when visualizing 5+ symbols
+    symbol_count = len(result.results)
+    if symbol_count >= 5:
+        logger.warning(
+            "Visualizing %d symbols may impact layout readability and performance.",
+            symbol_count,
+        )
+
     charts = []
+    oscillator_panels = []
 
     for symbol, symbol_result in result.results.items():
         # Filter data for this symbol
@@ -218,9 +265,17 @@ def _create_multi_symbol_layout(
 
         pdf = df.to_pandas()
 
-        price_chart = _create_candlestick_chart(pdf, symbol)
+        # Rename OHLC columns to be unique per symbol (prevents y-axis linking)
+        # HoloViews links axes with same dimension names across plots
+        ohlc_cols = ["open", "high", "low", "close"]
+        rename_map = {col: f"{symbol}_{col}" for col in ohlc_cols if col in pdf.columns}
+        pdf_renamed = pdf.rename(columns=rename_map)
+
+        # T003: Fix tuple unpacking - _create_candlestick_chart returns (chart, xlim)
+        price_chart, xlim = _create_candlestick_chart(pdf_renamed, symbol, rename_map)
         trade_boxes = _create_trade_boxes(symbol_result, pdf)
-        indicators = _create_indicator_overlays(pdf)
+        # T004: Fix _create_indicator_overlays call with required pair and xlim args
+        indicators, oscillator_panel = _create_indicator_overlays(pdf, symbol, xlim)
 
         combined = price_chart
         if trade_boxes:
@@ -229,18 +284,50 @@ def _create_multi_symbol_layout(
             combined = combined * indicators
 
         charts.append(combined)
+        if oscillator_panel:
+            oscillator_panels.append(oscillator_panel)
 
     if not charts:
         logger.error("No charts created.")
         return None
 
+    # FR-012 to FR-014: Create crosshairs for synchronized hover
+    # Shared crosshair for price and oscillator panels (extends across all)
+    price_crosshair = CrosshairTool(
+        dimensions="height", line_color="gray", line_alpha=0.5
+    )
+    price_crosshair_hook = _create_linked_crosshair_hook(price_crosshair)
+
+    # Isolated crosshair for PnL panel (does NOT extend to other panels)
+    pnl_crosshair = CrosshairTool(dimensions="both", line_color="gray", line_alpha=0.5)
+    pnl_crosshair_hook = _create_linked_crosshair_hook(pnl_crosshair)
+
+    # Apply crosshair hooks to price charts and oscillator panels
+    charts_with_crosshair = [
+        chart.opts(hooks=[price_crosshair_hook]) for chart in charts
+    ]
+    oscillators_with_crosshair = [
+        osc.opts(hooks=[price_crosshair_hook]) for osc in oscillator_panels
+    ]
+
     # Aggregate portfolio curve across all symbols
     portfolio_curve = _create_portfolio_curve(result, initial_balance, risk_per_trade)
 
-    # Stack charts vertically
-    layout = hv.Layout(charts).cols(1)
+    # Stack charts vertically with oscillator panels
+    all_panels = []
+    for i, chart in enumerate(charts_with_crosshair):
+        all_panels.append(chart)
+        if i < len(oscillators_with_crosshair):
+            all_panels.append(oscillators_with_crosshair[i])
+
+    # Add portfolio curve at the bottom (FR-006)
     if portfolio_curve:
-        layout = layout + portfolio_curve
+        # Apply isolated crosshair to PnL panel (FR-013, FR-014)
+        portfolio_with_crosshair = portfolio_curve.opts(hooks=[pnl_crosshair_hook])
+        all_panels.append(portfolio_with_crosshair)
+
+    # Create single-column layout for vertical stacking
+    layout = hv.Layout(all_panels).cols(1)
 
     # Title includes timeframe (e.g., "Multi-Symbol Backtest (15m)")
     title = (
@@ -248,9 +335,11 @@ def _create_multi_symbol_layout(
         if timeframe == "1m"
         else f"Multi-Symbol Backtest ({timeframe})"
     )
-    layout = layout.opts(title=title, shared_axes=False)
+    # FR-010/FR-011: HoloViews auto-links axes with same dimension name (time)
+    # while keeping different dimension names (price) independent
+    layout = layout.opts(title=title)
 
-    _save_and_show(layout, result.run_id, output_file, show_plot)
+    _save_and_show(layout, result.run_id, output_file, show_plot, result)
 
     return layout
 
@@ -290,8 +379,26 @@ def _prepare_data(
     return df
 
 
-def _create_candlestick_chart(pdf: pd.DataFrame, pair: str) -> Any:
-    """Create candlestick chart using hvplot."""
+def _create_candlestick_chart(
+    pdf: pd.DataFrame, pair: str, col_map: dict = None
+) -> Any:
+    """Create candlestick chart using hvplot.
+
+    Args:
+        pdf: DataFrame with OHLC data
+        pair: Symbol name for title
+        col_map: Optional column rename map (e.g., {'open': 'EURUSD_open'})
+                 Used to prevent y-axis linking across symbols.
+    """
+    # Get column names (renamed or original)
+    if col_map:
+        open_col = col_map.get("open", "open")
+        high_col = col_map.get("high", "high")
+        low_col = col_map.get("low", "low")
+        close_col = col_map.get("close", "close")
+    else:
+        open_col, high_col, low_col, close_col = "open", "high", "low", "close"
+
     # Prepare data
     if "timestamp_utc" in pdf.columns:
         pdf = pdf.set_index("timestamp_utc")
@@ -301,7 +408,7 @@ def _create_candlestick_chart(pdf: pd.DataFrame, pair: str) -> Any:
     # Enforce consistent datetime64[ns] naive dtype on index
     pdf.index = pd.to_datetime(pdf.index).tz_localize(None)
 
-    pdf = pdf.dropna(subset=["open", "high", "low", "close"])
+    pdf = pdf.dropna(subset=[open_col, high_col, low_col, close_col])
 
     # Add pre-formatted time string column for tooltip display
     # This avoids issues with Bokeh's datetime formatter and epoch milliseconds
@@ -319,12 +426,24 @@ def _create_candlestick_chart(pdf: pd.DataFrame, pair: str) -> Any:
 
     xlim = (initial_start, last_time)
 
-    # Calculate y-axis range from visible data only
+    # Calculate y-axis range from visible data only (use original column names)
     visible_pdf = pdf.loc[initial_start:last_time]
-    if len(visible_pdf) > 0:
-        ylim = _calculate_price_range(visible_pdf, pair)
+    # Create temp df with original column names for price range calculation
+    temp_df = visible_pdf.rename(
+        columns={open_col: "open", high_col: "high", low_col: "low", close_col: "close"}
+    )
+    if len(temp_df) > 0:
+        ylim = _calculate_price_range(temp_df, pair)
     else:
-        ylim = _calculate_price_range(pdf, pair)
+        temp_full = pdf.rename(
+            columns={
+                open_col: "open",
+                high_col: "high",
+                low_col: "low",
+                close_col: "close",
+            }
+        )
+        ylim = _calculate_price_range(temp_full, pair)
 
     # Determine decimal places based on pair type
     is_jpy_pair = "JPY" in pair.upper()
@@ -333,14 +452,14 @@ def _create_candlestick_chart(pdf: pd.DataFrame, pair: str) -> Any:
     # Create custom tooltips for OHLC chart
     tooltips = [
         ("Time", "@time_str"),
-        ("Open", f"@open{{{price_format}}}"),
-        ("High", f"@high{{{price_format}}}"),
-        ("Low", f"@low{{{price_format}}}"),
-        ("Close", f"@close{{{price_format}}}"),
+        ("Open", f"@{open_col}{{{price_format}}}"),
+        ("High", f"@{high_col}{{{price_format}}}"),
+        ("Low", f"@{low_col}{{{price_format}}}"),
+        ("Close", f"@{close_col}{{{price_format}}}"),
     ]
 
     chart = pdf.hvplot.ohlc(
-        y=["open", "high", "low", "close"],
+        y=[open_col, high_col, low_col, close_col],
         neg_color="red",
         pos_color="green",
         height=400,
@@ -348,7 +467,7 @@ def _create_candlestick_chart(pdf: pd.DataFrame, pair: str) -> Any:
         title=pair,
         ylim=ylim,
         xlim=xlim,
-        hover_cols=["time_str", "open", "high", "low", "close"],
+        hover_cols=["time_str", open_col, high_col, low_col, close_col],
     ).opts(
         tools=[
             "pan",
@@ -531,7 +650,7 @@ def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[A
 
         # Create entry-exit connecting lines, TP lines, and SL lines
         lines = None
-        for entry, exit_pt in zip(recent_entries, recent_exits):
+        for entry, exit_pt in zip(recent_entries, recent_exits, strict=False):
             entry_time = entry["time"]
             exit_time = entry.get("exit_time", exit_pt["time"])
 
