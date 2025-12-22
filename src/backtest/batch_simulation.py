@@ -306,6 +306,80 @@ class BatchSimulation:
             exit_reasons=np.array([], dtype=np.int8),
         )
 
+    def _filter_signals_vectorized(
+        self,
+        signal_indices: np.ndarray,
+        ohlc_arrays: tuple[np.ndarray, ...],
+    ) -> np.ndarray:
+        """Vectorized position filter for one-trade-at-a-time enforcement.
+
+        Uses numpy array slicing to quickly estimate exit points for all signals.
+        Much faster than per-signal scanning.
+        """
+        if len(signal_indices) == 0:
+            return signal_indices
+
+        n_candles = len(ohlc_arrays[0])
+        _, open_prices, high_prices, low_prices, _ = ohlc_arrays
+
+        # Calculate stop/target for all signals at once
+        entry_prices = open_prices[signal_indices]
+        pip_sizes = np.where(entry_prices < 10, 0.0001, 0.01)
+        stop_distances = 20 * pip_sizes
+        target_distances = 40 * pip_sizes
+        stop_prices = entry_prices - stop_distances
+        target_prices = entry_prices + target_distances
+
+        # Estimate exit indices for all signals (still need loop but with vectorized checks)
+        max_bars = 100
+        exit_indices = np.zeros(len(signal_indices), dtype=np.int64)
+
+        for idx, (signal_idx, stop, target) in enumerate(
+            zip(signal_indices, stop_prices, target_prices)
+        ):
+            end_idx = min(signal_idx + max_bars, n_candles)
+            if end_idx <= signal_idx + 1:
+                exit_indices[idx] = signal_idx + 1
+                continue
+
+            # Vectorized check: find first bar where stop OR target hit
+            future_lows = low_prices[signal_idx + 1 : end_idx]
+            future_highs = high_prices[signal_idx + 1 : end_idx]
+
+            stop_hit = future_lows <= stop
+            target_hit = future_highs >= target
+            exit_hit = stop_hit | target_hit
+
+            if exit_hit.any():
+                # Find first hit (argmax returns first True)
+                exit_offset = np.argmax(exit_hit) + 1
+                exit_indices[idx] = signal_idx + exit_offset
+            else:
+                exit_indices[idx] = end_idx - 1
+
+        # Now filter: keep only signals that don't overlap
+        kept_signals = []
+        current_exit_idx = -1
+
+        for signal_idx, exit_idx in zip(signal_indices, exit_indices):
+            if signal_idx <= current_exit_idx:
+                continue
+            kept_signals.append(signal_idx)
+            current_exit_idx = exit_idx
+
+        original_count = len(signal_indices)
+        filtered_count = len(kept_signals)
+
+        if filtered_count < original_count:
+            logger.info(
+                "Position filter (vectorized): %d -> %d signals (removed %d)",
+                original_count,
+                filtered_count,
+                original_count - filtered_count,
+            )
+
+        return np.array(kept_signals, dtype=np.int64)
+
     def _filter_signals_sequential(
         self,
         signal_indices: np.ndarray,
