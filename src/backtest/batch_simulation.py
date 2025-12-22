@@ -174,6 +174,10 @@ class BatchSimulation:
             progress.start()
 
         # Apply position filtering BEFORE initializing positions (FR-001)
+        import time as time_module
+
+        filter_start = time_module.perf_counter()
+
         logger.info(
             "Position filter check: max_concurrent=%s, n_signals=%d",
             self.max_concurrent_positions,
@@ -188,18 +192,24 @@ class BatchSimulation:
                 signal_indices, ohlc_arrays
             )
             n_signals = len(signal_indices)
+
+            filter_elapsed = time_module.perf_counter() - filter_start
             logger.info(
-                "Position filter applied: %d -> %d signals (removed %d)",
+                "Position filter applied: %d -> %d signals (removed %d) in %.2fs",
                 original_count,
                 n_signals,
                 original_count - n_signals,
+                filter_elapsed,
             )
+
             if n_signals == 0:
                 if progress is not None:
                     progress.finish()
                 sim_duration = time.perf_counter() - sim_start
                 logger.info("All signals filtered by position limit - no trades")
                 return self._create_zero_result(sim_duration)
+
+        logger.info("Starting position initialization with %d signals...", n_signals)
 
         # Initialize position state arrays
         position_state = self._initialize_positions(
