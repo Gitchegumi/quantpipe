@@ -17,8 +17,8 @@
 
 **Purpose**: Enable multi-symbol visualization in CLI (remove blocking code)
 
-- [ ] T001 Remove multi-symbol visualization skip block in `src/cli/run_backtest.py` (lines 1287-1290)
-- [ ] T002 Update CLI to call `plot_backtest_results()` for multi-symbol results in `src/cli/run_backtest.py`
+- [x] T001 Remove multi-symbol visualization skip block in `src/cli/run_backtest.py` (lines 1287-1290)
+- [x] T002 Update CLI to call `plot_backtest_results()` for multi-symbol results in `src/cli/run_backtest.py`
 
 ---
 
@@ -28,10 +28,10 @@
 
 **⚠️ CRITICAL**: These bugs must be fixed before any visualization features work
 
-- [ ] T003 Fix tuple unpacking on line 221 in `src/visualization/datashader_viz.py` - `_create_candlestick_chart()` returns `(chart, xlim)`
-- [ ] T004 Fix `_create_indicator_overlays()` call on line 223 in `src/visualization/datashader_viz.py` - pass required `pair` and `xlim` arguments
-- [ ] T005 Change `shared_axes=False` to `True` on line 251 in `src/visualization/datashader_viz.py`
-- [ ] T006 Add symbol count warning (5+ symbols) in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
+- [x] T003 Fix tuple unpacking on line 221 in `src/visualization/datashader_viz.py` - `_create_candlestick_chart()` returns `(chart, xlim)`
+- [x] T004 Fix `_create_indicator_overlays()` call on line 223 in `src/visualization/datashader_viz.py` - pass required `pair` and `xlim` arguments
+- [x] T005 Change `shared_axes=False` to `True` on line 251 in `src/visualization/datashader_viz.py`
+- [x] T006 Add symbol count warning (5+ symbols) in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
 
 **Checkpoint**: Foundation ready - multi-symbol visualization now renders
 
@@ -45,9 +45,9 @@
 
 ### Implementation for US1 & US2
 
-- [ ] T007 [US1] Verify symbol data filtering works correctly in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
-- [ ] T008 [US2] Verify trade markers display on correct symbol's chart (no cross-contamination) in `src/visualization/datashader_viz.py`
-- [ ] T009 [US2] Verify TP/SL lines (green/red dotted) render per symbol in `src/visualization/datashader_viz.py`
+- [x] T007 [US1] Verify symbol data filtering works correctly in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
+- [x] T008 [US2] Verify trade markers display on correct symbol's chart (no cross-contamination) in `src/visualization/datashader_viz.py`
+- [x] T009 [US2] Verify TP/SL lines (green/red dotted) render per symbol in `src/visualization/datashader_viz.py`
 
 **Checkpoint**: MVP complete - multi-symbol visualization with trade markers works
 
@@ -61,8 +61,8 @@
 
 ### Implementation for US3
 
-- [ ] T010 [US3] Verify portfolio equity curve aggregates trades from all symbols in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
-- [ ] T011 [US3] Verify portfolio curve uses correct initial balance ($2,500) and risk per trade ($6.25) in `src/visualization/datashader_viz.py`
+- [x] T010 [US3] Verify portfolio equity curve aggregates trades from all symbols in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
+- [x] T011 [US3] Verify portfolio curve uses correct initial balance ($2,500) and risk per trade ($6.25) in `src/visualization/datashader_viz.py`
 
 **Checkpoint**: Portfolio equity curve displays correctly
 
@@ -76,8 +76,8 @@
 
 ### Implementation for US4
 
-- [ ] T012 [US4] Verify timeframe parameter is passed to `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
-- [ ] T013 [US4] Verify chart title format includes timeframe suffix when not 1m in `src/visualization/datashader_viz.py`
+- [x] T012 [US4] Verify timeframe parameter is passed to `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
+- [x] T013 [US4] Verify chart title format includes timeframe suffix when not 1m in `src/visualization/datashader_viz.py`
 
 **Checkpoint**: Timeframe displays correctly in titles
 
@@ -91,11 +91,11 @@
 
 ### Implementation for US5
 
-- [ ] T014 [US5] Add `_create_linked_crosshair_hook()` helper function in `src/visualization/datashader_viz.py`
-- [ ] T015 [US5] Create shared `CrosshairTool` instance for price/oscillator panels in `src/visualization/datashader_viz.py`
-- [ ] T016 [US5] Create isolated `CrosshairTool` instance for PnL panel in `src/visualization/datashader_viz.py`
-- [ ] T017 [US5] Apply crosshair hooks via `.opts(hooks=[...])` to all charts in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
-- [ ] T018 [US5] Verify `shared_axes=True` enables synchronized pan/zoom (already set in T005)
+- [x] T014 [US5] Add `_create_linked_crosshair_hook()` helper function in `src/visualization/datashader_viz.py`
+- [x] T015 [US5] Create shared `CrosshairTool` instance for price/oscillator panels in `src/visualization/datashader_viz.py`
+- [x] T016 [US5] Create isolated `CrosshairTool` instance for PnL panel in `src/visualization/datashader_viz.py`
+- [x] T017 [US5] Apply crosshair hooks via `.opts(hooks=[...])` to all charts in `_create_multi_symbol_layout()` in `src/visualization/datashader_viz.py`
+- [x] T018 [US5] Verify `shared_axes=True` enables synchronized pan/zoom (already set in T005)
 
 **Checkpoint**: Synchronized navigation and crosshairs work correctly
 
@@ -105,13 +105,13 @@
 
 **Purpose**: Add unit tests and run verification
 
-- [ ] T019 [P] Create `tests/visualization/test_multi_symbol_viz.py` with test fixtures
-- [ ] T020 [P] Add `test_create_multi_symbol_layout_returns_layout()` in `tests/visualization/test_multi_symbol_viz.py`
-- [ ] T021 [P] Add `test_symbol_count_warning_logged()` in `tests/visualization/test_multi_symbol_viz.py`
-- [ ] T022 [P] Add `test_crosshair_tools_present()` in `tests/visualization/test_multi_symbol_viz.py`
-- [ ] T023 Run linting: `poetry run ruff check src/visualization/datashader_viz.py src/cli/run_backtest.py`
-- [ ] T024 Run formatting: `poetry run black src/visualization/datashader_viz.py src/cli/run_backtest.py`
-- [ ] T025 Run all visualization tests: `poetry run pytest tests/visualization/ -v`
+- [x] T019 [P] Create `tests/visualization/test_multi_symbol_viz.py` with test fixtures
+- [x] T020 [P] Add `test_create_multi_symbol_layout_returns_layout()` in `tests/visualization/test_multi_symbol_viz.py`
+- [x] T021 [P] Add `test_symbol_count_warning_logged()` in `tests/visualization/test_multi_symbol_viz.py`
+- [x] T022 [P] Add `test_crosshair_tools_present()` in `tests/visualization/test_multi_symbol_viz.py`
+- [x] T023 Run linting: `poetry run ruff check src/visualization/datashader_viz.py src/cli/run_backtest.py`
+- [x] T024 Run formatting: `poetry run black src/visualization/datashader_viz.py src/cli/run_backtest.py`
+- [x] T025 Run all visualization tests: `poetry run pytest tests/visualization/ -v`
 - [ ] T026 Manual verification per quickstart.md
 
 ---

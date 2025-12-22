@@ -48,6 +48,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 
 from ..backtest.orchestrator import BacktestOrchestrator
 from ..cli.logging_setup import setup_logging
@@ -284,7 +285,7 @@ def run_multi_symbol_backtest(
         show_progress: If True, show progress bars
 
     Returns:
-        Multi-symbol BacktestResult with aggregated metrics
+        Tuple of (Multi-symbol BacktestResult, enriched_data dict with DataFrames)
     """
     import polars as pl
 
@@ -292,6 +293,7 @@ def run_multi_symbol_backtest(
     from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
     results: dict[str, "BacktestResult"] = {}
+    enriched_data: dict[str, pl.DataFrame] = {}  # For visualization
     failures: list[dict] = []
     all_signals: list = []
     all_executions: list = []
@@ -362,6 +364,7 @@ def run_multi_symbol_backtest(
             )
 
             results[pair] = result
+            enriched_data[pair] = enriched_df  # Store for visualization
 
             # Aggregate signals and executions
             if result.signals:
@@ -462,7 +465,7 @@ def run_multi_symbol_backtest(
         len(failures),
     )
 
-    return multi_result
+    return multi_result, enriched_data
 
 
 def main():
@@ -907,7 +910,7 @@ Persistent storage not yet implemented."
                 else:
                     # Independent mode (default) - run each symbol in isolation
                     logger.info("Independent mode: each symbol runs in isolation")
-                    result = run_multi_symbol_backtest(
+                    result, enriched_data = run_multi_symbol_backtest(
                         pair_paths=pair_paths,
                         direction_mode=direction_mode,
                         strategy_params=parameters,
@@ -949,6 +952,54 @@ Persistent storage not yet implemented."
                 args.output.mkdir(parents=True, exist_ok=True)
                 output_path.write_text(output_content)
                 logger.info("Results written to %s", output_path)
+
+                # Multi-symbol visualization (FR-001)
+                if args.visualize:
+                    try:
+                        from ..visualization.datashader_viz import (
+                            plot_backtest_results,
+                        )
+                        from rich.console import Console
+
+                        console = Console()
+                        logger.info("Generating Datashader visualization...")
+
+                        # Combine enriched data (with indicators) for visualization
+                        symbol_dfs = []
+                        for symbol, df in enriched_data.items():
+                            # Add symbol column if not present
+                            if "symbol" not in df.columns:
+                                df = df.with_columns(pl.lit(symbol).alias("symbol"))
+                            symbol_dfs.append(df)
+
+                        all_symbol_data = pl.concat(symbol_dfs)
+
+                        with console.status(
+                            "[bold green]Preparing visualization "
+                            "(Datashader)...[/bold green]"
+                        ):
+                            plot_backtest_results(
+                                data=all_symbol_data,
+                                result=result,
+                                pair="Multi-Symbol",
+                                show_plot=True,
+                                start_date=args.viz_start,
+                                end_date=args.viz_end,
+                                timeframe=args.timeframe,
+                            )
+
+                    except ImportError as e:
+                        logger.error(
+                            "Visualization module not found or dependency "
+                            "missing: %s",
+                            e,
+                        )
+                    except Exception as e:
+                        logger.error(
+                            "Failed to generate visualization: %s",
+                            e,
+                            exc_info=True,
+                        )
 
                 return 0
 
@@ -1115,7 +1166,6 @@ Persistent storage not yet implemented."
             sys.exit(1)
 
         # Stage 1.5: Resample to target timeframe if not 1m (T014)
-        import polars as pl
 
         enriched_df = ingestion_result.data
         if isinstance(enriched_df, pd.DataFrame):
@@ -1284,59 +1334,33 @@ Persistent storage not yet implemented."
 
         # T011 Integration: Interactive Visualization
         if args.visualize:
-            if result.is_multi_symbol:
-                logger.warning(
-                    "Visualization skipped for multi-symbol result (not yet supported)."
+            try:
+                from ..visualization.datashader_viz import plot_backtest_results
+                from rich.console import Console
+
+                console = Console()
+                logger.info("Generating Datashader visualization...")
+
+                with console.status(
+                    "[bold green]Preparing visualization (Datashader)...[/bold green]"
+                ):
+                    plot_backtest_results(
+                        data=enriched_df,
+                        result=result,
+                        pair=pair,
+                        show_plot=True,
+                        start_date=args.viz_start,
+                        end_date=args.viz_end,
+                        timeframe=args.timeframe,
+                    )
+
+            except ImportError as e:
+                logger.error(
+                    "Visualization module not found or dependency missing: %s",
+                    e,
                 )
-            else:
-                try:
-                    from ..visualization.datashader_viz import plot_backtest_results
-                    from rich.console import Console
-
-                    console = Console()
-                    logger.info("Generating Datashader visualization...")
-
-                    with console.status(
-                        "[bold green]Preparing visualization (Datashader)...[/bold green]"
-                    ):
-                        plot_backtest_results(
-                            data=enriched_df,
-                            result=result,
-                            pair=pair,
-                            show_plot=True,
-                            start_date=args.viz_start,
-                            end_date=args.viz_end,
-                            timeframe=args.timeframe,
-                        )
-
-                except ImportError as e:
-                    logger.error(
-                        "Visualization module not found or dependency missing: %s",
-                        e,
-                    )
-                except Exception as e:
-                    logger.error(
-                        "Failed to generate visualization: %s", e, exc_info=True
-                    )
-
-    # TODO(T045): Generate PerformanceReport after backtest completes
-    # NOTE: Currently orchestrator doesn't expose ScanResult/SimulationResult
-    # Full integration requires orchestrator refactoring to return:
-    # - ScanResult: scan timing, candle count, signal count, progress overhead
-    # - SimulationResult: simulation timing, trade count, memory stats
-    # Once available, uncomment:
-    # from ..backtest.report import create_report
-    # perf_report = create_report(
-    #     scan_result=scan_result,
-    #     sim_result=sim_result,
-    #     candle_count=len(candles),
-    #     equivalence_verified=True,
-    #     indicator_names=["ema_fast", "ema_slow", "atr", "rsi"],
-    #     duplicate_timestamps=0,
-    # )
-    # report_writer = ReportWriter(output_dir=args.output)
-    # report_path = report_writer.write_report(perf_report)
-    # logger.info("Performance report written to %s", report_path)
+            except Exception as e:
+                logger.error("Failed to generate visualization: %s", e, exc_info=True)
 
     # Format output (outside profiling context)
     output_format = (
