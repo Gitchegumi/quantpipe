@@ -5,10 +5,11 @@ including declaring their required indicators.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Optional, Protocol
 
 if TYPE_CHECKING:
     import numpy as np
+    from src.models.visualization_config import VisualizationConfig
 
 
 @dataclass(frozen=True)
@@ -81,4 +82,27 @@ class Strategy(Protocol):
 
         Raises:
             NotImplementedError: If strategy doesn't support vectorized scanning
+        """
+
+    def get_visualization_config(self) -> Optional["VisualizationConfig"]:
+        """Return visualization configuration for this strategy's indicators.
+
+        Optional method that strategies can implement to control how their
+        indicators are displayed in backtest visualization charts.
+
+        Returns:
+            VisualizationConfig specifying price overlays and oscillators,
+            or None to use auto-detection fallback.
+
+        Examples:
+            >>> from src.models import VisualizationConfig, IndicatorDisplayConfig
+            >>> def get_visualization_config(self):
+            ...     return VisualizationConfig(
+            ...         price_overlays=[
+            ...             IndicatorDisplayConfig(name="ema20", color="#FFD700"),
+            ...         ],
+            ...         oscillators=[
+            ...             IndicatorDisplayConfig(name="stoch_rsi", color="#00FFFF"),
+            ...         ],
+            ...     )
         """

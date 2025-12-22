@@ -4,8 +4,14 @@ This module provides the complete trend_pullback strategy implementation
 conforming to the Strategy interface.
 """
 
+from typing import Optional
+
 import numpy as np
 
+from src.models.visualization_config import (
+    IndicatorDisplayConfig,
+    VisualizationConfig,
+)
 from src.strategy.base import Strategy, StrategyMetadata
 from src.strategy.trend_pullback.signal_generator import (
     generate_long_signals,
@@ -30,6 +36,32 @@ class TrendPullbackStrategy(Strategy):
             version="1.0.0",
             required_indicators=["ema20", "ema50", "atr14", "rsi14", "stoch_rsi"],
             tags=["trend-following", "pullback", "momentum"],
+        )
+
+    def get_visualization_config(self) -> Optional[VisualizationConfig]:
+        """Return visualization configuration for trend pullback indicators.
+
+        Configures:
+        - Price overlays: ema20 (fast, green), ema50 (slow, yellow-green)
+        - Oscillators: stoch_rsi, rsi14 (auto-colored from palette)
+
+        Colors are assigned from the ordered gradient palette:
+        - ema20 (position 0) = green (fastest MA)
+        - ema50 (position 1) = next gradient color
+
+        Returns:
+            VisualizationConfig with trend pullback indicators.
+        """
+        return VisualizationConfig(
+            price_overlays=[
+                # Order matters: fastest to slowest for gradient colors
+                IndicatorDisplayConfig(name="ema20", label="EMA 20"),
+                IndicatorDisplayConfig(name="ema50", label="EMA 50"),
+            ],
+            oscillators=[
+                # Oscillators use distinct cycling palette
+                IndicatorDisplayConfig(name="stoch_rsi", label="Stoch RSI"),
+            ],
         )
 
     def generate_signals(

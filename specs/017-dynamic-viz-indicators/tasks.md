@@ -23,8 +23,8 @@
 
 **Purpose**: Project initialization and model creation
 
-- [ ] T001 [P] Create VisualizationConfig and IndicatorDisplayConfig dataclasses in src/models/visualization_config.py
-- [ ] T002 [P] Add visualization_config to src/models/**init**.py exports
+- [x] T001 [P] Create VisualizationConfig and IndicatorDisplayConfig dataclasses in src/models/visualization_config.py
+- [x] T002 [P] Add visualization_config to src/models/**init**.py exports
 
 ---
 
@@ -34,8 +34,8 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Add optional get_visualization_config() method to Strategy protocol in src/strategy/base.py
-- [ ] T004 Update \_create_indicator_overlays() signature to accept optional VisualizationConfig in src/visualization/datashader_viz.py
+- [x] T003 Add optional get_visualization_config() method to Strategy protocol in src/strategy/base.py
+- [x] T004 Update \_create_indicator_overlays() signature to accept optional VisualizationConfig in src/visualization/datashader_viz.py
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -49,15 +49,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Unit tests for IndicatorDisplayConfig creation and defaults in tests/unit/test_visualization_config.py
-- [ ] T006 [P] [US1] Unit tests for VisualizationConfig with various configurations in tests/unit/test_visualization_config.py
+- [x] T005 [P] [US1] Unit tests for IndicatorDisplayConfig creation and defaults in tests/unit/test_visualization_config.py
+- [x] T006 [P] [US1] Unit tests for VisualizationConfig with various configurations in tests/unit/test_visualization_config.py
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Implement get_visualization_config() in TrendPullbackStrategy in src/strategy/trend_pullback/strategy.py
-- [ ] T008 [US1] Implement config-based overlay creation in \_create_indicator_overlays() in src/visualization/datashader_viz.py
-- [ ] T009 [US1] Thread viz_config parameter through plot_backtest_results() call chain in src/visualization/datashader_viz.py
-- [ ] T010 [US1] Add warning logging for missing indicator columns in src/visualization/datashader_viz.py
+- [x] T007 [US1] Implement get_visualization_config() in TrendPullbackStrategy in src/strategy/trend_pullback/strategy.py
+- [x] T008 [US1] Implement config-based overlay creation in \_create_indicator_overlays() in src/visualization/datashader_viz.py
+- [x] T009 [US1] Thread viz_config parameter through plot_backtest_results() call chain in src/visualization/datashader_viz.py
+- [x] T010 [US1] Add warning logging for missing indicator columns in src/visualization/datashader_viz.py
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -71,12 +71,12 @@
 
 ### Tests for User Story 2
 
-- [ ] T011 [P] [US2] Integration test for auto-detection fallback when no config provided in tests/visualization/test_viz_config_integration.py
+- [x] T011 [P] [US2] Integration test for auto-detection fallback when no config provided in tests/visualization/test_viz_config_integration.py
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Implement fallback logic to auto-detect when config is None in src/visualization/datashader_viz.py
-- [ ] T013 [US2] Add hasattr check for get_visualization_config() method in caller in src/visualization/datashader_viz.py
+- [x] T012 [US2] Implement fallback logic to auto-detect when config is None in src/visualization/datashader_viz.py
+- [x] T013 [US2] Add hasattr check for get_visualization_config() method in caller in src/visualization/datashader_viz.py
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -90,9 +90,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T014 [P] [US3] Define default color palette constants for common indicators in src/models/visualization_config.py
-- [ ] T015 [US3] Apply default colors when strategy config omits color in src/visualization/datashader_viz.py
-- [ ] T016 [US3] Add color validation/fallback for invalid color specs in src/visualization/datashader_viz.py
+- [x] T014 [P] [US3] Define default color palette constants for common indicators in src/models/visualization_config.py
+- [x] T015 [US3] Apply default colors when strategy config omits color in src/visualization/datashader_viz.py
+- [x] T016 [US3] Add color validation/fallback for invalid color specs in src/visualization/datashader_viz.py
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -102,10 +102,10 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T017 [P] Update quickstart.md with actual usage examples in specs/017-dynamic-viz-indicators/quickstart.md
-- [ ] T018 [P] Add docstrings to all new functions and classes per constitution standards
-- [ ] T019 Run Black, Ruff, Pylint on all modified files and fix any issues
-- [ ] T020 Run pytest on all new and existing visualization tests
+- [x] T017 [P] Update quickstart.md with actual usage examples in specs/017-dynamic-viz-indicators/quickstart.md
+- [x] T018 [P] Add docstrings to all new functions and classes per constitution standards
+- [x] T019 Run Black, Ruff, Pylint on all modified files and fix any issues
+- [x] T020 Run pytest on all new and existing visualization tests
 - [ ] T021 Manual verification: run backtest with --visualize and confirm chart appearance
 
 ---
