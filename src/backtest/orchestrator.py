@@ -1337,7 +1337,7 @@ class BacktestOrchestrator:
             ValueError: If df is empty or missing required columns
         """
 
-        if df.empty:
+        if df.is_empty():
             raise ValueError("DataFrame cannot be empty")
 
         start_time = datetime.now(UTC)
