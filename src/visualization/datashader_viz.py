@@ -102,6 +102,7 @@ def plot_backtest_results(
     initial_balance: float = DEFAULT_INITIAL_BALANCE,
     risk_per_trade: float = DEFAULT_RISK_PER_TRADE,
     timeframe: str = "1m",
+    viz_config: Optional[VisualizationConfig] = None,
 ) -> Optional[Any]:
     """
     Render interactive backtest visualization using Datashader.
@@ -159,6 +160,7 @@ def plot_backtest_results(
         show_plot,
         output_file,
         timeframe,
+        viz_config,
     )
 
 
@@ -173,6 +175,7 @@ def _create_single_symbol_layout(
     show_plot: bool,
     output_file: Optional[Union[str, Path]],
     timeframe: str = "1m",
+    viz_config: Optional[VisualizationConfig] = None,
 ) -> Optional[Any]:
     """Create visualization for a single symbol."""
     # Prepare data
@@ -187,7 +190,9 @@ def _create_single_symbol_layout(
     # Create components
     price_chart, xlim = _create_candlestick_chart(pdf, pair)
     trade_boxes = _create_trade_boxes(result, pdf)
-    indicator_overlays, oscillator_panel = _create_indicator_overlays(pdf, pair, xlim)
+    indicator_overlays, oscillator_panel = _create_indicator_overlays(
+        pdf, pair, xlim, viz_config
+    )
     portfolio_curve = _create_portfolio_curve(result, initial_balance, risk_per_trade)
 
     # Combine price chart with trade boxes and indicator overlays

@@ -1352,6 +1352,7 @@ Persistent storage not yet implemented."
                         start_date=args.viz_start,
                         end_date=args.viz_end,
                         timeframe=args.timeframe,
+                        viz_config=strategy.get_visualization_config(),
                     )
 
             except ImportError as e:

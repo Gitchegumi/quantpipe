@@ -327,8 +327,13 @@ class BatchSimulation:
 
             # This signal is valid - estimate its exit point
             entry_price = open_prices[signal_idx]
-            stop_price = entry_price * 0.99  # 1% stop placeholder
-            target_price = entry_price * 1.02  # 2% target placeholder
+            # Use pip-based stop/target for forex (20 pip stop, 40 pip target)
+            # This matches typical forex risk/reward ratios
+            pip_size = 0.0001 if entry_price < 10 else 0.01  # JPY pairs
+            stop_distance = 20 * pip_size  # 20 pip stop
+            target_distance = 40 * pip_size  # 40 pip target (2R)
+            stop_price = entry_price - stop_distance
+            target_price = entry_price + target_distance
 
             # Quick scan forward to find exit
             exit_idx = self._quick_exit_scan(
