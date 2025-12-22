@@ -307,7 +307,10 @@ class BacktestOrchestrator:
         if isinstance(candles, pl.DataFrame):
             if candles.is_empty():
                 raise ValueError("Candles DataFrame cannot be empty")
-            return self._run_vectorized_backtest(candles, pair, run_id, **signal_params)
+            # Use optimized path with BatchSimulation (includes position filtering)
+            return self.run_optimized_backtest(
+                df=candles, pair=pair, run_id=run_id, strategy=strategy, **signal_params
+            )
 
         if not candles:
             raise ValueError("Candles sequence cannot be empty")
@@ -1581,12 +1584,17 @@ class BacktestOrchestrator:
             "Running optimized simulation for %d signals", scan_result.signal_count
         )
 
+        # Get max_concurrent_positions from strategy metadata
+        max_concurrent = getattr(strategy.metadata, "max_concurrent_positions", 1)
+        logger.info(
+            "Simulator config: max_concurrent_positions=%s (from strategy metadata)",
+            max_concurrent,
+        )
+
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
             enable_progress=self.enable_progress,
-            max_concurrent_positions=getattr(
-                strategy.metadata, "max_concurrent_positions", 1
-            ),
+            max_concurrent_positions=max_concurrent,
         )
 
         # Extract OHLC arrays for simulation

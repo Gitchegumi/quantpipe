@@ -174,14 +174,26 @@ class BatchSimulation:
             progress.start()
 
         # Apply position filtering BEFORE initializing positions (FR-001)
+        logger.info(
+            "Position filter check: max_concurrent=%s, n_signals=%d",
+            self.max_concurrent_positions,
+            n_signals,
+        )
         if (
             self.max_concurrent_positions is not None
             and self.max_concurrent_positions > 0
         ):
+            original_count = len(signal_indices)
             signal_indices = self._filter_signals_sequential(
                 signal_indices, ohlc_arrays
             )
             n_signals = len(signal_indices)
+            logger.info(
+                "Position filter applied: %d -> %d signals (removed %d)",
+                original_count,
+                n_signals,
+                original_count - n_signals,
+            )
             if n_signals == 0:
                 if progress is not None:
                     progress.finish()
