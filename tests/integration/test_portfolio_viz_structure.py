@@ -10,11 +10,11 @@ import sys
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.cli.run_backtest import main
-from src.models.enums import DirectionMode, ExitReason
-from src.models.portfolio import ClosedTrade
+from src.models.enums import DirectionMode
+from src.backtest.portfolio.portfolio_simulator import ClosedTrade
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def mock_viz_dependencies():
     with (
         patch("src.cli.run_backtest.construct_data_paths") as mock_paths,
         patch("src.cli.run_backtest.run_portfolio_backtest") as mock_portfolio,
-        patch("src.cli.run_backtest.plot_backtest_results") as mock_plot,
+        patch("src.visualization.datashader_viz.plot_backtest_results") as mock_plot,
         patch("src.cli.run_backtest.ingest_ohlcv_data"),
         patch("src.cli.run_backtest.generate_output_filename"),
         patch("pathlib.Path.mkdir"),
@@ -39,12 +39,17 @@ def mock_viz_dependencies():
 
         # Setup fake portfolio result
         mock_result = MagicMock()
-        mock_result.start_time = datetime(2023, 1, 1)
+        mock_result.start_time = datetime(2023, 1, 1, tzinfo=timezone.utc)
         mock_result.direction_mode = DirectionMode.LONG
-        mock_result.end_time = datetime(2023, 2, 1)
-        mock_result.data_start_date = "2023-01-01"
-        mock_result.data_end_date = "2023-02-01"
+        mock_result.end_time = datetime(2023, 2, 1, tzinfo=timezone.utc)
+        mock_result.data_start_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
+        mock_result.data_end_date = datetime(2023, 2, 1, tzinfo=timezone.utc)
         mock_result.run_id = "test_run_123"
+        mock_result.timeframe = "1m"
+        mock_result.starting_equity = 2500.0
+        mock_result.final_equity = 2600.0
+        mock_result.total_trades = 2
+        mock_result.total_pnl = 100.0
 
         # Add some dummy trades for different symbols
         msg_trade = MagicMock(spec=ClosedTrade)
@@ -54,7 +59,7 @@ def mock_viz_dependencies():
         msg_trade.entry_price = 1.05
         msg_trade.exit_price = 1.06
         msg_trade.direction = "LONG"
-        msg_trade.exit_reason = ExitReason.TAKE_PROFIT
+        msg_trade.exit_reason = "TAKE_PROFIT"
         msg_trade.pnl_r = 2.0
         msg_trade.signal_id = "sig1"
 
@@ -65,7 +70,7 @@ def mock_viz_dependencies():
         msg_trade_2.entry_price = 110.0
         msg_trade_2.exit_price = 111.0
         msg_trade_2.direction = "LONG"
-        msg_trade_2.exit_reason = ExitReason.TAKE_PROFIT
+        msg_trade_2.exit_reason = "TAKE_PROFIT"
         msg_trade_2.pnl_r = 1.5
         msg_trade_2.signal_id = "sig2"
 
@@ -103,7 +108,11 @@ def test_visualization_structure_is_multi_symbol(mock_viz_dependencies):
     with patch.object(sys, "argv", test_args):
         try:
             main()
-        except:
+        except Exception as e:
+            import traceback
+
+            print(f"DEBUG EXCEPTION: {e}")
+            traceback.print_exc()
             pass  # Ignore potential exit codes, we care about the call args
 
     # Check if plot_backtest_results was called
