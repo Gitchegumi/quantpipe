@@ -657,14 +657,19 @@ class BatchSimulation:
             future_highs = high_prices[entry_idx + 1 : end_idx]
             future_lows = low_prices[entry_idx + 1 : end_idx]
 
-            # Check stop and target hits (vectorized)
+            # Check stop and target hits (direction-aware!)
             stop_price = position_state.stop_prices[i]
             target_price = position_state.target_prices[i]
 
-            # LONG positions: stop hit when low <= stop, target hit when high >= target
-            # (Assuming LONG for now - can be extended for both directions)
-            stop_hits = future_lows <= stop_price
-            target_hits = future_highs >= target_price
+            if direction == "LONG":
+                # LONG: stop hit when low <= stop, target hit when high >= target
+                stop_hits = future_lows <= stop_price
+                target_hits = future_highs >= target_price
+            else:  # SHORT
+                # SHORT: stop hit when high >= stop (price goes UP past stop)
+                #        target hit when low <= target (price goes DOWN to target)
+                stop_hits = future_highs >= stop_price
+                target_hits = future_lows <= target_price
 
             # Find first exit (stop takes priority if both hit same candle)
             if stop_hits.any() or target_hits.any():

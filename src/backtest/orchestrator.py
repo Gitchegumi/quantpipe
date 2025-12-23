@@ -1881,6 +1881,7 @@ class BacktestOrchestrator:
                 target_prices=long_scan.target_prices,
                 timestamps=timestamps,
                 ohlc_arrays=ohlc_arrays,
+                direction="LONG",
             )
             logger.info(
                 "LONG simulation: %d trades, %.2fs",
@@ -1901,6 +1902,7 @@ class BacktestOrchestrator:
                 target_prices=short_scan.target_prices,
                 timestamps=timestamps,
                 ohlc_arrays=ohlc_arrays,
+                direction="SHORT",
             )
             logger.info(
                 "SHORT simulation: %d trades, %.2fs",
