@@ -197,7 +197,7 @@ class BatchSimulation:
             original_signal_indices = signal_indices.copy()
 
             signal_indices = self._filter_signals_vectorized(
-                signal_indices, ohlc_arrays
+                signal_indices, stop_prices, target_prices, ohlc_arrays, direction
             )
             n_signals = len(signal_indices)
 
@@ -234,7 +234,12 @@ class BatchSimulation:
         # Initialize position state arrays WITH STRATEGY'S STOP/TARGET PRICES
         init_start = time_module.perf_counter()
         position_state = self._initialize_positions(
-            signal_indices, stop_prices, target_prices, timestamps, ohlc_arrays
+            signal_indices,
+            stop_prices,
+            target_prices,
+            timestamps,
+            ohlc_arrays,
+            direction,
         )
         init_elapsed = time_module.perf_counter() - init_start
         logger.info("Position initialization complete in %.2fs", init_elapsed)
@@ -346,12 +351,25 @@ class BatchSimulation:
     def _filter_signals_vectorized(
         self,
         signal_indices: np.ndarray,
+        stop_prices: np.ndarray,
+        target_prices: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
+        direction: str = "LONG",
     ) -> np.ndarray:
         """Vectorized position filter for one-trade-at-a-time enforcement.
 
         Uses numpy array slicing to quickly estimate exit points for all signals.
-        Much faster than per-signal scanning.
+        Uses strategy-provided stop/target prices for accurate exit estimation.
+
+        Args:
+            signal_indices: Indices of signal candles
+            stop_prices: Stop loss prices from strategy (ATR-based)
+            target_prices: Take profit prices from strategy (ATR-based)
+            ohlc_arrays: OHLC price arrays
+            direction: Trade direction ("LONG" or "SHORT")
+
+        Returns:
+            Filtered signal indices respecting max_concurrent_positions
         """
         if len(signal_indices) == 0:
             return signal_indices
@@ -359,13 +377,7 @@ class BatchSimulation:
         n_candles = len(ohlc_arrays[0])
         _, open_prices, high_prices, low_prices, _ = ohlc_arrays
 
-        # Calculate stop/target for all signals at once
-        entry_prices = open_prices[signal_indices]
-        pip_sizes = np.where(entry_prices < 10, 0.0001, 0.01)
-        stop_distances = 20 * pip_sizes
-        target_distances = 40 * pip_sizes
-        stop_prices = entry_prices - stop_distances
-        target_prices = entry_prices + target_distances
+        # Use strategy's stop/target prices (already calculated with ATR)
 
         # Estimate exit indices for all signals (still need loop but with vectorized checks)
         max_bars = 100
@@ -383,8 +395,13 @@ class BatchSimulation:
             future_lows = low_prices[signal_idx + 1 : end_idx]
             future_highs = high_prices[signal_idx + 1 : end_idx]
 
-            stop_hit = future_lows <= stop
-            target_hit = future_highs >= target
+            # Direction-aware exit detection
+            if direction == "LONG":
+                stop_hit = future_lows <= stop
+                target_hit = future_highs >= target
+            else:  # SHORT
+                stop_hit = future_highs >= stop
+                target_hit = future_lows <= target
             exit_hit = stop_hit | target_hit
 
             if exit_hit.any():
@@ -556,6 +573,7 @@ class BatchSimulation:
         target_prices_from_strategy: np.ndarray,
         timestamps: np.ndarray,  # pylint: disable=unused-argument
         ohlc_arrays: tuple[np.ndarray, ...],
+        direction: str = "LONG",
     ) -> PositionState:
         """Initialize position state arrays.
 
@@ -565,6 +583,7 @@ class BatchSimulation:
             target_prices_from_strategy: Take profit prices calculated by strategy (ATR-based)
             timestamps: Array of timestamps
             ohlc_arrays: OHLC price arrays
+            direction: Trade direction ("LONG" or "SHORT")
 
         Returns:
             PositionState with initialized arrays
@@ -583,8 +602,9 @@ class BatchSimulation:
         stop_prices = stop_prices_from_strategy
         target_prices = target_prices_from_strategy
 
-        # Placeholder: all LONG positions for now
-        directions = np.ones(n_signals, dtype=np.int8)  # 1=LONG, -1=SHORT
+        # Set direction based on trade type (1=LONG, -1=SHORT)
+        direction_value = 1 if direction == "LONG" else -1
+        directions = np.full(n_signals, direction_value, dtype=np.int8)
         position_sizes = np.ones(n_signals)  # Placeholder unit size
         is_open = np.ones(n_signals, dtype=bool)
 

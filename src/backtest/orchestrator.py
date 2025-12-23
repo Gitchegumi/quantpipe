@@ -1494,6 +1494,8 @@ class BacktestOrchestrator:
                 exit_fill_price=float(sim_result.exit_prices[i]),
                 exit_reason=exit_reason,
                 pnl_r=float(sim_result.pnl_r[i]),
+                stop_price=float(sim_result.stop_prices[i]),
+                target_price=float(sim_result.target_prices[i]),
                 slippage_entry_pips=0.5,  # TODO: Calculate actual slippage
                 slippage_exit_pips=0.5,  # TODO: Calculate actual slippage
                 costs_total=0.0,  # TODO: Calculate actual costs
@@ -1730,8 +1732,11 @@ class BacktestOrchestrator:
         self._start_phase("simulation")
         sim_result = simulator.simulate(
             signal_indices=scan_result.signal_indices,
+            stop_prices=scan_result.stop_prices,
+            target_prices=scan_result.target_prices,
             timestamps=timestamps,
             ohlc_arrays=ohlc_arrays,
+            direction="SHORT",
         )
         self._end_phase("simulation")
 
