@@ -1890,6 +1890,11 @@ class BacktestOrchestrator:
 
         if short_scan.signal_count > 0:
             logger.info("Simulating %d SHORT signals", short_scan.signal_count)
+            logger.info(
+                "SHORT scan has %d stop prices, %d target prices",
+                len(short_scan.stop_prices),
+                len(short_scan.target_prices),
+            )
             short_sim = simulator.simulate(
                 signal_indices=short_scan.signal_indices,
                 stop_prices=short_scan.stop_prices,
@@ -1902,6 +1907,8 @@ class BacktestOrchestrator:
                 short_sim.trade_count,
                 short_sim.simulation_duration_sec,
             )
+        else:
+            logger.warning("SHORT scan signal_count is 0, skipping SHORT simulation")
 
         self._end_phase("simulation")
 

@@ -136,6 +136,7 @@ class BatchSimulation:
         target_prices: np.ndarray,
         timestamps: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
+        direction: str = "LONG",
     ) -> SimulationResult:
         """Execute batch simulation on signal indices.
 
@@ -145,6 +146,7 @@ class BatchSimulation:
             target_prices: Array of take profit prices from strategy
             timestamps: Array of all timestamps
             ohlc_arrays: Tuple of (timestamps, open, high, low, close) arrays
+            direction: Trade direction - "LONG" or "SHORT"
 
         Returns:
             SimulationResult with trade outcomes and performance metrics
@@ -241,7 +243,7 @@ class BatchSimulation:
         sim_start_trade = time_module.perf_counter()
         logger.info("Starting trade simulation for %d positions...", n_signals)
         trade_outcomes = self._simulate_trades(
-            position_state, timestamps, ohlc_arrays, progress
+            position_state, timestamps, ohlc_arrays, progress, direction
         )
         sim_elapsed = time_module.perf_counter() - sim_start_trade
         logger.info("Trade simulation complete in %.2fs", sim_elapsed)
@@ -605,6 +607,7 @@ class BatchSimulation:
         timestamps: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
         progress: Optional[ProgressDispatcher],
+        direction: str = "LONG",
     ) -> dict:
         """Simulate trades using fully vectorized exit detection.
 
@@ -613,6 +616,7 @@ class BatchSimulation:
             timestamps: Array of timestamps
             ohlc_arrays: OHLC price arrays
             progress: Optional progress dispatcher
+            direction: Trade direction - "LONG" or "SHORT"
 
         Returns:
             Dictionary of trade outcomes with PnL and win/loss classification
