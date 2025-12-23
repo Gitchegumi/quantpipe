@@ -13,8 +13,8 @@ description: "Task list for fix-portfolio-viz"
 
 **Purpose**: Establish baseline verification integration tests to prove current failure and later success.
 
-- [ ] T001 Create integration test `tests/integration/test_portfolio_flow.py` for execution flow verification
-- [ ] T002 [P] Create integration test `tests/integration/test_portfolio_viz_structure.py` for visualization data structure verification
+- [x] T001 Create integration test `tests/integration/test_portfolio_flow.py` for execution flow verification
+- [x] T002 [P] Create integration test `tests/integration/test_portfolio_viz_structure.py` for visualization data structure verification
 
 ---
 
@@ -26,9 +26,9 @@ description: "Task list for fix-portfolio-viz"
 
 ### Implementation for User Story 2 & 3
 
-- [ ] T003 [US2] [P] Modify `src/cli/run_backtest.py` to add return statement after portfolio execution block
-- [ ] T004 [US2] [P] Verify log output for duplicate "Starting..." messages removal
-- [ ] T005 [US3] [P] Review `src/backtest/portfolio/portfolio_simulator.py` to ensure shared equity state is correctly finalized (No code change expected if logic holds, verification task)
+- [x] T003 [US2] [P] Modify `src/cli/run_backtest.py` to add return statement after portfolio execution block
+- [x] T004 [US2] [P] Verify log output for duplicate "Starting..." messages removal
+- [x] T005 [US3] [P] Review `src/backtest/portfolio/portfolio_simulator.py` to ensure shared equity state is correctly finalized (No code change expected if logic holds, verification task)
 
 **Checkpoint**: CLI runs cleanly for portfolio command without falling through to independent mode.
 
@@ -42,11 +42,11 @@ description: "Task list for fix-portfolio-viz"
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Refactor `run_backtest.py` visualization block: Create hierarchical `BacktestResult` structure
-- [ ] T007 [US1] [P] Implement symbol-based trade filtering loop to populate child results
-- [ ] T008 [US1] Set `is_multi_symbol=True` and populates `results` dict in the visualization conversion logic
-- [ ] T009 [US1] [P] Update `src/visualization/datashader_viz.py` to ensure it respects `Multi-Symbol` pair tag or auto-detects `results` dict
-- [ ] T010 [US1] Verify HTML output renders separate charts with correct title "Multi-Symbol Backtest"
+- [x] T006 [US1] Refactor `run_backtest.py` visualization block: Create hierarchical `BacktestResult` structure
+- [x] T007 [US1] [P] Implement symbol-based trade filtering loop to populate child results
+- [x] T008 [US1] Set `is_multi_symbol=True` and populates `results` dict in the visualization conversion logic
+- [x] T009 [US1] [P] Update `src/visualization/datashader_viz.py` to ensure it respects `Multi-Symbol` pair tag or auto-detects `results` dict
+- [x] T010 [US1] Verify HTML output renders separate charts with correct title "Multi-Symbol Backtest"
 
 **Checkpoint**: Generating visualization for a portfolio run produces a multi-panel HTML file.
 
@@ -56,8 +56,22 @@ description: "Task list for fix-portfolio-viz"
 
 **Purpose**: Cleanup and documentation.
 
-- [ ] T011 Update `quickstart.md` with final verified output screenshot or description
-- [ ] T012 Run full regression suite `tests/` to ensure no regression in single-symbol independent mode
+- [x] T011 Update `quickstart.md` with final verified output screenshot or description
+- [x] T012 Run full regression suite `tests/` to ensure no regression in single-symbol independent mode (Unrelated failures noted)
+
+---
+
+## Phase 5: Feedback Fixes (Profit Panel & Timeframe)
+
+- [x] T013 Update `BacktestResult` mapping in `run_backtest.py` to populate root metrics/executions for PnL curve generation
+- [x] T014 Pass `args.timeframe` to `PortfolioResult` or formatting logic to ensure it appears in output
+
+## Phase 6: Performance Investigation (Shared Engine)
+
+- [x] T015 Refactor `PortfolioSimulator` to use shared `simulate_trades_batch` engine for consistency
+- [x] T016 Verify Inputs/Outputs consistency between Independent and Portfolio Modes
+- [x] T017 Fix `run_backtest.py` to correctly write portfolio text reports to file
+- [x] T018 Investigate "Performance Discrepancy" (Result: Portfolio Mode verified correct; Independent Mode anomalous)
 
 ---
 

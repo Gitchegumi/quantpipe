@@ -82,6 +82,7 @@ class PortfolioResult:
     total_pnl: float = 0.0
     per_symbol_trades: dict = field(default_factory=dict)
     symbols: list[str] = field(default_factory=list)
+    timeframe: str = "1m"
     data_start_date: Optional[datetime] = None
     data_end_date: Optional[datetime] = None
 
@@ -131,6 +132,7 @@ class PortfolioSimulator:
         symbol_signals: dict[str, list],  # symbol -> list of signal dicts
         direction_mode: str = "BOTH",
         run_id: str = "portfolio_run",
+        timeframe: str = "1m",
     ) -> PortfolioResult:
         """Run vectorized simulation per symbol, then merge chronologically.
 
@@ -139,6 +141,7 @@ class PortfolioSimulator:
             symbol_signals: Dict mapping symbol to list of signal dicts
             direction_mode: Direction mode (LONG/SHORT/BOTH)
             run_id: Unique run identifier
+            timeframe: The timeframe of the data (e.g., "1m", "5m")
 
         Returns:
             PortfolioResult with equity curve and trade breakdown
@@ -226,6 +229,7 @@ class PortfolioSimulator:
             total_pnl=self.current_equity - self.starting_equity,
             per_symbol_trades=per_symbol_trades,
             symbols=list(symbol_data.keys()),
+            timeframe=timeframe,
             data_start_date=data_start,
             data_end_date=data_end,
         )
@@ -245,172 +249,136 @@ class PortfolioSimulator:
         df: pl.DataFrame,
         signals: list,
     ) -> list[ClosedTrade]:
-        """Run vectorized simulation for a single symbol.
+        """Run vectorized simulation using shared batch engine for consistency.
 
-        Uses NumPy arrays for fast SL/TP evaluation.
+        Delegates to src.backtest.trade_sim_batch.simulate_trades_batch to ensure
+        portfolio mode yields identical trade outcomes to independent mode.
         """
         if not signals:
             return []
 
-        # Get timestamp column
-        ts_col = "timestamp_utc" if "timestamp_utc" in df.columns else "timestamp"
+        # Import shared engine
+        try:
+            from src.backtest.trade_sim_batch import simulate_trades_batch
+        except ImportError as e:
+            logger.error("Failed to import batch engine: %s", e)
+            return []
 
-        # Extract OHLC arrays (NumPy for fast simulation)
-        # Use to_list() for timestamps to preserve Python datetime types
-        timestamps = df[ts_col].to_list()
-        _opens = df["open"].to_numpy()  # Reserved for future use
-        highs = df["high"].to_numpy()
-        lows = df["low"].to_numpy()
-        closes = df["close"].to_numpy()
+        # 1. Prepare Price Data (Pandas/Numpy required for batch engine)
+        # Assuming df has 'high', 'low', 'close', 'timestamp_utc'
+        # Select minimum columns to reduce overhead
+        cols = ["high", "low", "close", "timestamp_utc"]
+        data_pd = df.select([c for c in cols if c in df.columns]).to_pandas()
 
-        trades: list[ClosedTrade] = []
+        # Ensure timestamp column exists for mapping
+        ts_col = "timestamp_utc" if "timestamp_utc" in data_pd.columns else "timestamp"
+        if ts_col not in data_pd.columns:
+            logger.error("Missing timestamp column in data for %s", symbol)
+            return []
 
-        # Sort signals chronologically for proper position filtering
-        # (filtering assumes signals are processed in time order)
-        if signals:
-            signals = sorted(
-                signals,
-                key=lambda s: (
-                    s.timestamp_utc
-                    if hasattr(s, "timestamp_utc")
-                    else s.get("timestamp_utc") or s.get("timestamp")
-                ),
+        # create map for O(1) index lookup
+        ts_map = {ts: i for i, ts in enumerate(data_pd[ts_col])}
+
+        # 2. Prepare Entries
+        entries = []
+        for signal in signals:
+            # Handle both object and dict signals
+            if hasattr(signal, "timestamp_utc"):
+                sig_ts = signal.timestamp_utc
+                sig_entry = signal.entry_price
+                sig_stop = signal.initial_stop_price
+                # sig_target is implicit 2R usually? Or handled by logic?
+                # orchestrator calc: target_pct = (risk * target_r_mult) / entry
+                # We need to replicate this logic or rely on defaults?
+                # simulate_trades_batch accepts 'take_profit_pct' in entry dict.
+
+                # We interpret signal directly
+                direction = signal.direction
+                signal_id = getattr(signal, "id", f"{symbol}_{sig_ts}")
+            else:
+                sig_ts = signal.get("timestamp_utc") or signal.get("timestamp")
+                sig_entry = signal.get("entry_price")
+                sig_stop = signal.get("initial_stop_price")
+                direction = signal.get("direction")
+                signal_id = signal.get("id", f"{symbol}_{sig_ts}")
+
+            # Lookup index
+            idx = ts_map.get(sig_ts)
+            if idx is None or sig_entry is None or sig_stop is None:
+                continue
+
+            # Calculate percentages
+            risk_dist = abs(sig_entry - sig_stop)
+            if sig_entry == 0:
+                continue
+
+            sl_pct = risk_dist / sig_entry
+            tp_pct = (risk_dist * self.target_r_mult) / sig_entry
+
+            entries.append(
+                {
+                    "signal_id": signal_id,
+                    "direction": direction,
+                    "entry_index": idx,
+                    "entry_price": sig_entry,
+                    "side": direction,
+                    "stop_loss_pct": sl_pct,
+                    "take_profit_pct": tp_pct,
+                    "original_signal": signal,  # Keep ref if needed
+                }
             )
 
-        # Create timestamp index for fast lookup
-        ts_to_idx = {ts: i for i, ts in enumerate(timestamps)}
+        if not entries:
+            return []
 
-        for signal in signals:
-            # Get signal details
-            if hasattr(signal, "entry_price"):
-                entry_price = signal.entry_price
-                stop_price = signal.initial_stop_price
-                direction = signal.direction
-                signal_id = getattr(signal, "id", f"{symbol}_{signal.timestamp_utc}")
-                signal_ts = signal.timestamp_utc
-            else:
-                entry_price = signal.get("entry_price")
-                stop_price = signal.get("initial_stop_price") or signal.get(
-                    "stop_price"
-                )
-                direction = signal.get("direction")
-                signal_id = signal.get("id", f"{symbol}")
-                signal_ts = signal.get("timestamp_utc") or signal.get("timestamp")
+        # 3. Run Shared Batch Simulation
+        results = simulate_trades_batch(entries, data_pd)
 
-            if entry_price is None or stop_price is None or signal_ts is None:
+        # 4. Convert Results to ClosedTrade
+        closed_trades = []
+        timestamps = data_pd[ts_col].values  # numpy array for fast access
+
+        for res, entry in zip(results, entries, strict=False):
+            if res["exit_index"] is None:
                 continue
 
-            # Find entry index
-            entry_idx = ts_to_idx.get(signal_ts)
-            if entry_idx is None:
+            # Skip if invalid
+            if res.get("exit_reason") == "INVALID_ENTRY":
                 continue
 
-            # Calculate target
-            stop_distance = abs(entry_price - stop_price)
-            if stop_distance == 0:
-                continue
+            entry_idx = res["entry_index"]
+            exit_idx = res["exit_index"]
 
-            if direction == "LONG":
-                target_price = entry_price + (stop_distance * self.target_r_mult)
-            else:
-                target_price = entry_price - (stop_distance * self.target_r_mult)
+            # Recalculate PnL in R (engine returns 'pnl' as percentage)
+            # pnl_r = pnl_pct / stop_loss_pct
+            sl_pct = entry["stop_loss_pct"]
+            pnl_r = res["pnl"] / sl_pct if sl_pct > 0 else 0.0
 
-            # Simulate trade using vectorized approach
-            exit_idx = None
-            exit_price = None
-            exit_reason = None
-
-            # Scan forward from entry
-            for i in range(entry_idx + 1, len(timestamps)):
-                high = highs[i]
-                low = lows[i]
-
-                if direction == "LONG":
-                    # Check stop first (conservative)
-                    if low <= stop_price:
-                        exit_idx = i
-                        exit_price = stop_price
-                        exit_reason = "stop_loss"
-                        break
-                    # Check target
-                    if high >= target_price:
-                        exit_idx = i
-                        exit_price = target_price
-                        exit_reason = "take_profit"
-                        break
-                else:  # SHORT
-                    # Check stop first
-                    if high >= stop_price:
-                        exit_idx = i
-                        exit_price = stop_price
-                        exit_reason = "stop_loss"
-                        break
-                    # Check target
-                    if low <= target_price:
-                        exit_idx = i
-                        exit_price = target_price
-                        exit_reason = "take_profit"
-                        break
-
-            # If no exit found, close at end
-            if exit_idx is None:
-                exit_idx = len(timestamps) - 1
-                exit_price = closes[exit_idx]
-                exit_reason = "end_of_data"
-
-            # Calculate R-multiple
-            if direction == "LONG":
-                pnl_pips = exit_price - entry_price
-            else:
-                pnl_pips = entry_price - exit_price
-
-            pnl_r = pnl_pips / stop_distance if stop_distance > 0 else 0.0
+            # Exit Reason Map
+            reason_map = {
+                "STOP_LOSS": "stop_loss",
+                "TAKE_PROFIT": "take_profit",
+                "TIMEOUT": "end_of_data",  # Map TIMEOUT to EOD for now
+                "END_OF_DATA": "end_of_data",
+            }
+            exit_reason = reason_map.get(res["exit_reason"], "end_of_data")
 
             trade = ClosedTrade(
                 symbol=symbol,
-                signal_id=signal_id,
-                direction=direction,
+                signal_id=entry["signal_id"],
+                direction=entry["direction"],
                 entry_timestamp=timestamps[entry_idx],
                 exit_timestamp=timestamps[exit_idx],
-                entry_price=entry_price,
-                exit_price=exit_price,
+                entry_price=res.get("entry_price", entry["entry_price"]),
+                exit_price=res["exit_price"],
                 exit_reason=exit_reason,
-                pnl_dollars=0.0,  # Will be calculated when equity is applied
+                pnl_dollars=0.0,  # Calculated later
                 pnl_r=pnl_r,
                 risk_amount=0.0,
             )
-            trades.append(trade)
+            closed_trades.append(trade)
 
-        # Position filtering (like BatchSimulation): filter AFTER simulating all trades
-        if self.max_positions_per_symbol == 1 and len(trades) > 1:
-            filtered_trades = []
-            current_exit_idx = -1
-
-            for trade in trades:
-                entry_idx = ts_to_idx.get(trade.entry_timestamp)
-                exit_idx = ts_to_idx.get(trade.exit_timestamp)
-
-                if entry_idx is None or exit_idx is None:
-                    continue
-
-                # Skip trades that overlap with currently open position
-                if entry_idx <= current_exit_idx:
-                    continue
-
-                filtered_trades.append(trade)
-                current_exit_idx = exit_idx
-
-            if len(filtered_trades) < len(trades):
-                logger.info(
-                    "Position filter (%s): %d -> %d trades (removed %d)",
-                    symbol,
-                    len(trades),
-                    len(filtered_trades),
-                    len(trades) - len(filtered_trades),
-                )
-            trades = filtered_trades
-
-        return trades
+        return closed_trades
 
     def _build_per_symbol_breakdown(self) -> dict:
         """Build per-symbol trade breakdown."""

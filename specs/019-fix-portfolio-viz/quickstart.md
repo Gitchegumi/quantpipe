@@ -2,6 +2,8 @@
 
 How to run and verify the fixed portfolio visualization.
 
+> [!NOTE] > **Status**: Verified Fix (2025-12-23). The double-execution bug is resolved, and portfolio visualization now correctly displays separate charts for each symbol.
+
 ## Running a Portfolio Backtest
 
 Command line usage remains similar, but internal execution and output are fixed.

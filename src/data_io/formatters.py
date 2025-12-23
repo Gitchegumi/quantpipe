@@ -712,6 +712,9 @@ def format_portfolio_text_output(result) -> str:
     lines.append(f"Run ID:           {result.run_id}")
     lines.append(f"Direction Mode:   {result.direction_mode}")
     lines.append(f"Symbols:          {', '.join(result.symbols)}")
+    # Timeframe line (T014)
+    if hasattr(result, "timeframe") and result.timeframe:
+        lines.append(f"Timeframe:        {result.timeframe}")
     lines.append(f"Start Time:       {result.start_time.isoformat()}")
     lines.append(f"End Time:         {result.end_time.isoformat()}")
     duration = (result.end_time - result.start_time).total_seconds()
