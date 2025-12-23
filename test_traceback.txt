@@ -1,0 +1,59 @@
+﻿poetry : [2025-12-23 16:39:24] INFO - src.cli.run_backtest - Multi-symbol mode: 2 pairs specified, 2 with data
+At line:1 char:1
++ poetry run pytest tests/integration/test_portfolio_viz_structure.py - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([2025-12-23 16:...ed, 2 with data:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[2025-12-23 16:39:24] INFO - src.cli.run_backtest - Portfolio mode ENABLED: time-synchronized with shared equity
+Traceback (most recent call last):
+  File "e:\GitHub\trading-strategies\tests\integration\test_portfolio_viz_structure.py", line 106, in 
+test_visualization_structure_is_multi_symbol
+    main()
+    ~~~~^^
+  File "E:\GitHub\trading-strategies\src\cli\run_backtest.py", line 902, in main
+    output_content = format_portfolio_text_output(result)
+  File "E:\GitHub\trading-strategies\src\data_io\formatters.py", line 736, in format_portfolio_text_output
+    lines.append(f"Starting Equity:  ${result.starting_equity:,.2f}")
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: unsupported format string passed to MagicMock.__format__
+DEBUG EXCEPTION: unsupported format string passed to MagicMock.__format__
+F
+================================== FAILURES ===================================
+________________ test_visualization_structure_is_multi_symbol _________________
+
+mock_viz_dependencies = {'plot': <MagicMock name='plot_backtest_results' id='2512207824944'>}
+
+    def test_visualization_structure_is_multi_symbol(mock_viz_dependencies):
+        """Verify that portfolio visualization passes a structured multi-symbol result."""
+        test_args = [
+            "run_backtest.py",
+            "--portfolio-mode",
+            "--pair",
+            "EURUSD",
+            "USDJPY",
+            "--visualize",
+            "--dry-run",
+        ]
+    
+        with patch.object(sys, "argv", test_args):
+            try:
+                main()
+            except Exception as e:
+                import traceback
+    
+                print(f"DEBUG EXCEPTION: {e}")
+                traceback.print_exc()
+                pass  # Ignore potential exit codes, we care about the call args
+    
+        # Check if plot_backtest_results was called
+        mock_plot = mock_viz_dependencies["plot"]
+>       assert mock_plot.call_count == 1, "Visualization should be called exactly once"
+E       AssertionError: Visualization should be called exactly once
+E       assert 0 == 1
+E        +  where 0 = <MagicMock name='plot_backtest_results' id='2512207824944'>.call_count
+
+tests\integration\test_portfolio_viz_structure.py:116: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/integration/test_portfolio_viz_structure.py::test_visualization_structure_is_multi_symbol
+1 failed in 8.93s

@@ -154,6 +154,7 @@ def run_portfolio_backtest(
     starting_equity: float = 2500.0,
     dry_run: bool = False,
     show_progress: bool = True,
+    timeframe: str = "1m",
 ):
     """Run time-synchronized portfolio backtest with shared equity.
 
@@ -258,6 +259,7 @@ def run_portfolio_backtest(
         symbol_signals=symbol_signals,
         direction_mode=direction_mode.value,
         run_id=run_id,
+        timeframe=timeframe,
     )
 
     return result, symbol_data
@@ -879,6 +881,7 @@ Persistent storage not yet implemented."
                         starting_equity=DEFAULT_ACCOUNT_BALANCE,
                         dry_run=args.dry_run,
                         show_progress=show_progress,
+                        timeframe=args.timeframe,  # T014
                     )
 
                     # Format and output portfolio results
@@ -908,6 +911,12 @@ Persistent storage not yet implemented."
                             args.timeframe if args.timeframe != "1m" else None
                         ),
                     )
+
+                    # Write results to file
+                    output_path = args.output / output_filename
+                    args.output.mkdir(parents=True, exist_ok=True)
+                    output_path.write_text(output_content)
+                    logger.info("Results written to %s", output_path)
                     if args.visualize:
                         try:
                             from ..visualization.datashader_viz import (
@@ -930,9 +939,25 @@ Persistent storage not yet implemented."
                             from ..models.directional import BacktestResult
                             from ..models.core import TradeExecution
 
-                            # Convert ClosedTrade to TradeExecution for visualization
-                            executions = [
-                                TradeExecution(
+                            # Group executions by symbol (T007)
+                            symbol_executions: dict[str, list[TradeExecution]] = {}
+
+                            # Pre-initialize lists for all symbols loaded (to ensure charts for symbols with 0 trades)
+                            # all_symbol_data is a Polars DataFrame, "symbol" column values
+                            unique_symbols = (
+                                all_symbol_data["symbol"].unique().to_list()
+                            )
+                            for symbol in unique_symbols:
+                                symbol_executions[symbol] = []
+
+                            for trade in result.closed_trades:
+                                symbol = trade.symbol
+                                if symbol not in symbol_executions:
+                                    symbol_executions[symbol] = (
+                                        []
+                                    )  # Should be covered above but safe fallback
+
+                                exec_obj = TradeExecution(
                                     signal_id=trade.signal_id,
                                     direction=trade.direction,
                                     open_timestamp=trade.entry_timestamp,
@@ -947,7 +972,31 @@ Persistent storage not yet implemented."
                                     stop_price=0.0,  # Portfolio doesn't track original stop
                                     target_price=0.0,  # Portfolio doesn't track original target
                                 )
-                                for trade in result.closed_trades
+                                symbol_executions[symbol].append(exec_obj)
+
+                            # Create per-symbol results (T006)
+                            results_dict = {}
+                            for symbol, execs in symbol_executions.items():
+                                results_dict[symbol] = BacktestResult(
+                                    run_id=f"{result.run_id}_{symbol}",
+                                    direction_mode=result.direction_mode,
+                                    start_time=result.start_time,
+                                    end_time=result.end_time,
+                                    data_start_date=result.data_start_date,
+                                    data_end_date=result.data_end_date,
+                                    total_candles=0,
+                                    signals=[],
+                                    executions=execs,
+                                    metrics=None,
+                                    pair=symbol,
+                                    timeframe=result.timeframe,  # T014
+                                )
+
+                            # Populate "executions" field with flat list of all trades.
+                            executions = [
+                                trade
+                                for symbol_execs in symbol_executions.values()
+                                for trade in symbol_execs
                             ]
 
                             viz_result = BacktestResult(
@@ -957,11 +1006,14 @@ Persistent storage not yet implemented."
                                 end_time=result.end_time,
                                 data_start_date=result.data_start_date,
                                 data_end_date=result.data_end_date,
-                                total_candles=0,  # Not tracked in portfolio
-                                signals=[],  # Not needed for visualization
-                                executions=executions,
-                                metrics=None,  # Not needed for basic visualization
-                                results={},  # Portfolio doesn't split by symbol
+                                total_candles=0,
+                                signals=[],
+                                executions=executions,  # T013: Restore flattened execution list for Portfolio Curve generation
+                                metrics=None,
+                                results=results_dict,  # T008
+                                pair="Multi-Symbol",  # T009 Trigger
+                                symbols=list(results_dict.keys()),
+                                timeframe=result.timeframe,  # T014
                             )
                             with console.status(
                                 "[bold green]Preparing visualization "
@@ -988,6 +1040,9 @@ Persistent storage not yet implemented."
                                 e,
                                 exc_info=True,
                             )
+
+                    return 0  # Exit after portfolio mode completes
+
                 else:
                     # Independent mode (default) - run each symbol in isolation
                     logger.info("Independent mode: each symbol runs in isolation")
@@ -1081,9 +1136,7 @@ Persistent storage not yet implemented."
                                 exc_info=True,
                             )
 
-                    return 0  # Exit after portfolio mode completes
-
-                    return 0
+                    return 0  # Exit after multi-symbol independent mode completes
 
             # Single-symbol path: use first (and only) pair
             _, args.data = pair_paths[0]
