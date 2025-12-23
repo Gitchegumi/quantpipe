@@ -19,6 +19,7 @@ from src.backtest.arrays import (
 )
 from src.backtest.dedupe import DedupeResult, dedupe_timestamps_polars
 from src.backtest.progress import ProgressDispatcher
+from src.backtest.signal_filter import filter_overlapping_signals
 from src.strategy.base import Strategy
 
 
@@ -31,6 +32,8 @@ class ScanResult:
 
     Attributes:
         signal_indices: NumPy array of indices where signals were generated
+        stop_prices: NumPy array of stop loss prices (from strategy)
+        target_prices: NumPy array of take profit prices (from strategy)
         signal_count: Total number of signals generated
         candles_processed: Number of candles processed
         duplicates_removed: Number of duplicate timestamps removed
@@ -39,6 +42,8 @@ class ScanResult:
     """
 
     signal_indices: np.ndarray
+    stop_prices: np.ndarray
+    target_prices: np.ndarray
     signal_count: int
     candles_processed: int
     duplicates_removed: int
@@ -162,12 +167,15 @@ class BatchScan:
             progress.start()
 
         # Step 5: Scan for signals using batch processing
-        signal_indices = self._scan_signals(
+        signal_indices, stop_prices, target_prices = self._scan_signals(
             timestamps=timestamps,
             ohlc_arrays=ohlc_arrays,
             indicator_arrays=indicator_arrays,
             progress=progress,
         )
+
+        # Step 5a: Apply strategy's max concurrent positions filter (FR-001)
+        signal_indices = self._apply_position_filter(signal_indices)
 
         # Step 6: Finalize progress tracking
         progress_overhead_pct = 0.0
@@ -187,6 +195,8 @@ class BatchScan:
 
         return ScanResult(
             signal_indices=signal_indices,
+            stop_prices=stop_prices,
+            target_prices=target_prices,
             signal_count=len(signal_indices),
             candles_processed=len(timestamps),
             duplicates_removed=dedupe_result.duplicates_removed,
@@ -208,13 +218,55 @@ class BatchScan:
         """
         return dedupe_timestamps_polars(df, timestamp_col)
 
+    def _apply_position_filter(self, signal_indices: np.ndarray) -> np.ndarray:
+        """Apply strategy's max concurrent positions filter.
+
+        Uses the strategy's metadata.max_concurrent_positions setting to
+        filter overlapping signals and enforce position limits (FR-001).
+
+        Args:
+            signal_indices: Array of signal indices from scan
+
+        Returns:
+            Filtered array respecting strategy's position limit
+        """
+        max_concurrent = getattr(self.strategy.metadata, "max_concurrent_positions", 1)
+
+        # Position filtering is now handled in BatchSimulation with proper exit detection
+        # This simple window-based filter was too aggressive (filtered 34859 -> 1)
+        # Disabled in favor of BatchSimulation._filter_signals_sequential()
+        return signal_indices
+
+        # Old code (disabled):
+        # if max_concurrent is None or max_concurrent <= 0:
+        #     return signal_indices
+        #
+        # # Apply filter
+        # original_count = len(signal_indices)
+        # filtered = filter_overlapping_signals(
+        #     signal_indices,
+        #     exit_indices=None,  # Will be refined in batch simulation
+        #     max_concurrent=max_concurrent,
+        # )
+        #
+        # if len(filtered) < original_count:
+        #     logger.info(
+        #         "Position filter: %d -> %d signals (removed %d) (max_concurrent=%d)",
+        #         original_count,
+        #         len(filtered),
+        #         original_count - len(filtered),
+        #         max_concurrent,
+        #     )
+        #
+        # return filtered
+
     def _scan_signals(
         self,
         timestamps: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
         indicator_arrays: dict[str, np.ndarray],
         progress: Optional[ProgressDispatcher],
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Scan for signals using strategy's vectorized method.
 
         Delegates to strategy.scan_vectorized() for strategy-agnostic scanning.
@@ -227,7 +279,7 @@ class BatchScan:
             progress: Optional progress dispatcher
 
         Returns:
-            NumPy array of indices where signals were generated
+            Tuple of (signal_indices, stop_prices, target_prices) arrays
         """
         n_candles = len(timestamps)
 
@@ -245,7 +297,8 @@ class BatchScan:
 
         # Delegate to strategy's vectorized scan method
         try:
-            signal_indices = self.strategy.scan_vectorized(
+            # Strategy returns (indices, stop_prices, target_prices)
+            signal_indices, stop_prices, target_prices = self.strategy.scan_vectorized(
                 close=close_arr,
                 indicator_arrays=indicator_arrays,
                 parameters=self.parameters,
@@ -262,7 +315,7 @@ class BatchScan:
                 n_candles,
             )
 
-            return signal_indices
+            return signal_indices, stop_prices, target_prices
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error(

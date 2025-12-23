@@ -115,28 +115,38 @@ class BatchSimulation:
         self,
         risk_per_trade: float = 0.01,
         enable_progress: bool = True,
+        max_concurrent_positions: int | None = 1,
     ):
         """Initialize batch simulator.
 
         Args:
             risk_per_trade: Risk per trade as fraction of account (default: 0.01)
             enable_progress: Whether to emit progress updates (default: True)
+            max_concurrent_positions: Maximum concurrent positions (default: 1).
+                Set to None for unlimited positions.
         """
         self.risk_per_trade = risk_per_trade
         self.enable_progress = enable_progress
+        self.max_concurrent_positions = max_concurrent_positions
 
     def simulate(
         self,
         signal_indices: np.ndarray,
+        stop_prices: np.ndarray,
+        target_prices: np.ndarray,
         timestamps: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
+        direction: str = "LONG",
     ) -> SimulationResult:
         """Execute batch simulation on signal indices.
 
         Args:
             signal_indices: Array of candle indices where signals were generated
+            stop_prices: Array of stop loss prices from strategy
+            target_prices: Array of take profit prices from strategy
             timestamps: Array of all timestamps
             ohlc_arrays: Tuple of (timestamps, open, high, low, close) arrays
+            direction: Trade direction - "LONG" or "SHORT"
 
         Returns:
             SimulationResult with trade outcomes and performance metrics
@@ -169,15 +179,79 @@ class BatchSimulation:
             )
             progress.start()
 
-        # Initialize position state arrays
-        position_state = self._initialize_positions(
-            signal_indices, timestamps, ohlc_arrays
+        # Apply position filtering BEFORE initializing positions (FR-001)
+        import time as time_module
+
+        filter_start = time_module.perf_counter()
+
+        logger.info(
+            "Position filter check: max_concurrent=%s, n_signals=%d",
+            self.max_concurrent_positions,
+            n_signals,
         )
+        if (
+            self.max_concurrent_positions is not None
+            and self.max_concurrent_positions > 0
+        ):
+            original_count = len(signal_indices)
+            original_signal_indices = signal_indices.copy()
+
+            signal_indices = self._filter_signals_vectorized(
+                signal_indices, stop_prices, target_prices, ohlc_arrays, direction
+            )
+            n_signals = len(signal_indices)
+
+            # Create boolean mask of which positions were kept
+            # Find positions in original array that match kept signal indices
+            kept_mask = np.isin(original_signal_indices, signal_indices)
+
+            # Filter stop/target arrays using the mask
+            stop_prices = (
+                stop_prices[kept_mask] if len(stop_prices) > 0 else stop_prices
+            )
+            target_prices = (
+                target_prices[kept_mask] if len(target_prices) > 0 else target_prices
+            )
+
+            filter_elapsed = time_module.perf_counter() - filter_start
+            logger.info(
+                "Position filter applied: %d -> %d signals (removed %d) in %.2fs",
+                original_count,
+                n_signals,
+                original_count - n_signals,
+                filter_elapsed,
+            )
+
+            if n_signals == 0:
+                if progress is not None:
+                    progress.finish()
+                sim_duration = time.perf_counter() - sim_start
+                logger.info("All signals filtered by position limit - no trades")
+                return self._create_zero_result(sim_duration)
+
+        logger.info("Starting position initialization with %d signals...", n_signals)
+
+        # Initialize position state arrays WITH STRATEGY'S STOP/TARGET PRICES
+        init_start = time_module.perf_counter()
+        position_state = self._initialize_positions(
+            signal_indices,
+            stop_prices,
+            target_prices,
+            timestamps,
+            ohlc_arrays,
+            direction,
+        )
+        init_elapsed = time_module.perf_counter() - init_start
+        logger.info("Position initialization complete in %.2fs", init_elapsed)
 
         # Simulate trades (placeholder implementation)
+        sim_start_trade = time_module.perf_counter()
+        logger.info("Starting trade simulation for %d positions...", n_signals)
         trade_outcomes = self._simulate_trades(
-            position_state, timestamps, ohlc_arrays, progress
+            position_state, timestamps, ohlc_arrays, progress, direction
         )
+        sim_elapsed = time_module.perf_counter() - sim_start_trade
+        logger.info("Trade simulation complete in %.2fs", sim_elapsed)
 
         # Step 6: Finalize progress tracking
         progress_overhead_pct = 0.0
@@ -274,18 +348,242 @@ class BatchSimulation:
             exit_reasons=np.array([], dtype=np.int8),
         )
 
+    def _filter_signals_vectorized(
+        self,
+        signal_indices: np.ndarray,
+        stop_prices: np.ndarray,
+        target_prices: np.ndarray,
+        ohlc_arrays: tuple[np.ndarray, ...],
+        direction: str = "LONG",
+    ) -> np.ndarray:
+        """Vectorized position filter for one-trade-at-a-time enforcement.
+
+        Uses numpy array slicing to quickly estimate exit points for all signals.
+        Uses strategy-provided stop/target prices for accurate exit estimation.
+
+        Args:
+            signal_indices: Indices of signal candles
+            stop_prices: Stop loss prices from strategy (ATR-based)
+            target_prices: Take profit prices from strategy (ATR-based)
+            ohlc_arrays: OHLC price arrays
+            direction: Trade direction ("LONG" or "SHORT")
+
+        Returns:
+            Filtered signal indices respecting max_concurrent_positions
+        """
+        if len(signal_indices) == 0:
+            return signal_indices
+
+        n_candles = len(ohlc_arrays[0])
+        _, open_prices, high_prices, low_prices, _ = ohlc_arrays
+
+        # Use strategy's stop/target prices (already calculated with ATR)
+
+        # Estimate exit indices for all signals (still need loop but with vectorized checks)
+        max_bars = 100
+        exit_indices = np.zeros(len(signal_indices), dtype=np.int64)
+
+        for idx, (signal_idx, stop, target) in enumerate(
+            zip(signal_indices, stop_prices, target_prices)
+        ):
+            end_idx = min(signal_idx + max_bars, n_candles)
+            if end_idx <= signal_idx + 1:
+                exit_indices[idx] = signal_idx + 1
+                continue
+
+            # Vectorized check: find first bar where stop OR target hit
+            future_lows = low_prices[signal_idx + 1 : end_idx]
+            future_highs = high_prices[signal_idx + 1 : end_idx]
+
+            # Direction-aware exit detection
+            if direction == "LONG":
+                stop_hit = future_lows <= stop
+                target_hit = future_highs >= target
+            else:  # SHORT
+                stop_hit = future_highs >= stop
+                target_hit = future_lows <= target
+            exit_hit = stop_hit | target_hit
+
+            if exit_hit.any():
+                # Find first hit (argmax returns first True)
+                exit_offset = np.argmax(exit_hit) + 1
+                exit_indices[idx] = signal_idx + exit_offset
+            else:
+                exit_indices[idx] = end_idx - 1
+
+        # Now filter: keep only signals that don't overlap
+        kept_signals = []
+        current_exit_idx = -1
+
+        for signal_idx, exit_idx in zip(signal_indices, exit_indices):
+            if signal_idx <= current_exit_idx:
+                continue
+            kept_signals.append(signal_idx)
+            current_exit_idx = exit_idx
+
+        original_count = len(signal_indices)
+        filtered_count = len(kept_signals)
+
+        if filtered_count < original_count:
+            logger.info(
+                "Position filter (vectorized): %d -> %d signals (removed %d)",
+                original_count,
+                filtered_count,
+                original_count - filtered_count,
+            )
+
+        return np.array(kept_signals, dtype=np.int64)
+
+    def _filter_signals_sequential(
+        self,
+        signal_indices: np.ndarray,
+        ohlc_arrays: tuple[np.ndarray, ...],
+    ) -> np.ndarray:
+        """Filter signals to enforce one-trade-at-a-time (FR-001).
+
+        Simulates a quick forward scan for each signal to estimate when
+        the trade would exit, then only keeps signals that don't overlap.
+
+        Args:
+            signal_indices: Original signal indices
+            ohlc_arrays: OHLC price arrays for exit estimation
+
+        Returns:
+            Filtered signal indices respecting max_concurrent_positions
+        """
+        if len(signal_indices) == 0:
+            return signal_indices
+
+        n_candles = len(ohlc_arrays[0])
+        _, open_prices, high_prices, low_prices, _ = ohlc_arrays
+
+        kept_signals = []
+        current_exit_idx = -1  # Track when current position exits
+
+        for i, signal_idx in enumerate(signal_indices):
+            # Skip if this signal occurs before current position exits
+            if signal_idx <= current_exit_idx:
+                if i < 10:  # Log first 10 rejections for debugging
+                    logger.debug(
+                        "Signal %d at idx %d REJECTED (current_exit_idx=%d)",
+                        i,
+                        signal_idx,
+                        current_exit_idx,
+                    )
+                continue
+
+            # This signal is valid - estimate its exit point
+            entry_price = open_prices[signal_idx]
+            # Use pip-based stop/target for forex (20 pip stop, 40 pip target)
+            # This matches typical forex risk/reward ratios
+            pip_size = 0.0001 if entry_price < 10 else 0.01  # JPY pairs
+            stop_distance = 20 * pip_size  # 20 pip stop
+            target_distance = 40 * pip_size  # 40 pip target (2R)
+            stop_price = entry_price - stop_distance
+            target_price = entry_price + target_distance
+
+            # Quick scan forward to find exit
+            exit_idx = self._quick_exit_scan(
+                signal_idx,
+                entry_price,
+                stop_price,
+                target_price,
+                high_prices,
+                low_prices,
+                n_candles,
+            )
+
+            if i < 10:  # Log first 10 acceptances for debugging
+                logger.debug(
+                    "Signal %d at idx %d ACCEPTED (exit_idx=%d, duration=%d bars)",
+                    i,
+                    signal_idx,
+                    exit_idx,
+                    exit_idx - signal_idx,
+                )
+
+            kept_signals.append(signal_idx)
+            current_exit_idx = exit_idx
+
+        original_count = len(signal_indices)
+        filtered_count = len(kept_signals)
+
+        if filtered_count < original_count:
+            logger.info(
+                "Position filter (one-at-a-time): %d -> %d signals "
+                "(removed %d overlapping)",
+                original_count,
+                filtered_count,
+                original_count - filtered_count,
+            )
+        else:
+            logger.info(
+                "Position filter: All %d signals kept (no overlaps detected)",
+                original_count,
+            )
+
+        return np.array(kept_signals, dtype=np.int64)
+
+    def _quick_exit_scan(
+        self,
+        entry_idx: int,
+        entry_price: float,
+        stop_price: float,
+        target_price: float,
+        high_prices: np.ndarray,
+        low_prices: np.ndarray,
+        n_candles: int,
+        max_bars: int = 100,  # Reduced from 1000 to 100 for more realistic forex durations
+    ) -> int:
+        """Quick forward scan to estimate trade exit point.
+
+        Args:
+            entry_idx: Entry candle index
+            entry_price: Entry price
+            stop_price: Stop loss price
+            target_price: Target price
+            high_prices: High price array
+            low_prices: Low price array
+            n_candles: Total number of candles
+            max_bars: Maximum bars to scan forward (default 100 = ~1.5 hours for 1m bars)
+
+        Returns:
+            Estimated exit candle index
+        """
+        # Assume LONG direction for now (most common)
+        for candle_idx in range(entry_idx + 1, min(entry_idx + max_bars, n_candles)):
+            curr_high = high_prices[candle_idx]
+            curr_low = low_prices[candle_idx]
+
+            # Check stop hit (LONG: low <= stop)
+            if curr_low <= stop_price:
+                return candle_idx
+
+            # Check target hit (LONG: high >= target)
+            if curr_high >= target_price:
+                return candle_idx
+
+        # If no exit found within max_bars, assume exit at max_bars
+        return min(entry_idx + max_bars, n_candles - 1)
+
     def _initialize_positions(
         self,
         signal_indices: np.ndarray,
+        stop_prices_from_strategy: np.ndarray,
+        target_prices_from_strategy: np.ndarray,
         timestamps: np.ndarray,  # pylint: disable=unused-argument
         ohlc_arrays: tuple[np.ndarray, ...],
+        direction: str = "LONG",
     ) -> PositionState:
         """Initialize position state arrays.
 
         Args:
             signal_indices: Array of signal indices
+            stop_prices_from_strategy: Stop loss prices calculated by strategy (ATR-based)
+            target_prices_from_strategy: Take profit prices calculated by strategy (ATR-based)
             timestamps: Array of timestamps
             ohlc_arrays: OHLC price arrays
+            direction: Trade direction ("LONG" or "SHORT")
 
         Returns:
             PositionState with initialized arrays
@@ -295,17 +593,18 @@ class BatchSimulation:
         # Extract price arrays
         _, open_prices, _high_prices, _low_prices, _close_prices = ohlc_arrays
 
-        # Initialize state arrays (placeholder values)
+        # Initialize state arrays
         entry_indices = signal_indices.copy()
         exit_indices = np.full(n_signals, -1, dtype=np.int64)  # -1 = still open
         entry_prices = open_prices[signal_indices]  # Entry at signal candle open
 
-        # Placeholder: calculate stop/target prices (to be implemented)
-        stop_prices = entry_prices * 0.99  # Placeholder 1% stop
-        target_prices = entry_prices * 1.02  # Placeholder 2% target
+        # USE STRATEGY'S ATR-BASED STOP/TARGET PRICES (not placeholders!)
+        stop_prices = stop_prices_from_strategy
+        target_prices = target_prices_from_strategy
 
-        # Placeholder: all LONG positions for now
-        directions = np.ones(n_signals, dtype=np.int8)  # 1=LONG, -1=SHORT
+        # Set direction based on trade type (1=LONG, -1=SHORT)
+        direction_value = 1 if direction == "LONG" else -1
+        directions = np.full(n_signals, direction_value, dtype=np.int8)
         position_sizes = np.ones(n_signals)  # Placeholder unit size
         is_open = np.ones(n_signals, dtype=bool)
 
@@ -328,14 +627,16 @@ class BatchSimulation:
         timestamps: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
         progress: Optional[ProgressDispatcher],
+        direction: str = "LONG",
     ) -> dict:
-        """Simulate trades using vectorized SL/TP evaluation.
+        """Simulate trades using fully vectorized exit detection.
 
         Args:
             position_state: Position state arrays
             timestamps: Array of timestamps
             ohlc_arrays: OHLC price arrays
             progress: Optional progress dispatcher
+            direction: Trade direction - "LONG" or "SHORT"
 
         Returns:
             Dictionary of trade outcomes with PnL and win/loss classification
@@ -356,55 +657,71 @@ class BatchSimulation:
         # Arrays to track trades
         exit_prices = np.zeros(n_trades)
         exit_reasons = np.zeros(n_trades, dtype=np.int8)
+        exit_indices = np.full(n_trades, -1, dtype=np.int64)
 
-        # Scan forward from each entry to find exit
+        # Vectorized exit detection
+        max_lookahead = 100
+
         for i in range(n_trades):
             entry_idx = position_state.entry_indices[i]
+            end_idx = min(entry_idx + max_lookahead, n_candles)
 
-            # Scan forward candle by candle
-            for candle_idx in range(entry_idx + 1, min(entry_idx + 1000, n_candles)):
-                # Get current candle prices
-                curr_high = high_prices[candle_idx]
-                curr_low = low_prices[candle_idx]
+            if end_idx <= entry_idx + 1:
+                # No room to exit
+                exit_indices[i] = entry_idx
+                exit_prices[i] = adjusted_entries[i]
+                exit_reasons[i] = 0  # No exit
+                continue
 
-                # Evaluate stops and targets for this position
-                stop_hit, stop_price = evaluate_stops_vectorized(
-                    np.array([position_state.is_open[i]]),
-                    np.array([adjusted_entries[i]]),
-                    np.array([position_state.stop_prices[i]]),
-                    np.array([curr_high]),
-                    np.array([curr_low]),
-                    np.array([position_state.directions[i]]),
+            # Get price slices for this trade's lookahead window
+            future_highs = high_prices[entry_idx + 1 : end_idx]
+            future_lows = low_prices[entry_idx + 1 : end_idx]
+
+            # Check stop and target hits (direction-aware!)
+            stop_price = position_state.stop_prices[i]
+            target_price = position_state.target_prices[i]
+
+            if direction == "LONG":
+                # LONG: stop hit when low <= stop, target hit when high >= target
+                stop_hits = future_lows <= stop_price
+                target_hits = future_highs >= target_price
+            else:  # SHORT
+                # SHORT: stop hit when high >= stop (price goes UP past stop)
+                #        target hit when low <= target (price goes DOWN to target)
+                stop_hits = future_highs >= stop_price
+                target_hits = future_lows <= target_price
+
+            # Find first exit (stop takes priority if both hit same candle)
+            if stop_hits.any() or target_hits.any():
+                stop_idx = np.argmax(stop_hits) if stop_hits.any() else len(future_lows)
+                target_idx = (
+                    np.argmax(target_hits) if target_hits.any() else len(future_highs)
                 )
 
-                target_hit, target_price = evaluate_targets_vectorized(
-                    np.array([position_state.is_open[i]]),
-                    np.array([adjusted_entries[i]]),
-                    np.array([position_state.target_prices[i]]),
-                    np.array([curr_high]),
-                    np.array([curr_low]),
-                    np.array([position_state.directions[i]]),
-                )
+                if stop_idx <= target_idx:
+                    # Stop hit first
+                    exit_offset = stop_idx + 1
+                    exit_indices[i] = entry_idx + exit_offset
+                    exit_prices[i] = stop_price
+                    exit_reasons[i] = 1  # Stop loss
+                else:
+                    # Target hit first
+                    exit_offset = target_idx + 1
+                    exit_indices[i] = entry_idx + exit_offset
+                    exit_prices[i] = target_price
+                    exit_reasons[i] = 2  # Take profit
+            else:
+                # No exit within lookahead - use last price
+                exit_indices[i] = end_idx - 1
+                exit_prices[i] = future_highs[-1]  # Use last high as proxy
+                exit_reasons[i] = 0  # Timeout
 
-                # Determine exit priority
-                exit_mask, exit_price_arr, exit_reason_arr = evaluate_exit_priority(
-                    stop_hit,
-                    target_hit,
-                    stop_price,
-                    target_price,
-                )
-
-                # If exit occurred, record it
-                if exit_mask[0]:
-                    exit_prices[i] = exit_price_arr[0]
-                    exit_reasons[i] = exit_reason_arr[0]
-                    position_state.exit_indices[i] = candle_idx
-                    position_state.is_open[i] = False
-                    break
-
-            # Emit progress updates
-            if progress is not None and (i + 1) % 16384 == 0:
+            # Update progress periodically
+            if progress is not None and (i + 1) % 5000 == 0:
                 progress.update(i + 1)
+
+        # Update position state
+        position_state.exit_indices = exit_indices
 
         # Apply slippage to exit prices
         adjusted_exits = apply_slippage_vectorized(
@@ -434,16 +751,14 @@ class BatchSimulation:
             "exit_prices": adjusted_exits,
         }
 
-        # Log trade summary using Rich console if progress bar active
+        # Log trade summary
         trade_summary = (
             f"Simulated {n_trades} trades: "
             f"{np.sum(winners)} winners, {n_trades - np.sum(winners)} losers"
         )
         if progress is not None and progress._progress is not None:
-            # Use Rich console to print below the progress bar
             progress._progress.console.print(f"[cyan]{trade_summary}[/cyan]")
         else:
-            # Fallback to regular logging
             logger.info(
                 "Simulated %d trades: %d winners, %d losers",
                 n_trades,

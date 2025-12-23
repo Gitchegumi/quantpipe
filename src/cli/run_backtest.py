@@ -1261,13 +1261,18 @@ Persistent storage not yet implemented."
         )
 
         # Build signal parameters from strategy config
-        # Build signal parameters from strategy config
         signal_params = parameters.model_dump()
 
         # Call vectorized backtest with Polars DataFrame
         logger.info("Using vectorized backtest path (Polars)")
 
         from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
+
+        # Debug: Verify all required indicators are present
+        logger.info("DataFrame columns before backtest: %s", enriched_df.columns)
+        missing = [col for col in required_indicators if col not in enriched_df.columns]
+        if missing:
+            logger.error("Missing required indicators: %s", missing)
 
         result = orchestrator.run_backtest(
             candles=enriched_df,
@@ -1352,6 +1357,7 @@ Persistent storage not yet implemented."
                         start_date=args.viz_start,
                         end_date=args.viz_end,
                         timeframe=args.timeframe,
+                        viz_config=strategy.get_visualization_config(),
                     )
 
             except ImportError as e:

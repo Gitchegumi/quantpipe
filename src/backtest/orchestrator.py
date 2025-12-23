@@ -307,7 +307,10 @@ class BacktestOrchestrator:
         if isinstance(candles, pl.DataFrame):
             if candles.is_empty():
                 raise ValueError("Candles DataFrame cannot be empty")
-            return self._run_vectorized_backtest(candles, pair, run_id, **signal_params)
+            # Use optimized path with BatchSimulation (includes position filtering)
+            return self.run_optimized_backtest(
+                df=candles, pair=pair, run_id=run_id, strategy=strategy, **signal_params
+            )
 
         if not candles:
             raise ValueError("Candles sequence cannot be empty")
@@ -1334,7 +1337,7 @@ class BacktestOrchestrator:
             ValueError: If df is empty or missing required columns
         """
 
-        if df.empty:
+        if df.is_empty():
             raise ValueError("DataFrame cannot be empty")
 
         start_time = datetime.now(UTC)
@@ -1345,9 +1348,8 @@ class BacktestOrchestrator:
             self.direction_mode.value,
         )
 
-        # Convert pandas DataFrame to Polars for batch processing
-
-        polars_df = pl.from_pandas(df)
+        # df is already a Polars DataFrame from the CLI, no conversion needed
+        polars_df = df
 
         # Route to direction-specific optimized workflow
         if self.direction_mode == DirectionMode.LONG:
@@ -1492,6 +1494,8 @@ class BacktestOrchestrator:
                 exit_fill_price=float(sim_result.exit_prices[i]),
                 exit_reason=exit_reason,
                 pnl_r=float(sim_result.pnl_r[i]),
+                stop_price=float(sim_result.stop_prices[i]),
+                target_price=float(sim_result.target_prices[i]),
                 slippage_entry_pips=0.5,  # TODO: Calculate actual slippage
                 slippage_exit_pips=0.5,  # TODO: Calculate actual slippage
                 costs_total=0.0,  # TODO: Calculate actual costs
@@ -1581,9 +1585,17 @@ class BacktestOrchestrator:
             "Running optimized simulation for %d signals", scan_result.signal_count
         )
 
+        # Get max_concurrent_positions from strategy metadata
+        max_concurrent = getattr(strategy.metadata, "max_concurrent_positions", 1)
+        logger.info(
+            "Simulator config: max_concurrent_positions=%s (from strategy metadata)",
+            max_concurrent,
+        )
+
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
             enable_progress=self.enable_progress,
+            max_concurrent_positions=max_concurrent,
         )
 
         # Extract OHLC arrays for simulation
@@ -1599,6 +1611,8 @@ class BacktestOrchestrator:
         self._start_phase("simulation")
         sim_result = simulator.simulate(
             signal_indices=scan_result.signal_indices,
+            stop_prices=scan_result.stop_prices,
+            target_prices=scan_result.target_prices,
             timestamps=timestamps,
             ohlc_arrays=ohlc_arrays,
         )
@@ -1700,6 +1714,9 @@ class BacktestOrchestrator:
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
             enable_progress=self.enable_progress,
+            max_concurrent_positions=getattr(
+                strategy.metadata, "max_concurrent_positions", 1
+            ),
         )
 
         # Extract OHLC arrays for simulation
@@ -1715,8 +1732,11 @@ class BacktestOrchestrator:
         self._start_phase("simulation")
         sim_result = simulator.simulate(
             signal_indices=scan_result.signal_indices,
+            stop_prices=scan_result.stop_prices,
+            target_prices=scan_result.target_prices,
             timestamps=timestamps,
             ohlc_arrays=ohlc_arrays,
+            direction="SHORT",
         )
         self._end_phase("simulation")
 
@@ -1839,6 +1859,9 @@ class BacktestOrchestrator:
         simulator = BatchSimulation(
             risk_per_trade=signal_params.get("risk_per_trade_pct", 0.01),
             enable_progress=self.enable_progress,
+            max_concurrent_positions=getattr(
+                strategy.metadata, "max_concurrent_positions", 1
+            ),
         )
 
         timestamps = df["timestamp_utc"].to_numpy()
@@ -1859,8 +1882,11 @@ class BacktestOrchestrator:
             logger.info("Simulating %d LONG signals", long_scan.signal_count)
             long_sim = simulator.simulate(
                 signal_indices=long_scan.signal_indices,
+                stop_prices=long_scan.stop_prices,
+                target_prices=long_scan.target_prices,
                 timestamps=timestamps,
                 ohlc_arrays=ohlc_arrays,
+                direction="LONG",
             )
             logger.info(
                 "LONG simulation: %d trades, %.2fs",
@@ -1870,16 +1896,26 @@ class BacktestOrchestrator:
 
         if short_scan.signal_count > 0:
             logger.info("Simulating %d SHORT signals", short_scan.signal_count)
+            logger.info(
+                "SHORT scan has %d stop prices, %d target prices",
+                len(short_scan.stop_prices),
+                len(short_scan.target_prices),
+            )
             short_sim = simulator.simulate(
                 signal_indices=short_scan.signal_indices,
+                stop_prices=short_scan.stop_prices,
+                target_prices=short_scan.target_prices,
                 timestamps=timestamps,
                 ohlc_arrays=ohlc_arrays,
+                direction="SHORT",
             )
             logger.info(
                 "SHORT simulation: %d trades, %.2fs",
                 short_sim.trade_count,
                 short_sim.simulation_duration_sec,
             )
+        else:
+            logger.warning("SHORT scan signal_count is 0, skipping SHORT simulation")
 
         self._end_phase("simulation")
 

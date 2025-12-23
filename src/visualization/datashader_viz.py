@@ -102,6 +102,7 @@ def plot_backtest_results(
     initial_balance: float = DEFAULT_INITIAL_BALANCE,
     risk_per_trade: float = DEFAULT_RISK_PER_TRADE,
     timeframe: str = "1m",
+    viz_config: Optional[VisualizationConfig] = None,
 ) -> Optional[Any]:
     """
     Render interactive backtest visualization using Datashader.
@@ -159,6 +160,7 @@ def plot_backtest_results(
         show_plot,
         output_file,
         timeframe,
+        viz_config,
     )
 
 
@@ -173,6 +175,7 @@ def _create_single_symbol_layout(
     show_plot: bool,
     output_file: Optional[Union[str, Path]],
     timeframe: str = "1m",
+    viz_config: Optional[VisualizationConfig] = None,
 ) -> Optional[Any]:
     """Create visualization for a single symbol."""
     # Prepare data
@@ -186,8 +189,10 @@ def _create_single_symbol_layout(
 
     # Create components
     price_chart, xlim = _create_candlestick_chart(pdf, pair)
-    trade_boxes = _create_trade_boxes(result, pdf)
-    indicator_overlays, oscillator_panel = _create_indicator_overlays(pdf, pair, xlim)
+    trade_boxes = _create_trade_boxes(result, pdf, risk_per_trade)
+    indicator_overlays, oscillator_panel = _create_indicator_overlays(
+        pdf, pair, xlim, viz_config
+    )
     portfolio_curve = _create_portfolio_curve(result, initial_balance, risk_per_trade)
 
     # Combine price chart with trade boxes and indicator overlays
@@ -283,7 +288,7 @@ def _create_multi_symbol_layout(
 
         # T003: Fix tuple unpacking - _create_candlestick_chart returns (chart, xlim)
         price_chart, xlim = _create_candlestick_chart(pdf_renamed, symbol, rename_map)
-        trade_boxes = _create_trade_boxes(symbol_result, pdf)
+        trade_boxes = _create_trade_boxes(symbol_result, pdf, risk_per_trade)
         # T004: Fix _create_indicator_overlays call with required pair and xlim args
         indicators, oscillator_panel = _create_indicator_overlays(pdf, symbol, xlim)
 
@@ -520,7 +525,11 @@ def _calculate_price_range(pdf: pd.DataFrame, pair: str) -> tuple:
     return (price_min - padding, price_max + padding)
 
 
-def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[Any]:
+def _create_trade_boxes(
+    result: BacktestResult,
+    pdf: pd.DataFrame,
+    risk_per_trade: float = DEFAULT_RISK_PER_TRADE,
+) -> Optional[Any]:
     """Create trade entry/exit markers with connecting lines."""
     if not result.executions:
         return None
@@ -553,14 +562,20 @@ def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[A
         pnl_r = trade.pnl_r
         direction = trade.direction.upper() if trade.direction else "LONG"
 
-        # Calculate TP and SL levels (2R target, 1R stop)
-        risk = abs(exit_price - entry_price) / max(abs(pnl_r), 0.01)
-        if direction == "LONG":
-            tp_price = entry_price + 2 * risk
-            sl_price = entry_price - risk
-        else:
-            tp_price = entry_price - 2 * risk
-            sl_price = entry_price + risk
+        # Use actual stop/target prices from strategy
+        # These were calculated by the strategy and stored in TradeExecution
+        tp_price = getattr(trade, "target_price", 0.0)
+        sl_price = getattr(trade, "stop_price", 0.0)
+
+        # Fallback to estimation if not available (backward compatibility)
+        if tp_price == 0.0 or sl_price == 0.0:
+            risk = abs(exit_price - entry_price) / max(abs(pnl_r), 0.01)
+            if direction == "LONG":
+                tp_price = entry_price + 2 * risk
+                sl_price = entry_price - risk
+            else:
+                tp_price = entry_price - 2 * risk
+                sl_price = entry_price + risk
 
         entries.append(
             {
@@ -579,6 +594,7 @@ def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[A
                 "time": exit_time,
                 "price": exit_price,
                 "pnl_r": pnl_r,
+                "pnl_dollars": pnl_r * risk_per_trade,  # Convert R to dollars
             }
         )
 
@@ -634,6 +650,7 @@ def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[A
                 size=100,
                 alpha=1.0,
                 label="Win Exit",
+                hover_cols=["pnl_r", "pnl_dollars"],
             )
             markers = markers * winner_markers if markers else winner_markers
 
@@ -646,6 +663,7 @@ def _create_trade_boxes(result: BacktestResult, pdf: pd.DataFrame) -> Optional[A
                 size=100,
                 alpha=1.0,
                 label="Loss Exit",
+                hover_cols=["pnl_r", "pnl_dollars"],
             )
             markers = markers * loser_markers if markers else loser_markers
 

@@ -7,8 +7,10 @@ including declaring their required indicators.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Protocol
 
+
 if TYPE_CHECKING:
     import numpy as np
+
     from src.models.visualization_config import VisualizationConfig
 
 
@@ -22,12 +24,15 @@ class StrategyMetadata:
         required_indicators: List of indicator names this strategy needs.
             Examples: ["ema20", "ema50", "atr14", "stoch_rsi"]
         tags: Classification tags for filtering/grouping.
+        max_concurrent_positions: Maximum simultaneous open positions allowed.
+            Default is 1 (one trade at a time). Set to None for unlimited.
     """
 
     name: str
     version: str
     required_indicators: list[str]
     tags: list[str] = None
+    max_concurrent_positions: int | None = 1
 
     def __post_init__(self):
         """Ensure tags is always a list."""

@@ -141,6 +141,18 @@ def calculate_indicators(df: pl.DataFrame, indicators: list[str]) -> pl.DataFram
                 continue
 
             func = REGISTRY[name]
+            # Pass the original indicator string as output_col to preserve naming
+            # (e.g., rsi14 instead of just rsi)
+            if "output_col" not in kwargs:
+                kwargs["output_col"] = ind_str
+
+            # Special handling for stoch_rsi: find the rsi column
+            if name in ("stoch_rsi", "stochrsi") and "rsi_col" not in kwargs:
+                # Look for any rsi column (rsi, rsi14, etc.)
+                rsi_cols = [col for col in df.columns if col.startswith("rsi")]
+                if rsi_cols:
+                    kwargs["rsi_col"] = rsi_cols[0]  # Use first found
+
             df = func(df, **kwargs)
 
         except (ValueError, TypeError, pl.exceptions.PolarsError) as e:

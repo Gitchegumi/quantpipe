@@ -282,6 +282,8 @@ class TradeExecution:
         exit_reason: Exit trigger - 'TARGET', 'TRAILING_STOP', 'STOP_LOSS',
             or 'EXPIRY'.
         pnl_r: Profit/loss measured in R-multiples (risk units).
+        stop_price: Original stop-loss price from strategy (ATR-based).
+        target_price: Original take-profit price from strategy (ATR-based).
         slippage_entry_pips: Entry slippage in pips.
         slippage_exit_pips: Exit slippage in pips.
         costs_total: Total transaction costs (spread + commission).
@@ -312,9 +314,11 @@ class TradeExecution:
     exit_fill_price: float
     exit_reason: str  # Literal['TARGET', 'TRAILING_STOP', 'STOP_LOSS', 'EXPIRY']
     pnl_r: float
-    slippage_entry_pips: float
-    slippage_exit_pips: float
-    costs_total: float
+    stop_price: float = 0.0  # Original stop from strategy
+    target_price: float = 0.0  # Original target from strategy
+    slippage_entry_pips: float = 0.0
+    slippage_exit_pips: float = 0.0
+    costs_total: float = 0.0
     direction: str = ""  # Literal['LONG', 'SHORT'], empty for backward compatibility
 
 
