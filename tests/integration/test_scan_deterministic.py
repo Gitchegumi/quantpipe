@@ -47,19 +47,31 @@ def deterministic_strategy():
             """Return mock metadata."""
             return MockMetadata()
 
-        def generate_signals(self, candles, parameters):
-            """Generate deterministic signals based on simple rule.
-
-            Generates signals at fixed intervals for reproducibility.
-            """
+        def scan_vectorized(
+            self,
+            close: np.ndarray,
+            indicator_arrays: dict[str, np.ndarray],
+            parameters: dict,
+            direction: str,
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+            """Vectorized scan implementation."""
             # Simple deterministic rule: signal every 100th candle where EMA20 > EMA50
-            signals = []
-            for i in range(0, len(candles), 100):
-                if i < len(candles) and candles[i].get("ema20", 0) > candles[i].get(
-                    "ema50", 0
-                ):
-                    signals.append(i)
-            return signals
+            ema20 = indicator_arrays["ema20"]
+            ema50 = indicator_arrays["ema50"]
+
+            # Find indices where EMA20 > EMA50
+            condition = ema20 > ema50
+            potential_signals = np.where(condition)[0]
+
+            # Filter to roughly every 100th candle to match test expectations
+            # We use a deterministic spacing for testing
+            signals = potential_signals[potential_signals % 100 == 0]
+
+            # Dummy stop/target prices
+            stop_prices = np.zeros(len(signals))
+            target_prices = np.zeros(len(signals))
+
+            return signals, stop_prices, target_prices
 
     return DeterministicStrategy()
 

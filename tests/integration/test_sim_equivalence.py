@@ -128,6 +128,8 @@ def test_eurusd_equivalence(eurusd_signal_set):
     batch_sim = BatchSimulation()
     batch_result = batch_sim.simulate(
         signal_indices=eurusd_signal_set["signal_indices"],
+        stop_prices=np.zeros(len(eurusd_signal_set["signal_indices"])),
+        target_prices=np.zeros(len(eurusd_signal_set["signal_indices"])),
         timestamps=eurusd_signal_set["timestamps"],
         ohlc_arrays=eurusd_signal_set["ohlc_arrays"],
     )
@@ -172,6 +174,8 @@ def test_usdjpy_equivalence(usdjpy_signal_set):
     batch_sim = BatchSimulation()
     batch_result = batch_sim.simulate(
         signal_indices=usdjpy_signal_set["signal_indices"],
+        stop_prices=np.zeros(len(usdjpy_signal_set["signal_indices"])),
+        target_prices=np.zeros(len(usdjpy_signal_set["signal_indices"])),
         timestamps=usdjpy_signal_set["timestamps"],
         ohlc_arrays=usdjpy_signal_set["ohlc_arrays"],
     )
@@ -223,12 +227,16 @@ def test_both_symbols_equivalence(eurusd_signal_set, usdjpy_signal_set):
 
     eurusd_batch = batch_sim.simulate(
         signal_indices=eurusd_signal_set["signal_indices"],
+        stop_prices=np.zeros(len(eurusd_signal_set["signal_indices"])),
+        target_prices=np.zeros(len(eurusd_signal_set["signal_indices"])),
         timestamps=eurusd_signal_set["timestamps"],
         ohlc_arrays=eurusd_signal_set["ohlc_arrays"],
     )
 
     usdjpy_batch = batch_sim.simulate(
         signal_indices=usdjpy_signal_set["signal_indices"],
+        stop_prices=np.zeros(len(usdjpy_signal_set["signal_indices"])),
+        target_prices=np.zeros(len(usdjpy_signal_set["signal_indices"])),
         timestamps=usdjpy_signal_set["timestamps"],
         ohlc_arrays=usdjpy_signal_set["ohlc_arrays"],
     )
@@ -287,6 +295,8 @@ def test_zero_signals_edge_case():
     start_time = time.time()
     result = batch_sim.simulate(
         signal_indices=signal_indices,
+        stop_prices=np.zeros(len(signal_indices)),
+        target_prices=np.zeros(len(signal_indices)),
         timestamps=timestamps,
         ohlc_arrays=ohlc_arrays,
     )
@@ -334,6 +344,8 @@ def test_equivalence_tolerance_boundary():
     batch_sim = BatchSimulation()
     batch_result = batch_sim.simulate(
         signal_indices=signal_indices,
+        stop_prices=np.zeros(len(signal_indices)),
+        target_prices=np.zeros(len(signal_indices)),
         timestamps=timestamps,
         ohlc_arrays=ohlc_arrays,
     )

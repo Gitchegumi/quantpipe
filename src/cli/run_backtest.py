@@ -908,86 +908,86 @@ Persistent storage not yet implemented."
                             args.timeframe if args.timeframe != "1m" else None
                         ),
                     )
-                if args.visualize:
-                    try:
-                        from ..visualization.datashader_viz import (
-                            plot_backtest_results,
-                        )
-                        from rich.console import Console
-
-                        console = Console()
-                        logger.info("Generating Datashader visualization...")
-                        # Combine enriched data (with indicators) for visualization
-                        symbol_dfs = []
-                        for symbol, df in enriched_data.items():
-                            # Add symbol column if not present
-                            if "symbol" not in df.columns:
-                                df = df.with_columns(pl.lit(symbol).alias("symbol"))
-                            symbol_dfs.append(df)
-                        all_symbol_data = pl.concat(symbol_dfs)
-                        # Convert PortfolioResult to BacktestResult-like structure
-                        # For visualization compatibility
-                        from ..models.directional import BacktestResult
-                        from ..models.core import TradeExecution
-
-                        # Convert ClosedTrade to TradeExecution for visualization
-                        executions = [
-                            TradeExecution(
-                                signal_id=trade.signal_id,
-                                direction=trade.direction,
-                                open_timestamp=trade.entry_timestamp,
-                                entry_fill_price=trade.entry_price,
-                                close_timestamp=trade.exit_timestamp,
-                                exit_fill_price=trade.exit_price,
-                                exit_reason=trade.exit_reason,
-                                pnl_r=trade.pnl_r,
-                                slippage_entry_pips=0.0,
-                                slippage_exit_pips=0.0,
-                                costs_total=0.0,
-                                stop_price=0.0,  # Portfolio doesn't track original stop
-                                target_price=0.0,  # Portfolio doesn't track original target
+                    if args.visualize:
+                        try:
+                            from ..visualization.datashader_viz import (
+                                plot_backtest_results,
                             )
-                            for trade in result.closed_trades
-                        ]
+                            from rich.console import Console
 
-                        viz_result = BacktestResult(
-                            run_id=result.run_id,
-                            direction_mode=result.direction_mode,
-                            start_time=result.start_time,
-                            end_time=result.end_time,
-                            data_start_date=result.data_start_date,
-                            data_end_date=result.data_end_date,
-                            total_candles=0,  # Not tracked in portfolio
-                            signals=[],  # Not needed for visualization
-                            executions=executions,
-                            metrics=None,  # Not needed for basic visualization
-                            results={},  # Portfolio doesn't split by symbol
-                        )
-                        with console.status(
-                            "[bold green]Preparing visualization "
-                            "(Datashader)...[/bold green]"
-                        ):
-                            plot_backtest_results(
-                                data=all_symbol_data,
-                                result=viz_result,
-                                pair="Portfolio",
-                                show_plot=True,
-                                start_date=args.viz_start,
-                                end_date=args.viz_end,
-                                timeframe=args.timeframe,
+                            console = Console()
+                            logger.info("Generating Datashader visualization...")
+                            # Combine enriched data (with indicators) for visualization
+                            symbol_dfs = []
+                            for symbol, df in enriched_data.items():
+                                # Add symbol column if not present
+                                if "symbol" not in df.columns:
+                                    df = df.with_columns(pl.lit(symbol).alias("symbol"))
+                                symbol_dfs.append(df)
+                            all_symbol_data = pl.concat(symbol_dfs)
+                            # Convert PortfolioResult to BacktestResult-like structure
+                            # For visualization compatibility
+                            from ..models.directional import BacktestResult
+                            from ..models.core import TradeExecution
+
+                            # Convert ClosedTrade to TradeExecution for visualization
+                            executions = [
+                                TradeExecution(
+                                    signal_id=trade.signal_id,
+                                    direction=trade.direction,
+                                    open_timestamp=trade.entry_timestamp,
+                                    entry_fill_price=trade.entry_price,
+                                    close_timestamp=trade.exit_timestamp,
+                                    exit_fill_price=trade.exit_price,
+                                    exit_reason=trade.exit_reason,
+                                    pnl_r=trade.pnl_r,
+                                    slippage_entry_pips=0.0,
+                                    slippage_exit_pips=0.0,
+                                    costs_total=0.0,
+                                    stop_price=0.0,  # Portfolio doesn't track original stop
+                                    target_price=0.0,  # Portfolio doesn't track original target
+                                )
+                                for trade in result.closed_trades
+                            ]
+
+                            viz_result = BacktestResult(
+                                run_id=result.run_id,
+                                direction_mode=result.direction_mode,
+                                start_time=result.start_time,
+                                end_time=result.end_time,
+                                data_start_date=result.data_start_date,
+                                data_end_date=result.data_end_date,
+                                total_candles=0,  # Not tracked in portfolio
+                                signals=[],  # Not needed for visualization
+                                executions=executions,
+                                metrics=None,  # Not needed for basic visualization
+                                results={},  # Portfolio doesn't split by symbol
                             )
-                    except ImportError as e:
-                        logger.error(
-                            "Visualization module not found or dependency "
-                            "missing: %s",
-                            e,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to generate visualization: %s",
-                            e,
-                            exc_info=True,
-                        )
+                            with console.status(
+                                "[bold green]Preparing visualization "
+                                "(Datashader)...[/bold green]"
+                            ):
+                                plot_backtest_results(
+                                    data=all_symbol_data,
+                                    result=viz_result,
+                                    pair="Portfolio",
+                                    show_plot=True,
+                                    start_date=args.viz_start,
+                                    end_date=args.viz_end,
+                                    timeframe=args.timeframe,
+                                )
+                        except ImportError as e:
+                            logger.error(
+                                "Visualization module not found or dependency "
+                                "missing: %s",
+                                e,
+                            )
+                        except Exception as e:
+                            logger.error(
+                                "Failed to generate visualization: %s",
+                                e,
+                                exc_info=True,
+                            )
                 else:
                     # Independent mode (default) - run each symbol in isolation
                     logger.info("Independent mode: each symbol runs in isolation")

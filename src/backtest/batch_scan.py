@@ -19,7 +19,6 @@ from src.backtest.arrays import (
 )
 from src.backtest.dedupe import DedupeResult, dedupe_timestamps_polars
 from src.backtest.progress import ProgressDispatcher
-from src.backtest.signal_filter import filter_overlapping_signals
 from src.strategy.base import Strategy
 
 
@@ -230,11 +229,6 @@ class BatchScan:
         Returns:
             Filtered array respecting strategy's position limit
         """
-        max_concurrent = getattr(self.strategy.metadata, "max_concurrent_positions", 1)
-
-        # Position filtering is now handled in BatchSimulation with proper exit detection
-        # This simple window-based filter was too aggressive (filtered 34859 -> 1)
-        # Disabled in favor of BatchSimulation._filter_signals_sequential()
         return signal_indices
 
         # Old code (disabled):
@@ -293,7 +287,7 @@ class BatchScan:
                 "Cannot perform batch scanning.",
                 self.strategy.metadata.name,
             )
-            return np.array([], dtype=np.int64)
+            return np.array([], dtype=np.int64), np.array([]), np.array([])
 
         # Delegate to strategy's vectorized scan method
         try:
@@ -323,4 +317,4 @@ class BatchScan:
                 e,
                 exc_info=True,
             )
-            return np.array([], dtype=np.int64)
+            return np.array([], dtype=np.int64), np.array([]), np.array([])

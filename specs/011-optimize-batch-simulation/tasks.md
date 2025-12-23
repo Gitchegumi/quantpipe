@@ -8,29 +8,29 @@ This document outlines the tasks required to optimize the batch simulation perfo
 
 ## Phase 1: Setup & Research
 
-- [X] T001 Install profiling tools (`py-spy`, `cProfile`) using Poetry.
-- [X] T002 Profile the existing simulation engine to identify performance bottlenecks related to pandas window operations in `src/backtest/`.
-- [X] T003 Document the profiling results in `research.md`.
-- [X] T004 Investigate and prototype alternatives to pandas rolling windows using Polars or NumPy in `research.md`.
-- [X] T005 Evaluate parallelization libraries (`multiprocessing`, `joblib`, `dask`, `ray`) and document the findings in `research.md`.
-- [X] T006 Based on the research, decide on the approach for replacing pandas rolling windows and the parallelization library to be used. Update `research.md` with the decision.
+- [x] T001 Install profiling tools (`py-spy`, `cProfile`) using Poetry.
+- [x] T002 Profile the existing simulation engine to identify performance bottlenecks related to pandas window operations in `src/backtest/`.
+- [x] T003 Document the profiling results in `research.md`.
+- [x] T004 Investigate and prototype alternatives to pandas rolling windows using Polars or NumPy in `research.md`.
+- [x] T005 Evaluate parallelization libraries (`multiprocessing`, `joblib`, `dask`, `ray`) and document the findings in `research.md`.
+- [x] T006 Based on the research, decide on the approach for replacing pandas rolling windows and the parallelization library to be used. Update `research.md` with the decision.
 
 ## Phase 2: Foundational Changes
 
-- [X] T007 [P] Install the chosen parallelization library and add it to `pyproject.toml`.
-- [X] T008 Create a new module `src/backtest/parallel_runner.py` to encapsulate the parallel execution logic.
-- [X] T009 Create a new module `src/backtest/vectorized_rolling_window.py` for the new vectorized rolling window implementation.
+- [x] T007 [P] Install the chosen parallelization library and add it to `pyproject.toml`.
+- [x] T008 Create a new module `src/backtest/parallel_runner.py` to encapsulate the parallel execution logic.
+- [x] T009 Create a new module `src/backtest/vectorized_rolling_window.py` for the new vectorized rolling window implementation.
 
 ## Phase 3: User Story 1 - Faster Single Simulation Run
 
-- [X] T010 [US1] Implement the vectorized rolling window logic in `src/backtest/vectorized_rolling_window.py`.
-- [X] T011 [US1] Refactor the core simulation loop in `src/backtest/trade_sim_batch.py` to use the new vectorized rolling window implementation.
-- [X] T012 [US1] Create a benchmark test to measure the execution time of a single simulation run in `tests/performance/test_single_simulation.py`.
+- [x] T010 [US1] Implement the vectorized rolling window logic in `src/backtest/vectorized_rolling_window.py`.
+- [x] T011 [US1] Refactor the core simulation loop in `src/backtest/trade_sim_batch.py` to use the new vectorized rolling window implementation.
+- [x] T012 [US1] Create a benchmark test to measure the execution time of a single simulation run in `tests/performance/test_single_simulation.py`.
 - [ ] T013 [US1] Run the benchmark test and verify that the execution time is reduced by at least 90%.
 
 ## Phase 4: User Story 2 - Efficient Multi-Experiment Execution
 
-- [ ] T014 [US2] Implement the batch simulation logic in `src/backtest/batch_simulation.py` using the `parallel_runner.py` module.
+- [/] T014 [US2] Implement the batch simulation logic in `src/backtest/batch_simulation.py` using the `parallel_runner.py` module.
 - [ ] T015 [US2] Update the CLI in `src/cli/main.py` to support running batch simulations.
 - [ ] T016 [US2] Create a benchmark test to measure the execution time of a batch of 50 simulations in `tests/performance/test_batch_simulation.py`.
 - [ ] T017 [US2] Run the benchmark test and verify that the batch of 50 simulations completes within 4 hours.

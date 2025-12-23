@@ -105,6 +105,12 @@ def test_eurusd_timing_determinism(eurusd_deterministic_signal_set):
         start_time = time.time()
         result = batch_sim.simulate(
             signal_indices=eurusd_deterministic_signal_set["signal_indices"],
+            stop_prices=np.zeros(
+                len(eurusd_deterministic_signal_set["signal_indices"])
+            ),
+            target_prices=np.zeros(
+                len(eurusd_deterministic_signal_set["signal_indices"])
+            ),
             timestamps=eurusd_deterministic_signal_set["timestamps"],
             ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
         )
@@ -160,6 +166,12 @@ def test_usdjpy_timing_determinism(usdjpy_deterministic_signal_set):
         start_time = time.time()
         result = batch_sim.simulate(
             signal_indices=usdjpy_deterministic_signal_set["signal_indices"],
+            stop_prices=np.zeros(
+                len(usdjpy_deterministic_signal_set["signal_indices"])
+            ),
+            target_prices=np.zeros(
+                len(usdjpy_deterministic_signal_set["signal_indices"])
+            ),
             timestamps=usdjpy_deterministic_signal_set["timestamps"],
             ohlc_arrays=usdjpy_deterministic_signal_set["ohlc_arrays"],
         )
@@ -210,6 +222,12 @@ def test_eurusd_pnl_determinism(eurusd_deterministic_signal_set):
     for run_idx in range(3):
         result = batch_sim.simulate(
             signal_indices=eurusd_deterministic_signal_set["signal_indices"],
+            stop_prices=np.zeros(
+                len(eurusd_deterministic_signal_set["signal_indices"])
+            ),
+            target_prices=np.zeros(
+                len(eurusd_deterministic_signal_set["signal_indices"])
+            ),
             timestamps=eurusd_deterministic_signal_set["timestamps"],
             ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
         )
@@ -259,6 +277,12 @@ def test_usdjpy_pnl_determinism(usdjpy_deterministic_signal_set):
     for run_idx in range(3):
         result = batch_sim.simulate(
             signal_indices=usdjpy_deterministic_signal_set["signal_indices"],
+            stop_prices=np.zeros(
+                len(usdjpy_deterministic_signal_set["signal_indices"])
+            ),
+            target_prices=np.zeros(
+                len(usdjpy_deterministic_signal_set["signal_indices"])
+            ),
             timestamps=usdjpy_deterministic_signal_set["timestamps"],
             ohlc_arrays=usdjpy_deterministic_signal_set["ohlc_arrays"],
         )
@@ -318,6 +342,12 @@ def test_both_symbols_determinism(
         start_time = time.time()
         eurusd_result = batch_sim.simulate(
             signal_indices=eurusd_deterministic_signal_set["signal_indices"],
+            stop_prices=np.zeros(
+                len(eurusd_deterministic_signal_set["signal_indices"])
+            ),
+            target_prices=np.zeros(
+                len(eurusd_deterministic_signal_set["signal_indices"])
+            ),
             timestamps=eurusd_deterministic_signal_set["timestamps"],
             ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
         )
@@ -327,6 +357,12 @@ def test_both_symbols_determinism(
         start_time = time.time()
         usdjpy_result = batch_sim.simulate(
             signal_indices=usdjpy_deterministic_signal_set["signal_indices"],
+            stop_prices=np.zeros(
+                len(usdjpy_deterministic_signal_set["signal_indices"])
+            ),
+            target_prices=np.zeros(
+                len(usdjpy_deterministic_signal_set["signal_indices"])
+            ),
             timestamps=usdjpy_deterministic_signal_set["timestamps"],
             ohlc_arrays=usdjpy_deterministic_signal_set["ohlc_arrays"],
         )
@@ -395,6 +431,8 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
     # Run without progress tracking
     result_no_progress = batch_sim.simulate(
         signal_indices=eurusd_deterministic_signal_set["signal_indices"],
+        stop_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
+        target_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
         timestamps=eurusd_deterministic_signal_set["timestamps"],
         ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
     )
@@ -404,6 +442,8 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
     # Not via simulate() parameter, so both runs use same configuration
     result_with_progress = batch_sim.simulate(
         signal_indices=eurusd_deterministic_signal_set["signal_indices"],
+        stop_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
+        target_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
         timestamps=eurusd_deterministic_signal_set["timestamps"],
         ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
     )
