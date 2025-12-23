@@ -49,7 +49,7 @@ def generate_signals_vectorized(
         "close",
         "ema20",
         "ema50",
-        "rsi",
+        "rsi14",
         "stoch_rsi",
         "atr14",
     ]
@@ -131,7 +131,7 @@ def _generate_long_signals_vec(
 
     # Identify candles where oscillator is extreme
     is_extreme = (pl.col("trend_state") == 1) & (
-        (pl.col("rsi") < rsi_oversold) | (pl.col("stoch_rsi") < stoch_rsi_low)
+        (pl.col("rsi14") < rsi_oversold) | (pl.col("stoch_rsi") < stoch_rsi_low)
     )
 
     # We need to propagate the "active pullback" state forward.
@@ -153,8 +153,8 @@ def _generate_long_signals_vec(
     # 1. Momentum Turn:
     #    RSI low (<40) then rising, OR StochRSI low (<0.3) then rising.
 
-    prev_rsi = pl.col("rsi").shift(1)
-    rsi_turn_up = (prev_rsi < 40) & (pl.col("rsi") > prev_rsi)
+    prev_rsi = pl.col("rsi14").shift(1)
+    rsi_turn_up = (prev_rsi < 40) & (pl.col("rsi14") > prev_rsi)
 
     prev_stoch = pl.col("stoch_rsi").shift(1)
     stoch_turn_up = (prev_stoch < 0.3) & (pl.col("stoch_rsi") > prev_stoch)
@@ -254,7 +254,7 @@ def _generate_short_signals_vec(
     # Condition: Trend is DOWN AND (RSI > overbought OR StochRSI > high)
 
     is_extreme = (pl.col("trend_state") == -1) & (
-        (pl.col("rsi") > rsi_overbought) | (pl.col("stoch_rsi") > stoch_rsi_high)
+        (pl.col("rsi14") > rsi_overbought) | (pl.col("stoch_rsi") > stoch_rsi_high)
     )
 
     pullback_max_age = parameters.get("pullback_max_age", 20)
@@ -268,8 +268,8 @@ def _generate_short_signals_vec(
     # 1. Momentum Turn:
     #    RSI high (>60) then falling, OR StochRSI high (>0.7) then falling.
 
-    prev_rsi = pl.col("rsi").shift(1)
-    rsi_turn_down = (prev_rsi > 60) & (pl.col("rsi") < prev_rsi)
+    prev_rsi = pl.col("rsi14").shift(1)
+    rsi_turn_down = (prev_rsi > 60) & (pl.col("rsi14") < prev_rsi)
 
     prev_stoch = pl.col("stoch_rsi").shift(1)
     stoch_turn_down = (prev_stoch > 0.7) & (pl.col("stoch_rsi") < prev_stoch)
