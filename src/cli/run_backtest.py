@@ -1029,60 +1029,61 @@ Persistent storage not yet implemented."
                         ),
                     )
 
-                output_path = args.output / output_filename
-                args.output.mkdir(parents=True, exist_ok=True)
-                output_path.write_text(output_content)
-                logger.info("Results written to %s", output_path)
+                    output_path = args.output / output_filename
+                    args.output.mkdir(parents=True, exist_ok=True)
+                    output_path.write_text(output_content)
+                    logger.info("Results written to %s", output_path)
 
-                # Multi-symbol visualization (FR-001)
-                if args.visualize:
-                    try:
-                        from ..visualization.datashader_viz import (
-                            plot_backtest_results,
-                        )
-                        from rich.console import Console
+                    # Multi-symbol visualization (FR-001) - INDEPENDENT MODE ONLY
+                    if args.visualize:
+                        try:
+                            from ..visualization.datashader_viz import (
+                                plot_backtest_results,
+                            )
+                            from rich.console import Console
 
-                        console = Console()
-                        logger.info("Generating Datashader visualization...")
+                            console = Console()
+                            logger.info("Generating Datashader visualization...")
 
-                        # Combine enriched data (with indicators) for visualization
-                        symbol_dfs = []
-                        for symbol, df in enriched_data.items():
-                            # Add symbol column if not present
-                            if "symbol" not in df.columns:
-                                df = df.with_columns(pl.lit(symbol).alias("symbol"))
-                            symbol_dfs.append(df)
+                            # Combine enriched data (with indicators) for visualization
+                            symbol_dfs = []
+                            for symbol, df in enriched_data.items():
+                                # Add symbol column if not present
+                                if "symbol" not in df.columns:
+                                    df = df.with_columns(pl.lit(symbol).alias("symbol"))
+                                symbol_dfs.append(df)
 
-                        all_symbol_data = pl.concat(symbol_dfs)
+                            all_symbol_data = pl.concat(symbol_dfs)
 
-                        with console.status(
-                            "[bold green]Preparing visualization "
-                            "(Datashader)...[/bold green]"
-                        ):
-                            plot_backtest_results(
-                                data=all_symbol_data,
-                                result=result,
-                                pair="Multi-Symbol",
-                                show_plot=True,
-                                start_date=args.viz_start,
-                                end_date=args.viz_end,
-                                timeframe=args.timeframe,
+                            with console.status(
+                                "[bold green]Preparing visualization "
+                                "(Datashader)...[/bold green]"
+                            ):
+                                plot_backtest_results(
+                                    data=all_symbol_data,
+                                    result=result,
+                                    pair="Multi-Symbol",
+                                    show_plot=True,
+                                    start_date=args.viz_start,
+                                    end_date=args.viz_end,
+                                    timeframe=args.timeframe,
+                                )
+                        except ImportError as e:
+                            logger.error(
+                                "Visualization module not found or dependency "
+                                "missing: %s",
+                                e,
+                            )
+                        except Exception as e:
+                            logger.error(
+                                "Failed to generate visualization: %s",
+                                e,
+                                exc_info=True,
                             )
 
-                    except ImportError as e:
-                        logger.error(
-                            "Visualization module not found or dependency "
-                            "missing: %s",
-                            e,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to generate visualization: %s",
-                            e,
-                            exc_info=True,
-                        )
+                    return 0  # Exit after portfolio mode completes
 
-                return 0
+                    return 0
 
             # Single-symbol path: use first (and only) pair
             _, args.data = pair_paths[0]
