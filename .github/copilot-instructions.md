@@ -7,6 +7,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - N/A (in-memory visualization) (017-dynamic-viz-indicators)
 - Python 3.11+ + NumPy (vectorized operations), pytest (testing) (018-strategy-trade-rules)
 - N/A (in-memory arrays) (018-strategy-trade-rules)
+- Python 3.11+ + Polars (vectorized data), HoloViews/Datashader (visualization), Pytest (testing) (019-fix-portfolio-viz)
+- N/A (stateless execution, outputs to files) (019-fix-portfolio-viz)
 
 - Python 3.13 + numpy, pandas, pydantic, rich (existing); no new dependencies required (002-directional-backtesting)
 - CSV files for price data input; text/JSON files for backtest results output (002-directional-backtesting)
@@ -103,10 +105,10 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - See Constitution Principle XI for full requirements
 
 ## Recent Changes
+- 019-fix-portfolio-viz: Added Python 3.11+ + Polars (vectorized data), HoloViews/Datashader (visualization), Pytest (testing)
 - 018-strategy-trade-rules: Added Python 3.11+ + NumPy (vectorized operations), pytest (testing)
 - 017-dynamic-viz-indicators: Added Python 3.13 + HoloViews 1.19+, hvplot 0.10+, Datashader 0.16+, Panel 1.4+, Bokeh 3.4+
 
-- 016-multi-symbol-viz: Added Python 3.13 + HoloViews, hvplot, Panel, Bokeh (existing visualization stack)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
