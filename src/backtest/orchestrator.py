@@ -1877,6 +1877,8 @@ class BacktestOrchestrator:
             logger.info("Simulating %d LONG signals", long_scan.signal_count)
             long_sim = simulator.simulate(
                 signal_indices=long_scan.signal_indices,
+                stop_prices=long_scan.stop_prices,
+                target_prices=long_scan.target_prices,
                 timestamps=timestamps,
                 ohlc_arrays=ohlc_arrays,
             )
@@ -1890,6 +1892,8 @@ class BacktestOrchestrator:
             logger.info("Simulating %d SHORT signals", short_scan.signal_count)
             short_sim = simulator.simulate(
                 signal_indices=short_scan.signal_indices,
+                stop_prices=short_scan.stop_prices,
+                target_prices=short_scan.target_prices,
                 timestamps=timestamps,
                 ohlc_arrays=ohlc_arrays,
             )
