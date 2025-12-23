@@ -265,6 +265,18 @@ class PortfolioSimulator:
 
         trades: list[ClosedTrade] = []
 
+        # Sort signals chronologically for proper position filtering
+        # (filtering assumes signals are processed in time order)
+        if signals:
+            signals = sorted(
+                signals,
+                key=lambda s: (
+                    s.timestamp_utc
+                    if hasattr(s, "timestamp_utc")
+                    else s.get("timestamp_utc") or s.get("timestamp")
+                ),
+            )
+
         # Create timestamp index for fast lookup
         ts_to_idx = {ts: i for i, ts in enumerate(timestamps)}
 
@@ -368,6 +380,35 @@ class PortfolioSimulator:
                 risk_amount=0.0,
             )
             trades.append(trade)
+
+        # Position filtering (like BatchSimulation): filter AFTER simulating all trades
+        if self.max_positions_per_symbol == 1 and len(trades) > 1:
+            filtered_trades = []
+            current_exit_idx = -1
+
+            for trade in trades:
+                entry_idx = ts_to_idx.get(trade.entry_timestamp)
+                exit_idx = ts_to_idx.get(trade.exit_timestamp)
+
+                if entry_idx is None or exit_idx is None:
+                    continue
+
+                # Skip trades that overlap with currently open position
+                if entry_idx <= current_exit_idx:
+                    continue
+
+                filtered_trades.append(trade)
+                current_exit_idx = exit_idx
+
+            if len(filtered_trades) < len(trades):
+                logger.info(
+                    "Position filter (%s): %d -> %d trades (removed %d)",
+                    symbol,
+                    len(trades),
+                    len(filtered_trades),
+                    len(trades) - len(filtered_trades),
+                )
+            trades = filtered_trades
 
         return trades
 
