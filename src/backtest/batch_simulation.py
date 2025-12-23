@@ -192,19 +192,23 @@ class BatchSimulation:
             and self.max_concurrent_positions > 0
         ):
             original_count = len(signal_indices)
+            original_signal_indices = signal_indices.copy()
+
             signal_indices = self._filter_signals_vectorized(
                 signal_indices, ohlc_arrays
             )
             n_signals = len(signal_indices)
 
-            # Filter stop/target arrays to match filtered signals
+            # Create boolean mask of which positions were kept
+            # Find positions in original array that match kept signal indices
+            kept_mask = np.isin(original_signal_indices, signal_indices)
+
+            # Filter stop/target arrays using the mask
             stop_prices = (
-                stop_prices[signal_indices] if len(stop_prices) > 0 else stop_prices
+                stop_prices[kept_mask] if len(stop_prices) > 0 else stop_prices
             )
             target_prices = (
-                target_prices[signal_indices]
-                if len(target_prices) > 0
-                else target_prices
+                target_prices[kept_mask] if len(target_prices) > 0 else target_prices
             )
 
             filter_elapsed = time_module.perf_counter() - filter_start
