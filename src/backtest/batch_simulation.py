@@ -132,6 +132,8 @@ class BatchSimulation:
     def simulate(
         self,
         signal_indices: np.ndarray,
+        stop_prices: np.ndarray,
+        target_prices: np.ndarray,
         timestamps: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
     ) -> SimulationResult:
@@ -139,6 +141,8 @@ class BatchSimulation:
 
         Args:
             signal_indices: Array of candle indices where signals were generated
+            stop_prices: Array of stop loss prices from strategy
+            target_prices: Array of take profit prices from strategy
             timestamps: Array of all timestamps
             ohlc_arrays: Tuple of (timestamps, open, high, low, close) arrays
 
@@ -193,6 +197,16 @@ class BatchSimulation:
             )
             n_signals = len(signal_indices)
 
+            # Filter stop/target arrays to match filtered signals
+            stop_prices = (
+                stop_prices[signal_indices] if len(stop_prices) > 0 else stop_prices
+            )
+            target_prices = (
+                target_prices[signal_indices]
+                if len(target_prices) > 0
+                else target_prices
+            )
+
             filter_elapsed = time_module.perf_counter() - filter_start
             logger.info(
                 "Position filter applied: %d -> %d signals (removed %d) in %.2fs",
@@ -211,10 +225,10 @@ class BatchSimulation:
 
         logger.info("Starting position initialization with %d signals...", n_signals)
 
-        # Initialize position state arrays
+        # Initialize position state arrays WITH STRATEGY'S STOP/TARGET PRICES
         init_start = time_module.perf_counter()
         position_state = self._initialize_positions(
-            signal_indices, timestamps, ohlc_arrays
+            signal_indices, stop_prices, target_prices, timestamps, ohlc_arrays
         )
         init_elapsed = time_module.perf_counter() - init_start
         logger.info("Position initialization complete in %.2fs", init_elapsed)
@@ -532,6 +546,8 @@ class BatchSimulation:
     def _initialize_positions(
         self,
         signal_indices: np.ndarray,
+        stop_prices_from_strategy: np.ndarray,
+        target_prices_from_strategy: np.ndarray,
         timestamps: np.ndarray,  # pylint: disable=unused-argument
         ohlc_arrays: tuple[np.ndarray, ...],
     ) -> PositionState:
@@ -539,6 +555,8 @@ class BatchSimulation:
 
         Args:
             signal_indices: Array of signal indices
+            stop_prices_from_strategy: Stop loss prices calculated by strategy (ATR-based)
+            target_prices_from_strategy: Take profit prices calculated by strategy (ATR-based)
             timestamps: Array of timestamps
             ohlc_arrays: OHLC price arrays
 
@@ -550,14 +568,14 @@ class BatchSimulation:
         # Extract price arrays
         _, open_prices, _high_prices, _low_prices, _close_prices = ohlc_arrays
 
-        # Initialize state arrays (placeholder values)
+        # Initialize state arrays
         entry_indices = signal_indices.copy()
         exit_indices = np.full(n_signals, -1, dtype=np.int64)  # -1 = still open
         entry_prices = open_prices[signal_indices]  # Entry at signal candle open
 
-        # Placeholder: calculate stop/target prices (to be implemented)
-        stop_prices = entry_prices * 0.99  # Placeholder 1% stop
-        target_prices = entry_prices * 1.02  # Placeholder 2% target
+        # USE STRATEGY'S ATR-BASED STOP/TARGET PRICES (not placeholders!)
+        stop_prices = stop_prices_from_strategy
+        target_prices = target_prices_from_strategy
 
         # Placeholder: all LONG positions for now
         directions = np.ones(n_signals, dtype=np.int8)  # 1=LONG, -1=SHORT

@@ -1609,6 +1609,8 @@ class BacktestOrchestrator:
         self._start_phase("simulation")
         sim_result = simulator.simulate(
             signal_indices=scan_result.signal_indices,
+            stop_prices=scan_result.stop_prices,
+            target_prices=scan_result.target_prices,
             timestamps=timestamps,
             ohlc_arrays=ohlc_arrays,
         )

@@ -32,6 +32,8 @@ class ScanResult:
 
     Attributes:
         signal_indices: NumPy array of indices where signals were generated
+        stop_prices: NumPy array of stop loss prices (from strategy)
+        target_prices: NumPy array of take profit prices (from strategy)
         signal_count: Total number of signals generated
         candles_processed: Number of candles processed
         duplicates_removed: Number of duplicate timestamps removed
@@ -40,6 +42,8 @@ class ScanResult:
     """
 
     signal_indices: np.ndarray
+    stop_prices: np.ndarray
+    target_prices: np.ndarray
     signal_count: int
     candles_processed: int
     duplicates_removed: int
@@ -163,7 +167,7 @@ class BatchScan:
             progress.start()
 
         # Step 5: Scan for signals using batch processing
-        signal_indices = self._scan_signals(
+        signal_indices, stop_prices, target_prices = self._scan_signals(
             timestamps=timestamps,
             ohlc_arrays=ohlc_arrays,
             indicator_arrays=indicator_arrays,
@@ -191,6 +195,8 @@ class BatchScan:
 
         return ScanResult(
             signal_indices=signal_indices,
+            stop_prices=stop_prices,
+            target_prices=target_prices,
             signal_count=len(signal_indices),
             candles_processed=len(timestamps),
             duplicates_removed=dedupe_result.duplicates_removed,
@@ -260,7 +266,7 @@ class BatchScan:
         ohlc_arrays: tuple[np.ndarray, ...],
         indicator_arrays: dict[str, np.ndarray],
         progress: Optional[ProgressDispatcher],
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Scan for signals using strategy's vectorized method.
 
         Delegates to strategy.scan_vectorized() for strategy-agnostic scanning.
@@ -273,7 +279,7 @@ class BatchScan:
             progress: Optional progress dispatcher
 
         Returns:
-            NumPy array of indices where signals were generated
+            Tuple of (signal_indices, stop_prices, target_prices) arrays
         """
         n_candles = len(timestamps)
 
