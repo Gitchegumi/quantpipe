@@ -33,6 +33,7 @@ class StrategyParameters(BaseModel):
         exit_target_max_candles: Max candles before switching from fixed target to trailing
          (default: 50).
         risk_per_trade_pct: Risk per trade as percentage of equity (default: 0.25).
+        account_balance: Account balance in base currency for position sizing (default: 2500.0).
         max_open_trades: Maximum concurrent open positions (default: 3).
         max_pair_exposure: Maximum exposure per currency pair (default: 1).
         max_drawdown_threshold: Maximum drawdown before halting (default: 0.10).
@@ -74,6 +75,9 @@ class StrategyParameters(BaseModel):
     atr_trail_mult: float = Field(default=3.0, gt=0.0, le=20.0)
     exit_target_max_candles: int = Field(default=50, gt=0, le=500)
     risk_per_trade_pct: float = Field(default=0.25, gt=0.0, le=5.0)
+    account_balance: float = Field(
+        default=2500.0, gt=0.0
+    )  # Account balance for position sizing
     max_open_trades: int = Field(default=3, gt=0, le=20)
     max_pair_exposure: int = Field(default=1, gt=0, le=10)
     max_drawdown_threshold: float = Field(default=0.10, gt=0.0, le=0.50)

@@ -97,7 +97,7 @@ class TrendPullbackStrategy(Strategy):
         indicator_arrays: dict[str, np.ndarray],
         parameters: dict,
         direction: str,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Scan for signals using vectorized operations.
 
         Implements trend-pullback logic using NumPy array operations:
@@ -112,7 +112,7 @@ class TrendPullbackStrategy(Strategy):
             direction: "LONG", "SHORT", or "BOTH"
 
         Returns:
-            Tuple of (signal_indices, stop_prices, target_prices) arrays
+            Tuple of (signal_indices, stop_prices, target_prices, position_sizes) arrays
         """
         # Extract required indicators (using actual registered names)
         ema20 = indicator_arrays["ema20"]
@@ -163,7 +163,7 @@ class TrendPullbackStrategy(Strategy):
 
         # Calculate stop/target prices from ATR (strategy logic, not backtester!)
         if len(signal_indices) == 0:
-            return signal_indices, np.array([]), np.array([])
+            return signal_indices, np.array([]), np.array([]), np.array([])
 
         entry_prices = close[signal_indices]
         atr_values = (
@@ -195,7 +195,24 @@ class TrendPullbackStrategy(Strategy):
                 entry_prices - (atr_values * target_atr_mult),
             )
 
-        return signal_indices, stop_prices, target_prices
+        # Calculate position sizes based on risk parameters (strategy responsibility!)
+        account_balance = parameters.get("account_balance", 2500.0)
+        risk_per_trade_pct = parameters.get("risk_per_trade_pct", 0.25)  # 0.25%
+        pip_value = 10.0  # Standard forex pip value
+
+        # Calculate stop distance in pips
+        stop_distances_pips = np.abs(entry_prices - stop_prices) * 10000
+        stop_distances_pips = np.maximum(stop_distances_pips, 0.1)  # Avoid div by zero
+
+        # Calculate risk amount and position sizes
+        risk_amount = account_balance * (risk_per_trade_pct / 100.0)
+        position_sizes = risk_amount / (stop_distances_pips * pip_value)
+
+        # Round to lot step and clamp
+        position_sizes = np.floor(position_sizes / 0.01) * 0.01
+        position_sizes = np.clip(position_sizes, 0.01, 10.0)
+
+        return signal_indices, stop_prices, target_prices, position_sizes
 
 
 # Global instance for easy access

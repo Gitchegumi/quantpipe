@@ -134,6 +134,7 @@ class BatchSimulation:
         signal_indices: np.ndarray,
         stop_prices: np.ndarray,
         target_prices: np.ndarray,
+        position_sizes: np.ndarray,
         timestamps: np.ndarray,
         ohlc_arrays: tuple[np.ndarray, ...],
         direction: str = "LONG",
@@ -144,6 +145,7 @@ class BatchSimulation:
             signal_indices: Array of candle indices where signals were generated
             stop_prices: Array of stop loss prices from strategy
             target_prices: Array of take profit prices from strategy
+            position_sizes: Array of position sizes from strategy (lots)
             timestamps: Array of all timestamps
             ohlc_arrays: Tuple of (timestamps, open, high, low, close) arrays
             direction: Trade direction - "LONG" or "SHORT"
@@ -205,12 +207,15 @@ class BatchSimulation:
             # Find positions in original array that match kept signal indices
             kept_mask = np.isin(original_signal_indices, signal_indices)
 
-            # Filter stop/target arrays using the mask
+            # Filter stop/target/position_sizes arrays using the mask
             stop_prices = (
                 stop_prices[kept_mask] if len(stop_prices) > 0 else stop_prices
             )
             target_prices = (
                 target_prices[kept_mask] if len(target_prices) > 0 else target_prices
+            )
+            position_sizes = (
+                position_sizes[kept_mask] if len(position_sizes) > 0 else position_sizes
             )
 
             filter_elapsed = time_module.perf_counter() - filter_start
@@ -237,6 +242,7 @@ class BatchSimulation:
             signal_indices,
             stop_prices,
             target_prices,
+            position_sizes,
             timestamps,
             ohlc_arrays,
             direction,
@@ -571,6 +577,7 @@ class BatchSimulation:
         signal_indices: np.ndarray,
         stop_prices_from_strategy: np.ndarray,
         target_prices_from_strategy: np.ndarray,
+        position_sizes_from_strategy: np.ndarray,
         timestamps: np.ndarray,  # pylint: disable=unused-argument
         ohlc_arrays: tuple[np.ndarray, ...],
         direction: str = "LONG",
@@ -581,6 +588,7 @@ class BatchSimulation:
             signal_indices: Array of signal indices
             stop_prices_from_strategy: Stop loss prices calculated by strategy (ATR-based)
             target_prices_from_strategy: Take profit prices calculated by strategy (ATR-based)
+            position_sizes_from_strategy: Position sizes calculated by strategy (lots)
             timestamps: Array of timestamps
             ohlc_arrays: OHLC price arrays
             direction: Trade direction ("LONG" or "SHORT")
@@ -598,14 +606,17 @@ class BatchSimulation:
         exit_indices = np.full(n_signals, -1, dtype=np.int64)  # -1 = still open
         entry_prices = open_prices[signal_indices]  # Entry at signal candle open
 
-        # USE STRATEGY'S ATR-BASED STOP/TARGET PRICES (not placeholders!)
+        # USE STRATEGY'S STOP/TARGET PRICES (not placeholders!)
         stop_prices = stop_prices_from_strategy
         target_prices = target_prices_from_strategy
 
         # Set direction based on trade type (1=LONG, -1=SHORT)
         direction_value = 1 if direction == "LONG" else -1
         directions = np.full(n_signals, direction_value, dtype=np.int8)
-        position_sizes = np.ones(n_signals)  # Placeholder unit size
+
+        # USE STRATEGY'S POSITION SIZES (calculated based on risk parameters)
+        position_sizes = position_sizes_from_strategy
+
         is_open = np.ones(n_signals, dtype=bool)
 
         logger.debug("Initialized position state for %d signals", n_signals)
@@ -736,6 +747,7 @@ class BatchSimulation:
             adjusted_exits,
             position_state.directions,
             position_state.position_sizes,
+            position_state.stop_prices,
             pip_value=10.0,
         )
 

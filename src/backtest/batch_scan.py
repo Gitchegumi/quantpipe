@@ -33,6 +33,7 @@ class ScanResult:
         signal_indices: NumPy array of indices where signals were generated
         stop_prices: NumPy array of stop loss prices (from strategy)
         target_prices: NumPy array of take profit prices (from strategy)
+        position_sizes: NumPy array of position sizes (from strategy)
         signal_count: Total number of signals generated
         candles_processed: Number of candles processed
         duplicates_removed: Number of duplicate timestamps removed
@@ -43,6 +44,7 @@ class ScanResult:
     signal_indices: np.ndarray
     stop_prices: np.ndarray
     target_prices: np.ndarray
+    position_sizes: np.ndarray
     signal_count: int
     candles_processed: int
     duplicates_removed: int
@@ -166,7 +168,7 @@ class BatchScan:
             progress.start()
 
         # Step 5: Scan for signals using batch processing
-        signal_indices, stop_prices, target_prices = self._scan_signals(
+        signal_indices, stop_prices, target_prices, position_sizes = self._scan_signals(
             timestamps=timestamps,
             ohlc_arrays=ohlc_arrays,
             indicator_arrays=indicator_arrays,
@@ -196,6 +198,7 @@ class BatchScan:
             signal_indices=signal_indices,
             stop_prices=stop_prices,
             target_prices=target_prices,
+            position_sizes=position_sizes,
             signal_count=len(signal_indices),
             candles_processed=len(timestamps),
             duplicates_removed=dedupe_result.duplicates_removed,
@@ -273,7 +276,7 @@ class BatchScan:
             progress: Optional progress dispatcher
 
         Returns:
-            Tuple of (signal_indices, stop_prices, target_prices) arrays
+            Tuple of (signal_indices, stop_prices, target_prices, position_sizes) arrays
         """
         n_candles = len(timestamps)
 
@@ -287,16 +290,23 @@ class BatchScan:
                 "Cannot perform batch scanning.",
                 self.strategy.metadata.name,
             )
-            return np.array([], dtype=np.int64), np.array([]), np.array([])
+            return (
+                np.array([], dtype=np.int64),
+                np.array([]),
+                np.array([]),
+                np.array([]),
+            )
 
         # Delegate to strategy's vectorized scan method
         try:
-            # Strategy returns (indices, stop_prices, target_prices)
-            signal_indices, stop_prices, target_prices = self.strategy.scan_vectorized(
-                close=close_arr,
-                indicator_arrays=indicator_arrays,
-                parameters=self.parameters,
-                direction=self.direction,
+            # Strategy returns (indices, stop_prices, target_prices, position_sizes)
+            signal_indices, stop_prices, target_prices, position_sizes = (
+                self.strategy.scan_vectorized(
+                    close=close_arr,
+                    indicator_arrays=indicator_arrays,
+                    parameters=self.parameters,
+                    direction=self.direction,
+                )
             )
 
             # Update progress to completion
@@ -309,7 +319,7 @@ class BatchScan:
                 n_candles,
             )
 
-            return signal_indices, stop_prices, target_prices
+            return signal_indices, stop_prices, target_prices, position_sizes
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error(
@@ -317,4 +327,9 @@ class BatchScan:
                 e,
                 exc_info=True,
             )
-            return np.array([], dtype=np.int64), np.array([]), np.array([])
+            return (
+                np.array([], dtype=np.int64),
+                np.array([]),
+                np.array([]),
+                np.array([]),
+            )

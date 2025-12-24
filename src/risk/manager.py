@@ -80,8 +80,12 @@ def calculate_position_size(
     risk_amount = account_balance * (risk_per_trade_pct / 100.0)
 
     # Calculate stop distance in pips
+    # JPY pairs have 2 decimal places (1 pip = 0.01)
+    # Other pairs have 4 decimal places (1 pip = 0.0001)
     price_difference = abs(signal.entry_price - signal.initial_stop_price)
-    stop_distance_pips = price_difference * 10000  # Forex pips conversion
+    is_jpy_pair = "JPY" in signal.pair.upper()
+    pip_multiplier = 100.0 if is_jpy_pair else 10000.0
+    stop_distance_pips = price_difference * pip_multiplier
 
     if stop_distance_pips == 0:
         logger.warning("Stop distance is zero, cannot calculate position size")
@@ -104,7 +108,7 @@ def calculate_position_size(
 
     # Ensure minimum position size
     if position_size < lot_step:
-        logger.warning(
+        logger.debug(
             "Calculated position size %.2f below minimum %.2f, using minimum",
             position_size,
             lot_step,
