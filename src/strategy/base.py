@@ -68,7 +68,7 @@ class Strategy(Protocol):
         indicator_arrays: dict[str, "np.ndarray"],
         parameters: dict,
         direction: str,
-    ) -> "np.ndarray":
+    ) -> tuple["np.ndarray", "np.ndarray", "np.ndarray", "np.ndarray"]:
         """Scan for signals using vectorized operations (optional, for performance).
 
         This is an optional method that strategies can implement for high-performance
@@ -83,7 +83,7 @@ class Strategy(Protocol):
             direction: Trading direction ("LONG", "SHORT", or "BOTH")
 
         Returns:
-            NumPy array of indices where signals occur
+            Tuple of (signal_indices, stop_prices, target_prices, position_sizes) arrays
 
         Raises:
             NotImplementedError: If strategy doesn't support vectorized scanning

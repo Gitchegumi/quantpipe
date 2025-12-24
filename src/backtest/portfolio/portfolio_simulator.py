@@ -38,6 +38,8 @@ class ClosedTrade:
         pnl_dollars: Profit/loss in dollars
         pnl_r: Profit/loss as R-multiple
         risk_amount: Original risk amount
+        portfolio_balance_at_exit: Portfolio balance after this trade closed
+        risk_percent: Risk percentage used for this trade (e.g., 0.0025 = 0.25%)
     """
 
     symbol: str
@@ -51,6 +53,8 @@ class ClosedTrade:
     pnl_dollars: float
     pnl_r: float
     risk_amount: float
+    portfolio_balance_at_exit: float = 0.0
+    risk_percent: float = 0.0025  # Default 0.25%
 
 
 @dataclass
@@ -198,13 +202,18 @@ class PortfolioSimulator:
 
         # Phase 3: Update equity chronologically
         for trade in all_trades:
-            # Recalculate P&L based on current equity at trade entry time
-            # For now, use fixed R-multiple from signal
-            pnl_dollars = trade.pnl_r * (self.current_equity * self.risk_per_trade)
+            # Calculate P&L based on current equity at trade entry time
+            risk_amount = self.current_equity * self.risk_per_trade
+            pnl_dollars = trade.pnl_r * risk_amount
             trade.pnl_dollars = pnl_dollars
-            trade.risk_amount = self.current_equity * self.risk_per_trade
+            trade.risk_amount = risk_amount
+            trade.risk_percent = self.risk_per_trade
 
             self.current_equity += pnl_dollars
+
+            # Record portfolio balance AFTER this trade closed
+            trade.portfolio_balance_at_exit = self.current_equity
+
             self.closed_trades.append(trade)
             self.equity_curve.append((trade.exit_timestamp, self.current_equity))
 
@@ -331,8 +340,41 @@ class PortfolioSimulator:
         if not entries:
             return []
 
-        # 3. Run Shared Batch Simulation
-        results = simulate_trades_batch(entries, data_pd)
+        # 3. Sort entries by entry index and run simulation
+        entries.sort(key=lambda e: e["entry_index"])
+        all_results = simulate_trades_batch(entries, data_pd)
+
+        # 4. Filter overlapping trades to enforce max_positions_per_symbol
+        # Iterate through trades chronologically, only keeping those that don't
+        # exceed the concurrent position limit
+        filtered_entries = []
+        filtered_results = []
+        open_positions = []  # List of exit_idx for currently open trades
+
+        for entry, result in zip(entries, all_results, strict=False):
+            entry_idx = entry["entry_index"]
+            exit_idx = result.get("exit_index") or entry_idx
+
+            # Remove closed positions (those that exited before current entry)
+            open_positions = [x for x in open_positions if x > entry_idx]
+
+            # Check if we can open a new position
+            if len(open_positions) < self.max_positions_per_symbol:
+                filtered_entries.append(entry)
+                filtered_results.append(result)
+                open_positions.append(exit_idx)
+
+        logger.debug(
+            "Position filter for %s: %d -> %d signals (max_concurrent=%d)",
+            symbol,
+            len(entries),
+            len(filtered_entries),
+            self.max_positions_per_symbol,
+        )
+
+        # Use filtered results
+        results = filtered_results
+        entries = filtered_entries
 
         # 4. Convert Results to ClosedTrade
         closed_trades = []

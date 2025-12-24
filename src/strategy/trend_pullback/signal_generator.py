@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from ...models.core import Candle, TradeSignal
+from ...risk.manager import calculate_position_size
 from ...strategy.id_factory import compute_parameters_hash, generate_signal_id
 from .pullback_detector import detect_pullback
 from .reversal import detect_reversal
@@ -139,8 +140,11 @@ def generate_long_signals(
     target_r_mult = parameters.get("target_r_mult", 2.0)
     target_price = entry_price + (stop_distance * target_r_mult)
 
-    # Calculate position size (placeholder - will be done by risk manager)
-    position_size = 0.01  # Temporary value
+    # Calculate position size based on account balance and risk percentage
+    account_balance = parameters.get("account_balance", 2500.0)  # Default $2,500
+    position_size = (
+        0.01  # Temporary placeholder, will be calculated after signal creation
+    )
 
     # Generate deterministic signal ID
     signal_id = generate_signal_id(
@@ -153,7 +157,7 @@ def generate_long_signals(
         parameters_hash=parameters_hash,
     )
 
-    # Create signal
+    # Create signal with placeholder position size
     signal = TradeSignal(
         id=signal_id,
         pair=parameters.get("pair", "EURUSD"),
@@ -162,7 +166,32 @@ def generate_long_signals(
         initial_stop_price=stop_price,
         target_price=target_price,  # Strategy-defined TP
         risk_per_trade_pct=parameters.get("position_risk_pct", 0.25),
-        calc_position_size=position_size,
+        calc_position_size=position_size,  # Will be updated below
+        tags=["pullback", "reversal", "long"],
+        version="0.1.0",
+        timestamp_utc=latest_candle.timestamp_utc,
+    )
+
+    # Calculate actual position size based on risk parameters
+    calculated_position_size = calculate_position_size(
+        signal=signal,
+        account_balance=account_balance,
+        risk_per_trade_pct=signal.risk_per_trade_pct,
+        pip_value=10.0,
+        lot_step=0.01,
+        max_position_size=10.0,
+    )
+
+    # Create final signal with correct position size
+    signal = TradeSignal(
+        id=signal_id,
+        pair=parameters.get("pair", "EURUSD"),
+        direction="LONG",
+        entry_price=entry_price,
+        initial_stop_price=stop_price,
+        target_price=target_price,  # Strategy-defined TP
+        risk_per_trade_pct=parameters.get("risk_per_trade_pct", 0.25),
+        calc_position_size=calculated_position_size,
         tags=["pullback", "reversal", "long"],
         version="0.1.0",
         timestamp_utc=latest_candle.timestamp_utc,
@@ -301,8 +330,11 @@ def generate_short_signals(
         stop_distance * target_r_mult
     )  # Target below for shorts
 
-    # Calculate position size (placeholder - will be done by risk manager)
-    position_size = 0.01  # Temporary value
+    # Calculate position size based on account balance and risk percentage
+    account_balance = parameters.get("account_balance", 2500.0)  # Default $2,500
+    position_size = (
+        0.01  # Temporary placeholder, will be calculated after signal creation
+    )
 
     # Generate deterministic signal ID
     signal_id = generate_signal_id(
@@ -315,7 +347,7 @@ def generate_short_signals(
         parameters_hash=parameters_hash,
     )
 
-    # Create signal
+    # Create signal with placeholder position size
     signal = TradeSignal(
         id=signal_id,
         pair=parameters.get("pair", "EURUSD"),
@@ -324,7 +356,32 @@ def generate_short_signals(
         initial_stop_price=stop_price,
         target_price=target_price,  # Strategy-defined TP
         risk_per_trade_pct=parameters.get("position_risk_pct", 0.25),
-        calc_position_size=position_size,
+        calc_position_size=position_size,  # Will be updated below
+        tags=["pullback", "reversal", "short"],
+        version="0.1.0",
+        timestamp_utc=latest_candle.timestamp_utc,
+    )
+
+    # Calculate actual position size based on risk parameters
+    calculated_position_size = calculate_position_size(
+        signal=signal,
+        account_balance=account_balance,
+        risk_per_trade_pct=signal.risk_per_trade_pct,
+        pip_value=10.0,
+        lot_step=0.01,
+        max_position_size=10.0,
+    )
+
+    # Create final signal with correct position size
+    signal = TradeSignal(
+        id=signal_id,
+        pair=parameters.get("pair", "EURUSD"),
+        direction="SHORT",
+        entry_price=entry_price,
+        initial_stop_price=stop_price,
+        target_price=target_price,  # Strategy-defined TP
+        risk_per_trade_pct=parameters.get("position_risk_pct", 0.25),
+        calc_position_size=calculated_position_size,
         tags=["pullback", "reversal", "short"],
         version="0.1.0",
         timestamp_utc=latest_candle.timestamp_utc,

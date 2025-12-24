@@ -15,6 +15,7 @@ import numpy as np
 from datetime import datetime
 
 from ...models.core import TradeSignal
+from ...risk.manager import calculate_position_size
 from ...strategy.id_factory import compute_parameters_hash, generate_signal_id
 
 
@@ -202,7 +203,7 @@ def _generate_long_signals_vec(
     signals = []
     stop_mult = parameters.get("stop_loss_atr_multiplier", 2.0)
     target_r_mult = parameters.get("target_r_mult", 2.0)  # Strategy's reward/risk
-    risk_pct = parameters.get("position_risk_pct", 0.25)
+    risk_pct = parameters.get("risk_per_trade_pct", 0.25)
     pair = parameters.get("pair", "EURUSD")
 
     # We iterate over the *filtered* rows, which should be very few compared to total data
@@ -228,6 +229,7 @@ def _generate_long_signals_vec(
             parameters_hash=parameters_hash,
         )
 
+        # Create signal with placeholder position size first
         signal = TradeSignal(
             id=signal_id,
             pair=pair,
@@ -236,7 +238,33 @@ def _generate_long_signals_vec(
             initial_stop_price=stop_price,
             target_price=target_price,  # Strategy-defined TP
             risk_per_trade_pct=risk_pct,
-            calc_position_size=0.01,
+            calc_position_size=0.01,  # Placeholder, will be calculated
+            tags=tags,
+            version="0.1.0",
+            timestamp_utc=timestamp,
+        )
+
+        # Calculate actual position size based on risk parameters
+        account_balance = parameters.get("account_balance", 2500.0)
+        calculated_position_size = calculate_position_size(
+            signal=signal,
+            account_balance=account_balance,
+            risk_per_trade_pct=signal.risk_per_trade_pct,
+            pip_value=10.0,
+            lot_step=0.01,
+            max_position_size=10.0,
+        )
+
+        # Create final signal with correct position size
+        signal = TradeSignal(
+            id=signal_id,
+            pair=pair,
+            direction="LONG",
+            entry_price=entry_price,
+            initial_stop_price=stop_price,
+            target_price=target_price,  # Strategy-defined TP
+            risk_per_trade_pct=risk_pct,
+            calc_position_size=calculated_position_size,
             tags=tags,
             version="0.1.0",
             timestamp_utc=timestamp,
@@ -320,7 +348,7 @@ def _generate_short_signals_vec(
     signals = []
     stop_mult = parameters.get("stop_loss_atr_multiplier", 2.0)
     target_r_mult = parameters.get("target_r_mult", 2.0)  # Strategy's reward/risk
-    risk_pct = parameters.get("position_risk_pct", 0.25)
+    risk_pct = parameters.get("risk_per_trade_pct", 0.25)
     pair = parameters.get("pair", "EURUSD")
 
     for row in signal_df.iter_rows(named=True):
@@ -343,6 +371,7 @@ def _generate_short_signals_vec(
             parameters_hash=parameters_hash,
         )
 
+        # Create signal with placeholder position size first
         signal = TradeSignal(
             id=signal_id,
             pair=pair,
@@ -351,7 +380,33 @@ def _generate_short_signals_vec(
             initial_stop_price=stop_price,
             target_price=target_price,  # Strategy-defined TP
             risk_per_trade_pct=risk_pct,
-            calc_position_size=0.01,
+            calc_position_size=0.01,  # Placeholder, will be calculated
+            tags=tags,
+            version="0.1.0",
+            timestamp_utc=timestamp,
+        )
+
+        # Calculate actual position size based on risk parameters
+        account_balance = parameters.get("account_balance", 2500.0)
+        calculated_position_size = calculate_position_size(
+            signal=signal,
+            account_balance=account_balance,
+            risk_per_trade_pct=signal.risk_per_trade_pct,
+            pip_value=10.0,
+            lot_step=0.01,
+            max_position_size=10.0,
+        )
+
+        # Create final signal with correct position size
+        signal = TradeSignal(
+            id=signal_id,
+            pair=pair,
+            direction="SHORT",
+            entry_price=entry_price,
+            initial_stop_price=stop_price,
+            target_price=target_price,  # Strategy-defined TP
+            risk_per_trade_pct=risk_pct,
+            calc_position_size=calculated_position_size,
             tags=tags,
             version="0.1.0",
             timestamp_utc=timestamp,

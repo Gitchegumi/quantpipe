@@ -172,6 +172,7 @@ def calculate_pnl_vectorized(
     exit_prices: np.ndarray,
     directions: np.ndarray,
     position_sizes: np.ndarray,
+    stop_prices: np.ndarray,
     pip_value: float = 10.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Calculate PnL vectorially for closed positions.
@@ -181,6 +182,7 @@ def calculate_pnl_vectorized(
         exit_prices: Exit fill prices
         directions: Position directions (1=LONG, -1=SHORT)
         position_sizes: Position sizes (lots)
+        stop_prices: Stop loss prices for calculating R-multiples
         pip_value: Value per pip per lot (default: 10.0 for standard forex)
 
     Returns:
@@ -197,9 +199,11 @@ def calculate_pnl_vectorized(
     # Calculate currency PnL
     pnl_currency = directional_pips * pip_value * position_sizes
 
-    # Calculate R multiples (placeholder: assume 1R = initial risk)
-    # This should be calculated based on actual stop distance
-    pnl_r = directional_pips / 100.0  # Placeholder: 100 pips = 1R
+    # Calculate R multiples based on actual stop distance
+    # R = price_move / stop_distance
+    stop_distance_pips = np.abs(entry_prices - stop_prices) * 10000
+    stop_distance_pips = np.maximum(stop_distance_pips, 0.1)  # Avoid div by zero
+    pnl_r = directional_pips / stop_distance_pips
 
     logger.debug(
         "Calculated PnL for %d positions: total=%.2f currency, avg_r=%.2f",

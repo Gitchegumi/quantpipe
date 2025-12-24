@@ -577,6 +577,23 @@ def _create_trade_boxes(
                 tp_price = entry_price - 2 * risk
                 sl_price = entry_price + risk
 
+        # Get position size (risk amount) from trade
+        position_size = getattr(trade, "risk_amount", 0.0)
+
+        # Calculate TP/SL dollar values from actual strategy levels
+        # R-multiple for TP = (TP distance from entry) / (SL distance from entry)
+        if direction == "LONG":
+            sl_distance = abs(entry_price - sl_price) if sl_price > 0 else 0
+            tp_distance = abs(tp_price - entry_price) if tp_price > 0 else 0
+        else:  # SHORT
+            sl_distance = abs(sl_price - entry_price) if sl_price > 0 else 0
+            tp_distance = abs(entry_price - tp_price) if tp_price > 0 else 0
+
+        # Calculate actual R-multiple for TP based on strategy levels
+        tp_r_mult = tp_distance / sl_distance if sl_distance > 0 else 2.0
+        tp_value = position_size * tp_r_mult  # Potential profit if TP hit
+        sl_value = position_size * -1.0  # SL is always -1R
+
         entries.append(
             {
                 "time": entry_time,
@@ -586,15 +603,35 @@ def _create_trade_boxes(
                 "sl_price": sl_price,
                 "direction": direction,
                 "pnl_r": pnl_r,
+                "position_size": position_size,
+                "tp_value": tp_value,
+                "sl_value": sl_value,
             }
         )
+        # Extract portfolio tracking fields (if available from ClosedTrade)
+        portfolio_balance = getattr(trade, "portfolio_balance_at_exit", 0.0)
+        risk_percent = getattr(trade, "risk_percent", 0.0025)
+        risk_amount = getattr(trade, "risk_amount", 0.0)
+
+        # If risk_amount not set, calculate from balance and percent
+        if risk_amount == 0.0 and portfolio_balance > 0:
+            # Approximate: use balance before trade (before pnl applied)
+            balance_before = portfolio_balance - (
+                pnl_r * risk_percent * portfolio_balance
+            )
+            risk_amount = balance_before * risk_percent if balance_before > 0 else 0.0
 
         exits.append(
             {
                 "time": exit_time,
                 "price": exit_price,
                 "pnl_r": pnl_r,
-                "pnl_dollars": pnl_r * risk_per_trade,  # Convert R to dollars
+                "pnl_dollars": (
+                    pnl_r * risk_amount if risk_amount > 0 else pnl_r * risk_per_trade
+                ),
+                "portfolio_balance": portfolio_balance,
+                "risk_percent": risk_percent * 100,  # Convert to percentage
+                "risk_value": risk_amount,
             }
         )
 
@@ -621,6 +658,7 @@ def _create_trade_boxes(
             size=80,
             alpha=0.9,
             label="Long Entry",
+            hover_cols=["position_size", "tp_value", "sl_value"],
         )
         markers = long_markers
 
@@ -633,6 +671,7 @@ def _create_trade_boxes(
             size=80,
             alpha=0.9,
             label="Short Entry",
+            hover_cols=["position_size", "tp_value", "sl_value"],
         )
         markers = markers * short_markers if markers else short_markers
 
@@ -650,7 +689,13 @@ def _create_trade_boxes(
                 size=100,
                 alpha=1.0,
                 label="Win Exit",
-                hover_cols=["pnl_r", "pnl_dollars"],
+                hover_cols=[
+                    "pnl_r",
+                    "pnl_dollars",
+                    "portfolio_balance",
+                    "risk_percent",
+                    "risk_value",
+                ],
             )
             markers = markers * winner_markers if markers else winner_markers
 
@@ -663,7 +708,13 @@ def _create_trade_boxes(
                 size=100,
                 alpha=1.0,
                 label="Loss Exit",
-                hover_cols=["pnl_r", "pnl_dollars"],
+                hover_cols=[
+                    "pnl_r",
+                    "pnl_dollars",
+                    "portfolio_balance",
+                    "risk_percent",
+                    "risk_value",
+                ],
             )
             markers = markers * loser_markers if markers else loser_markers
 
@@ -972,7 +1023,15 @@ def _create_portfolio_curve(
     for trade in all_trades:
         if hasattr(trade, "close_timestamp") and hasattr(trade, "pnl_r"):
             ts = _to_naive_datetime(trade.close_timestamp)
-            trade_data.append({"timestamp": ts, "pnl_r": trade.pnl_r})
+            # Use actual portfolio balance if available (from ClosedTrade)
+            portfolio_balance = getattr(trade, "portfolio_balance_at_exit", 0.0)
+            trade_data.append(
+                {
+                    "timestamp": ts,
+                    "pnl_r": trade.pnl_r,
+                    "portfolio_balance": portfolio_balance,
+                }
+            )
 
     if not trade_data:
         return None
@@ -980,20 +1039,43 @@ def _create_portfolio_curve(
     trade_df = pd.DataFrame(trade_data).sort_values("timestamp")
     trade_df = trade_df.set_index("timestamp")
 
-    # Calculate cumulative portfolio value
-    trade_df["pnl_dollars"] = trade_df["pnl_r"] * risk_per_trade
-    trade_df["portfolio_value"] = initial_balance + trade_df["pnl_dollars"].cumsum()
+    # Use actual portfolio balance if available, otherwise calculate with cumsum
+    if trade_df["portfolio_balance"].sum() > 0:
+        # Has actual balance data from simulation
+        trade_df["portfolio_value"] = trade_df["portfolio_balance"]
+    else:
+        # Fallback: calculate using fixed risk (legacy mode)
+        trade_df["pnl_dollars"] = trade_df["pnl_r"] * risk_per_trade
+        trade_df["portfolio_value"] = initial_balance + trade_df["pnl_dollars"].cumsum()
 
-    # Create line chart using datetime x-axis
+    # Add formatted time string for hover tooltip
+    trade_df = trade_df.reset_index()
+    trade_df["time_str"] = trade_df["timestamp"].dt.strftime("%Y-%m-%d %H:%M")
+    trade_df = trade_df.set_index("timestamp")
+
+    # Create hover tooltip for balance display
+    tooltips = [
+        ("Time", "@time_str"),
+        ("Balance", "$@portfolio_value{0,0.00}"),
+    ]
+
+    # Create line chart with crosshair and hover
     curve = trade_df.hvplot.line(
         y="portfolio_value",
-        label="Portfolio Value ($)",
+        label="Portfolio Balance ($)",
         color="cyan",
         height=200,
         width=1200,
+        hover_cols=["time_str", "portfolio_value"],
     ).opts(
-        ylabel="Portfolio Value ($)",
-        tools=["pan", "wheel_zoom", "reset"],
+        ylabel="Portfolio Balance ($)",
+        tools=[
+            "pan",
+            "wheel_zoom",
+            "reset",
+            HoverTool(tooltips=tooltips, mode="vline"),
+            CrosshairTool(dimensions="both", line_color="gray", line_alpha=0.5),
+        ],
     )
 
     logger.info("Created portfolio curve with %d trade events.", len(trade_df))

@@ -323,6 +323,10 @@ class TradeExecution:
     slippage_exit_pips: float = 0.0
     costs_total: float = 0.0
     direction: str = ""  # Literal['LONG', 'SHORT'], empty for backward compatibility
+    # Portfolio tracking fields for visualization
+    portfolio_balance_at_exit: float = 0.0
+    risk_percent: float = 0.0025  # Default 0.25%
+    risk_amount: float = 0.0
 
 
 @dataclass(frozen=True)

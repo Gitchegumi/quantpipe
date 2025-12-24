@@ -233,9 +233,12 @@ def run_portfolio_backtest(
     for pair, df in symbol_data.items():
         logger.info("Generating signals for %s", pair)
 
+        # Include pair in parameters for position sizing (JPY has different pip value)
+        params = strategy_params.model_dump()
+        params["pair"] = pair
         signals = generate_signals_vectorized(
             df,
-            parameters=strategy_params.model_dump(),
+            parameters=params,
             direction_mode=direction_mode.value,
         )
         symbol_signals[pair] = signals
@@ -646,14 +649,13 @@ def main():
 (default: True for multi-strategy)",
     )
 
-    # Multi-symbol portfolio mode (013-multi-symbol-backtest)
+    # Account balance for position sizing (unified architecture)
     parser.add_argument(
-        "--portfolio-mode",
-        action="store_true",
-        help="Enable time-synchronized portfolio simulation with shared equity. "
-        "When enabled, all symbols trade against a shared running balance, "
-        "wins/losses affect capital available for subsequent trades. "
-        "Default: Independent mode (each symbol runs in isolation).",
+        "--starting-balance",
+        type=float,
+        default=2500.0,
+        help="Starting account balance for position sizing (default: $2500). "
+        "All symbols trade against this shared balance.",
     )
 
     parser.add_argument(
@@ -856,151 +858,121 @@ Persistent storage not yet implemented."
             # Use new construct_data_paths() for multi-pair support (T008-T011)
             pair_paths = construct_data_paths(args.pair, args.dataset)
 
-            # Multi-symbol path: use run_multi_symbol_backtest() (T019)
-            if len(pair_paths) > 1 or len(args.pair) > 1:
-                logger.info(
-                    "Multi-symbol mode: %d pairs specified, %d with data",
-                    len(args.pair),
-                    len(pair_paths),
-                )
+            # Unified backtest path: always use run_portfolio_backtest (1 or N symbols)
+            logger.info(
+                "Backtest: %d symbol(s), $%.2f starting balance",
+                len(pair_paths),
+                args.starting_balance,
+            )
 
-                # Load strategy parameters
-                parameters = StrategyParameters()
-                direction_mode = DirectionMode[args.direction]
-                show_progress = sys.stdout.isatty()
+            # Load strategy parameters
+            parameters = StrategyParameters()
+            direction_mode = DirectionMode[args.direction]
+            show_progress = sys.stdout.isatty()
 
-                # Check for portfolio mode (time-synchronized shared equity)
-                if hasattr(args, "portfolio_mode") and args.portfolio_mode:
-                    logger.info(
-                        "Portfolio mode ENABLED: time-synchronized with shared equity"
+            result, enriched_data = run_portfolio_backtest(
+                pair_paths=pair_paths,
+                direction_mode=direction_mode,
+                strategy_params=parameters,
+                starting_equity=args.starting_balance,
+                dry_run=args.dry_run,
+                show_progress=show_progress,
+                timeframe=args.timeframe,
+            )
+
+            # Format and output portfolio results
+            from ..data_io.formatters import (
+                format_portfolio_json_output,
+                format_portfolio_text_output,
+            )
+
+            output_format = (
+                OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
+            )
+
+            if output_format == OutputFormat.JSON:
+                output_content = format_portfolio_json_output(result)
+            else:
+                output_content = format_portfolio_text_output(result)
+
+            # Generate output filename
+            output_filename = generate_output_filename(
+                direction=direction_mode,
+                output_format=output_format,
+                timestamp=result.start_time,
+                symbol_tag="portfolio",
+                timeframe_tag=(args.timeframe if args.timeframe != "1m" else None),
+            )
+
+            # Write results to file
+            output_path = args.output / output_filename
+            args.output.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(output_content)
+            logger.info("Results written to %s", output_path)
+            if args.visualize:
+                try:
+                    from ..visualization.datashader_viz import (
+                        plot_backtest_results,
                     )
-                    result, enriched_data = run_portfolio_backtest(
-                        pair_paths=pair_paths,
-                        direction_mode=direction_mode,
-                        strategy_params=parameters,
-                        starting_equity=DEFAULT_ACCOUNT_BALANCE,
-                        dry_run=args.dry_run,
-                        show_progress=show_progress,
-                        timeframe=args.timeframe,  # T014
-                    )
+                    from rich.console import Console
 
-                    # Format and output portfolio results
-                    from ..data_io.formatters import (
-                        format_portfolio_json_output,
-                        format_portfolio_text_output,
-                    )
+                    console = Console()
 
-                    output_format = (
-                        OutputFormat.JSON
-                        if args.output_format == "json"
-                        else OutputFormat.TEXT
-                    )
+                    # Show spinner while preparing data
+                    with console.status(
+                        "[bold green]Preparing visualization data...[/bold green]"
+                    ):
+                        # Combine enriched data (with indicators) for visualization
+                        symbol_dfs = []
+                        for symbol, df in enriched_data.items():
+                            # Add symbol column if not present
+                            if "symbol" not in df.columns:
+                                df = df.with_columns(pl.lit(symbol).alias("symbol"))
+                            symbol_dfs.append(df)
+                        all_symbol_data = pl.concat(symbol_dfs)
+                        # Convert PortfolioResult to BacktestResult-like structure
+                        # For visualization compatibility
+                        from ..models.directional import BacktestResult
+                        from ..models.core import TradeExecution
 
-                    if output_format == OutputFormat.JSON:
-                        output_content = format_portfolio_json_output(result)
-                    else:
-                        output_content = format_portfolio_text_output(result)
+                        # Group executions by symbol
+                        symbol_executions: dict[str, list[TradeExecution]] = {}
 
-                    # Generate output filename
-                    output_filename = generate_output_filename(
-                        direction=direction_mode,
-                        output_format=output_format,
-                        timestamp=result.start_time,
-                        symbol_tag="portfolio",
-                        timeframe_tag=(
-                            args.timeframe if args.timeframe != "1m" else None
-                        ),
-                    )
+                        # Pre-initialize lists for all symbols loaded
+                        unique_symbols = all_symbol_data["symbol"].unique().to_list()
+                        for symbol in unique_symbols:
+                            symbol_executions[symbol] = []
 
-                    # Write results to file
-                    output_path = args.output / output_filename
-                    args.output.mkdir(parents=True, exist_ok=True)
-                    output_path.write_text(output_content)
-                    logger.info("Results written to %s", output_path)
-                    if args.visualize:
-                        try:
-                            from ..visualization.datashader_viz import (
-                                plot_backtest_results,
-                            )
-                            from rich.console import Console
-
-                            console = Console()
-                            logger.info("Generating Datashader visualization...")
-                            # Combine enriched data (with indicators) for visualization
-                            symbol_dfs = []
-                            for symbol, df in enriched_data.items():
-                                # Add symbol column if not present
-                                if "symbol" not in df.columns:
-                                    df = df.with_columns(pl.lit(symbol).alias("symbol"))
-                                symbol_dfs.append(df)
-                            all_symbol_data = pl.concat(symbol_dfs)
-                            # Convert PortfolioResult to BacktestResult-like structure
-                            # For visualization compatibility
-                            from ..models.directional import BacktestResult
-                            from ..models.core import TradeExecution
-
-                            # Group executions by symbol (T007)
-                            symbol_executions: dict[str, list[TradeExecution]] = {}
-
-                            # Pre-initialize lists for all symbols loaded (to ensure charts for symbols with 0 trades)
-                            # all_symbol_data is a Polars DataFrame, "symbol" column values
-                            unique_symbols = (
-                                all_symbol_data["symbol"].unique().to_list()
-                            )
-                            for symbol in unique_symbols:
+                        for trade in result.closed_trades:
+                            symbol = trade.symbol
+                            if symbol not in symbol_executions:
                                 symbol_executions[symbol] = []
 
-                            for trade in result.closed_trades:
-                                symbol = trade.symbol
-                                if symbol not in symbol_executions:
-                                    symbol_executions[symbol] = (
-                                        []
-                                    )  # Should be covered above but safe fallback
+                            exec_obj = TradeExecution(
+                                signal_id=trade.signal_id,
+                                direction=trade.direction,
+                                open_timestamp=trade.entry_timestamp,
+                                entry_fill_price=trade.entry_price,
+                                close_timestamp=trade.exit_timestamp,
+                                exit_fill_price=trade.exit_price,
+                                exit_reason=trade.exit_reason,
+                                pnl_r=trade.pnl_r,
+                                slippage_entry_pips=0.0,
+                                slippage_exit_pips=0.0,
+                                costs_total=0.0,
+                                stop_price=0.0,
+                                target_price=0.0,
+                                portfolio_balance_at_exit=trade.portfolio_balance_at_exit,
+                                risk_percent=trade.risk_percent,
+                                risk_amount=trade.risk_amount,
+                            )
+                            symbol_executions[symbol].append(exec_obj)
 
-                                exec_obj = TradeExecution(
-                                    signal_id=trade.signal_id,
-                                    direction=trade.direction,
-                                    open_timestamp=trade.entry_timestamp,
-                                    entry_fill_price=trade.entry_price,
-                                    close_timestamp=trade.exit_timestamp,
-                                    exit_fill_price=trade.exit_price,
-                                    exit_reason=trade.exit_reason,
-                                    pnl_r=trade.pnl_r,
-                                    slippage_entry_pips=0.0,
-                                    slippage_exit_pips=0.0,
-                                    costs_total=0.0,
-                                    stop_price=0.0,  # Portfolio doesn't track original stop
-                                    target_price=0.0,  # Portfolio doesn't track original target
-                                )
-                                symbol_executions[symbol].append(exec_obj)
-
-                            # Create per-symbol results (T006)
-                            results_dict = {}
-                            for symbol, execs in symbol_executions.items():
-                                results_dict[symbol] = BacktestResult(
-                                    run_id=f"{result.run_id}_{symbol}",
-                                    direction_mode=result.direction_mode,
-                                    start_time=result.start_time,
-                                    end_time=result.end_time,
-                                    data_start_date=result.data_start_date,
-                                    data_end_date=result.data_end_date,
-                                    total_candles=0,
-                                    signals=[],
-                                    executions=execs,
-                                    metrics=None,
-                                    pair=symbol,
-                                    timeframe=result.timeframe,  # T014
-                                )
-
-                            # Populate "executions" field with flat list of all trades.
-                            executions = [
-                                trade
-                                for symbol_execs in symbol_executions.values()
-                                for trade in symbol_execs
-                            ]
-
-                            viz_result = BacktestResult(
-                                run_id=result.run_id,
+                        # Create per-symbol results
+                        results_dict = {}
+                        for symbol, execs in symbol_executions.items():
+                            results_dict[symbol] = BacktestResult(
+                                run_id=f"{result.run_id}_{symbol}",
                                 direction_mode=result.direction_mode,
                                 start_time=result.start_time,
                                 end_time=result.end_time,
@@ -1008,138 +980,59 @@ Persistent storage not yet implemented."
                                 data_end_date=result.data_end_date,
                                 total_candles=0,
                                 signals=[],
-                                executions=executions,  # T013: Restore flattened execution list for Portfolio Curve generation
+                                executions=execs,
                                 metrics=None,
-                                results=results_dict,  # T008
-                                pair="Multi-Symbol",  # T009 Trigger
-                                symbols=list(results_dict.keys()),
-                                timeframe=result.timeframe,  # T014
-                            )
-                            with console.status(
-                                "[bold green]Preparing visualization "
-                                "(Datashader)...[/bold green]"
-                            ):
-                                plot_backtest_results(
-                                    data=all_symbol_data,
-                                    result=viz_result,
-                                    pair="Portfolio",
-                                    show_plot=True,
-                                    start_date=args.viz_start,
-                                    end_date=args.viz_end,
-                                    timeframe=args.timeframe,
-                                )
-                        except ImportError as e:
-                            logger.error(
-                                "Visualization module not found or dependency "
-                                "missing: %s",
-                                e,
-                            )
-                        except Exception as e:
-                            logger.error(
-                                "Failed to generate visualization: %s",
-                                e,
-                                exc_info=True,
+                                pair=symbol,
+                                timeframe=result.timeframe,
                             )
 
-                    return 0  # Exit after portfolio mode completes
+                        # Populate executions field with flat list of all trades
+                        executions = [
+                            trade
+                            for symbol_execs in symbol_executions.values()
+                            for trade in symbol_execs
+                        ]
 
-                else:
-                    # Independent mode (default) - run each symbol in isolation
-                    logger.info("Independent mode: each symbol runs in isolation")
-                    result, enriched_data = run_multi_symbol_backtest(
-                        pair_paths=pair_paths,
-                        direction_mode=direction_mode,
-                        strategy_params=parameters,
-                        dry_run=args.dry_run,
-                        enable_profiling=args.profile,
-                        show_progress=show_progress,
+                        viz_result = BacktestResult(
+                            run_id=result.run_id,
+                            direction_mode=result.direction_mode,
+                            start_time=result.start_time,
+                            end_time=result.end_time,
+                            data_start_date=result.data_start_date,
+                            data_end_date=result.data_end_date,
+                            total_candles=0,
+                            signals=[],
+                            executions=executions,
+                            metrics=None,
+                            results=results_dict,
+                            pair="Multi-Symbol",
+                            symbols=list(results_dict.keys()),
+                            timeframe=result.timeframe,
+                        )
+
+                    # Spinner ends here, then call plot which logs cleanly
+                    plot_backtest_results(
+                        data=all_symbol_data,
+                        result=viz_result,
+                        pair="Portfolio",
+                        show_plot=True,
+                        start_date=args.viz_start,
+                        end_date=args.viz_end,
                         timeframe=args.timeframe,
                     )
-
-                    # Format and output multi-symbol results (T020)
-                    from ..data_io.formatters import (
-                        format_multi_symbol_json_output,
-                        format_multi_symbol_text_output,
+                except ImportError as e:
+                    logger.error(
+                        "Visualization module not found or dependency missing: %s",
+                        e,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to generate visualization: %s",
+                        e,
+                        exc_info=True,
                     )
 
-                    output_format = (
-                        OutputFormat.JSON
-                        if args.output_format == "json"
-                        else OutputFormat.TEXT
-                    )
-
-                    if output_format == OutputFormat.JSON:
-                        output_content = format_multi_symbol_json_output(result)
-                    else:
-                        output_content = format_multi_symbol_text_output(result)
-
-                    # Generate output filename
-                    output_filename = generate_output_filename(
-                        direction=direction_mode,
-                        output_format=output_format,
-                        timestamp=result.start_time,
-                        symbol_tag="multi",
-                        timeframe_tag=(
-                            args.timeframe if args.timeframe != "1m" else None
-                        ),
-                    )
-
-                    output_path = args.output / output_filename
-                    args.output.mkdir(parents=True, exist_ok=True)
-                    output_path.write_text(output_content)
-                    logger.info("Results written to %s", output_path)
-
-                    # Multi-symbol visualization (FR-001) - INDEPENDENT MODE ONLY
-                    if args.visualize:
-                        try:
-                            from ..visualization.datashader_viz import (
-                                plot_backtest_results,
-                            )
-                            from rich.console import Console
-
-                            console = Console()
-                            logger.info("Generating Datashader visualization...")
-
-                            # Combine enriched data (with indicators) for visualization
-                            symbol_dfs = []
-                            for symbol, df in enriched_data.items():
-                                # Add symbol column if not present
-                                if "symbol" not in df.columns:
-                                    df = df.with_columns(pl.lit(symbol).alias("symbol"))
-                                symbol_dfs.append(df)
-
-                            all_symbol_data = pl.concat(symbol_dfs)
-
-                            with console.status(
-                                "[bold green]Preparing visualization "
-                                "(Datashader)...[/bold green]"
-                            ):
-                                plot_backtest_results(
-                                    data=all_symbol_data,
-                                    result=result,
-                                    pair="Multi-Symbol",
-                                    show_plot=True,
-                                    start_date=args.viz_start,
-                                    end_date=args.viz_end,
-                                    timeframe=args.timeframe,
-                                )
-                        except ImportError as e:
-                            logger.error(
-                                "Visualization module not found or dependency "
-                                "missing: %s",
-                                e,
-                            )
-                        except Exception as e:
-                            logger.error(
-                                "Failed to generate visualization: %s",
-                                e,
-                                exc_info=True,
-                            )
-
-                    return 0  # Exit after multi-symbol independent mode completes
-
-            # Single-symbol path: use first (and only) pair
-            _, args.data = pair_paths[0]
+            return 0  # Exit after backtest completes
     elif not args.data.exists():
         print(f"Error: Data file not found: {args.data}", file=sys.stderr)
         sys.exit(1)
