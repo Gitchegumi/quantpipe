@@ -129,11 +129,15 @@ def generate_long_signals(
     # All conditions met - generate signal
     latest_candle = candles[-1]
 
-    # Calculate entry and stop prices
+    # Calculate entry, stop, and target prices
     entry_price = latest_candle.close
     atr_value = latest_candle.atr if latest_candle.atr is not None else 0.002
     stop_distance = atr_value * parameters.get("stop_loss_atr_multiplier", 2.0)
     stop_price = entry_price - stop_distance
+
+    # Calculate target price using strategy's reward/risk ratio
+    target_r_mult = parameters.get("target_r_mult", 2.0)
+    target_price = entry_price + (stop_distance * target_r_mult)
 
     # Calculate position size (placeholder - will be done by risk manager)
     position_size = 0.01  # Temporary value
@@ -156,6 +160,7 @@ def generate_long_signals(
         direction="LONG",
         entry_price=entry_price,
         initial_stop_price=stop_price,
+        target_price=target_price,  # Strategy-defined TP
         risk_per_trade_pct=parameters.get("position_risk_pct", 0.25),
         calc_position_size=position_size,
         tags=["pullback", "reversal", "long"],
@@ -164,10 +169,11 @@ def generate_long_signals(
     )
 
     logger.debug(
-        "Long signal generated: id=%s..., entry=%.5f, stop=%.5f, timestamp=%s",
+        "Long signal generated: id=%s..., entry=%.5f, stop=%.5f, target=%.5f, timestamp=%s",
         signal_id[:16],
         entry_price,
         stop_price,
+        target_price,
         latest_candle.timestamp_utc.isoformat(),
     )
 
@@ -283,11 +289,17 @@ def generate_short_signals(
     # All conditions met - generate signal
     latest_candle = candles[-1]
 
-    # Calculate entry and stop prices (SHORT: stop above entry)
+    # Calculate entry, stop, and target prices (SHORT: stop above entry, target below)
     entry_price = latest_candle.close
     atr_value = latest_candle.atr if latest_candle.atr is not None else 0.002
     stop_distance = atr_value * parameters.get("stop_loss_atr_multiplier", 2.0)
     stop_price = entry_price + stop_distance  # Stop above for shorts
+
+    # Calculate target price using strategy's reward/risk ratio
+    target_r_mult = parameters.get("target_r_mult", 2.0)
+    target_price = entry_price - (
+        stop_distance * target_r_mult
+    )  # Target below for shorts
 
     # Calculate position size (placeholder - will be done by risk manager)
     position_size = 0.01  # Temporary value
@@ -310,6 +322,7 @@ def generate_short_signals(
         direction="SHORT",
         entry_price=entry_price,
         initial_stop_price=stop_price,
+        target_price=target_price,  # Strategy-defined TP
         risk_per_trade_pct=parameters.get("position_risk_pct", 0.25),
         calc_position_size=position_size,
         tags=["pullback", "reversal", "short"],
@@ -318,10 +331,11 @@ def generate_short_signals(
     )
 
     logger.debug(
-        "Short signal generated: id=%s..., entry=%.5f, stop=%.5f, timestamp=%s",
+        "Short signal generated: id=%s..., entry=%.5f, stop=%.5f, target=%.5f, timestamp=%s",
         signal_id[:16],
         entry_price,
         stop_price,
+        target_price,
         latest_candle.timestamp_utc.isoformat(),
     )
 
