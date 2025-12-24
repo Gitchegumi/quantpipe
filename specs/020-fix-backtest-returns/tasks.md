@@ -28,8 +28,8 @@ description: "Fix backtest return calculations to honor strategy-defined 2R take
 
 **Purpose**: Verify existing project structure
 
-- [ ] T001 Verify project structure matches plan.md (single Python project with src/ and tests/)
-- [ ] T002 Confirm pytest is available for running tests
+- [x] T001 Verify project structure matches plan.md (single Python project with src/ and tests/)
+- [x] T002 Confirm pytest is available for running tests
 
 ---
 
@@ -39,9 +39,9 @@ description: "Fix backtest return calculations to honor strategy-defined 2R take
 
 **⚠️ CRITICAL**: Complete audit before implementing fixes
 
-- [ ] T003 [P] Audit `_run_vectorized_backtest()` in src/backtest/orchestrator.py (lines 633-866) to verify stop_prices/target_prices flow
-- [ ] T004 [P] Audit `BatchSimulation.simulate()` in src/backtest/batch_simulation.py (lines 136-244) to confirm no hardcoded R-multiples
-- [ ] T005 [P] Review portfolio mode implementation in src/backtest/portfolio/portfolio_simulator.py (lines 246-381) as reference
+- [x] T003 [P] Audit `_run_vectorized_backtest()` in src/backtest/orchestrator.py (lines 633-866) to verify stop_prices/target_prices flow
+- [x] T004 [P] Audit `BatchSimulation.simulate()` in src/backtest/batch_simulation.py (lines 136-244) to confirm no hardcoded R-multiples
+- [x] T005 [P] Review portfolio mode implementation in src/backtest/portfolio/portfolio_simulator.py (lines 246-381) as reference
 
 **Checkpoint**: Understand which paths are broken vs. working before proceeding
 
@@ -57,20 +57,20 @@ description: "Fix backtest return calculations to honor strategy-defined 2R take
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T006 [P] [US1] [US2] Create unit test file tests/unit/test_simulate_batch_fix.py
-- [ ] T007 [P] [US1] [US2] Write test_simulate_batch_respects_per_trade_sltp() to verify 3 entries with different SL/TP% (2%, 5%, 10%)
-- [ ] T008 [P] [US1] [US2] Write test_simulate_batch_target_r_mult_from_strategy() to mock strategy with target_r_mult=3.0
-- [ ] T009 [P] [US1] [US2] Write test_simulate_batch_no_global_defaults() to verify per-trade values are required
-- [ ] T010 [US1] [US2] Run new unit tests, confirm they FAIL as expected: `poetry run pytest tests/unit/test_simulate_batch_fix.py -v`
+- [x] T006 [P] [US1] [US2] Create unit test file tests/unit/test_simulate_batch_fix.py
+- [x] T007 [P] [US1] [US2] Write test_simulate_batch_respects_per_trade_sltp() to verify 3 entries with different SL/TP% (2%, 5%, 10%)
+- [x] T008 [P] [US1] [US2] Write test_simulate_batch_target_r_mult_from_strategy() to mock strategy with target_r_mult=3.0
+- [x] T009 [P] [US1] [US2] Write test_simulate_batch_no_global_defaults() to verify per-trade values are required
+- [x] T010 [US1] [US2] Run new unit tests, confirm they FAIL as expected: `poetry run pytest tests/unit/test_simulate_batch_fix.py -v`
 
 ### Implementation for User Stories 1 & 2
 
-- [ ] T011 [US1] [US2] Modify simulate_trades_batch() signature in src/backtest/trade_sim_batch.py (lines 30-31) to make stop_loss_pct and take_profit_pct Optional[float] = None
-- [ ] T012 [US1] [US2] Update fallback logic in src/backtest/trade_sim_batch.py (lines 102-103) to require per-trade SL/TP with ValueError if missing
-- [ ] T013 [US1] [US2] Add target_r_mult parameter to \_simulate_batch() signature in src/backtest/orchestrator.py (line 130)
-- [ ] T014 [US1] [US2] Replace hardcoded 2.0 with target_r_mult parameter in src/backtest/orchestrator.py (line 186)
-- [ ] T015 [US1] [US2] Remove global stop_loss_pct and take_profit_pct from simulate_trades_batch() call in src/backtest/orchestrator.py (lines 211-215)
-- [ ] T016 [US1] [US2] Find all call sites of \_simulate_batch() and ensure target_r_mult is passed from strategy
+- [x] T011 [US1] [US2] Modify simulate_trades_batch() signature in src/backtest/trade_sim_batch.py (lines 30-31) to make stop_loss_pct and take_profit_pct Optional[float] = None
+- [x] T012 [US1] [US2] Update fallback logic in src/backtest/trade_sim_batch.py (lines 102-103) to require per-trade SL/TP with ValueError if missing
+- [x] T013 [US1] [US2] Add target_r_mult parameter to \_simulate_batch() signature in src/backtest/orchestrator.py (line 130)
+- [x] T014 [US1] [US2] Replace hardcoded 2.0 with target_r_mult parameter in src/backtest/orchestrator.py (line 186)
+- [x] T015 [US1] [US2] Remove global stop_loss_pct and take_profit_pct from simulate_trades_batch() call in src/backtest/orchestrator.py (lines 211-215)
+- [x] T016 [US1] [US2] Find all call sites of \_simulate_batch() and ensure target_r_mult is passed from strategy
 - [ ] T017 [US1] [US2] Run unit tests to verify fix: `poetry run pytest tests/unit/test_simulate_batch_fix.py -v`
 
 **Checkpoint**: Old batch simulation path now honors per-trade SL/TP and strategy target_r_mult

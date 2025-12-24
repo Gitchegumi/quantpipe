@@ -230,6 +230,7 @@ class TradeSignal:
         direction: Trade direction - 'LONG' or 'SHORT'.
         entry_price: Proposed entry price level.
         initial_stop_price: Initial stop-loss price level.
+        target_price: Take-profit price level (strategy-defined).
         risk_per_trade_pct: Risk allocation as percentage of account equity.
         calc_position_size: Calculated position size in lots/units.
         tags: Sequence of string tags for signal classification and filtering.
@@ -244,6 +245,7 @@ class TradeSignal:
         ...     direction='LONG',
         ...     entry_price=1.1000,
         ...     initial_stop_price=1.0980,
+        ...     target_price=1.1040,  # 2R target with 20 pip stop
         ...     risk_per_trade_pct=0.25,
         ...     calc_position_size=10000.0,
         ...     tags=['trend', 'pullback', 'reversal'],
@@ -259,11 +261,12 @@ class TradeSignal:
     direction: str  # Literal['LONG', 'SHORT']
     entry_price: float
     initial_stop_price: float
-    risk_per_trade_pct: float
-    calc_position_size: float
-    tags: Sequence[str]
-    version: str
-    timestamp_utc: datetime
+    target_price: float = 0.0  # Strategy-defined take-profit price
+    risk_per_trade_pct: float = 0.0
+    calc_position_size: float = 0.0
+    tags: Sequence[str] = field(default_factory=list)
+    version: str = ""
+    timestamp_utc: datetime = field(default_factory=datetime.now)
     metadata: dict = field(default_factory=dict)
 
 

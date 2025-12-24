@@ -138,8 +138,11 @@ class BacktestOrchestrator:
         Converts signals to batch format, runs vectorized simulation, and
         converts results back to TradeExecution objects.
 
+        Strategy provides all prices (entry, stop, target). Orchestrator only
+        converts absolute prices to percentages for the batch simulation engine.
+
         Args:
-            signals: Trade signals to simulate.
+            signals: Trade signals with entry_price, initial_stop_price, and target_price.
             candles: Full candle dataset.
             slippage_pips: Entry slippage in pips.
 
@@ -176,10 +179,18 @@ class BacktestOrchestrator:
             else:  # SHORT
                 entry_price = entry_candle.open - (slippage_pips / 10000)
 
-            # Calculate stop-loss and take-profit percentages
-            risk_distance = abs(entry_price - signal.initial_stop_price)
-            stop_loss_pct = risk_distance / entry_price
-            take_profit_pct = (risk_distance * 2.0) / entry_price  # 2R target
+            # Convert strategy's absolute prices to percentages for batch sim
+            # Strategy dictates all prices - orchestrator just converts format
+            stop_distance = abs(entry_price - signal.initial_stop_price)
+            stop_loss_pct = stop_distance / entry_price
+
+            # Use strategy's target price (if provided), otherwise fallback to 2R
+            if signal.target_price > 0:
+                target_distance = abs(signal.target_price - entry_price)
+                take_profit_pct = target_distance / entry_price
+            else:
+                # Fallback for legacy signals without target_price
+                take_profit_pct = (stop_distance * 2.0) / entry_price
 
             entries.append(
                 {
@@ -206,13 +217,12 @@ class BacktestOrchestrator:
             }
         )
 
-        # Run batch simulation (use first entry's SL/TP as defaults for now)
-        # TODO: Support per-trade SL/TP in simulate_trades_batch
+        # Run batch simulation (per-trade SL/TP now in entry dicts)
+        # T015: Remove global SL/TP parameters - rely on per-trade values
         results = simulate_trades_batch(
             entries=entries,
             price_data=price_data,
-            stop_loss_pct=entries[0]["stop_loss_pct"],
-            take_profit_pct=entries[0]["take_profit_pct"],
+            # Removed: stop_loss_pct and take_profit_pct (now per-trade)
         )
 
         # Convert results to TradeExecution objects

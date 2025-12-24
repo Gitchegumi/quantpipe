@@ -27,8 +27,8 @@ import pandas as pd
 def simulate_trades_batch(
     entries: List[Dict[str, Any]],
     price_data: pd.DataFrame,
-    stop_loss_pct: float = 0.02,
-    take_profit_pct: float = 0.04,
+    stop_loss_pct: Optional[float] = None,  # Deprecated: use per-trade values
+    take_profit_pct: Optional[float] = None,  # Deprecated: use per-trade values
 ) -> List[Dict[str, Any]]:
     """Simulate trade exits in batched/vectorized mode.
 
@@ -98,9 +98,23 @@ def simulate_trades_batch(
         search_end = min(search_start + max_lookahead, len(price_data))
 
         # Calculate SL/TP thresholds
-        # Use per-trade parameters if available, otherwise defaults
-        sl_pct = entry.get("stop_loss_pct", stop_loss_pct)
-        tp_pct = entry.get("take_profit_pct", take_profit_pct)
+        # REQUIRE per-trade parameters (Bug fix: T012)
+        sl_pct = entry.get("stop_loss_pct")
+        tp_pct = entry.get("take_profit_pct")
+
+        # Fallback to global params if provided (legacy support)
+        if sl_pct is None:
+            sl_pct = stop_loss_pct
+        if tp_pct is None:
+            tp_pct = take_profit_pct
+
+        # Error if still missing (enforce per-trade values)
+        if sl_pct is None or tp_pct is None:
+            raise ValueError(
+                f"Missing SL/TP for entry at index {entry.get('entry_index')}: "
+                f"stop_loss_pct={sl_pct}, take_profit_pct={tp_pct}. "
+                "Per-trade SL/TP values are required."
+            )
 
         # Slice arrays for the current window
         window_highs = highs[search_start:search_end]
