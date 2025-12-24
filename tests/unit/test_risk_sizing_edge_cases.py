@@ -177,8 +177,7 @@ class TestHighVolatilityScenarios:
         # Risk amount: $100
         # Stop distance: 250 pips
         # Position size: 100 / (250 * 10) = 0.04 lots
-        # But manager applies minimum of 0.01, so result is 0.01
-        assert position_size == 0.01
+        assert position_size == 0.04
         assert position_size <= 0.10  # Should be small
 
     def test_volatility_adjustment_maintains_risk_pct(self):
