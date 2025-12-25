@@ -12,16 +12,67 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.1.2
+### Current Version: 0.2.0
 
 - **Status**: Released
-- **Date**: 2025-12-21
-- **Branch**: 016-multi-symbol-viz
-- **PR**: #44
+- **Date**: 2025-12-24
+- **Branch**: main
+- **PR**: #49
 
 ---
 
 ## Released Versions
+
+### [v0.2.0] - 2025-12-24
+
+**Theme**: Unified Backtest Architecture & Enhanced Visualization
+
+**Highlights**:
+
+- Unified backtest code path for single and multi-symbol runs
+- Dynamic position sizing with compounding based on current equity
+- Enhanced visualization tooltips with portfolio tracking info
+- Portfolio curve shows actual balance (not cumulative P&L)
+
+**Key Features**:
+
+Unified Architecture:
+
+- Removed `--portfolio-mode` CLI flag
+- All backtests (1 or N symbols) use `run_portfolio_backtest()`
+- Single shared account with unified capital pool
+- Consistent position filtering across all modes
+
+Dynamic Position Sizing:
+
+- Risk per trade calculated as % of current equity
+- Compounding effect: position sizes adjust as portfolio grows/shrinks
+- `portfolio_balance_at_exit`, `risk_percent`, `risk_amount` tracked per trade
+
+Enhanced Visualization Tooltips:
+
+- Entry markers: position_size, tp_value, sl_value (from strategy levels)
+- Exit markers: portfolio_balance, risk_percent, risk_value, pnl_dollars
+- TP/SL values calculated dynamically from strategy price levels
+
+Portfolio Curve Improvements:
+
+- Shows actual portfolio balance instead of cumulative P&L with fixed risk
+- Crosshair with hover tooltip showing balance at cursor position
+- Correctly reflects compounding effect
+
+**Usage**:
+
+```bash
+poetry run python -m src.cli.run_backtest --pair EURUSD --direction BOTH --visualize --starting-balance 2500
+```
+
+**Related**:
+
+- Pull Request: #49
+- Branch: 020-fix-backtest-returns
+
+---
 
 ### [v0.1.2] - 2025-12-21
 
@@ -184,7 +235,7 @@ Performance:
 
 ## Version Planning
 
-### v0.2.0 (Next Minor Release)
+### v0.3.0 (Next Minor Release)
 
 - Enhanced reporting and export formats
 - Additional strategy implementations
