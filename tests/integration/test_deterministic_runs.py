@@ -228,6 +228,9 @@ def test_eurusd_pnl_determinism(eurusd_deterministic_signal_set):
             target_prices=np.zeros(
                 len(eurusd_deterministic_signal_set["signal_indices"])
             ),
+            position_sizes=np.ones(
+                len(eurusd_deterministic_signal_set["signal_indices"])
+            ),
             timestamps=eurusd_deterministic_signal_set["timestamps"],
             ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
         )
@@ -281,6 +284,9 @@ def test_usdjpy_pnl_determinism(usdjpy_deterministic_signal_set):
                 len(usdjpy_deterministic_signal_set["signal_indices"])
             ),
             target_prices=np.zeros(
+                len(usdjpy_deterministic_signal_set["signal_indices"])
+            ),
+            position_sizes=np.ones(
                 len(usdjpy_deterministic_signal_set["signal_indices"])
             ),
             timestamps=usdjpy_deterministic_signal_set["timestamps"],
@@ -433,6 +439,7 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
         signal_indices=eurusd_deterministic_signal_set["signal_indices"],
         stop_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
         target_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
+        position_sizes=np.ones(len(eurusd_deterministic_signal_set["signal_indices"])),
         timestamps=eurusd_deterministic_signal_set["timestamps"],
         ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
     )
@@ -444,6 +451,7 @@ def test_determinism_with_progress_tracking(eurusd_deterministic_signal_set):
         signal_indices=eurusd_deterministic_signal_set["signal_indices"],
         stop_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
         target_prices=np.zeros(len(eurusd_deterministic_signal_set["signal_indices"])),
+        position_sizes=np.ones(len(eurusd_deterministic_signal_set["signal_indices"])),
         timestamps=eurusd_deterministic_signal_set["timestamps"],
         ohlc_arrays=eurusd_deterministic_signal_set["ohlc_arrays"],
     )

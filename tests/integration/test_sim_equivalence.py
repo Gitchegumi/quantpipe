@@ -297,6 +297,7 @@ def test_zero_signals_edge_case():
         signal_indices=signal_indices,
         stop_prices=np.zeros(len(signal_indices)),
         target_prices=np.zeros(len(signal_indices)),
+        position_sizes=np.ones(len(signal_indices)),
         timestamps=timestamps,
         ohlc_arrays=ohlc_arrays,
     )
