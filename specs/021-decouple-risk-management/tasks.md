@@ -174,7 +174,7 @@
 - [x] T051 [P] Run poetry run pylint src/ --score=yes (not required - using ruff)
 - [x] T052 Run 50 risk-specific tests - all passing
 - [x] T053 [P] Update specs/021-decouple-risk-management/quickstart.md with final CLI examples
-- [ ] T054 Create PR using .github/pull_request_template.md
+- [x] T054 Create PR using .github/pull_request_template.md - [PR #50](https://github.com/Gitchegumi/quantpipe/pull/50)
 
 ---
 
