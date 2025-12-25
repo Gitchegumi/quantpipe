@@ -246,3 +246,243 @@ def validate_risk_limits(
         return False
 
     return True
+
+
+# =============================================================================
+# RiskManager Class (Feature 021 - Decoupled Risk Management)
+# =============================================================================
+
+
+class RiskManager:
+    """
+    Risk manager that composes pluggable policies to build order plans.
+
+    RiskManager transforms lightweight Signals into complete OrderPlans by
+    applying configured stop, take-profit, and position sizing policies.
+
+    Attributes:
+        config: RiskConfig with policy selections and parameters.
+        stop_policy: Instantiated stop-loss policy.
+        tp_policy: Instantiated take-profit policy.
+        sizer: Instantiated position sizer.
+
+    Examples:
+        >>> from src.risk.config import RiskConfig
+        >>> config = RiskConfig(risk_pct=0.25)
+        >>> manager = RiskManager(config)
+        >>> order = manager.build_orders(signal, portfolio_balance=10000.0)
+    """
+
+    def __init__(self, config: "RiskConfig") -> None:
+        """
+        Initialize RiskManager with configuration.
+
+        Args:
+            config: RiskConfig defining policies and parameters.
+        """
+        from src.risk.config import RiskConfig
+        from src.risk.registry import policy_registry
+
+        self.config = config
+        self._registry = policy_registry
+
+        # Policies will be instantiated lazily or when registered
+        self._stop_policy = None
+        self._tp_policy = None
+        self._sizer = None
+
+        logger.debug(
+            "RiskManager initialized with risk_pct=%.2f%%, stop=%s, tp=%s",
+            config.risk_pct,
+            config.stop_policy.type,
+            config.take_profit_policy.type,
+        )
+
+    def build_orders(
+        self,
+        signal: "Signal",
+        portfolio_balance: float,
+        market_context: dict | None = None,
+    ) -> "OrderPlan":
+        """
+        Build an OrderPlan from a Signal using configured policies.
+
+        Args:
+            signal: Lightweight Signal with direction and symbol.
+            portfolio_balance: Current portfolio balance for position sizing.
+            market_context: Market data including ATR, high, low, close.
+
+        Returns:
+            Complete OrderPlan with entry, stop, target, and position size.
+
+        Raises:
+            RiskConfigurationError: If required market data is missing.
+        """
+        from src.models.order_plan import OrderPlan
+        from src.risk.policies.stop_policies import RiskConfigurationError
+
+        context = market_context or {}
+
+        # Determine entry price (use hint or require context)
+        entry_price = signal.entry_hint
+        if entry_price is None:
+            entry_price = context.get("close")
+            if entry_price is None:
+                raise RiskConfigurationError(
+                    "Entry price required: provide signal.entry_hint or context['close']"
+                )
+
+        # Calculate stop price using policy
+        stop_price = self._calculate_stop(entry_price, signal.direction, context)
+
+        # Calculate take-profit using policy
+        target_price = self._calculate_tp(
+            entry_price, stop_price, signal.direction, context
+        )
+
+        # Calculate position size
+        position_size = self._calculate_size(entry_price, stop_price, portfolio_balance)
+
+        # Build OrderPlan
+        order = OrderPlan(
+            signal=signal,
+            entry_price=entry_price,
+            stop_price=stop_price,
+            target_price=target_price,
+            position_size=position_size,
+            stop_policy_type=self.config.stop_policy.type,
+            is_trailing=self.config.stop_policy.type == "ATR_Trailing",
+            trailing_params=(
+                {
+                    "multiplier": self.config.stop_policy.multiplier,
+                    "period": self.config.stop_policy.period,
+                }
+                if self.config.stop_policy.type == "ATR_Trailing"
+                else {}
+            ),
+        )
+
+        logger.debug(
+            "Built OrderPlan: %s %s entry=%.5f stop=%.5f target=%s size=%.2f",
+            signal.direction,
+            signal.symbol,
+            entry_price,
+            stop_price,
+            target_price,
+            position_size,
+        )
+
+        return order
+
+    def _calculate_stop(
+        self, entry_price: float, direction: str, context: dict
+    ) -> float:
+        """Calculate stop price using configured policy."""
+        from src.risk.policies.stop_policies import RiskConfigurationError
+
+        policy_type = self.config.stop_policy.type
+        multiplier = self.config.stop_policy.multiplier
+
+        # Get ATR from context
+        atr = context.get("atr") or context.get("atr14")
+        if atr is None and policy_type in ("ATR", "ATR_Trailing"):
+            raise RiskConfigurationError(
+                f"{policy_type} policy requires ATR in market context"
+            )
+
+        # Calculate stop based on policy type
+        if policy_type in ("ATR", "ATR_Trailing"):
+            stop_distance = atr * multiplier
+            if direction == "LONG":
+                return entry_price - stop_distance
+            else:
+                return entry_price + stop_distance
+        elif policy_type == "FixedPips":
+            pips = self.config.stop_policy.pips or 50
+            # Convert pips to price (assuming 4-decimal pair)
+            is_jpy = "JPY" in context.get("symbol", "")
+            pip_size = 0.01 if is_jpy else 0.0001
+            stop_distance = pips * pip_size
+            if direction == "LONG":
+                return entry_price - stop_distance
+            else:
+                return entry_price + stop_distance
+        else:
+            raise RiskConfigurationError(f"Unknown stop policy type: {policy_type}")
+
+    def _calculate_tp(
+        self, entry_price: float, stop_price: float, direction: str, context: dict
+    ) -> float | None:
+        """Calculate take-profit using configured policy."""
+        policy_type = self.config.take_profit_policy.type
+
+        if policy_type == "None":
+            return None
+
+        if policy_type == "RiskMultiple":
+            rr_ratio = self.config.take_profit_policy.rr_ratio
+            risk_distance = abs(entry_price - stop_price)
+            reward_distance = risk_distance * rr_ratio
+
+            if direction == "LONG":
+                return entry_price + reward_distance
+            else:
+                return entry_price - reward_distance
+
+        return None
+
+    def _calculate_size(
+        self, entry_price: float, stop_price: float, portfolio_balance: float
+    ) -> float:
+        """Calculate position size using configured policy."""
+        risk_pct = self.config.risk_pct
+        pip_value = self.config.pip_value
+        lot_step = self.config.lot_step
+        max_size = self.config.max_position_size
+
+        # Calculate risk amount
+        risk_amount = portfolio_balance * (risk_pct / 100.0)
+
+        # Calculate stop distance in pips (assume 4-decimal pair)
+        price_diff = abs(entry_price - stop_price)
+        stop_pips = price_diff * 10000  # Standard forex pip conversion
+
+        if stop_pips == 0:
+            logger.warning("Zero stop distance, using minimum position size")
+            return lot_step
+
+        # Calculate raw size
+        raw_size = risk_amount / (stop_pips * pip_value)
+
+        # Round to lot step
+        position_size = math.floor(raw_size / lot_step) * lot_step
+
+        # Apply max limit
+        if position_size > max_size:
+            logger.warning(
+                "Position size %.2f exceeds max %.2f, capping",
+                position_size,
+                max_size,
+            )
+            position_size = max_size
+
+        # Ensure minimum
+        if position_size < lot_step:
+            position_size = lot_step
+
+        return position_size
+
+    def get_label(self) -> str:
+        """Get a descriptive label of the risk manager configuration."""
+        return (
+            f"{self.config.stop_policy.type} "
+            f"(risk_pct={self.config.risk_pct}, "
+            f"atr_mult={self.config.stop_policy.multiplier})"
+        )
+
+
+# Type hints for forward references
+if True:  # TYPE_CHECKING equivalent that always runs
+    from src.models.signal import Signal
+    from src.models.order_plan import OrderPlan
+    from src.risk.config import RiskConfig

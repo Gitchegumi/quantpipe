@@ -23,11 +23,11 @@
 
 **Purpose**: Project initialization and basic structure for risk management module
 
-- [ ] T001 Create policies directory structure at src/risk/policies/
-- [ ] T002 [P] Create src/risk/policies/**init**.py with policy exports
-- [ ] T003 [P] Create src/models/signal.py with Signal dataclass (symbol, direction, timestamp, entry_hint, metadata)
-- [ ] T004 [P] Create src/models/order_plan.py with OrderPlan dataclass (signal, entry_price, stop_price, target_price, position_size, etc.)
-- [ ] T005 Update src/models/**init**.py to export Signal and OrderPlan
+- [x] T001 Create policies directory structure at src/risk/policies/
+- [x] T002 [P] Create src/risk/policies/**init**.py with policy exports
+- [x] T003 [P] Create src/models/signal.py with Signal dataclass (symbol, direction, timestamp, entry_hint, metadata)
+- [x] T004 [P] Create src/models/order_plan.py with OrderPlan dataclass (signal, entry_price, stop_price, target_price, position_size, etc.)
+- [x] T005 Update src/models/**init**.py to export Signal and OrderPlan
 
 ---
 
@@ -37,14 +37,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T006 Create src/risk/config.py with RiskConfig pydantic model (risk_pct, stop_policy, take_profit_policy, position_sizer, max_position_size)
-- [ ] T007 Create src/risk/registry.py with PolicyRegistry class for string-based policy lookup
-- [ ] T008 [P] Create StopPolicy protocol in src/risk/policies/stop_policies.py (initial_stop, update_stop methods)
-- [ ] T009 [P] Create TakeProfitPolicy protocol in src/risk/policies/tp_policies.py (initial_tp method)
-- [ ] T010 [P] Create PositionSizer protocol in src/risk/policies/position_sizers.py (size method)
-- [ ] T011 Add RiskManager class to src/risk/manager.py (accepts RiskConfig, composes policies, build_orders method)
-- [ ] T012 Update src/risk/**init**.py to export RiskManager, RiskConfig, and policy protocols
-- [ ] T013 [P] Create tests/unit/test_risk_config.py validating RiskConfig schema and defaults
+- [x] T006 Create src/risk/config.py with RiskConfig pydantic model (risk_pct, stop_policy, take_profit_policy, position_sizer, max_position_size)
+- [x] T007 Create src/risk/registry.py with PolicyRegistry class for string-based policy lookup
+- [x] T008 [P] Create StopPolicy protocol in src/risk/policies/stop_policies.py (initial_stop, update_stop methods)
+- [x] T009 [P] Create TakeProfitPolicy protocol in src/risk/policies/tp_policies.py (initial_tp method)
+- [x] T010 [P] Create PositionSizer protocol in src/risk/policies/position_sizers.py (size method)
+- [x] T011 Add RiskManager class to src/risk/manager.py (accepts RiskConfig, composes policies, build_orders method)
+- [x] T012 Update src/risk/**init**.py to export RiskManager, RiskConfig, and policy protocols
+- [x] T013 [P] Create tests/unit/test_risk_config.py validating RiskConfig schema and defaults
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 

@@ -1,5 +1,7 @@
 """Data models and entities."""
 
+from src.models.order_plan import OrderPlan
+from src.models.signal import Signal
 from src.models.visualization_config import (
     IndicatorDisplayConfig,
     VisualizationConfig,
@@ -13,6 +15,8 @@ from src.models.visualization_config import (
 )
 
 __all__ = [
+    "OrderPlan",
+    "Signal",
     "IndicatorDisplayConfig",
     "VisualizationConfig",
     "MA_COLOR_FASTEST",
