@@ -8,7 +8,6 @@ Tests validate:
 - JSON deserialization
 """
 
-from datetime import UTC, datetime
 
 import pytest
 

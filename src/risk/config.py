@@ -7,7 +7,7 @@ including stop-loss, take-profit, and position sizing parameters.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class StopPolicyConfig(BaseModel):

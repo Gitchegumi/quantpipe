@@ -280,7 +280,6 @@ class RiskManager:
         Args:
             config: RiskConfig defining policies and parameters.
         """
-        from src.risk.config import RiskConfig
         from src.risk.registry import policy_registry
 
         self.config = config
@@ -329,7 +328,8 @@ class RiskManager:
             entry_price = context.get("close")
             if entry_price is None:
                 raise RiskConfigurationError(
-                    "Entry price required: provide signal.entry_hint or context['close']"
+                    "Entry price required: provide signal.entry_hint "
+                    "or context['close']"
                 )
 
         # Calculate stop price using policy
