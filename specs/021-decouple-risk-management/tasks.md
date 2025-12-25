@@ -58,17 +58,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Create tests/unit/test_risk_manager.py with test_build_orders_with_different_configs (SC-001)
-- [ ] T015 [P] [US1] Create tests/integration/test_risk_policy_switching.py validating CLI policy switching (SC-002)
+- [x] T014 [P] [US1] Create tests/unit/test_risk_manager.py with test_build_orders_with_different_configs (SC-001)
+- [x] T015 [P] [US1] Create tests/integration/test_risk_policy_switching.py validating CLI policy switching (SC-002)
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Implement ATRStop class in src/risk/policies/stop_policies.py (initial_stop using ATR multiplier)
-- [ ] T017 [US1] Implement RiskMultipleTP class in src/risk/policies/tp_policies.py (TP at N× risk distance)
-- [ ] T018 [US1] Implement NoTakeProfit class in src/risk/policies/tp_policies.py (returns None)
-- [ ] T019 [US1] Register ATRStop, RiskMultipleTP, NoTakeProfit in src/risk/registry.py
-- [ ] T020 [US1] Add --risk-config, --risk-pct, --stop-policy, --tp-policy, --rr-ratio args to src/cli/run_backtest.py
-- [ ] T021 [US1] Parse CLI args and construct RiskConfig in src/cli/run_backtest.py
+- [x] T016 [US1] Implement ATRStop class in src/risk/policies/stop_policies.py (initial_stop using ATR multiplier)
+- [x] T017 [US1] Implement RiskMultipleTP class in src/risk/policies/tp_policies.py (TP at N× risk distance)
+- [x] T018 [US1] Implement NoTakeProfit class in src/risk/policies/tp_policies.py (returns None)
+- [x] T019 [US1] Register ATRStop, RiskMultipleTP, NoTakeProfit in src/risk/registry.py
+- [x] T020 [US1] Add --risk-config, --risk-pct, --stop-policy, --tp-policy, --rr-ratio args to src/cli/run_backtest.py
+- [x] T021 [US1] Parse CLI args and construct RiskConfig in src/cli/run_backtest.py
 - [ ] T022 [US1] Modify src/backtest/orchestrator.py to accept optional RiskManager parameter
 - [ ] T023 [US1] Inject RiskManager into \_run_vectorized_backtest() and transform signals to OrderPlans
 - [ ] T024 [US1] Add risk manager labeling to backtest output (strategy_name, risk_manager_type, risk_params) for SC-005
