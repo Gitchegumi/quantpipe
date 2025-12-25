@@ -738,6 +738,72 @@ def main():
         "Example: --config backtest_config.yaml",
     )
 
+    # Risk Management Arguments (Feature 021: FR-004 - Runtime policy selection)
+    parser.add_argument(
+        "--risk-config",
+        type=Path,
+        help="Path to JSON risk configuration file. "
+        "Overrides individual --risk-* arguments if specified. "
+        "See specs/021-decouple-risk-management/quickstart.md for format.",
+    )
+
+    parser.add_argument(
+        "--risk-pct",
+        type=float,
+        default=0.25,
+        help="Risk percentage per trade (e.g., 0.25 for 0.25%%). Default: 0.25",
+    )
+
+    parser.add_argument(
+        "--stop-policy",
+        type=str,
+        choices=["ATR", "ATR_Trailing", "FixedPips"],
+        default="ATR",
+        help="Stop-loss policy type. Default: ATR",
+    )
+
+    parser.add_argument(
+        "--atr-mult",
+        type=float,
+        default=2.0,
+        help="ATR multiplier for stop distance. Default: 2.0",
+    )
+
+    parser.add_argument(
+        "--atr-period",
+        type=int,
+        default=14,
+        help="ATR calculation period. Default: 14",
+    )
+
+    parser.add_argument(
+        "--fixed-pips",
+        type=float,
+        help="Fixed pip distance for FixedPips stop policy (required if --stop-policy=FixedPips)",
+    )
+
+    parser.add_argument(
+        "--tp-policy",
+        type=str,
+        choices=["RiskMultiple", "None"],
+        default="RiskMultiple",
+        help="Take-profit policy type. Default: RiskMultiple",
+    )
+
+    parser.add_argument(
+        "--rr-ratio",
+        type=float,
+        default=2.0,
+        help="Reward-to-risk ratio for RiskMultiple TP policy. Default: 2.0",
+    )
+
+    parser.add_argument(
+        "--max-position-size",
+        type=float,
+        default=10.0,
+        help="Maximum position size in lots. Default: 10.0",
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -767,6 +833,58 @@ def main():
                 args.dataset = config["dataset"]
         else:
             logger.warning("Config file not found: %s", args.config)
+
+    # Construct RiskConfig from CLI args or --risk-config file (T021: FR-004)
+    risk_config = None
+    if hasattr(args, "risk_config") and args.risk_config:
+        import json
+
+        from ..risk.config import RiskConfig
+
+        if args.risk_config.exists():
+            with open(args.risk_config, "r", encoding="utf-8") as f:
+                risk_dict = json.load(f)
+            risk_config = RiskConfig.from_dict(risk_dict)
+            logger.info(
+                "Loaded risk config from %s: %s",
+                args.risk_config,
+                risk_config.stop_policy.type,
+            )
+        else:
+            logger.warning("Risk config file not found: %s", args.risk_config)
+    elif hasattr(args, "stop_policy"):
+        # Construct from individual CLI args
+        from ..risk.config import (
+            RiskConfig,
+            StopPolicyConfig,
+            TakeProfitPolicyConfig,
+        )
+
+        stop_policy = StopPolicyConfig(
+            type=args.stop_policy,
+            multiplier=args.atr_mult,
+            period=args.atr_period,
+            pips=args.fixed_pips,
+        )
+
+        tp_policy = TakeProfitPolicyConfig(
+            type=args.tp_policy,
+            rr_ratio=args.rr_ratio,
+        )
+
+        risk_config = RiskConfig(
+            risk_pct=args.risk_pct,
+            stop_policy=stop_policy,
+            take_profit_policy=tp_policy,
+            max_position_size=args.max_position_size,
+        )
+        logger.info(
+            "Constructed risk config from CLI: stop=%s (mult=%.1f), tp=%s (rr=%.1f)",
+            args.stop_policy,
+            args.atr_mult,
+            args.tp_policy,
+            args.rr_ratio,
+        )
 
     # Handle --list-strategies (FR-017: List strategies without running backtest)
     if args.list_strategies:

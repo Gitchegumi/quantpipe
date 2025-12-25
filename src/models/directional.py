@@ -257,6 +257,7 @@ class BacktestResult:
     executions: list | None = None  # TradeExecution list (avoid circular import)
     conflicts: list[ConflictEvent] = field(default_factory=list)
     dry_run: bool = False
+    risk_label: str | None = None  # Risk manager label for SC-005 (Feature 021)
 
     @property
     def is_multi_symbol(self) -> bool:
