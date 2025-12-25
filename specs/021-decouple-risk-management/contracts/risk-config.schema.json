@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trading-strategies/risk-config.schema.json",
+  "title": "Risk Manager Configuration",
+  "description": "Schema for configuring risk management policies in backtest and live trading",
+  "type": "object",
+  "properties": {
+    "risk_pct": {
+      "type": "number",
+      "description": "Percentage of portfolio to risk per trade",
+      "minimum": 0.01,
+      "maximum": 10.0,
+      "default": 0.25
+    },
+    "stop_policy": {
+      "type": "object",
+      "description": "Stop-loss policy configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ATR", "ATR_Trailing", "FixedPips"],
+          "description": "Type of stop policy"
+        },
+        "multiplier": {
+          "type": "number",
+          "description": "ATR multiplier for stop distance",
+          "minimum": 0.5,
+          "maximum": 10.0,
+          "default": 2.0
+        },
+        "period": {
+          "type": "integer",
+          "description": "ATR calculation period",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 14
+        },
+        "pips": {
+          "type": "number",
+          "description": "Fixed pip distance for FixedPips policy",
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "required": ["type"],
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "FixedPips" } } },
+          "then": { "required": ["pips"] }
+        }
+      ]
+    },
+    "take_profit_policy": {
+      "type": "object",
+      "description": "Take-profit policy configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["RiskMultiple", "None"],
+          "description": "Type of take-profit policy"
+        },
+        "rr_ratio": {
+          "type": "number",
+          "description": "Reward-to-risk ratio for RiskMultiple policy",
+          "minimum": 0.5,
+          "maximum": 20.0,
+          "default": 2.0
+        }
+      },
+      "required": ["type"]
+    },
+    "position_sizer": {
+      "type": "object",
+      "description": "Position sizing algorithm configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["RiskPercent"],
+          "description": "Type of position sizer"
+        }
+      },
+      "required": ["type"]
+    },
+    "max_position_size": {
+      "type": "number",
+      "description": "Maximum position size in lots",
+      "minimum": 0.01,
+      "maximum": 100.0,
+      "default": 10.0
+    },
+    "pip_value": {
+      "type": "number",
+      "description": "Value of 1 pip per lot in base currency",
+      "minimum": 0.01,
+      "default": 10.0
+    },
+    "lot_step": {
+      "type": "number",
+      "description": "Minimum lot size increment",
+      "minimum": 0.001,
+      "maximum": 1.0,
+      "default": 0.01
+    }
+  },
+  "additionalProperties": false
+}
