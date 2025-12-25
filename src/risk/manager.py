@@ -472,6 +472,51 @@ class RiskManager:
 
         return position_size
 
+    def update_trailing(
+        self,
+        current_stop: float,
+        entry_price: float,
+        direction: str,
+        market: dict,
+    ) -> float:
+        """
+        Update trailing stop for current bar. Stop only moves in favorable direction.
+
+        For trailing policies (ATR_Trailing), recalculates stop based on current
+        market conditions and returns the tighter of current vs new stop.
+
+        Args:
+            current_stop: Current stop-loss price.
+            entry_price: Original entry price (for distance reference).
+            direction: Trade direction ("LONG" or "SHORT").
+            market: Current bar data with high, low, close, atr.
+
+        Returns:
+            Updated stop-loss price. Never widens risk (FR-006).
+        """
+        if self.config.stop_policy.type != "ATR_Trailing":
+            # Non-trailing policies don't update
+            return current_stop
+
+        atr = market.get("atr") or market.get("atr14")
+        if atr is None:
+            return current_stop
+
+        multiplier = self.config.stop_policy.multiplier
+
+        if direction == "LONG":
+            # For LONG: trail behind the high
+            high = market.get("high", entry_price)
+            new_stop = high - (atr * multiplier)
+            # Only ratchet up (tighten risk)
+            return max(current_stop, new_stop)
+        else:  # SHORT
+            # For SHORT: trail above the low
+            low = market.get("low", entry_price)
+            new_stop = low + (atr * multiplier)
+            # Only ratchet down (tighten risk)
+            return min(current_stop, new_stop)
+
     def get_label(self) -> str:
         """Get a descriptive label of the risk manager configuration."""
         return (

@@ -120,3 +120,118 @@ class TestTrailingStopNeverWidens:
 
         # StopPolicy protocol should have update_stop method
         assert hasattr(StopPolicy, "__protocol_attrs__") or True  # Protocol validation
+
+
+class TestUpdateTrailingMethod:
+    """Test RiskManager.update_trailing() method (T035-T037)."""
+
+    def test_update_trailing_long_ratchets_up(self):
+        """LONG trailing stop should ratchet UP when price moves favorably."""
+        from src.risk.config import RiskConfig, StopPolicyConfig
+        from src.risk.manager import RiskManager
+
+        config = RiskConfig(
+            stop_policy=StopPolicyConfig(type="ATR_Trailing", multiplier=2.0)
+        )
+        manager = RiskManager(config)
+
+        # Initial stop at 1.0960 (entry 1.1000 - 2*ATR)
+        current_stop = 1.0960
+        entry_price = 1.1000
+
+        # Price moved up: high is now 1.1100
+        market = {"high": 1.1100, "low": 1.1050, "close": 1.1080, "atr": 0.0020}
+
+        new_stop = manager.update_trailing(current_stop, entry_price, "LONG", market)
+
+        # New stop should be 1.1100 - 0.0040 = 1.1060, higher than 1.0960
+        assert new_stop > current_stop
+        assert new_stop == pytest.approx(1.1060, abs=0.0001)
+
+    def test_update_trailing_long_never_widens(self):
+        """LONG trailing stop should never move DOWN (widen risk)."""
+        from src.risk.config import RiskConfig, StopPolicyConfig
+        from src.risk.manager import RiskManager
+
+        config = RiskConfig(
+            stop_policy=StopPolicyConfig(type="ATR_Trailing", multiplier=2.0)
+        )
+        manager = RiskManager(config)
+
+        # Stop already at 1.1060
+        current_stop = 1.1060
+        entry_price = 1.1000
+
+        # Price drops: high is now 1.1050 (below previous high)
+        market = {"high": 1.1050, "low": 1.1000, "close": 1.1020, "atr": 0.0020}
+
+        new_stop = manager.update_trailing(current_stop, entry_price, "LONG", market)
+
+        # New calculated stop would be 1.1050 - 0.0040 = 1.1010 (lower)
+        # But should NOT widen risk - keep at 1.1060
+        assert new_stop >= current_stop
+        assert new_stop == current_stop
+
+    def test_update_trailing_short_ratchets_down(self):
+        """SHORT trailing stop should ratchet DOWN when price moves favorably."""
+        from src.risk.config import RiskConfig, StopPolicyConfig
+        from src.risk.manager import RiskManager
+
+        config = RiskConfig(
+            stop_policy=StopPolicyConfig(type="ATR_Trailing", multiplier=2.0)
+        )
+        manager = RiskManager(config)
+
+        # Initial stop at 1.1040 (entry 1.1000 + 2*ATR)
+        current_stop = 1.1040
+        entry_price = 1.1000
+
+        # Price moved down: low is now 1.0900
+        market = {"high": 1.0950, "low": 1.0900, "close": 1.0920, "atr": 0.0020}
+
+        new_stop = manager.update_trailing(current_stop, entry_price, "SHORT", market)
+
+        # New stop should be 1.0900 + 0.0040 = 1.0940, lower than 1.1040
+        assert new_stop < current_stop
+        assert new_stop == pytest.approx(1.0940, abs=0.0001)
+
+    def test_update_trailing_short_never_widens(self):
+        """SHORT trailing stop should never move UP (widen risk)."""
+        from src.risk.config import RiskConfig, StopPolicyConfig
+        from src.risk.manager import RiskManager
+
+        config = RiskConfig(
+            stop_policy=StopPolicyConfig(type="ATR_Trailing", multiplier=2.0)
+        )
+        manager = RiskManager(config)
+
+        # Stop already at 1.0940
+        current_stop = 1.0940
+        entry_price = 1.1000
+
+        # Price bounces: low is now higher
+        market = {"high": 1.1000, "low": 1.0950, "close": 1.0980, "atr": 0.0020}
+
+        new_stop = manager.update_trailing(current_stop, entry_price, "SHORT", market)
+
+        # New calculated stop would be 1.0950 + 0.0040 = 1.0990 (higher)
+        # But should NOT widen risk - keep at 1.0940
+        assert new_stop <= current_stop
+        assert new_stop == current_stop
+
+    def test_non_trailing_policy_unchanged(self):
+        """Non-trailing policies should return current stop unchanged."""
+        from src.risk.config import RiskConfig, StopPolicyConfig
+        from src.risk.manager import RiskManager
+
+        config = RiskConfig(
+            stop_policy=StopPolicyConfig(type="ATR", multiplier=2.0)  # Not trailing
+        )
+        manager = RiskManager(config)
+
+        current_stop = 1.0960
+        market = {"high": 1.1100, "low": 1.1050, "close": 1.1080, "atr": 0.0020}
+
+        new_stop = manager.update_trailing(current_stop, 1.1000, "LONG", market)
+
+        assert new_stop == current_stop

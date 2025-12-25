@@ -42,11 +42,23 @@ python -m src.cli.run_backtest \
   --pair EURUSD \
   --direction LONG \
   --risk-pct 0.25 \
-  --stop-policy ATR_Trailing --atr-mult 2.0 \
+  --stop-policy ATR_Trailing --atr-mult 2.0 --atr-period 14 \
   --tp-policy None
 ```
 
-### 4. Use JSON Config File
+### 4. Use Fixed Pip Stop (50 pips)
+
+```bash
+python -m src.cli.run_backtest \
+  --strategy trend_pullback \
+  --pair EURUSD \
+  --direction LONG \
+  --risk-pct 0.25 \
+  --stop-policy FixedPips --fixed-pips 50 \
+  --tp-policy RiskMultiple --rr-ratio 2.0
+```
+
+### 5. Use JSON Config File
 
 Create `risk_config.json`:
 
