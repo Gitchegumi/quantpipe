@@ -12,16 +12,71 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.2.0
+### Current Version: 0.2.1
 
 - **Status**: Released
-- **Date**: 2025-12-24
+- **Date**: 2025-12-25
 - **Branch**: main
-- **PR**: #49
+- **PR**: #50
 
 ---
 
 ## Released Versions
+
+### [v0.2.1] - 2025-12-25
+
+**Theme**: Decoupled Risk Management
+
+**Highlights**:
+
+- Runtime risk policy switching via CLI/config without code changes
+- Pluggable stop, take-profit, and position sizing policies
+- Trailing stop support with ratchet behavior
+- 50 new risk-specific tests
+
+**Key Features**:
+
+Risk Policy Architecture:
+
+- `RiskConfig` pydantic model for validation and defaults
+- `RiskManager` with `build_orders()` and `update_trailing()` methods
+- Protocol-based policies: `StopPolicy`, `TakeProfitPolicy`, `PositionSizer`
+- String-based policy registry for runtime selection
+
+CLI Arguments:
+
+- `--risk-pct` (0.25 default)
+- `--stop-policy ATR|ATR_Trailing|FixedPips`
+- `--atr-mult`, `--atr-period`, `--fixed-pips`
+- `--tp-policy RiskMultiple|None`
+- `--rr-ratio`
+- `--risk-config config.json`
+
+Data Models:
+
+- `Signal` - lightweight strategy output (symbol, direction, timestamp)
+- `OrderPlan` - complete order specification with stop, target, size
+- `BacktestResult.risk_label` for backtest metadata
+
+**Usage**:
+
+```bash
+# ATR trailing stop with 3:1 RR
+poetry run python -m src.cli.run_backtest --pair EURUSD --direction LONG \
+  --stop-policy ATR_Trailing --atr-mult 2.0 --tp-policy RiskMultiple --rr-ratio 3.0
+
+# Load from JSON config file
+poetry run python -m src.cli.run_backtest --pair EURUSD --risk-config risk_config.json
+```
+
+**Related**:
+
+- Pull Request: #50
+- Closes Issue: #12
+- Spec: 021-decouple-risk-management
+- Tests: 50 passing (6 test files)
+
+---
 
 ### [v0.2.0] - 2025-12-24
 
@@ -233,13 +288,27 @@ Performance:
 
 ---
 
-## Version Planning
+## Roadmap
 
-### v0.3.0 (Next Minor Release)
+### Next Up (Scheduled)
 
-- Enhanced reporting and export formats
-- Additional strategy implementations
-- Live data integration
+| Priority | Issue | Feature                                            |
+| -------- | ----- | -------------------------------------------------- |
+| 1        | #8    | User portfolio prompt with default risk parameters |
+| 2        | #24   | City Traders Imperium funded account progression   |
+| 3        | #26   | Interactive prompts for missing backtest flags     |
+| 4        | #13   | Runtime prompts for strategy & risk params         |
+| 5        | #39   | Forward testing module (multi-platform)            |
+| 6        | #40   | Market regime discovery (HDBSCAN clustering)       |
+| 7        | #23   | Optional GPU acceleration (CUDA)                   |
+| 8        | #16   | Z-Score mean reversion strategy                    |
+
+### Backlog
+
+| Issue | Feature                                                           |
+| ----- | ----------------------------------------------------------------- |
+| #41   | Next.js-based GUI (long-term)                                     |
+| #2    | Multi-Strategy, Multi-Currency, Platform Integration (meta-issue) |
 
 ### v1.0.0 (Future Major Release)
 
