@@ -69,9 +69,9 @@
 - [x] T019 [US1] Register ATRStop, RiskMultipleTP, NoTakeProfit in src/risk/registry.py
 - [x] T020 [US1] Add --risk-config, --risk-pct, --stop-policy, --tp-policy, --rr-ratio args to src/cli/run_backtest.py
 - [x] T021 [US1] Parse CLI args and construct RiskConfig in src/cli/run_backtest.py
-- [ ] T022 [US1] Modify src/backtest/orchestrator.py to accept optional RiskManager parameter
-- [ ] T023 [US1] Inject RiskManager into \_run_vectorized_backtest() and transform signals to OrderPlans
-- [ ] T024 [US1] Add risk manager labeling to backtest output (strategy_name, risk_manager_type, risk_params) for SC-005
+- [x] T022 [US1] Modify src/backtest/orchestrator.py to accept optional RiskManager parameter
+- [x] T023 [US1] Inject RiskManager into \_run_vectorized_backtest() and transform signals to OrderPlans
+- [x] T024 [US1] Add risk manager labeling to backtest output (strategy_name, risk_manager_type, risk_params) for SC-005
 
 **Checkpoint**: User Story 1 complete - can switch risk policies via CLI without code changes
 

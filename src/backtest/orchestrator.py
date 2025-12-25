@@ -82,6 +82,7 @@ class BacktestOrchestrator:
         enable_profiling: bool = False,
         log_frequency: int = 1000,
         enable_progress: bool = True,
+        risk_manager: Any = None,
     ):
         """
         Initialize backtest orchestrator.
@@ -92,21 +93,25 @@ class BacktestOrchestrator:
             enable_profiling: If True, enable phase timing instrumentation.
             log_frequency: Log progress every N items (signals/trades). Default 1000.
             enable_progress: If True, display rich progress bars.
+            risk_manager: Optional RiskManager for decoupled risk management (Feature 021).
+                If provided, used to transform signals into OrderPlans with configured policies.
         """
         self.direction_mode = direction_mode
         self.dry_run = dry_run
         self.enable_profiling = enable_profiling
         self.log_frequency = log_frequency
         self.enable_progress = enable_progress
+        self.risk_manager = risk_manager
         self.profiler: ProfilingContext | None = None
         logger.info(
             "Initialized BacktestOrchestrator: \n"
-            "direction=%s, dry_run=%s, profiling=%s, log_freq=%d, progress=%s",
+            "direction=%s, dry_run=%s, profiling=%s, log_freq=%d, progress=%s, risk_mgr=%s",
             direction_mode.value,
             dry_run,
             enable_profiling,
             log_frequency,
             enable_progress,
+            risk_manager.get_label() if risk_manager else "None",
         )
 
     def _start_phase(self, phase_name: str) -> None:
