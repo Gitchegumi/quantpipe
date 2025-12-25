@@ -85,15 +85,15 @@
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] Create tests/unit/test_position_sizers.py with test_risk_percent_sizing_formula
-- [ ] T026 [P] [US2] Add test_position_size_edge_cases in tests/unit/test_position_sizers.py (zero stop, max cap, JPY pairs) for SC-006
+- [x] T025 [P] [US2] Create tests/unit/test_position_sizers.py with test_risk_percent_sizing_formula
+- [x] T026 [P] [US2] Add test_position_size_edge_cases in tests/unit/test_position_sizers.py (zero stop, max cap, JPY pairs) for SC-006
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Implement RiskPercentSizer class in src/risk/policies/position_sizers.py using existing calculate_position_size logic
-- [ ] T028 [US2] Register RiskPercentSizer in src/risk/registry.py
-- [ ] T029 [US2] Wire PositionSizer into RiskManager.build_orders() in src/risk/manager.py
-- [ ] T030 [US2] Add max_position_size capping with warning log in RiskPercentSizer
+- [x] T027 [US2] Implement RiskPercentSizer class in src/risk/policies/position_sizers.py using existing calculate_position_size logic
+- [x] T028 [US2] Register RiskPercentSizer in src/risk/registry.py (covered in RiskManager)
+- [x] T029 [US2] Wire PositionSizer into RiskManager.build_orders() in src/risk/manager.py
+- [x] T030 [US2] Add max_position_size capping with warning log in RiskPercentSizer (in RiskManager.\_calculate_size)
 
 **Checkpoint**: User Story 2 complete - position sizing by risk percent works
 
@@ -107,18 +107,18 @@
 
 ### Tests for User Story 3
 
-- [ ] T031 [P] [US3] Create tests/unit/test_stop_policies.py with test_atr_trailing_ratchet_up
-- [ ] T032 [P] [US3] Add test_atr_trailing_never_widens in tests/unit/test_stop_policies.py
+- [x] T031 [P] [US3] Create tests/unit/test_stop_policies.py with test_atr_trailing_ratchet_up
+- [x] T032 [P] [US3] Add test_atr_trailing_never_widens in tests/unit/test_stop_policies.py
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] Implement ATRTrailingStop class in src/risk/policies/stop_policies.py with initial_stop and update_stop methods
-- [ ] T034 [US3] Register ATRTrailingStop in src/risk/registry.py
-- [ ] T035 [US3] Add update_trailing() method to RiskManager in src/risk/manager.py
-- [ ] T036 [US3] Modify src/backtest/orchestrator.py to call RiskManager.update_trailing() per bar during simulation
-- [ ] T037 [US3] Record exit_reason as "trailing_stop_hit" when trailing stop triggers
+- [x] T033 [US3] Implement ATRTrailingStop class in src/risk/policies/stop_policies.py with initial_stop and update_stop methods (in RiskManager)
+- [x] T034 [US3] Register ATRTrailingStop in src/risk/registry.py (covered: ATR_Trailing type supported)
+- [/] T035 [US3] Add update_trailing() method to RiskManager in src/risk/manager.py (protocol defined, integration deferred to v2)
+- [/] T036 [US3] Modify src/backtest/orchestrator.py to call RiskManager.update_trailing() per bar during simulation (deferred to v2)
+- [ ] T037 [US3] Record exit_reason as "trailing_stop_hit" when trailing stop triggers (deferred to v2)
 
-**Checkpoint**: User Story 3 complete - trailing stops ratchet correctly
+**Checkpoint**: User Story 3 partially complete - initial trailing stops work, per-bar updates deferred to v2
 
 ---
 
@@ -130,15 +130,15 @@
 
 ### Tests for User Story 4
 
-- [ ] T038 [P] [US4] Create tests/unit/test_tp_policies.py with tests for RiskMultipleTP and NoTakeProfit
-- [ ] T039 [P] [US4] Add test_policy_registry_lookup in tests/unit/test_risk_config.py
+- [x] T038 [P] [US4] Create tests/unit/test_tp_policies.py with tests for RiskMultipleTP and NoTakeProfit
+- [x] T039 [P] [US4] Add test_policy_registry_lookup in tests/unit/test_risk_config.py (covered by T013 tests)
 
 ### Implementation for User Story 4
 
-- [ ] T040 [US4] Implement FixedPipsStop class in src/risk/policies/stop_policies.py
-- [ ] T041 [US4] Register FixedPipsStop in src/risk/registry.py
-- [ ] T042 [US4] Add --atr-mult, --atr-period, --fixed-pips CLI args to src/cli/run_backtest.py
-- [ ] T043 [US4] Validate policy combinations in RiskConfig (e.g., ATR policies require period)
+- [x] T040 [US4] Implement FixedPipsStop class in src/risk/policies/stop_policies.py (in RiskManager.\_calculate_stop)
+- [x] T041 [US4] Register FixedPipsStop in src/risk/registry.py (covered: FixedPips type supported)
+- [x] T042 [US4] Add --atr-mult, --atr-period, --fixed-pips CLI args to src/cli/run_backtest.py
+- [x] T043 [US4] Validate policy combinations in RiskConfig (e.g., ATR policies require period)
 - [ ] T044 [US4] Document custom policy creation in specs/021-decouple-risk-management/quickstart.md
 
 **Checkpoint**: User Story 4 complete - multiple policies available
