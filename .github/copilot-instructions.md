@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - N/A (stateless execution, outputs to files) (019-fix-portfolio-viz)
 - Python 3.11 (per pyproject.toml) + numpy, pandas, polars, pydantic (v2.4.0+), pytest (021-decouple-risk-management)
 - N/A (file-based config, memory-resident processing) (021-decouple-risk-management)
+- Python 3.13 + Click (CLI), pytest (testing), Jinja2 (template rendering) (022-strategy-templating)
+- N/A (file system for scaffold output) (022-strategy-templating)
 
 - Python 3.13 + numpy, pandas, pydantic, rich (existing); no new dependencies required (002-directional-backtesting)
 - CSV files for price data input; text/JSON files for backtest results output (002-directional-backtesting)
@@ -107,9 +109,9 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - See Constitution Principle XI for full requirements
 
 ## Recent Changes
+- 022-strategy-templating: Added Python 3.13 + Click (CLI), pytest (testing), Jinja2 (template rendering)
 - 021-decouple-risk-management: Added Python 3.11 (per pyproject.toml) + numpy, pandas, polars, pydantic (v2.4.0+), pytest
 - 019-fix-portfolio-viz: Added Python 3.11+ + Polars (vectorized data), HoloViews/Datashader (visualization), Pytest (testing)
-- 018-strategy-trade-rules: Added Python 3.11+ + NumPy (vectorized operations), pytest (testing)
 
 
 <!-- MANUAL ADDITIONS START -->
