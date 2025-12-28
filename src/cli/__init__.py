@@ -39,8 +39,24 @@ run_backtest.py
             --data data.csv --manifest manifest.yaml --direction long
 
         # Dry run (signals only, no execution)
-        poetry run python -m src.cli.run_backtest \
+        poetry run python -m src.cli.run_backtest \\
             --data data.csv --manifest manifest.yaml --dry-run
+
+scaffold_strategy.py
+    Scaffold a new trading strategy from template (Feature 022)
+
+    Usage:
+        poetry run python -m src.cli.scaffold_strategy <name> [options]
+
+    Arguments:
+        name: Strategy name (valid Python identifier)
+
+    Options:
+        --output PATH: Output directory (default: src/strategy/<name>/)
+        --tags TEXT: Comma-separated list of tags
+
+    Example:
+        poetry run python -m src.cli.scaffold_strategy my_momentum --tags trend
 
 build_dataset.py (PLACEHOLDER - Feature 004)
     Build time series dataset with test/validation splits

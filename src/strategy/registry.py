@@ -13,6 +13,7 @@ Design Goals (per multi-strategy plan):
 NOTE: This is a foundational skeleton. Full validation (configs, risk limits)
 will be layered in subsequent tasks (see tasks T009, T017).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -58,6 +59,7 @@ class StrategyRegistry:
         tags: Optional[Iterable[str]] = None,
         version: str | None = None,
         overwrite: bool = False,
+        validate_on_register: bool = False,
     ) -> RegisteredStrategy:
         """Register a strategy callable.
 
@@ -68,15 +70,25 @@ class StrategyRegistry:
             tags: Optional iterable of tag strings.
             version: Optional semantic version string.
             overwrite: Allow replacing an existing strategy with same name.
+            validate_on_register: If True, validate strategy contract before
+                registering. Raises StrategyValidationError on failure.
 
         Returns:
             RegisteredStrategy instance.
 
         Raises:
             ValueError: If name already exists and overwrite=False.
+            StrategyValidationError: If validate_on_register=True and validation fails.
         """
         if name in self._strategies and not overwrite:
             raise ValueError(f"Strategy '{name}' already registered")
+
+        # Validate strategy contract if requested
+        if validate_on_register:
+            from src.strategy.validator import validate_strategy
+
+            validate_strategy(func, strict=True)
+
         strategy = RegisteredStrategy(
             name=name,
             func=func,
@@ -85,10 +97,11 @@ class StrategyRegistry:
         )
         self._strategies[name] = strategy
         logger.info(
-            "Registered strategy name=%s tags=%d overwrite=%s",
+            "Registered strategy name=%s tags=%d overwrite=%s validated=%s",
             name,
             len(strategy.tags),
-            overwrite
+            overwrite,
+            validate_on_register,
         )
         return strategy
 
@@ -109,9 +122,10 @@ class StrategyRegistry:
         return list(self._strategies.values())
 
     def filter(
-            self,
-            names: Optional[Iterable[str]] = None, tags: Optional[Iterable[str]] = None
-        ) -> List[RegisteredStrategy]:
+        self,
+        names: Optional[Iterable[str]] = None,
+        tags: Optional[Iterable[str]] = None,
+    ) -> List[RegisteredStrategy]:
         """Filter strategies by names and/or tags.
 
         Args:
@@ -136,5 +150,6 @@ class StrategyRegistry:
     def has(self, name: str) -> bool:
         """Return True if a strategy with 'name' is registered."""
         return name in self._strategies
+
 
 __all__ = ["StrategyRegistry", "RegisteredStrategy"]

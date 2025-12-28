@@ -19,10 +19,10 @@
 
 **Purpose**: Project initialization, dependencies, and shared scaffold infrastructure
 
-- [ ] T001 Add Jinja2 dependency to pyproject.toml per research.md decision
-- [ ] T002 Create scaffold directory structure at src/strategy/scaffold/
-- [ ] T003 [P] Create src/strategy/scaffold/**init**.py with module exports
-- [ ] T004 [P] Create src/strategy/scaffold/templates/ directory for Jinja2 templates
+- [x] T001 Add Jinja2 dependency to pyproject.toml per research.md decision
+- [x] T002 Create scaffold directory structure at src/strategy/scaffold/
+- [x] T003 [P] Create src/strategy/scaffold/**init**.py with module exports
+- [x] T004 [P] Create src/strategy/scaffold/templates/ directory for Jinja2 templates
 
 ---
 
@@ -32,10 +32,10 @@
 
 **⚠️ CRITICAL**: User Story 1 (Scaffold) and User Story 2 (Validation) share the validator component
 
-- [ ] T005 Create ValidationResult dataclass in src/strategy/validator.py per data-model.md
-- [ ] T006 Create StrategyValidationError exception in src/strategy/validator.py per data-model.md
-- [ ] T007 Implement validate_strategy() function in src/strategy/validator.py per contracts/validator-api.md
-- [ ] T008 Add validate_on_register parameter to StrategyRegistry.register() in src/strategy/registry.py
+- [x] T005 Create ValidationResult dataclass in src/strategy/validator.py per data-model.md
+- [x] T006 Create StrategyValidationError exception in src/strategy/validator.py per data-model.md
+- [x] T007 Implement validate_strategy() function in src/strategy/validator.py per contracts/validator-api.md
+- [x] T008 Add validate_on_register parameter to StrategyRegistry.register() in src/strategy/registry.py
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -49,18 +49,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] Create unit test for ScaffoldGenerator in tests/unit/test_scaffold_generator.py
-- [ ] T010 [P] [US1] Create integration test for scaffold CLI in tests/integration/test_strategy_scaffold_e2e.py
+- [x] T009 [P] [US1] Create unit test for ScaffoldGenerator in tests/unit/test_scaffold_generator.py
+- [x] T010 [P] [US1] Create integration test for scaffold CLI in tests/integration/test_strategy_scaffold_e2e.py
 
 ### Implementation for User Story 1
 
-- [ ] T011 [P] [US1] Create strategy.py.j2 template in src/strategy/scaffold/templates/strategy.py.j2
-- [ ] T012 [P] [US1] Create **init**.py.j2 template in src/strategy/scaffold/templates/**init**.py.j2
-- [ ] T013 [P] [US1] Create signal_generator.py.j2 template in src/strategy/scaffold/templates/signal_generator.py.j2
-- [ ] T014 [US1] Implement ScaffoldGenerator class in src/strategy/scaffold/generator.py (depends on T011-T013)
-- [ ] T015 [US1] Implement scaffold CLI command in src/cli/scaffold_strategy.py per contracts/validator-api.md
-- [ ] T016 [US1] Add auto-registration logic to scaffold_strategy.py (calls registry.register after generation)
-- [ ] T017 [US1] Verify scaffolded strategy runs in basic backtest without modification
+- [x] T011 [P] [US1] Create strategy.py.j2 template in src/strategy/scaffold/templates/strategy.py.j2
+- [x] T012 [P] [US1] Create **init**.py.j2 template in src/strategy/scaffold/templates/**init**.py.j2
+- [x] T013 [P] [US1] Create signal_generator.py.j2 template in src/strategy/scaffold/templates/signal_generator.py.j2
+- [x] T014 [US1] Implement ScaffoldGenerator class in src/strategy/scaffold/generator.py (depends on T011-T013)
+- [x] T015 [US1] Implement scaffold CLI command in src/cli/scaffold_strategy.py per contracts/validator-api.md
+- [x] T016 [US1] Add auto-registration logic to scaffold_strategy.py (calls registry.register after generation)
+- [x] T017 [US1] Verify scaffolded strategy runs in basic backtest without modification
 
 **Checkpoint**: User Story 1 complete - users can scaffold new strategies via CLI
 
@@ -74,17 +74,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T018 [P] [US2] Create unit tests for validator in tests/unit/test_strategy_validator.py (missing method detection)
-- [ ] T019 [P] [US2] Create unit tests for validator in tests/unit/test_strategy_validator.py (invalid metadata detection)
-- [ ] T020 [P] [US2] Create unit tests for validator in tests/unit/test_strategy_validator.py (wrong signature detection)
+- [x] T018 [P] [US2] Create unit tests for validator in tests/unit/test_strategy_validator.py (missing method detection)
+- [x] T019 [P] [US2] Create unit tests for validator in tests/unit/test_strategy_validator.py (invalid metadata detection)
+- [x] T020 [P] [US2] Create unit tests for validator in tests/unit/test_strategy_validator.py (wrong signature detection)
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] Add metadata property validation to validate_strategy() in src/strategy/validator.py
-- [ ] T022 [US2] Add generate_signals method validation with signature check in src/strategy/validator.py
-- [ ] T023 [US2] Add StrategyMetadata field validation (name, version, required_indicators) in src/strategy/validator.py
-- [ ] T024 [US2] Implement suggestion generation for error messages in src/strategy/validator.py per FR-006
-- [ ] T025 [US2] Add fail-fast exit behavior on validation failure (sys.exit with non-zero code)
+- [x] T021 [US2] Add metadata property validation to validate_strategy() in src/strategy/validator.py
+- [x] T022 [US2] Add generate_signals method validation with signature check in src/strategy/validator.py
+- [x] T023 [US2] Add StrategyMetadata field validation (name, version, required_indicators) in src/strategy/validator.py
+- [x] T024 [US2] Implement suggestion generation for error messages in src/strategy/validator.py per FR-006
+- [x] T025 [US2] Add fail-fast exit behavior on validation failure (sys.exit with non-zero code)
 
 **Checkpoint**: User Story 2 complete - contract violations caught at load time with actionable errors
 
@@ -98,11 +98,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T026 [P] [US3] Create src/strategy/simple_momentum/**init**.py with module exports
-- [ ] T027 [US3] Implement SimpleMomentumStrategy class in src/strategy/simple_momentum/strategy.py
-- [ ] T028 [US3] Add comprehensive docstrings explaining each section in simple_momentum/strategy.py per FR-007
-- [ ] T029 [US3] Register simple_momentum strategy in strategy registry
-- [ ] T030 [US3] Verify reference strategy passes validation and produces trades in test backtest
+- [x] T026 [P] [US3] Create src/strategy/simple_momentum/**init**.py with module exports
+- [x] T027 [US3] Implement SimpleMomentumStrategy class in src/strategy/simple_momentum/strategy.py
+- [x] T028 [US3] Add comprehensive docstrings explaining each section in simple_momentum/strategy.py per FR-007
+- [x] T029 [US3] Register simple_momentum strategy in strategy registry
+- [x] T030 [US3] Verify reference strategy passes validation and produces trades in test backtest
 
 **Checkpoint**: User Story 3 complete - reference strategy available for learning
 
@@ -116,11 +116,11 @@
 
 ### Implementation for User Story 4
 
-- [ ] T031 [US4] Create docs/strategy_authoring.md with Strategy Lifecycle section per FR-009
-- [ ] T032 [US4] Add Required Methods section with complete signatures in docs/strategy_authoring.md
-- [ ] T033 [US4] Add Indicator Integration section in docs/strategy_authoring.md
-- [ ] T034 [US4] Add Risk Management Integration section in docs/strategy_authoring.md
-- [ ] T035 [US4] Add Examples and Troubleshooting section in docs/strategy_authoring.md
+- [x] T031 [US4] Create docs/strategy_authoring.md with Strategy Lifecycle section per FR-009
+- [x] T032 [US4] Add Required Methods section with complete signatures in docs/strategy_authoring.md
+- [x] T033 [US4] Add Indicator Integration section in docs/strategy_authoring.md
+- [x] T034 [US4] Add Risk Management Integration section in docs/strategy_authoring.md
+- [x] T035 [US4] Add Examples and Troubleshooting section in docs/strategy_authoring.md
 
 **Checkpoint**: User Story 4 complete - documentation covers all required methods and lifecycle
 
@@ -130,12 +130,12 @@
 
 **Purpose**: Final verification, code quality, and cross-story integration
 
-- [ ] T036 [P] Run full test suite to verify no regressions: `poetry run pytest tests/ -v`
-- [ ] T037 [P] Run Black formatting: `poetry run black src/ tests/`
-- [ ] T038 [P] Run Ruff linting: `poetry run ruff check src/ tests/`
-- [ ] T039 Run Pylint with target ≥9.0: `poetry run pylint src/ --score=yes`
-- [ ] T040 Update src/cli/**init**.py docstring to document new scaffold_strategy command
-- [ ] T041 Run quickstart.md validation (manual test of scaffold → backtest flow)
+- [x] T036 [P] Run full test suite to verify no regressions: `poetry run pytest tests/ -v`
+- [x] T037 [P] Run Black formatting: `poetry run black src/ tests/`
+- [x] T038 [P] Run Ruff linting: `poetry run ruff check src/ tests/`
+- [x] T039 Run Pylint with target ≥9.0: `poetry run pylint src/ --score=yes` (9.93/10 ✓)
+- [x] T040 Update src/cli/**init**.py docstring to document new scaffold_strategy command
+- [x] T041 Run quickstart.md validation (manual test of scaffold → backtest flow)
 
 ---
 
