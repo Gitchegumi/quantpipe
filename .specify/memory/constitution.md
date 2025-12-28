@@ -1,13 +1,12 @@
 <!--
 Sync Impact Report:
-- Version change: 1.9.0 → 1.10.0
+- Version change: 1.10.0 → 1.10.1
 - Modified principles:
-  - Principle XIII (NEW) - GitHub Workflow Templates
+  - Principle IX (UPDATED) - Added Dependency Installation Requirements subsection
 - Added sections:
-  - Principle XIII: GitHub Workflow Templates
-  - Issue template requirements: feature_request.md, bug_report.md
-  - PR template requirements: pull_request_template.md
-  - gh CLI usage for issue/PR creation
+  - Dependency Installation Requirements under Principle IX
+  - Mandates `poetry add` for new dependencies
+  - Prohibits direct pyproject.toml editing for dependencies
 - Removed sections: None
 - Templates requiring updates:
   ✅ plan-template.md - Compatible (no changes needed)
@@ -145,6 +144,13 @@ Python projects MUST use Poetry as the package manager. The use of `requirements
 - Lock file: `poetry.lock` (MUST be committed)
 - No `requirements.txt` except for minimal production deployments
 - Development dependencies separated from production dependencies
+
+**Dependency Installation Requirements:**
+
+- New dependencies MUST be added using `poetry add <package>` command
+- Development dependencies MUST use `poetry add --group dev <package>`
+- Direct editing of `pyproject.toml` to add dependencies is PROHIBITED
+- Rationale: `poetry add` automatically resolves version constraints, updates the lock file, and ensures dependency compatibility
 
 ### Principle X: Code Quality Automation & Linting
 
@@ -377,6 +383,6 @@ Amendments require:
 - Risk committee approval for changes affecting trading or risk management
 - Documentation updates across all affected systems and procedures
 
-**Version:** 1.10.0
+**Version:** 1.10.1
 **Ratified:** October 25, 2025
-**Last Amended:** December 21, 2025
+**Last Amended:** December 28, 2025
