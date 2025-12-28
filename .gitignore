@@ -222,3 +222,23 @@ results/*
 .venv/
 /data/raw/
 ./runs/
+
+# =============================================================================
+# User-Created Strategies (022-strategy-templating)
+# =============================================================================
+# Ignore all new strategies created via scaffold command while allowing:
+# - Core strategy files (base.py, registry.py, validator.py, etc.)
+# - Scaffold module (src/strategy/scaffold/)
+# - Official strategies (trend_pullback, simple_momentum)
+# =============================================================================
+
+# Ignore all subdirectories in src/strategy/ (user-created strategies)
+src/strategy/*/
+
+# But explicitly allow these directories:
+!src/strategy/scaffold/
+!src/strategy/trend_pullback/
+!src/strategy/simple_momentum/
+
+# Also ignore any strategies created in root /strategy/ directory (scaffold default)
+/strategy/
