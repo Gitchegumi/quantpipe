@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - N/A (file-based config, memory-resident processing) (021-decouple-risk-management)
 - Python 3.13 + Click (CLI), pytest (testing), Jinja2 (template rendering) (022-strategy-templating)
 - N/A (file system for scaffold output) (022-strategy-templating)
+- Python 3.11+ (per pyproject.toml) + pydantic (validation), pandas/polars (timestamps), pytz (timezone handling) (023-session-blackouts)
+- N/A (in-memory calendar generation, optional CSV/Parquet export) (023-session-blackouts)
 
 - Python 3.13 + numpy, pandas, pydantic, rich (existing); no new dependencies required (002-directional-backtesting)
 - CSV files for price data input; text/JSON files for backtest results output (002-directional-backtesting)
@@ -109,9 +111,9 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - See Constitution Principle XI for full requirements
 
 ## Recent Changes
+- 023-session-blackouts: Added Python 3.11+ (per pyproject.toml) + pydantic (validation), pandas/polars (timestamps), pytz (timezone handling)
 - 022-strategy-templating: Added Python 3.13 + Click (CLI), pytest (testing), Jinja2 (template rendering)
 - 021-decouple-risk-management: Added Python 3.11 (per pyproject.toml) + numpy, pandas, polars, pydantic (v2.4.0+), pytest
-- 019-fix-portfolio-viz: Added Python 3.11+ + Polars (vectorized data), HoloViews/Datashader (visualization), Pytest (testing)
 
 
 <!-- MANUAL ADDITIONS START -->
