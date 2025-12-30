@@ -23,6 +23,7 @@ from src.risk.blackout.config import (
     BlackoutConfig,
     NewsBlackoutConfig,
     SessionBlackoutConfig,
+    SessionOnlyConfig,
 )
 from src.risk.blackout.holidays import (
     get_us_holidays_for_year,
@@ -35,6 +36,13 @@ from src.risk.blackout.windows import (
     is_in_blackout,
     merge_overlapping_windows,
 )
+from src.risk.blackout.sessions import (
+    TradingSession,
+    TRADING_SESSIONS,
+    get_session,
+    get_allowed_session_windows,
+    build_session_only_blackouts,
+)
 
 
 __all__ = [
@@ -42,9 +50,11 @@ __all__ = [
     "BlackoutConfig",
     "NewsBlackoutConfig",
     "SessionBlackoutConfig",
+    "SessionOnlyConfig",
     # Data classes
     "NewsEvent",
     "BlackoutWindow",
+    "TradingSession",
     # Calendar generation
     "generate_nfp_events",
     "generate_ijc_events",
@@ -57,4 +67,9 @@ __all__ = [
     # Holiday detection
     "is_us_market_holiday",
     "get_us_holidays_for_year",
+    # Session-only trading
+    "TRADING_SESSIONS",
+    "get_session",
+    "get_allowed_session_windows",
+    "build_session_only_blackouts",
 ]

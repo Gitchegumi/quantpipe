@@ -57,6 +57,32 @@ risk_config = RiskConfig(
 )
 ```
 
+### Session-Only Trading (Whitelist)
+
+Only trade during specific sessions:
+
+```python
+from src.risk.blackout import SessionOnlyConfig
+
+# Only trade during NY and London sessions
+risk_config = RiskConfig(
+    blackout=BlackoutConfig(
+        session_only=SessionOnlyConfig(
+            enabled=True,
+            allowed_sessions=["NY", "LONDON"],  # Also: ASIA, SYDNEY
+        )
+    )
+)
+```
+
+Available sessions:
+| Session | Hours | Timezone |
+|---------|-------|----------|
+| NY | 08:00-17:00 | America/New_York |
+| LONDON | 08:00-16:00 | Europe/London |
+| ASIA | 09:00-18:00 | Asia/Tokyo |
+| SYDNEY | 07:00-16:00 | Australia/Sydney |
+
 ## CLI Usage (Planned)
 
 ```bash
@@ -71,6 +97,11 @@ python -m src.cli.run_backtest \
 python -m src.cli.run_backtest \
     --pair EURUSD \
     --blackout-sessions
+
+# Run backtest with session-only trading
+python -m src.cli.run_backtest \
+    --pair EURUSD \
+    --trade-sessions NY LONDON
 ```
 
 ## Generate News Calendar

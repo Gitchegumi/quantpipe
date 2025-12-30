@@ -191,6 +191,21 @@ class BacktestOrchestrator:
             all_windows.extend(session_windows)
             logger.info("Built %d session blackout windows", len(session_windows))
 
+        # Build session-only blackouts (whitelist approach)
+        if self.blackout_config.session_only.enabled:
+            from src.risk.blackout.sessions import build_session_only_blackouts
+
+            session_only_blackouts = build_session_only_blackouts(
+                start_date, end_date, self.blackout_config.session_only.allowed_sessions
+            )
+            logger.info(
+                "Built %d session-only blackout windows for %s",
+                len(session_only_blackouts),
+                self.blackout_config.session_only.allowed_sessions,
+            )
+            # Return directly - session_only is exclusive
+            return session_only_blackouts
+
         # Merge overlapping windows
         if all_windows:
             merged = merge_overlapping_windows(all_windows)

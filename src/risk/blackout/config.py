@@ -5,7 +5,6 @@ This module defines configuration models for news and session blackout windows,
 including timing offsets and force-close behavior settings.
 """
 
-
 from pydantic import BaseModel, Field
 
 
@@ -63,13 +62,36 @@ class SessionBlackoutConfig(BaseModel):
     asian_timezone: str = "Asia/Tokyo"
 
 
+class SessionOnlyConfig(BaseModel):
+    """
+    Configuration for session-only trading (whitelist approach).
+
+    When enabled, trades are only allowed during specified sessions.
+    Times outside allowed sessions become blackout periods.
+
+    Attributes:
+        enabled: Enable session-only mode (default: False).
+        allowed_sessions: List of session names to allow (e.g., ["NY", "LONDON"]).
+            Valid values: NY, LONDON, ASIA, SYDNEY.
+
+    Example:
+        >>> config = SessionOnlyConfig(enabled=True, allowed_sessions=["NY", "LONDON"])
+        >>> config.allowed_sessions
+        ['NY', 'LONDON']
+    """
+
+    enabled: bool = False
+    allowed_sessions: list[str] = Field(default_factory=list)
+
+
 class BlackoutConfig(BaseModel):
     """
-    Top-level configuration combining news and session blackouts.
+    Top-level configuration combining news, session, and session-only blackouts.
 
     Attributes:
         news: News blackout settings.
-        sessions: Session blackout settings.
+        sessions: Session gap blackout settings (NY close → Asian open).
+        session_only: Session-only trading (whitelist approach).
 
     Example:
         >>> config = BlackoutConfig()
@@ -81,8 +103,9 @@ class BlackoutConfig(BaseModel):
 
     news: NewsBlackoutConfig = Field(default_factory=NewsBlackoutConfig)
     sessions: SessionBlackoutConfig = Field(default_factory=SessionBlackoutConfig)
+    session_only: SessionOnlyConfig = Field(default_factory=SessionOnlyConfig)
 
     @property
     def any_enabled(self) -> bool:
         """Return True if any blackout type is enabled."""
-        return self.news.enabled or self.sessions.enabled
+        return self.news.enabled or self.sessions.enabled or self.session_only.enabled
