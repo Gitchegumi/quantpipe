@@ -54,6 +54,7 @@ class RiskConfig(BaseModel):
         max_position_size: Maximum position size in lots.
         pip_value: Value of 1 pip per lot in base currency.
         lot_step: Minimum lot size increment.
+        blackout: Optional blackout configuration (Feature 023).
 
     Examples:
         >>> config = RiskConfig(risk_pct=0.25)
@@ -72,6 +73,9 @@ class RiskConfig(BaseModel):
     max_position_size: float = Field(default=10.0, ge=0.01, le=100.0)
     pip_value: float = Field(default=10.0, ge=0.01)
     lot_step: float = Field(default=0.01, ge=0.001, le=1.0)
+    # Optional blackout configuration (Feature 023 - Session Blackouts)
+    # Uses Any to avoid circular import; validated at runtime
+    blackout: Any = None
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "RiskConfig":

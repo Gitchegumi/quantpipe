@@ -10,6 +10,13 @@ from src.risk.policies import (
     RiskConfigurationError,
 )
 
+# Blackout module exports (Feature 023 - Session Blackouts)
+from src.risk.blackout.config import (
+    BlackoutConfig,
+    NewsBlackoutConfig,
+    SessionBlackoutConfig,
+)
+
 __all__ = [
     "RiskConfig",
     "DEFAULT_RISK_CONFIG",
@@ -20,4 +27,8 @@ __all__ = [
     "TakeProfitPolicy",
     "PositionSizer",
     "RiskConfigurationError",
+    # Blackout module
+    "BlackoutConfig",
+    "NewsBlackoutConfig",
+    "SessionBlackoutConfig",
 ]

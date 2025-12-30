@@ -19,9 +19,9 @@
 
 **Purpose**: Create blackout subpackage structure and base configuration
 
-- [ ] T001 Create blackout subpackage directory `src/risk/blackout/`
-- [ ] T002 Create module init file `src/risk/blackout/__init__.py` with public exports
-- [ ] T003 [P] Create test directory `tests/unit/blackout/`
+- [x] T001 Create blackout subpackage directory `src/risk/blackout/`
+- [x] T002 Create module init file `src/risk/blackout/__init__.py` with public exports
+- [x] T003 [P] Create test directory `tests/unit/blackout/`
 
 ---
 
@@ -31,14 +31,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Create `BlackoutWindow` dataclass in `src/risk/blackout/windows.py` (start_utc, end_utc, source)
-- [ ] T005 Create `NewsEvent` dataclass in `src/risk/blackout/calendar.py` (event_name, currency, event_time_utc)
-- [ ] T006 [P] Create `NewsBlackoutConfig` pydantic model in `src/risk/blackout/config.py`
-- [ ] T007 [P] Create `SessionBlackoutConfig` pydantic model in `src/risk/blackout/config.py`
-- [ ] T008 Create `BlackoutConfig` composite model in `src/risk/blackout/config.py`
-- [ ] T009 Add `blackout: BlackoutConfig | None = None` field to `src/risk/config.py` (RiskConfig)
-- [ ] T010 Update `src/risk/__init__.py` to export blackout components
-- [ ] T011 [P] Create unit test `tests/unit/blackout/test_config.py` for config validation
+- [x] T004 Create `BlackoutWindow` dataclass in `src/risk/blackout/windows.py` (start_utc, end_utc, source)
+- [x] T005 Create `NewsEvent` dataclass in `src/risk/blackout/calendar.py` (event_name, currency, event_time_utc)
+- [x] T006 [P] Create `NewsBlackoutConfig` pydantic model in `src/risk/blackout/config.py`
+- [x] T007 [P] Create `SessionBlackoutConfig` pydantic model in `src/risk/blackout/config.py`
+- [x] T008 Create `BlackoutConfig` composite model in `src/risk/blackout/config.py`
+- [x] T009 Add `blackout: BlackoutConfig | None = None` field to `src/risk/config.py` (RiskConfig)
+- [x] T010 Update `src/risk/__init__.py` to export blackout components
+- [x] T011 [P] Create unit test `tests/unit/blackout/test_config.py` for config validation
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -54,19 +54,19 @@
 
 ### Unit Tests for User Story 3
 
-- [ ] T012 [P] [US3] Create `tests/unit/blackout/test_holidays.py` with holiday detection tests
-- [ ] T013 [P] [US3] Create `tests/unit/blackout/test_calendar.py` with NFP/IJC generation tests
+- [x] T012 [P] [US3] Create `tests/unit/blackout/test_holidays.py` with holiday detection tests
+- [x] T013 [P] [US3] Create `tests/unit/blackout/test_calendar.py` with NFP/IJC generation tests
 
 ### Implementation for User Story 3
 
-- [ ] T014 [P] [US3] Implement `is_us_market_holiday(date)` in `src/risk/blackout/holidays.py`
-- [ ] T015 [P] [US3] Implement `get_us_holidays_for_year(year)` in `src/risk/blackout/holidays.py`
-- [ ] T016 [US3] Implement `generate_nfp_events(start, end)` in `src/risk/blackout/calendar.py` (first Friday of month)
-- [ ] T017 [US3] Implement `generate_ijc_events(start, end)` in `src/risk/blackout/calendar.py` (every Thursday)
-- [ ] T018 [US3] Implement `generate_news_calendar(start, end, event_types)` in `src/risk/blackout/calendar.py`
-- [ ] T019 [US3] Add holiday skip logic to calendar generation (skip events on U.S. holidays)
-- [ ] T020 [US3] Add DST-aware timezone conversion (America/New_York → UTC)
-- [ ] T021 [US3] Run and verify all US3 unit tests pass: `poetry run pytest tests/unit/blackout/test_calendar.py tests/unit/blackout/test_holidays.py -v`
+- [x] T014 [P] [US3] Implement `is_us_market_holiday(date)` in `src/risk/blackout/holidays.py`
+- [x] T015 [P] [US3] Implement `get_us_holidays_for_year(year)` in `src/risk/blackout/holidays.py`
+- [x] T016 [US3] Implement `generate_nfp_events(start, end)` in `src/risk/blackout/calendar.py` (first Friday of month)
+- [x] T017 [US3] Implement `generate_ijc_events(start, end)` in `src/risk/blackout/calendar.py` (every Thursday)
+- [x] T018 [US3] Implement `generate_news_calendar(start, end, event_types)` in `src/risk/blackout/calendar.py`
+- [x] T019 [US3] Add holiday skip logic to calendar generation (skip events on U.S. holidays)
+- [x] T020 [US3] Add DST-aware timezone conversion (America/New_York → UTC)
+- [x] T021 [US3] Run and verify all US3 unit tests pass: `poetry run pytest tests/unit/blackout/test_calendar.py tests/unit/blackout/test_holidays.py -v`
 
 **Checkpoint**: Calendar generation works independently - can generate and export NFP/IJC events
 
@@ -82,16 +82,16 @@
 
 ### Unit Tests for User Story 1
 
-- [ ] T022 [P] [US1] Create `tests/unit/blackout/test_windows.py` with window merge/overlap tests
+- [x] T022 [P] [US1] Create `tests/unit/blackout/test_windows.py` with window merge/overlap tests
 
 ### Implementation for User Story 1
 
-- [ ] T023 [US1] Implement `expand_news_windows(events, config)` in `src/risk/blackout/windows.py`
-- [ ] T024 [US1] Implement `merge_overlapping_windows(windows)` in `src/risk/blackout/windows.py`
-- [ ] T025 [US1] Implement `is_in_blackout(timestamp, windows)` in `src/risk/blackout/windows.py`
-- [ ] T026 [US1] Implement **vectorized** `filter_blackout_signals(indices, timestamps, windows)` in `src/backtest/signal_filter.py` using NumPy boolean masks (NO per-candle loops)
-- [ ] T027 [US1] Add telemetry logging for blocked entries in `src/risk/blackout/windows.py`
-- [ ] T028 [US1] Run and verify all US1 unit tests pass: `poetry run pytest tests/unit/blackout/test_windows.py -v`
+- [x] T023 [US1] Implement `expand_news_windows(events, config)` in `src/risk/blackout/windows.py`
+- [x] T024 [US1] Implement `merge_overlapping_windows(windows)` in `src/risk/blackout/windows.py`
+- [x] T025 [US1] Implement `is_in_blackout(timestamp, windows)` in `src/risk/blackout/windows.py`
+- [x] T026 [US1] Implement **vectorized** `filter_blackout_signals(indices, timestamps, windows)` in `src/backtest/signal_filter.py` using NumPy boolean masks (NO per-candle loops)
+- [x] T027 [US1] Add telemetry logging for blocked entries in `src/risk/blackout/windows.py`
+- [x] T028 [US1] Run and verify all US1 unit tests pass: `poetry run pytest tests/unit/blackout/test_windows.py -v`
 
 **Checkpoint**: News blackouts work independently - entries blocked during NFP/IJC windows
 
@@ -107,10 +107,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Implement `expand_session_windows(date_range, config)` in `src/risk/blackout/windows.py`
-- [ ] T030 [US2] Add session window tests to `tests/unit/blackout/test_windows.py`
-- [ ] T031 [US2] Add session anchor configuration (NY close: 17:00 ET, Asian open: 09:00 Tokyo)
-- [ ] T032 [US2] Run and verify session window tests pass: `poetry run pytest tests/unit/blackout/test_windows.py -v`
+- [x] T029 [US2] Implement `expand_session_windows(date_range, config)` in `src/risk/blackout/windows.py`
+- [x] T030 [US2] Add session window tests to `tests/unit/blackout/test_windows.py`
+- [x] T031 [US2] Add session anchor configuration (NY close: 17:00 ET, Asian open: 09:00 Tokyo)
+- [x] T032 [US2] Run and verify session window tests pass: `poetry run pytest tests/unit/blackout/test_windows.py -v`
 
 **Checkpoint**: Session blackouts work - entries blocked during NY close → Asian open
 
@@ -123,8 +123,8 @@
 - [ ] T033 Add blackout window building to backtest orchestrator in `src/backtest/orchestrator.py`
 - [ ] T034 Wire `filter_blackout_signals` into signal filtering pipeline in `src/backtest/orchestrator.py`
 - [ ] T035 Add optional force-close callback structure (stub for future implementation)
-- [ ] T036 [P] Create integration test `tests/integration/test_blackout_backtest.py`
-- [ ] T037 Run integration tests: `poetry run pytest tests/integration/test_blackout_backtest.py -v`
+- [x] T036 [P] Create integration test `tests/integration/test_blackout_backtest.py`
+- [x] T037 Run integration tests: `poetry run pytest tests/integration/test_blackout_backtest.py -v`
 
 **Checkpoint**: End-to-end blackout filtering works in real backtests
 
@@ -134,10 +134,10 @@
 
 **Purpose**: Documentation, cleanup, and final validation
 
-- [ ] T038 [P] Update `src/risk/blackout/__init__.py` with complete public API exports
+- [x] T038 [P] Update `src/risk/blackout/__init__.py` with complete public API exports
 - [ ] T039 [P] Add docstrings to all public functions (PEP 257 compliance)
 - [ ] T040 Run full linting: `poetry run ruff check src/risk/blackout/`
-- [ ] T041 Run full test suite: `poetry run pytest tests/unit/blackout/ tests/integration/test_blackout_backtest.py -v`
+- [x] T041 Run full test suite: `poetry run pytest tests/unit/blackout/ tests/integration/test_blackout_backtest.py -v`
 - [ ] T042 Validate quickstart.md examples work as documented
 - [ ] T043 [P] Update GEMINI.md with new module reference
 
