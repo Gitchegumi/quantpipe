@@ -12,16 +12,79 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.2.1
+### Current Version: 0.2.2
 
 - **Status**: Released
-- **Date**: 2025-12-25
+- **Date**: 2025-12-30
 - **Branch**: main
-- **PR**: #50
+- **PR**: #52
 
 ---
 
 ## Released Versions
+
+### [v0.2.2] - 2025-12-30
+
+**Theme**: Session Blackouts + High-Impact News Avoidance
+
+**Highlights**:
+
+- Block new trade entries during high-impact news events (NFP, IJC)
+- Block entries during low-liquidity session gaps (NY close → Asian open)
+- Session-only trading mode to whitelist specific sessions (NY, London, Asia, Sydney)
+- Rule-based calendar generation without external API dependencies
+
+**Key Features**:
+
+News Blackouts:
+
+- NFP (first Friday) and IJC (every Thursday) at 08:30 ET
+- U.S. market holiday detection (NYSE calendar)
+- Configurable pre/post event timing offsets
+- DST-aware timezone conversion
+
+Session Blackouts:
+
+- NY close (17:00 ET) → Asian open (09:00 Tokyo) gap filtering
+- Configurable session anchors and timing
+
+Session-Only Trading (NEW):
+
+- Whitelist approach: `--trade-sessions NY LONDON`
+- 4 sessions: NY, London, Asia, Sydney
+- Overlapping sessions automatically merge
+
+Technical:
+
+- Vectorized `filter_blackout_signals()` using NumPy boolean masks
+- New `src/risk/blackout/` module (config, calendar, holidays, windows, sessions)
+- 93 new tests (77 unit + 16 session-only)
+
+**Usage**:
+
+```python
+from src.risk.blackout import BlackoutConfig, NewsBlackoutConfig, SessionOnlyConfig
+
+# News blackouts
+config = BlackoutConfig(news=NewsBlackoutConfig(enabled=True))
+
+# Session-only trading
+config = BlackoutConfig(
+    session_only=SessionOnlyConfig(
+        enabled=True,
+        allowed_sessions=["NY", "LONDON"]
+    )
+)
+```
+
+**Related**:
+
+- Pull Request: #52
+- Closes Issue: #19
+- Spec: 023-session-blackouts
+- Tests: 93 passing (5 test files)
+
+---
 
 ### [v0.2.1] - 2025-12-25
 
