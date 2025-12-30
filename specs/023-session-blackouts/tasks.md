@@ -135,11 +135,11 @@
 **Purpose**: Documentation, cleanup, and final validation
 
 - [x] T038 [P] Update `src/risk/blackout/__init__.py` with complete public API exports
-- [ ] T039 [P] Add docstrings to all public functions (PEP 257 compliance)
-- [ ] T040 Run full linting: `poetry run ruff check src/risk/blackout/`
+- [x] T039 [P] Add docstrings to all public functions (PEP 257 compliance)
+- [x] T040 Run full linting: `poetry run ruff check src/risk/blackout/`
 - [x] T041 Run full test suite: `poetry run pytest tests/unit/blackout/ tests/integration/test_blackout_backtest.py -v`
-- [ ] T042 Validate quickstart.md examples work as documented
-- [ ] T043 [P] Update GEMINI.md with new module reference
+- [x] T042 Validate quickstart.md examples work as documented
+- [x] T043 [P] Update GEMINI.md with new module reference
 
 ---
 
