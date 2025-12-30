@@ -153,3 +153,73 @@ def _filter_simple_window(
     )
 
     return np.array(kept_indices, dtype=np.int64)
+
+
+def filter_blackout_signals(
+    signal_indices: np.ndarray,
+    timestamps: np.ndarray,
+    blackout_windows: list[tuple],
+) -> tuple[np.ndarray, int]:
+    """
+    Vectorized filter to remove signals falling within blackout windows.
+
+    This function uses NumPy boolean masks for O(n*w) complexity where
+    n = number of signals and w = number of windows. NO per-candle loops.
+
+    Args:
+        signal_indices: Array of signal indices to filter.
+        timestamps: Array of UTC timestamps (as np.datetime64 or float epoch).
+            Must have same length as signal_indices.
+        blackout_windows: List of (start_utc, end_utc) tuples representing
+            blackout periods. Timestamps can be datetime objects or np.datetime64.
+
+    Returns:
+        Tuple of (filtered_indices, blocked_count):
+            - filtered_indices: Signals not in any blackout window
+            - blocked_count: Number of signals that were filtered out
+
+    Example:
+        >>> import numpy as np
+        >>> signals = np.array([0, 1, 2, 3, 4])
+        >>> timestamps = np.array(['2023-01-06T13:25', '2023-01-06T13:35',
+        ...                        '2023-01-06T14:30', '2023-01-06T15:00',
+        ...                        '2023-01-06T16:00'], dtype='datetime64[m]')
+        >>> # Blackout from 13:20 to 14:00
+        >>> blackouts = [(np.datetime64('2023-01-06T13:20'),
+        ...               np.datetime64('2023-01-06T14:00'))]
+        >>> filtered, blocked = filter_blackout_signals(signals, timestamps, blackouts)
+        >>> blocked  # signals at 13:25 and 13:35 should be blocked
+        2
+    """
+    if len(signal_indices) == 0:
+        return np.array([], dtype=np.int64), 0
+
+    if len(blackout_windows) == 0:
+        return signal_indices.copy(), 0
+
+    # Start with all signals allowed
+    mask = np.ones(len(signal_indices), dtype=bool)
+
+    for start, end in blackout_windows:
+        # Convert datetime to numpy datetime64 if needed
+        if hasattr(start, "timestamp"):
+            start = np.datetime64(int(start.timestamp()), "s")
+        if hasattr(end, "timestamp"):
+            end = np.datetime64(int(end.timestamp()), "s")
+
+        # Vectorized comparison - no per-candle loop
+        in_window = (timestamps >= start) & (timestamps <= end)
+        mask &= ~in_window
+
+    filtered_indices = signal_indices[mask]
+    blocked_count = len(signal_indices) - len(filtered_indices)
+
+    if blocked_count > 0:
+        logger.info(
+            "Blackout filter: blocked %d of %d signals (%.1f%%)",
+            blocked_count,
+            len(signal_indices),
+            100 * blocked_count / len(signal_indices),
+        )
+
+    return filtered_indices, blocked_count

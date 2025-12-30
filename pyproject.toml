@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.13"
 numpy = "^2.0.0"
 pandas = "^2.2.0"
 pydantic = "^2.4.0"
@@ -22,7 +22,6 @@ psutil = "^6.1.0"
 tqdm = "^4.67.1"
 py-spy = "^0.4.1"
 joblib = "^1.5.2"
-lightweight-charts = "^2.0.0"
 
 # Datashader visualization stack (for large dataset backtest analysis)
 holoviews = "^1.19.0"

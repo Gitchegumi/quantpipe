@@ -1,88 +1,75 @@
-import pandas as pd
-import polars as pl
+"""
+Tests for the deprecated interactive visualization module.
+
+Since interactive.py is now a deprecation stub that forwards to datashader_viz,
+these tests verify the deprecation warnings and forwarding behavior.
+"""
+
 import pytest
-from unittest.mock import MagicMock, patch
-from src.visualization.interactive import (
-    plot_backtest_results,
-    _prepare_candle_data,
-    _prepare_indicator_data,
-)
-from src.models.directional import BacktestResult
+from unittest.mock import patch, MagicMock
 
 
-@pytest.fixture
-def mock_ohlcv_data():
-    return pl.DataFrame(
-        {
-            "timestamp_utc": ["2023-01-01 10:00:00", "2023-01-01 10:01:00"],
-            "open": [1.0, 1.1],
-            "high": [1.2, 1.3],
-            "low": [0.9, 1.0],
-            "close": [1.1, 1.2],
-            "ema_50": [1.05, 1.15],
-        }
-    )
+pytestmark = pytest.mark.unit
 
 
-@pytest.fixture
-def mock_result():
-    return MagicMock(spec=BacktestResult)
+class TestDeprecationWarning:
+    """Test that deprecation warnings are issued."""
+
+    def test_import_logs_deprecation_warning(self, caplog):
+        """Importing the module should log a deprecation warning."""
+        import logging
+
+        caplog.set_level(logging.WARNING)
+
+        # Force reimport
+        import importlib
+        import src.visualization.interactive as interactive_module
+
+        importlib.reload(interactive_module)
+
+        assert any("DEPRECATED" in record.message for record in caplog.records)
 
 
-def test_prepare_candle_data_success(mock_ohlcv_data):
-    df = _prepare_candle_data(mock_ohlcv_data)
-    assert isinstance(df, pd.DataFrame)
-    assert "time" in df.columns
-    assert "open" in df.columns
-    assert len(df) == 2
+class TestForwardingStub:
+    """Test that the forwarding stub works correctly."""
 
+    @patch("src.visualization.datashader_viz.plot_backtest_results")
+    def test_plot_backtest_results_forwards_to_datashader(self, mock_new_plot):
+        """plot_backtest_results should forward to datashader_viz."""
+        from src.visualization.interactive import plot_backtest_results
 
-def test_prepare_candle_data_missing_cols():
-    bad_data = pl.DataFrame({"timestamp_utc": []})
-    with pytest.raises(ValueError):
-        _prepare_candle_data(bad_data)
+        # Call the stub
+        mock_data = MagicMock()
+        mock_result = MagicMock()
 
+        plot_backtest_results(mock_data, mock_result, "EURUSD")
 
-def test_prepare_indicator_data_success(mock_ohlcv_data):
-    indicators = _prepare_indicator_data(mock_ohlcv_data)
-    assert "ema_50" in indicators
-    assert isinstance(indicators["ema_50"], pd.DataFrame)
-    assert "value" in indicators["ema_50"].columns
-    # Should exclude open/high/low/close
-    assert "open" not in indicators
+        # Verify it forwarded to new implementation
+        mock_new_plot.assert_called_once_with(mock_data, mock_result, "EURUSD")
 
+    @patch("src.visualization.datashader_viz.plot_backtest_results")
+    def test_plot_backtest_results_forwards_kwargs(self, mock_new_plot):
+        """Keyword arguments should be forwarded correctly."""
+        from src.visualization.interactive import plot_backtest_results
 
-@patch("src.visualization.interactive.Chart")
-def test_plot_backtest_results_calls(mock_chart_cls, mock_ohlcv_data, mock_result):
-    mock_chart_instance = mock_chart_cls.return_value
-    mock_line = mock_chart_instance.create_line.return_value
+        mock_data = MagicMock()
+        mock_result = MagicMock()
 
-    # Mock executions in result
-    mock_result.executions = [
-        {"timestamp": "2023-01-01 10:00:00", "side": "BUY", "price": 1.1},
-        {"timestamp": "2023-01-01 10:01:00", "side": "SELL", "price": 1.2},
-    ]
+        plot_backtest_results(
+            mock_data, mock_result, "EURUSD", show_plot=False, start_date="2023-01-01"
+        )
 
-    plot_backtest_results(mock_ohlcv_data, mock_result, "EURUSD", show_plot=False)
+        mock_new_plot.assert_called_once_with(
+            mock_data, mock_result, "EURUSD", show_plot=False, start_date="2023-01-01"
+        )
 
-    mock_chart_cls.assert_called()
-    mock_chart_instance.set.assert_called()  # Set candles
-    mock_chart_instance.create_line.assert_called_with(name="ema_50")
-    mock_line.set.assert_called()  # Set indicator data
+    @patch("src.visualization.datashader_viz.plot_backtest_results")
+    def test_plot_backtest_results_returns_result(self, mock_new_plot):
+        """Return value should be passed through from datashader_viz."""
+        from src.visualization.interactive import plot_backtest_results
 
-    # Verify markers
-    mock_chart_instance.marker.assert_called()
-    call_args = mock_chart_instance.marker.call_args[0][0]
-    assert len(call_args) == 2
-    assert call_args[0]["shape"] == "arrowUp"
-    assert call_args[1]["shape"] == "arrowDown"
+        mock_new_plot.return_value = "chart_object"
 
-    # show_plot=False should prevent show call
-    mock_chart_instance.show.assert_not_called()
+        result = plot_backtest_results(MagicMock(), MagicMock(), "EURUSD")
 
-
-@patch("src.visualization.interactive.Chart")
-def test_plot_backtest_results_show(mock_chart_cls, mock_ohlcv_data, mock_result):
-    mock_chart_instance = mock_chart_cls.return_value
-    plot_backtest_results(mock_ohlcv_data, mock_result, "EURUSD", show_plot=True)
-    mock_chart_instance.show.assert_called_with(block=True)
+        assert result == "chart_object"

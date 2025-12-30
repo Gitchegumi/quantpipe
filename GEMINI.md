@@ -23,6 +23,7 @@ Python 3.11: Follow standard conventions
 
 ## Recent Changes
 
+- 023-session-blackouts: Added `src/risk/blackout/` module for news and session blackout filtering
 - 011-optimize-batch-simulation: Added Python 3.11 + pandas, numpy, polars, pytest
 
 <!-- MANUAL ADDITIONS START -->

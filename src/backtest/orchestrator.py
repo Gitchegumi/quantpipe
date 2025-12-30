@@ -83,6 +83,7 @@ class BacktestOrchestrator:
         log_frequency: int = 1000,
         enable_progress: bool = True,
         risk_manager: Any = None,
+        blackout_config: Any = None,
     ):
         """
         Initialize backtest orchestrator.
@@ -95,6 +96,7 @@ class BacktestOrchestrator:
             enable_progress: If True, display rich progress bars.
             risk_manager: Optional RiskManager for decoupled risk management (Feature 021).
                 If provided, used to transform signals into OrderPlans with configured policies.
+            blackout_config: Optional BlackoutConfig for blocking signals during news/session gaps.
         """
         self.direction_mode = direction_mode
         self.dry_run = dry_run
@@ -102,16 +104,22 @@ class BacktestOrchestrator:
         self.log_frequency = log_frequency
         self.enable_progress = enable_progress
         self.risk_manager = risk_manager
+        self.blackout_config = blackout_config
         self.profiler: ProfilingContext | None = None
         logger.info(
             "Initialized BacktestOrchestrator: \n"
-            "direction=%s, dry_run=%s, profiling=%s, log_freq=%d, progress=%s, risk_mgr=%s",
+            "direction=%s, dry_run=%s, profiling=%s, log_freq=%d, progress=%s, risk_mgr=%s, blackout=%s",
             direction_mode.value,
             dry_run,
             enable_profiling,
             log_frequency,
             enable_progress,
             risk_manager.get_label() if risk_manager else "None",
+            (
+                "enabled"
+                if blackout_config and blackout_config.any_enabled
+                else "disabled"
+            ),
         )
 
     def _start_phase(self, phase_name: str) -> None:
@@ -131,6 +139,80 @@ class BacktestOrchestrator:
         """
         if self.enable_profiling and self.profiler:
             self.profiler.end_phase(phase_name)
+
+    def _build_blackout_windows(self, data_start_date, data_end_date) -> list[tuple]:
+        """Build blackout windows from config for the data date range.
+
+        Args:
+            data_start_date: Start date of the backtest data.
+            data_end_date: End date of the backtest data.
+
+        Returns:
+            List of (start_utc, end_utc) tuples for blackout filtering.
+        """
+        if not self.blackout_config or not self.blackout_config.any_enabled:
+            return []
+
+        from src.risk.blackout.calendar import generate_news_calendar
+        from src.risk.blackout.windows import (
+            expand_news_windows,
+            expand_session_windows,
+            merge_overlapping_windows,
+        )
+
+        all_windows = []
+
+        # Get date range for calendar generation
+        from datetime import date
+
+        if hasattr(data_start_date, "date"):
+            start_date = data_start_date.date()
+        else:
+            start_date = date.fromisoformat(str(data_start_date)[:10])
+        if hasattr(data_end_date, "date"):
+            end_date = data_end_date.date()
+        else:
+            end_date = date.fromisoformat(str(data_end_date)[:10])
+
+        # Build news blackout windows
+        if self.blackout_config.news.enabled:
+            events = generate_news_calendar(
+                start_date, end_date, event_types=self.blackout_config.news.event_types
+            )
+            news_windows = expand_news_windows(events, self.blackout_config.news)
+            all_windows.extend(news_windows)
+            logger.info("Built %d news blackout windows", len(news_windows))
+
+        # Build session blackout windows
+        if self.blackout_config.sessions.enabled:
+            session_windows = expand_session_windows(
+                start_date, end_date, self.blackout_config.sessions
+            )
+            all_windows.extend(session_windows)
+            logger.info("Built %d session blackout windows", len(session_windows))
+
+        # Build session-only blackouts (whitelist approach)
+        if self.blackout_config.session_only.enabled:
+            from src.risk.blackout.sessions import build_session_only_blackouts
+
+            session_only_blackouts = build_session_only_blackouts(
+                start_date, end_date, self.blackout_config.session_only.allowed_sessions
+            )
+            logger.info(
+                "Built %d session-only blackout windows for %s",
+                len(session_only_blackouts),
+                self.blackout_config.session_only.allowed_sessions,
+            )
+            # Return directly - session_only is exclusive
+            return session_only_blackouts
+
+        # Merge overlapping windows
+        if all_windows:
+            merged = merge_overlapping_windows(all_windows)
+            logger.info("Merged to %d total blackout windows", len(merged))
+            return [(w.start_utc, w.end_utc) for w in merged]
+
+        return []
 
     def _simulate_batch(
         self,
