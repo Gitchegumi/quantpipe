@@ -120,8 +120,8 @@
 
 **Purpose**: Wire blackout checks into backtest execution pipeline
 
-- [ ] T033 Add blackout window building to backtest orchestrator in `src/backtest/orchestrator.py`
-- [ ] T034 Wire `filter_blackout_signals` into signal filtering pipeline in `src/backtest/orchestrator.py`
+- [x] T033 Add blackout window building to backtest orchestrator in `src/backtest/orchestrator.py`
+- [x] T034 Wire `filter_blackout_signals` into signal filtering pipeline in `src/backtest/orchestrator.py`
 - [ ] T035 Add optional force-close callback structure (stub for future implementation)
 - [x] T036 [P] Create integration test `tests/integration/test_blackout_backtest.py`
 - [x] T037 Run integration tests: `poetry run pytest tests/integration/test_blackout_backtest.py -v`

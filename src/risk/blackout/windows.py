@@ -46,9 +46,11 @@ class BlackoutWindow:
     def __post_init__(self) -> None:
         """Validate window constraints."""
         if self.end_utc <= self.start_utc:
-            raise ValueError("end_utc must be after start_utc")
+            msg = "end_utc must be after start_utc"
+            raise ValueError(msg)
         if self.start_utc.tzinfo is None or self.end_utc.tzinfo is None:
-            raise ValueError("Both timestamps must be timezone-aware")
+            msg = "Both timestamps must be timezone-aware"
+            raise ValueError(msg)
 
 
 def expand_news_windows(
@@ -196,10 +198,7 @@ def is_in_blackout(
         >>> is_in_blackout(datetime(2023, 1, 6, 13, 30, tzinfo=timezone.utc), [window])
         True
     """
-    for window in windows:
-        if window.start_utc <= timestamp <= window.end_utc:
-            return True
-    return False
+    return any(window.start_utc <= timestamp <= window.end_utc for window in windows)
 
 
 def expand_session_windows(

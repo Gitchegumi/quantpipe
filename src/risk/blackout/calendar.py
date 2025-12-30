@@ -52,11 +52,14 @@ class NewsEvent:
     def __post_init__(self) -> None:
         """Validate event constraints."""
         if not self.event_name:
-            raise ValueError("event_name must not be empty")
+            msg = "event_name must not be empty"
+            raise ValueError(msg)
         if len(self.currency) != 3:
-            raise ValueError("currency must be a 3-character code")
+            msg = "currency must be a 3-character code"
+            raise ValueError(msg)
         if self.event_time_utc.tzinfo is None:
-            raise ValueError("event_time_utc must be timezone-aware")
+            msg = "event_time_utc must be timezone-aware"
+            raise ValueError(msg)
 
 
 def _first_friday_of_month(year: int, month: int) -> date:
