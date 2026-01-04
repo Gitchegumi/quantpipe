@@ -44,6 +44,7 @@ import argparse
 import logging
 import sys
 from contextlib import nullcontext
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,7 @@ import pandas as pd
 import polars as pl
 
 from ..backtest.orchestrator import BacktestOrchestrator
+from ..backtest.portfolio.portfolio_simulator import PortfolioSimulator
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
 from ..data_io.formatters import (
@@ -63,7 +65,14 @@ from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-
 from ..data_io.resample import resample_ohlcv
 from ..data_io.resample_cache import resample_with_cache
 from ..data_io.timeframe import parse_timeframe
+from ..indicators.dispatcher import calculate_indicators
+from ..models.core import TradeExecution
+from ..models.directional import BacktestResult
 from ..models.enums import DirectionMode, OutputFormat
+from ..strategy.trend_pullback.signal_generator_vectorized import (
+    generate_signals_vectorized,
+)
+from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
 
 logger = logging.getLogger(__name__)
@@ -176,13 +185,6 @@ def run_portfolio_backtest(
         Tuple of (PortfolioResult, enriched_data dict) where enriched_data maps
         symbol names to their enriched Polars DataFrames with indicators
     """
-    from ..backtest.portfolio.portfolio_simulator import PortfolioSimulator
-    from ..indicators.dispatcher import calculate_indicators
-    from ..strategy.trend_pullback.signal_generator_vectorized import (
-        generate_signals_vectorized,
-    )
-    from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
     logger.info(
         "Portfolio backtest: Loading %d symbols with $%.2f starting capital",
         len(pair_paths),
@@ -390,9 +392,6 @@ def run_multi_symbol_backtest(
     Returns:
         Tuple of (Multi-symbol BacktestResult, enriched_data dict with DataFrames)
     """
-    from ..indicators.dispatcher import calculate_indicators
-    from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
     results: dict[str, "BacktestResult"] = {}
     enriched_data: dict[str, pl.DataFrame] = {}  # For visualization
     failures: list[dict] = []
@@ -504,7 +503,6 @@ def run_multi_symbol_backtest(
             continue
 
     # Aggregate into multi-symbol BacktestResult
-    from ..models.directional import BacktestResult
 
     if not results:
         raise RuntimeError("All symbol backtests failed")
@@ -1202,8 +1200,6 @@ Persistent storage not yet implemented."
                         all_symbol_data = pl.concat(symbol_dfs)
                         # Convert PortfolioResult to BacktestResult-like structure
                         # For visualization compatibility
-                        from ..models.directional import BacktestResult
-                        from ..models.core import TradeExecution
 
                         # Group executions by symbol
                         symbol_executions: dict[str, list[TradeExecution]] = {}
@@ -1295,7 +1291,7 @@ Persistent storage not yet implemented."
                         "Visualization module not found or dependency missing: %s",
                         e,
                     )
-                except Exception as e:
+                except (RuntimeError, TypeError, ValueError, KeyError) as e:
                     logger.error(
                         "Failed to generate visualization: %s",
                         e,
@@ -1420,8 +1416,6 @@ Persistent storage not yet implemented."
             profiler.start_phase("ingest")
 
         # Load strategy to get required indicators
-        from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
         strategy = TREND_PULLBACK_STRATEGY
         required_indicators = strategy.metadata.required_indicators
 
@@ -1513,7 +1507,6 @@ Persistent storage not yet implemented."
 
         # Stage 2: Vectorized indicator calculation
         logger.info("Stage 2/2: Computing technical indicators (vectorized)...")
-        from ..indicators.dispatcher import calculate_indicators
 
         # Calculate indicators dynamically based on strategy requirements
         enriched_df = calculate_indicators(enriched_df, required_indicators)
@@ -1564,8 +1557,6 @@ Persistent storage not yet implemented."
         # Call vectorized backtest with Polars DataFrame
         logger.info("Using vectorized backtest path (Polars)")
 
-        from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
         # Debug: Verify all required indicators are present
         logger.info("DataFrame columns before backtest: %s", enriched_df.columns)
         missing = [col for col in required_indicators if col not in enriched_df.columns]
@@ -1581,8 +1572,6 @@ Persistent storage not yet implemented."
         )
 
         # Add timeframe to result for output formatting (FR-015)
-        from dataclasses import replace
-
         result = replace(result, timeframe=args.timeframe)
 
         logger.info("Backtest complete: %s", result.run_id)
@@ -1663,7 +1652,7 @@ Persistent storage not yet implemented."
                     "Visualization module not found or dependency missing: %s",
                     e,
                 )
-            except Exception as e:
+            except (RuntimeError, TypeError, ValueError, KeyError) as e:
                 logger.error("Failed to generate visualization: %s", e, exc_info=True)
 
     # Format output (outside profiling context)
