@@ -46,6 +46,7 @@ import sys
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import polars as pl
@@ -155,6 +156,7 @@ def run_portfolio_backtest(
     dry_run: bool = False,
     show_progress: bool = True,
     timeframe: str = "1m",
+    blackout_config: Any = None,
 ):
     """Run time-synchronized portfolio backtest with shared equity.
 
@@ -174,8 +176,6 @@ def run_portfolio_backtest(
         Tuple of (PortfolioResult, enriched_data dict) where enriched_data maps
         symbol names to their enriched Polars DataFrames with indicators
     """
-    import polars as pl
-
     from ..backtest.portfolio.portfolio_simulator import PortfolioSimulator
     from ..indicators.dispatcher import calculate_indicators
     from ..strategy.trend_pullback.signal_generator_vectorized import (
@@ -230,6 +230,76 @@ def run_portfolio_backtest(
 
     # Phase 2: Generate signals for all symbols
     symbol_signals: dict[str, list] = {}
+
+    # Build blackout windows if config provided (Feature 023)
+    blackout_windows: list[tuple] = []
+    if blackout_config and blackout_config.any_enabled:
+        from ..risk.blackout.windows import (
+            expand_news_windows,
+            expand_session_windows,
+            merge_overlapping_windows,
+        )
+        from ..risk.blackout.calendar import generate_news_calendar
+
+        # Get date range from first symbol's data
+        first_df = next(iter(symbol_data.values()))
+        data_start = first_df["timestamp_utc"][0]
+        data_end = first_df["timestamp_utc"][-1]
+
+        # Build news windows if enabled
+        if blackout_config.news.enabled:
+            # Convert datetime to date for calendar generation
+            start_date = (
+                data_start.date() if hasattr(data_start, "date") else data_start
+            )
+            end_date = data_end.date() if hasattr(data_end, "date") else data_end
+            news_events = generate_news_calendar(
+                start_date, end_date, blackout_config.news.event_types
+            )
+            news_windows = expand_news_windows(news_events, blackout_config.news)
+            blackout_windows.extend(news_windows)
+            logger.info("Built %d news blackout windows", len(news_windows))
+
+        # Build session windows if enabled
+        if blackout_config.sessions.enabled:
+            session_windows = expand_session_windows(
+                data_start, data_end, blackout_config.sessions
+            )
+            blackout_windows.extend(session_windows)
+            logger.info("Built %d session blackout windows", len(session_windows))
+
+        # Build session-only windows if enabled (whitelist approach)
+        if blackout_config.session_only.enabled:
+            from ..risk.blackout.sessions import build_session_only_blackouts
+
+            start_date = (
+                data_start.date() if hasattr(data_start, "date") else data_start
+            )
+            end_date = data_end.date() if hasattr(data_end, "date") else data_end
+            session_only_windows = build_session_only_blackouts(
+                start_date, end_date, blackout_config.session_only.allowed_sessions
+            )
+            # session_only_windows are already tuples, need to convert to BlackoutWindow
+            from ..risk.blackout.windows import BlackoutWindow
+
+            for start_utc, end_utc in session_only_windows:
+                blackout_windows.append(
+                    BlackoutWindow(
+                        start_utc=start_utc, end_utc=end_utc, source="session_only"
+                    )
+                )
+            logger.info(
+                "Built %d session-only blackout windows for sessions: %s",
+                len(session_only_windows),
+                blackout_config.session_only.allowed_sessions,
+            )
+
+        # Merge overlapping windows, then convert to tuples for filter function
+        if blackout_windows:
+            merged = merge_overlapping_windows(blackout_windows)
+            blackout_windows = [(w.start_utc, w.end_utc) for w in merged]
+            logger.info("Total blackout windows after merge: %d", len(blackout_windows))
+
     for pair, df in symbol_data.items():
         logger.info("Generating signals for %s", pair)
 
@@ -241,6 +311,33 @@ def run_portfolio_backtest(
             parameters=params,
             direction_mode=direction_mode.value,
         )
+
+        # Apply blackout filtering if windows exist
+        if blackout_windows and signals:
+            original_count = len(signals)
+            filtered_signals = []
+
+            for signal in signals:
+                signal_ts = signal.timestamp_utc
+                in_blackout = False
+
+                for start_utc, end_utc in blackout_windows:
+                    if start_utc <= signal_ts <= end_utc:
+                        in_blackout = True
+                        break
+
+                if not in_blackout:
+                    filtered_signals.append(signal)
+
+            blocked_count = original_count - len(filtered_signals)
+            signals = filtered_signals
+            logger.info(
+                "Blackout filtering for %s: %d blocked, %d remaining",
+                pair,
+                blocked_count,
+                len(signals),
+            )
+
         symbol_signals[pair] = signals
         logger.info("Generated %d signals for %s", len(signals), pair)
 
@@ -293,8 +390,6 @@ def run_multi_symbol_backtest(
     Returns:
         Tuple of (Multi-symbol BacktestResult, enriched_data dict with DataFrames)
     """
-    import polars as pl
-
     from ..indicators.dispatcher import calculate_indicators
     from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
@@ -804,6 +899,32 @@ def main():
         help="Maximum position size in lots. Default: 10.0",
     )
 
+    # Blackout Filtering Arguments (Feature 023: Session Blackouts)
+    parser.add_argument(
+        "--blackout-sessions",
+        action="store_true",
+        help="Enable session-gap blackout filtering. Blocks new entries during "
+        "NY close → Asian open transition (low liquidity period). "
+        "See specs/023-session-blackouts for details.",
+    )
+
+    parser.add_argument(
+        "--blackout-news",
+        action="store_true",
+        help="Enable news-event blackout filtering. Blocks new entries during "
+        "high-impact news releases (NFP, IJC). Default windows: 10min before "
+        "to 30min after event. See specs/023-session-blackouts for details.",
+    )
+
+    parser.add_argument(
+        "--sessions",
+        type=str,
+        nargs="+",
+        help="Enable session-only trading (whitelist approach). Only allow trades "
+        "during specified sessions. Valid values: NY, LONDON, ASIA, SYDNEY. "
+        "Example: --sessions NY LONDON (trades only during NY and London hours).",
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -988,6 +1109,36 @@ Persistent storage not yet implemented."
             direction_mode = DirectionMode[args.direction]
             show_progress = sys.stdout.isatty()
 
+            # Build blackout config from CLI args (Feature 023)
+            blackout_config = None
+            if args.blackout_sessions or args.blackout_news or args.sessions:
+                from ..risk.blackout.config import (
+                    BlackoutConfig,
+                    NewsBlackoutConfig,
+                    SessionBlackoutConfig,
+                    SessionOnlyConfig,
+                )
+
+                # Normalize session names to uppercase
+                allowed_sessions = (
+                    [s.upper() for s in args.sessions] if args.sessions else []
+                )
+
+                blackout_config = BlackoutConfig(
+                    news=NewsBlackoutConfig(enabled=args.blackout_news),
+                    sessions=SessionBlackoutConfig(enabled=args.blackout_sessions),
+                    session_only=SessionOnlyConfig(
+                        enabled=bool(args.sessions),
+                        allowed_sessions=allowed_sessions,
+                    ),
+                )
+                logger.info(
+                    "Blackout filtering enabled: news=%s, sessions=%s, session_only=%s",
+                    args.blackout_news,
+                    args.blackout_sessions,
+                    allowed_sessions if args.sessions else False,
+                )
+
             result, enriched_data = run_portfolio_backtest(
                 pair_paths=pair_paths,
                 direction_mode=direction_mode,
@@ -996,6 +1147,7 @@ Persistent storage not yet implemented."
                 dry_run=args.dry_run,
                 show_progress=show_progress,
                 timeframe=args.timeframe,
+                blackout_config=blackout_config,
             )
 
             # Format and output portfolio results
