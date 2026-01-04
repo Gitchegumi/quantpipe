@@ -141,7 +141,56 @@ def register_builtins() -> None:
     except ValueError:
         logger.debug("Indicator stoch_rsi already registered")
 
-    logger.debug("Built-in indicators registered: ema20, ema50, atr14, stoch_rsi")
+    # Register semantic EMA aliases for parameter sweep support
+    # fast_ema: Short-term EMA (default 20 period)
+    try:
+        fast_ema_spec = IndicatorSpec(
+            name="fast_ema",
+            requires=["close"],
+            provides=["fast_ema"],
+            compute=_ema_wrapper,
+            version="1.0.0",
+            params={"period": 20, "column": "close"},
+        )
+        registry.register(fast_ema_spec)
+        logger.debug("Registered built-in indicator: fast_ema")
+    except ValueError:
+        logger.debug("Indicator fast_ema already registered")
+
+    # slow_ema: Long-term EMA (default 50 period)
+    try:
+        slow_ema_spec = IndicatorSpec(
+            name="slow_ema",
+            requires=["close"],
+            provides=["slow_ema"],
+            compute=_ema_wrapper,
+            version="1.0.0",
+            params={"period": 50, "column": "close"},
+        )
+        registry.register(slow_ema_spec)
+        logger.debug("Registered built-in indicator: slow_ema")
+    except ValueError:
+        logger.debug("Indicator slow_ema already registered")
+
+    # atr: Generic ATR alias (default 14 period)
+    try:
+        atr_spec = IndicatorSpec(
+            name="atr",
+            requires=["high", "low", "close"],
+            provides=["atr"],
+            compute=_atr_wrapper,
+            version="1.0.0",
+            params={"period": 14},
+        )
+        registry.register(atr_spec)
+        logger.debug("Registered built-in indicator: atr")
+    except ValueError:
+        logger.debug("Indicator atr already registered")
+
+    logger.debug(
+        "Built-in indicators registered: ema20, ema50, atr14, stoch_rsi, "
+        "fast_ema, slow_ema, atr"
+    )
 
 
 # Auto-register on module import

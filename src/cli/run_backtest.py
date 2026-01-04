@@ -923,6 +923,27 @@ def main():
         "Example: --sessions NY LONDON (trades only during NY and London hours).",
     )
 
+    # Parameter Sweep Arguments (Feature 024: Parallel Indicator Parameter Sweep)
+    parser.add_argument(
+        "--test_range",
+        action="store_true",
+        help="Enable interactive parameter sweep mode. Prompts for indicator "
+        "parameter ranges and runs backtests across all combinations. "
+        "See specs/024-parallel-param-sweep for details.",
+    )
+
+    parser.add_argument(
+        "--export",
+        type=Path,
+        help="Export sweep results to CSV file (only with --test_range).",
+    )
+
+    parser.add_argument(
+        "--sequential",
+        action="store_true",
+        help="Run parameter sweep sequentially for debugging (only with --test_range).",
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -1086,6 +1107,51 @@ Persistent storage not yet implemented."
         except ValueError as exc:
             print(f"Error: Registration failed: {exc}", file=sys.stderr)
             sys.exit(1)
+
+    # Handle --test_range (Feature 024: Parameter Sweep Mode)
+    if args.test_range:
+        from .prompts.range_input import collect_all_ranges, confirm_sweep
+        from ..backtest.sweep import (
+            filter_invalid_combinations,
+            generate_combinations,
+        )
+        from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
+
+        logger.info("Entering parameter sweep mode...")
+
+        # Load strategy (currently only trend_pullback supported)
+        strategy = TrendPullbackStrategy()
+
+        # Collect parameter ranges from user
+        sweep_config = collect_all_ranges(strategy)
+        if sweep_config is None:
+            print("No parameters to sweep. Exiting.")
+            return 0
+
+        # Generate combinations
+        all_combinations = generate_combinations(sweep_config.ranges)
+        sweep_config.total_combinations = len(all_combinations)
+
+        # Filter invalid combinations
+        valid_combinations, skipped = filter_invalid_combinations(all_combinations)
+        sweep_config.valid_combinations = len(valid_combinations)
+        sweep_config.skipped_count = skipped
+
+        if not valid_combinations:
+            print("No valid combinations after filtering. Exiting.")
+            return 0
+
+        # Confirm with user
+        if not confirm_sweep(sweep_config, len(valid_combinations), skipped):
+            print("Sweep cancelled by user.")
+            return 0
+
+        # TODO: Phase 4 - Execute sweep with run_sweep()
+        print(
+            f"\n[INFO] Sweep configuration collected: {len(valid_combinations)} combinations"
+        )
+        print("[INFO] Sweep execution will be implemented in Phase 4 (US3)")
+        return 0
 
     # Validate data file exists
     # (required for backtest runs, not for listing/registration)

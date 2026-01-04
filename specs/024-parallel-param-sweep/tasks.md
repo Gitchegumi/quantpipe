@@ -15,8 +15,8 @@
 
 **Purpose**: Project initialization and directory structure
 
-- [ ] T001 Create `src/cli/prompts/` directory for interactive input modules
-- [ ] T002 Create `src/cli/prompts/__init__.py` package file
+- [x] T001 Create `src/cli/prompts/` directory for interactive input modules
+- [x] T002 Create `src/cli/prompts/__init__.py` package file
 
 ---
 
@@ -26,12 +26,12 @@
 
 **⚠️ CRITICAL**: User story work cannot begin until semantic indicators are registered
 
-- [ ] T003 [P] Register `fast_ema` semantic indicator in `src/indicators/registry/builtins.py`
-- [ ] T004 [P] Register `slow_ema` semantic indicator in `src/indicators/registry/builtins.py`
-- [ ] T005 [P] Register `atr` semantic indicator alias in `src/indicators/registry/builtins.py`
-- [ ] T006 Update TrendPullbackStrategy metadata to use semantic names in `src/strategy/trend_pullback/strategy.py`
-- [ ] T007 Update `scan_vectorized()` to use semantic indicator names in `src/strategy/trend_pullback/strategy.py`
-- [ ] T008 Update `get_visualization_config()` to use semantic indicator names in `src/strategy/trend_pullback/strategy.py`
+- [x] T003 [P] Register `fast_ema` semantic indicator in `src/indicators/registry/builtins.py`
+- [x] T004 [P] Register `slow_ema` semantic indicator in `src/indicators/registry/builtins.py`
+- [x] T005 [P] Register `atr` semantic indicator alias in `src/indicators/registry/builtins.py`
+- [x] T006 Update TrendPullbackStrategy metadata to use semantic names in `src/strategy/trend_pullback/strategy.py`
+- [x] T007 Update `scan_vectorized()` to use semantic indicator names in `src/strategy/trend_pullback/strategy.py`
+- [x] T008 Update `get_visualization_config()` to use semantic indicator names in `src/strategy/trend_pullback/strategy.py`
 
 **Checkpoint**: Semantic indicators registered, strategy updated - user story implementation can begin
 
@@ -45,15 +45,15 @@
 
 ### Implementation for User Stories 1 & 2
 
-- [ ] T009 [P] [US1] Create `ParameterRange` dataclass in `src/backtest/sweep.py`
-- [ ] T010 [P] [US1] Create `ParameterSet` dataclass in `src/backtest/sweep.py`
-- [ ] T011 [P] [US1] Create `SweepConfig` dataclass in `src/backtest/sweep.py`
-- [ ] T012 [US1] Implement `parse_range_input()` function in `src/backtest/sweep.py`
-- [ ] T013 [US1] Implement `prompt_for_indicator_params()` in `src/cli/prompts/range_input.py`
-- [ ] T014 [US1] Implement `collect_all_ranges()` in `src/cli/prompts/range_input.py`
-- [ ] T015 [US1] Add `--test_range` argument to `src/cli/run_backtest.py`
-- [ ] T016 [US1] Add sweep mode entry point in `main()` of `src/cli/run_backtest.py`
-- [ ] T017 [US1] Add input validation with clear error messages for malformed range syntax
+- [x] T009 [P] [US1] Create `ParameterRange` dataclass in `src/backtest/sweep.py`
+- [x] T010 [P] [US1] Create `ParameterSet` dataclass in `src/backtest/sweep.py`
+- [x] T011 [P] [US1] Create `SweepConfig` dataclass in `src/backtest/sweep.py`
+- [x] T012 [US1] Implement `parse_range_input()` function in `src/backtest/sweep.py`
+- [x] T013 [US1] Implement `prompt_for_indicator_params()` in `src/cli/prompts/range_input.py`
+- [x] T014 [US1] Implement `collect_all_ranges()` in `src/cli/prompts/range_input.py`
+- [x] T015 [US1] Add `--test_range` argument to `src/cli/run_backtest.py`
+- [x] T016 [US1] Add sweep mode entry point in `main()` of `src/cli/run_backtest.py`
+- [x] T017 [US1] Add input validation with clear error messages for malformed range syntax
 
 **Checkpoint**: `--test_range` flag works, prompts appear with defaults, ranges are parsed
 
@@ -67,16 +67,16 @@
 
 ### Implementation for User Story 3
 
-- [ ] T018 [P] [US3] Create `SingleResult` dataclass in `src/backtest/sweep.py`
-- [ ] T019 [P] [US3] Create `SweepResult` dataclass in `src/backtest/sweep.py`
-- [ ] T020 [US3] Implement `generate_combinations()` cartesian product in `src/backtest/sweep.py`
-- [ ] T021 [US3] Implement `filter_invalid_combinations()` with constraint checking in `src/backtest/sweep.py`
+- [x] T018 [P] [US3] Create `SingleResult` dataclass in `src/backtest/sweep.py`
+- [x] T019 [P] [US3] Create `SweepResult` dataclass in `src/backtest/sweep.py`
+- [x] T020 [US3] Implement `generate_combinations()` cartesian product in `src/backtest/sweep.py`
+- [x] T021 [US3] Implement `filter_invalid_combinations()` with constraint checking in `src/backtest/sweep.py`
 - [ ] T022 [US3] Implement `run_single_backtest()` worker function in `src/backtest/sweep.py`
 - [ ] T023 [US3] Implement `run_sweep()` orchestrator in `src/backtest/sweep.py`
-- [ ] T024 [US3] Add confirmation prompt for large sweeps (>500 combinations) in `src/cli/prompts/range_input.py`
-- [ ] T025 [US3] Add progress display using Rich during sweep execution in `src/backtest/sweep.py`
-- [ ] T026 [US3] Implement results ranking by Sharpe ratio in `src/backtest/sweep.py`
-- [ ] T027 [US3] Display results table with parameter labels in `src/backtest/sweep.py`
+- [x] T024 [US3] Add confirmation prompt for large sweeps (>500 combinations) in `src/cli/prompts/range_input.py`
+- [x] T025 [US3] Add progress display using Rich during sweep execution in `src/backtest/sweep.py`
+- [x] T026 [US3] Implement results ranking by Sharpe ratio in `src/backtest/sweep.py`
+- [x] T027 [US3] Display results table with parameter labels in `src/backtest/sweep.py`
 
 **Checkpoint**: Cartesian product generated, backtests run sequentially, results displayed
 
