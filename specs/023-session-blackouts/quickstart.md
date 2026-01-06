@@ -76,12 +76,13 @@ risk_config = RiskConfig(
 ```
 
 Available sessions:
-| Session | Hours | Timezone |
-|---------|-------|----------|
-| NY | 08:00-17:00 | America/New_York |
-| LONDON | 08:00-16:00 | Europe/London |
-| ASIA | 09:00-18:00 | Asia/Tokyo |
-| SYDNEY | 07:00-16:00 | Australia/Sydney |
+
+| Session | Hours       | Timezone         |
+| ------- | ----------- | ---------------- |
+| NY      | 08:00-17:00 | America/New_York |
+| LONDON  | 08:00-16:00 | Europe/London    |
+| ASIA    | 09:00-18:00 | Asia/Tokyo       |
+| SYDNEY  | 07:00-16:00 | Australia/Sydney |
 
 ## CLI Usage (Planned)
 

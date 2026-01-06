@@ -68,6 +68,24 @@ def _stoch_rsi_wrapper(
     )
 
 
+def _rsi_wrapper(df: pd.DataFrame, params: dict[str, Any]) -> dict[str, pd.Series]:
+    """Wrapper for RSI computation to match IndicatorSpec signature.
+
+    Args:
+        df: DataFrame containing OHLCV data.
+        params: Parameters including 'period' and optionally 'column'.
+
+    Returns:
+        Dict[str, pd.Series]: Computed RSI series.
+    """
+    from src.indicators.builtin.stochrsi import compute_rsi
+
+    period = params.get("period", 14)
+    column = params.get("column", "close")
+    # compute_rsi returns a Series, wrap it in a dict
+    return {"rsi": compute_rsi(df, period=period, column=column)}
+
+
 def register_builtins() -> None:
     """Register all built-in indicators with the global registry.
 
@@ -141,7 +159,71 @@ def register_builtins() -> None:
     except ValueError:
         logger.debug("Indicator stoch_rsi already registered")
 
-    logger.debug("Built-in indicators registered: ema20, ema50, atr14, stoch_rsi")
+    # Register semantic EMA aliases for parameter sweep support
+    # fast_ema: Short-term EMA (default 20 period)
+    try:
+        fast_ema_spec = IndicatorSpec(
+            name="fast_ema",
+            requires=["close"],
+            provides=["fast_ema"],
+            compute=_ema_wrapper,
+            version="1.0.0",
+            params={"period": 20, "column": "close"},
+        )
+        registry.register(fast_ema_spec)
+        logger.debug("Registered built-in indicator: fast_ema")
+    except ValueError:
+        logger.debug("Indicator fast_ema already registered")
+
+    # slow_ema: Long-term EMA (default 50 period)
+    try:
+        slow_ema_spec = IndicatorSpec(
+            name="slow_ema",
+            requires=["close"],
+            provides=["slow_ema"],
+            compute=_ema_wrapper,
+            version="1.0.0",
+            params={"period": 50, "column": "close"},
+        )
+        registry.register(slow_ema_spec)
+        logger.debug("Registered built-in indicator: slow_ema")
+    except ValueError:
+        logger.debug("Indicator slow_ema already registered")
+
+    # atr: Generic ATR alias (default 14 period)
+    try:
+        atr_spec = IndicatorSpec(
+            name="atr",
+            requires=["high", "low", "close"],
+            provides=["atr"],
+            compute=_atr_wrapper,
+            version="1.0.0",
+            params={"period": 14},
+        )
+        registry.register(atr_spec)
+        logger.debug("Registered built-in indicator: atr")
+    except ValueError:
+        logger.debug("Indicator atr already registered")
+
+    # rsi: Generic RSI alias (default 14 period)
+    try:
+        rsi_spec = IndicatorSpec(
+            name="rsi",
+            requires=["close"],
+            provides=["rsi"],
+            compute=_rsi_wrapper,
+            version="1.0.0",
+            params={"period": 14, "column": "close"},
+        )
+        registry.register(rsi_spec)
+        logger.debug("Registered built-in indicator: rsi")
+    except ValueError:
+        logger.debug("Indicator rsi already registered")
+
+    logger.debug(
+        "Built-in indicators registered: ema20, ema50, atr14, stoch_rsi, "
+        "fast_ema, slow_ema, atr, rsi"
+    )
 
 
 # Auto-register on module import

@@ -39,17 +39,22 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
-import io
 import argparse
+import io
 import logging
 import sys
 from contextlib import nullcontext
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 import polars as pl
 
+from ..backtest.engine import (
+    construct_data_paths,
+    run_portfolio_backtest,
+)
 from ..backtest.orchestrator import BacktestOrchestrator
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
@@ -62,416 +67,21 @@ from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-
 from ..data_io.resample import resample_ohlcv
 from ..data_io.resample_cache import resample_with_cache
 from ..data_io.timeframe import parse_timeframe
+from ..indicators.dispatcher import calculate_indicators
+from ..indicators.registry.builtins import register_builtins
+from ..models.core import TradeExecution
+from ..models.directional import BacktestResult
 from ..models.enums import DirectionMode, OutputFormat
+from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
+
+# Ensure built-in indicators are registered early
+register_builtins()
 
 logger = logging.getLogger(__name__)
 
 # Default account balance for multi-symbol concurrent PnL calculation (FR-003)
 DEFAULT_ACCOUNT_BALANCE: float = 2500.0
-
-
-def construct_data_paths(
-    pairs: list[str],
-    dataset: str,
-    base_dir: Path = Path("price_data/processed"),
-) -> list[tuple[str, Path]]:
-    """Construct data paths for all specified pairs with validation.
-
-    Iterates over all pairs, constructs paths for each (Parquet preferred,
-    CSV fallback), and validates that at least one path exists.
-
-    Args:
-        pairs: List of currency pair codes (e.g., ['EURUSD', 'USDJPY'])
-        dataset: Dataset partition to use ('test' or 'validate')
-        base_dir: Base directory for processed data
-
-    Returns:
-        List of (pair, path) tuples for all valid pairs
-
-    Raises:
-        SystemExit: If no valid data paths found for any pair
-    """
-    pair_paths: list[tuple[str, Path]] = []
-    missing_pairs: list[str] = []
-
-    for pair in pairs:
-        pair_lower = pair.lower()
-        base_path = base_dir / pair_lower / dataset
-        filename_base = f"{pair_lower}_{dataset}"
-
-        # Try Parquet first (faster loading)
-        parquet_path = base_path / f"{filename_base}.parquet"
-        csv_path = base_path / f"{filename_base}.csv"
-
-        if parquet_path.exists():
-            pair_paths.append((pair, parquet_path))
-            logger.info(
-                "Constructed path for %s: %s",
-                pair,
-                parquet_path,
-            )
-        elif csv_path.exists():
-            pair_paths.append((pair, csv_path))
-            logger.info(
-                "Constructed path for %s: %s (Parquet not found, using CSV)",
-                pair,
-                csv_path,
-            )
-        else:
-            missing_pairs.append(pair)
-            logger.warning(
-                "No data file found for %s. Searched: %s, %s",
-                pair,
-                parquet_path,
-                csv_path,
-            )
-
-    # Fail-fast validation (FR-006): All pairs must have data
-    if missing_pairs and not pair_paths:
-        print(
-            f"Error: No data files found for any specified pairs: {missing_pairs}\n"
-            f"Expected structure: price_data/processed/<pair>/<dataset>/"
-            f"<pair>_<dataset>.[parquet|csv]\n"
-            f"Use --data to specify a custom path for single-pair runs.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    if missing_pairs:
-        logger.warning(
-            "Some pairs have no data files and will be skipped: %s",
-            ", ".join(missing_pairs),
-        )
-
-    return pair_paths
-
-
-def run_portfolio_backtest(
-    pair_paths: list[tuple[str, Path]],
-    direction_mode: DirectionMode,
-    strategy_params,
-    starting_equity: float = 2500.0,
-    dry_run: bool = False,
-    show_progress: bool = True,
-    timeframe: str = "1m",
-):
-    """Run time-synchronized portfolio backtest with shared equity.
-
-    All symbols trade against a shared running balance. Trades execute
-    chronologically, with wins/losses affecting capital available for
-    subsequent trades.
-
-    Args:
-        pair_paths: List of (pair, path) tuples from construct_data_paths()
-        direction_mode: Direction mode (LONG/SHORT/BOTH)
-        strategy_params: Strategy parameters to use
-        starting_equity: Starting portfolio capital ($2,500 default)
-        dry_run: If True, generate signals only without execution
-        show_progress: If True, show progress bars
-
-    Returns:
-        Tuple of (PortfolioResult, enriched_data dict) where enriched_data maps
-        symbol names to their enriched Polars DataFrames with indicators
-    """
-    import polars as pl
-
-    from ..backtest.portfolio.portfolio_simulator import PortfolioSimulator
-    from ..indicators.dispatcher import calculate_indicators
-    from ..strategy.trend_pullback.signal_generator_vectorized import (
-        generate_signals_vectorized,
-    )
-    from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
-    logger.info(
-        "Portfolio backtest: Loading %d symbols with $%.2f starting capital",
-        len(pair_paths),
-        starting_equity,
-    )
-
-    # Phase 1: Load and enrich ALL symbol data first
-    symbol_data: dict[str, pl.DataFrame] = {}
-    for pair, data_path in pair_paths:
-        logger.info("Loading data for %s from %s", pair, data_path)
-
-        use_arrow = data_path.suffix.lower() == ".parquet"
-        ingestion_result = ingest_ohlcv_data(
-            path=data_path,
-            timeframe_minutes=1,
-            mode="columnar",
-            downcast=False,
-            use_arrow=use_arrow,
-            strict_cadence=False,
-            fill_gaps=False,
-            return_polars=True,
-        )
-
-        enriched_df = ingestion_result.data
-        if not isinstance(enriched_df, pl.DataFrame):
-            enriched_df = pl.from_pandas(enriched_df)
-
-        # Rename timestamp if needed
-        if "timestamp" in enriched_df.columns:
-            enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
-
-        # Calculate indicators
-        strategy = TREND_PULLBACK_STRATEGY
-        required_indicators = strategy.metadata.required_indicators
-        enriched_df = calculate_indicators(enriched_df, required_indicators)
-
-        symbol_data[pair] = enriched_df
-        logger.info(
-            "Loaded %s: %d bars, %s to %s",
-            pair,
-            len(enriched_df),
-            enriched_df["timestamp_utc"][0],
-            enriched_df["timestamp_utc"][-1],
-        )
-
-    # Phase 2: Generate signals for all symbols
-    symbol_signals: dict[str, list] = {}
-    for pair, df in symbol_data.items():
-        logger.info("Generating signals for %s", pair)
-
-        # Include pair in parameters for position sizing (JPY has different pip value)
-        params = strategy_params.model_dump()
-        params["pair"] = pair
-        signals = generate_signals_vectorized(
-            df,
-            parameters=params,
-            direction_mode=direction_mode.value,
-        )
-        symbol_signals[pair] = signals
-        logger.info("Generated %d signals for %s", len(signals), pair)
-
-    # Phase 3: Run portfolio simulation
-    simulator = PortfolioSimulator(
-        starting_equity=starting_equity,
-        risk_per_trade=0.0025,  # 0.25%
-        max_positions_per_symbol=1,
-        target_r_mult=strategy_params.target_r_mult,
-    )
-
-    run_id = (
-        f"portfolio_{direction_mode.value.lower()}_"
-        f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-    )
-
-    result = simulator.simulate(
-        symbol_data=symbol_data,
-        symbol_signals=symbol_signals,
-        direction_mode=direction_mode.value,
-        run_id=run_id,
-        timeframe=timeframe,
-    )
-
-    return result, symbol_data
-
-
-def run_multi_symbol_backtest(
-    pair_paths: list[tuple[str, Path]],
-    direction_mode: DirectionMode,
-    strategy_params,
-    dry_run: bool = False,
-    enable_profiling: bool = False,
-    show_progress: bool = True,
-    timeframe: str = "1m",
-):
-    """Run backtests on multiple symbols and aggregate results.
-
-    Executes independent backtests for each symbol, then aggregates results
-    into a multi-symbol BacktestResult with combined PnL calculation.
-
-    Args:
-        pair_paths: List of (pair, path) tuples from construct_data_paths()
-        direction_mode: Direction mode (LONG/SHORT/BOTH)
-        strategy_params: Strategy parameters to use
-        dry_run: If True, generate signals only without execution
-        enable_profiling: If True, enable performance profiling
-        show_progress: If True, show progress bars
-
-    Returns:
-        Tuple of (Multi-symbol BacktestResult, enriched_data dict with DataFrames)
-    """
-    import polars as pl
-
-    from ..indicators.dispatcher import calculate_indicators
-    from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
-    results: dict[str, "BacktestResult"] = {}
-    enriched_data: dict[str, pl.DataFrame] = {}  # For visualization
-    failures: list[dict] = []
-    all_signals: list = []
-    all_executions: list = []
-    total_r_multiple = 0.0
-
-    # Equal capital allocation per symbol
-    num_symbols = len(pair_paths)
-    capital_per_symbol = DEFAULT_ACCOUNT_BALANCE / num_symbols
-
-    logger.info(
-        "Starting multi-symbol backtest for %d symbols with $%.2f each",
-        num_symbols,
-        capital_per_symbol,
-    )
-
-    # Run backtest for each symbol
-    for pair, data_path in pair_paths:
-        logger.info("Processing symbol: %s from %s", pair, data_path)
-
-        try:
-            # Load data using Polars
-            use_arrow = data_path.suffix.lower() == ".parquet"
-            ingestion_result = ingest_ohlcv_data(
-                path=data_path,
-                timeframe_minutes=1,
-                mode="columnar",
-                downcast=False,
-                use_arrow=use_arrow,
-                strict_cadence=False,
-                fill_gaps=False,
-                return_polars=True,
-            )
-
-            enriched_df = ingestion_result.data
-            if not isinstance(enriched_df, pl.DataFrame):
-                enriched_df = pl.from_pandas(enriched_df)
-
-            # Rename timestamp if needed
-            if "timestamp" in enriched_df.columns:
-                enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
-
-            # Calculate indicators
-            strategy = TREND_PULLBACK_STRATEGY
-            required_indicators = strategy.metadata.required_indicators
-            enriched_df = calculate_indicators(enriched_df, required_indicators)
-
-            # Create orchestrator
-            orchestrator = BacktestOrchestrator(
-                direction_mode=direction_mode,
-                dry_run=dry_run,
-                enable_profiling=enable_profiling,
-                enable_progress=show_progress,
-            )
-
-            # Run backtest
-
-            run_id = (
-                f"{pair.lower()}_{direction_mode.value.lower()}_"
-                f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-            )
-
-            result = orchestrator.run_backtest(
-                candles=enriched_df,
-                pair=pair,
-                run_id=run_id,
-                strategy=strategy,
-                **strategy_params.model_dump(),
-            )
-
-            results[pair] = result
-            enriched_data[pair] = enriched_df  # Store for visualization
-
-            # Aggregate signals and executions
-            if result.signals:
-                all_signals.extend(result.signals)
-            if result.executions:
-                all_executions.extend(result.executions)
-
-            # Calculate R-multiple contribution for this symbol
-            if result.metrics:
-                if hasattr(result.metrics, "combined"):
-                    total_r_multiple += result.metrics.combined.avg_r * (
-                        result.metrics.combined.trade_count or 0
-                    )
-                elif hasattr(result.metrics, "avg_r"):
-                    total_r_multiple += result.metrics.avg_r * (
-                        result.metrics.trade_count or 0
-                    )
-
-            logger.info(
-                "Completed %s: %d trades",
-                pair,
-                (
-                    (
-                        result.metrics.combined.trade_count
-                        if hasattr(result.metrics, "combined")
-                        else result.metrics.trade_count
-                    )
-                    if result.metrics
-                    else 0
-                ),
-            )
-
-        except (FileNotFoundError, ValueError, RuntimeError) as exc:
-            logger.warning("Backtest failed for %s: %s", pair, exc)
-            failures.append({"pair": pair, "error": str(exc)})
-            continue
-
-    # Aggregate into multi-symbol BacktestResult
-    from ..models.directional import BacktestResult
-
-    if not results:
-        raise RuntimeError("All symbol backtests failed")
-
-    # Get time bounds from first successful result
-    first_result = next(iter(results.values()))
-
-    # Build aggregated metrics
-    total_trades = sum(
-        (
-            r.metrics.combined.trade_count
-            if hasattr(r.metrics, "combined")
-            else r.metrics.trade_count
-        )
-        for r in results.values()
-        if r.metrics
-    )
-
-    _avg_win_rate = (  # Reserved for future aggregate reporting
-        sum(
-            (
-                r.metrics.combined.win_rate
-                if hasattr(r.metrics, "combined")
-                else r.metrics.win_rate
-            )
-            for r in results.values()
-            if r.metrics
-        )
-        / len(results)
-        if results
-        else 0.0
-    )
-
-    # Create aggregated result
-    multi_result = BacktestResult(
-        run_id=f"multi_{direction_mode.value.lower()}_"
-        f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
-        direction_mode=direction_mode.value,
-        start_time=first_result.start_time,
-        end_time=datetime.now(timezone.utc),
-        data_start_date=first_result.data_start_date,
-        data_end_date=first_result.data_end_date,
-        total_candles=sum(r.total_candles for r in results.values()),
-        metrics=first_result.metrics,  # Use first result's metrics structure
-        pair=None,  # Multi-symbol has no single pair
-        timeframe=timeframe,  # FR-015: Include timeframe in output
-        symbols=list(results.keys()),
-        results=results,
-        failures=failures if failures else None,
-        signals=all_signals if all_signals else None,
-        executions=all_executions if all_executions else None,
-        dry_run=dry_run,
-    )
-
-    logger.info(
-        "Multi-symbol backtest complete: %d symbols, %d trades, %d failures",
-        len(results),
-        total_trades,
-        len(failures),
-    )
-
-    return multi_result, enriched_data
 
 
 def main():
@@ -804,6 +414,53 @@ def main():
         help="Maximum position size in lots. Default: 10.0",
     )
 
+    # Blackout Filtering Arguments (Feature 023: Session Blackouts)
+    parser.add_argument(
+        "--blackout-sessions",
+        action="store_true",
+        help="Enable session-gap blackout filtering. Blocks new entries during "
+        "NY close → Asian open transition (low liquidity period). "
+        "See specs/023-session-blackouts for details.",
+    )
+
+    parser.add_argument(
+        "--blackout-news",
+        action="store_true",
+        help="Enable news-event blackout filtering. Blocks new entries during "
+        "high-impact news releases (NFP, IJC). Default windows: 10min before "
+        "to 30min after event. See specs/023-session-blackouts for details.",
+    )
+
+    parser.add_argument(
+        "--sessions",
+        type=str,
+        nargs="+",
+        help="Enable session-only trading (whitelist approach). Only allow trades "
+        "during specified sessions. Valid values: NY, LONDON, ASIA, SYDNEY. "
+        "Example: --sessions NY LONDON (trades only during NY and London hours).",
+    )
+
+    # Parameter Sweep Arguments (Feature 024: Parallel Indicator Parameter Sweep)
+    parser.add_argument(
+        "--test-range",
+        action="store_true",
+        help="Enable interactive parameter sweep mode. Prompts for indicator "
+        "parameter ranges and runs backtests across all combinations. "
+        "See specs/024-parallel-param-sweep for details.",
+    )
+
+    parser.add_argument(
+        "--export",
+        type=Path,
+        help="Export sweep results to CSV file (only with --test-range).",
+    )
+
+    parser.add_argument(
+        "--sequential",
+        action="store_true",
+        help="Run parameter sweep sequentially for debugging (only with --test-range).",
+    )
+
     args = parser.parse_args()
 
     # Setup logging early for --list-strategies and --register-strategy
@@ -814,7 +471,7 @@ def main():
         import yaml
 
         if args.config.exists():
-            with open(args.config, "r", encoding="utf-8") as f:
+            with open(args.config, encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
 
             logger.info("Loaded config from %s", args.config)
@@ -842,7 +499,7 @@ def main():
         from ..risk.config import RiskConfig
 
         if args.risk_config.exists():
-            with open(args.risk_config, "r", encoding="utf-8") as f:
+            with open(args.risk_config, encoding="utf-8") as f:
                 risk_dict = json.load(f)
             risk_config = RiskConfig.from_dict(risk_dict)
             logger.info(
@@ -968,6 +625,70 @@ Persistent storage not yet implemented."
             print(f"Error: Registration failed: {exc}", file=sys.stderr)
             sys.exit(1)
 
+    # Handle --test_range (Feature 024: Parameter Sweep Mode)
+    if args.test_range:
+        from ..backtest.sweep import (
+            display_results_table,
+            export_results_to_csv,
+            filter_invalid_combinations,
+            generate_combinations,
+            run_sweep,
+        )
+        from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
+        from .prompts.range_input import collect_all_ranges, confirm_sweep
+
+        logger.info("Entering parameter sweep mode...")
+
+        # Load strategy (currently only trend_pullback supported)
+        strategy = TrendPullbackStrategy()
+
+        # Collect parameter ranges from user
+        sweep_config = collect_all_ranges(strategy)
+        if sweep_config is None:
+            print("No parameters to sweep. Exiting.")
+            return 0
+
+        # Generate combinations
+        all_combinations = generate_combinations(sweep_config.ranges)
+        sweep_config.total_combinations = len(all_combinations)
+
+        # Filter invalid combinations
+        valid_combinations, skipped = filter_invalid_combinations(all_combinations)
+        sweep_config.valid_combinations = len(valid_combinations)
+        sweep_config.skipped_count = skipped
+
+        if not valid_combinations:
+            print("No valid combinations after filtering. Exiting.")
+            return 0
+
+        # Confirm with user
+        if not confirm_sweep(sweep_config, len(valid_combinations), skipped):
+            print("Sweep cancelled by user.")
+            return 0
+
+        # Execute sweep
+        print(
+            f"\n[INFO] Starting sweep execution with {len(valid_combinations)} combinations..."
+        )
+
+        sweep_result = run_sweep(
+            combinations=valid_combinations,
+            pairs=args.pair,
+            dataset=args.dataset,
+            direction=args.direction,
+            max_workers=args.max_workers,
+            sequential=args.sequential,
+        )
+
+        display_results_table(sweep_result.results, top_n=10)
+
+        # Export results (Phase 6)
+        if args.export:
+            export_results_to_csv(sweep_result, args.export)
+            print(f"\n[INFO] Sweep results exported to: {args.export}")
+
+        return 0
+
     # Validate data file exists
     # (required for backtest runs, not for listing/registration)
     if args.data is None:
@@ -988,6 +709,36 @@ Persistent storage not yet implemented."
             direction_mode = DirectionMode[args.direction]
             show_progress = sys.stdout.isatty()
 
+            # Build blackout config from CLI args (Feature 023)
+            blackout_config = None
+            if args.blackout_sessions or args.blackout_news or args.sessions:
+                from ..risk.blackout.config import (
+                    BlackoutConfig,
+                    NewsBlackoutConfig,
+                    SessionBlackoutConfig,
+                    SessionOnlyConfig,
+                )
+
+                # Normalize session names to uppercase
+                allowed_sessions = (
+                    [s.upper() for s in args.sessions] if args.sessions else []
+                )
+
+                blackout_config = BlackoutConfig(
+                    news=NewsBlackoutConfig(enabled=args.blackout_news),
+                    sessions=SessionBlackoutConfig(enabled=args.blackout_sessions),
+                    session_only=SessionOnlyConfig(
+                        enabled=bool(args.sessions),
+                        allowed_sessions=allowed_sessions,
+                    ),
+                )
+                logger.info(
+                    "Blackout filtering enabled: news=%s, sessions=%s, session_only=%s",
+                    args.blackout_news,
+                    args.blackout_sessions,
+                    allowed_sessions if args.sessions else False,
+                )
+
             result, enriched_data = run_portfolio_backtest(
                 pair_paths=pair_paths,
                 direction_mode=direction_mode,
@@ -996,6 +747,7 @@ Persistent storage not yet implemented."
                 dry_run=args.dry_run,
                 show_progress=show_progress,
                 timeframe=args.timeframe,
+                blackout_config=blackout_config,
             )
 
             # Format and output portfolio results
@@ -1029,10 +781,11 @@ Persistent storage not yet implemented."
             logger.info("Results written to %s", output_path)
             if args.visualize:
                 try:
+                    from rich.console import Console
+
                     from ..visualization.datashader_viz import (
                         plot_backtest_results,
                     )
-                    from rich.console import Console
 
                     console = Console()
 
@@ -1050,8 +803,6 @@ Persistent storage not yet implemented."
                         all_symbol_data = pl.concat(symbol_dfs)
                         # Convert PortfolioResult to BacktestResult-like structure
                         # For visualization compatibility
-                        from ..models.directional import BacktestResult
-                        from ..models.core import TradeExecution
 
                         # Group executions by symbol
                         symbol_executions: dict[str, list[TradeExecution]] = {}
@@ -1143,7 +894,7 @@ Persistent storage not yet implemented."
                         "Visualization module not found or dependency missing: %s",
                         e,
                     )
-                except Exception as e:
+                except (RuntimeError, TypeError, ValueError, KeyError) as e:
                     logger.error(
                         "Failed to generate visualization: %s",
                         e,
@@ -1268,8 +1019,6 @@ Persistent storage not yet implemented."
             profiler.start_phase("ingest")
 
         # Load strategy to get required indicators
-        from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-
         strategy = TREND_PULLBACK_STRATEGY
         required_indicators = strategy.metadata.required_indicators
 
@@ -1361,7 +1110,6 @@ Persistent storage not yet implemented."
 
         # Stage 2: Vectorized indicator calculation
         logger.info("Stage 2/2: Computing technical indicators (vectorized)...")
-        from ..indicators.dispatcher import calculate_indicators
 
         # Calculate indicators dynamically based on strategy requirements
         enriched_df = calculate_indicators(enriched_df, required_indicators)
@@ -1375,7 +1123,7 @@ Persistent storage not yet implemented."
         # Set default benchmark output path if profiling enabled
         benchmark_path = args.benchmark_out
         if args.profile and not benchmark_path:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
 
         show_progress = sys.stdout.isatty()
@@ -1397,7 +1145,7 @@ Persistent storage not yet implemented."
 
         run_id = (
             f"{args.direction.lower()}_"
-            f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
         )
         logger.info(
             "Running backtest with run_id=%s, pair=%s, strategy=%s",
@@ -1411,8 +1159,6 @@ Persistent storage not yet implemented."
 
         # Call vectorized backtest with Polars DataFrame
         logger.info("Using vectorized backtest path (Polars)")
-
-        from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
         # Debug: Verify all required indicators are present
         logger.info("DataFrame columns before backtest: %s", enriched_df.columns)
@@ -1429,8 +1175,6 @@ Persistent storage not yet implemented."
         )
 
         # Add timeframe to result for output formatting (FR-015)
-        from dataclasses import replace
-
         result = replace(result, timeframe=args.timeframe)
 
         logger.info("Backtest complete: %s", result.run_id)
@@ -1486,8 +1230,9 @@ Persistent storage not yet implemented."
         # T011 Integration: Interactive Visualization
         if args.visualize:
             try:
-                from ..visualization.datashader_viz import plot_backtest_results
                 from rich.console import Console
+
+                from ..visualization.datashader_viz import plot_backtest_results
 
                 console = Console()
                 logger.info("Generating Datashader visualization...")
@@ -1511,7 +1256,7 @@ Persistent storage not yet implemented."
                     "Visualization module not found or dependency missing: %s",
                     e,
                 )
-            except Exception as e:
+            except (RuntimeError, TypeError, ValueError, KeyError) as e:
                 logger.error("Failed to generate visualization: %s", e, exc_info=True)
 
     # Format output (outside profiling context)
@@ -1600,7 +1345,7 @@ Persistent storage not yet implemented."
             duplicate_timestamps_removed=0,
             duplicate_first_ts=None,
             duplicate_last_ts=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         # Write report to JSON

@@ -52,8 +52,8 @@ def classify_trend(
         ...         low=1.099 + i*0.001,
         ...         close=1.10 + i*0.001,
         ...         volume=1000.0,
-        ...         ema20=1.10 + i*0.001,
-        ...         ema50=1.095,
+        ...         fast_ema=1.10 + i*0.001,
+        ...         slow_ema=1.095,
         ...         atr=0.002,
         ...         rsi=60.0,
         ...         stoch_rsi=0.7
@@ -74,13 +74,13 @@ def classify_trend(
     latest_candle = candles[-1]
 
     # Check if EMA values are available
-    if latest_candle.ema20 is None or latest_candle.ema50 is None:
-        raise ValueError("Candles must have computed EMA values")
+    if latest_candle.fast_ema is None or latest_candle.slow_ema is None:
+        raise ValueError("Candles must have computed EMA values (fast_ema, slow_ema)")
 
     # Determine current EMA relationship
-    if latest_candle.ema20 > latest_candle.ema50:
+    if latest_candle.fast_ema > latest_candle.slow_ema:
         current_state = "UP"
-    elif latest_candle.ema20 < latest_candle.ema50:
+    elif latest_candle.fast_ema < latest_candle.slow_ema:
         current_state = "DOWN"
     else:
         current_state = "RANGE"
@@ -140,13 +140,13 @@ def _count_ema_crossovers(candles: Sequence[Candle]) -> int:
         return 0
 
     cross_count = 0
-    previous_above = candles[0].ema20 > candles[0].ema50
+    previous_above = candles[0].fast_ema > candles[0].slow_ema
 
     for candle in candles[1:]:
-        if candle.ema20 is None or candle.ema50 is None:
+        if candle.fast_ema is None or candle.slow_ema is None:
             continue
 
-        current_above = candle.ema20 > candle.ema50
+        current_above = candle.fast_ema > candle.slow_ema
 
         # Detect crossover
         if current_above != previous_above:
@@ -182,19 +182,19 @@ def _find_last_trend_change(candles: Sequence[Candle]):
 
     # Get current EMA relationship
     latest_candle = candles[-1]
-    if latest_candle.ema20 is None or latest_candle.ema50 is None:
+    if latest_candle.fast_ema is None or latest_candle.slow_ema is None:
         return None
 
-    current_above = latest_candle.ema20 > latest_candle.ema50
+    current_above = latest_candle.fast_ema > latest_candle.slow_ema
 
     # Scan backwards to find crossover
     for i in range(len(candles) - 2, -1, -1):
         candle = candles[i]
 
-        if candle.ema20 is None or candle.ema50 is None:
+        if candle.fast_ema is None or candle.slow_ema is None:
             continue
 
-        previous_above = candle.ema20 > candle.ema50
+        previous_above = candle.fast_ema > candle.slow_ema
 
         # Found crossover
         if previous_above != current_above:

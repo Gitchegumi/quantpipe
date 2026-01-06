@@ -33,8 +33,8 @@ class TrendPullbackStrategy(Strategy):
         """Return strategy metadata including required indicators."""
         return StrategyMetadata(
             name="trend-pullback",
-            version="1.0.0",
-            required_indicators=["ema20", "ema50", "atr14", "rsi14", "stoch_rsi"],
+            version="1.1.0",
+            required_indicators=["fast_ema", "slow_ema", "atr", "stoch_rsi"],
             tags=["trend-following", "pullback", "momentum"],
             max_concurrent_positions=1,  # One trade at a time per FR-001
         )
@@ -56,13 +56,12 @@ class TrendPullbackStrategy(Strategy):
         return VisualizationConfig(
             price_overlays=[
                 # Order matters: fastest to slowest for gradient colors
-                IndicatorDisplayConfig(name="ema20", label="EMA 20"),
-                IndicatorDisplayConfig(name="ema50", label="EMA 50"),
+                IndicatorDisplayConfig(name="fast_ema", label="Fast EMA"),
+                IndicatorDisplayConfig(name="slow_ema", label="Slow EMA"),
             ],
             oscillators=[
                 # Oscillators use distinct cycling palette
                 IndicatorDisplayConfig(name="stoch_rsi", label="Stoch RSI"),
-                IndicatorDisplayConfig(name="rsi14", label="RSI 14"),  # FR-003
             ],
         )
 
@@ -114,13 +113,11 @@ class TrendPullbackStrategy(Strategy):
         Returns:
             Tuple of (signal_indices, stop_prices, target_prices, position_sizes) arrays
         """
-        # Extract required indicators (using actual registered names)
-        ema20 = indicator_arrays["ema20"]
-        ema50 = indicator_arrays["ema50"]
+        # Extract required indicators (using semantic names)
+        fast_ema = indicator_arrays["fast_ema"]
+        slow_ema = indicator_arrays["slow_ema"]
         stoch_rsi = indicator_arrays["stoch_rsi"]
-        atr14 = indicator_arrays.get(
-            "atr14", indicator_arrays.get("atr")
-        )  # Handle both names
+        atr = indicator_arrays.get("atr")  # Semantic ATR name
 
         # Get parameters with defaults (stoch_rsi is 0-1, not 0-100)
         rsi_oversold = parameters.get("rsi_oversold", 0.3)
@@ -129,25 +126,25 @@ class TrendPullbackStrategy(Strategy):
         target_atr_mult = parameters.get("target_profit_atr_multiplier", 4.0)  # 2:1 R:R
 
         # Vectorized trend classification
-        trend_up = ema20 > ema50
-        trend_down = ema20 < ema50
+        trend_up = fast_ema > slow_ema
+        trend_down = fast_ema < slow_ema
 
         # Vectorized pullback detection
         pullback_long = trend_up & (stoch_rsi < rsi_oversold)
         pullback_short = trend_down & (stoch_rsi > rsi_overbought)
 
-        # Vectorized reversal detection (price crosses EMA20)
-        close_above_ema20 = close > ema20
-        close_below_ema20 = close < ema20
+        # Vectorized reversal detection (price crosses fast EMA)
+        close_above_fast_ema = close > fast_ema
+        close_below_fast_ema = close < fast_ema
 
         # Detect crosses using shift
-        prev_close_above = np.roll(close_above_ema20, 1)
-        prev_close_below = np.roll(close_below_ema20, 1)
+        prev_close_above = np.roll(close_above_fast_ema, 1)
+        prev_close_below = np.roll(close_below_fast_ema, 1)
         prev_close_above[0] = False
         prev_close_below[0] = False
 
-        cross_above = close_above_ema20 & ~prev_close_above
-        cross_below = close_below_ema20 & ~prev_close_below
+        cross_above = close_above_fast_ema & ~prev_close_above
+        cross_below = close_below_fast_ema & ~prev_close_below
 
         # Combine conditions based on direction
         if direction == "LONG":
@@ -167,8 +164,8 @@ class TrendPullbackStrategy(Strategy):
 
         entry_prices = close[signal_indices]
         atr_values = (
-            atr14[signal_indices]
-            if atr14 is not None
+            atr[signal_indices]
+            if atr is not None
             else np.full(len(signal_indices), 0.002)
         )
 

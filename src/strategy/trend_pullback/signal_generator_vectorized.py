@@ -9,14 +9,13 @@ columnar operations using Polars expressions. It implements the same logic:
 """
 
 import logging
-from typing import Dict, Any, List, Optional
-import polars as pl
-import numpy as np
-from datetime import datetime
+from typing import Any
 
-from ...models.core import TradeSignal
-from ...risk.manager import calculate_position_size
-from ...strategy.id_factory import compute_parameters_hash, generate_signal_id
+import polars as pl
+
+from src.models.core import TradeSignal
+from src.risk.manager import calculate_position_size
+from src.strategy.id_factory import compute_parameters_hash, generate_signal_id
 
 
 logger = logging.getLogger(__name__)
@@ -24,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 def generate_signals_vectorized(
     df: pl.DataFrame,
-    parameters: Dict[str, Any],
+    parameters: dict[str, Any],
     direction_mode: str = "BOTH",  # "LONG", "SHORT", "BOTH"
-) -> List[TradeSignal]:
+) -> list[TradeSignal]:
     """
     Generate trade signals for the entire dataset using vectorized operations.
 
@@ -48,23 +47,17 @@ def generate_signals_vectorized(
         "high",
         "low",
         "close",
-        "ema20",
-        "ema50",
-        "rsi14",
+        "fast_ema",
+        "slow_ema",
+        "rsi",
         "stoch_rsi",
-        "atr14",
+        "atr",
     ]
     missing = [c for c in required_cols if c not in df.columns]
 
-    # Handle legacy column names if necessary
-    if "atr" in df.columns and "atr14" not in df.columns:
-        df = df.with_columns(pl.col("atr").alias("atr14"))
-
-    if missing and not ("atr" in missing and "atr14" in df.columns):
-        # check again after aliasing
-        missing = [c for c in required_cols if c not in df.columns]
-        if missing:
-            raise ValueError(f"Missing required columns: {missing}")
+    if missing:
+        msg = f"Missing required columns: {missing}"
+        raise ValueError(msg)
 
     # compute parameters hash
     parameters_hash = compute_parameters_hash(parameters)
@@ -78,7 +71,7 @@ def generate_signals_vectorized(
 
     # Calculate crossovers (where relationship changes)
     # 1 where EMA20 > EMA50, 0 otherwise
-    ema_rel = (pl.col("ema20") > pl.col("ema50")).cast(pl.Int8)
+    ema_rel = (pl.col("fast_ema") > pl.col("slow_ema")).cast(pl.Int8)
     # Detect change: current != prev
     crossovers = (ema_rel != ema_rel.shift(1)).cast(pl.Int8).fill_null(0)
 
@@ -90,16 +83,16 @@ def generate_signals_vectorized(
     trend_state = (
         pl.when(rolling_crosses >= cross_threshold)
         .then(0)
-        .when(pl.col("ema20") > pl.col("ema50"))
+        .when(pl.col("fast_ema") > pl.col("slow_ema"))
         .then(1)
-        .when(pl.col("ema20") < pl.col("ema50"))
+        .when(pl.col("fast_ema") < pl.col("slow_ema"))
         .then(-1)
         .otherwise(0)
     ).alias("trend_state")
 
     df = df.with_columns(trend_state)
 
-    signals: List[TradeSignal] = []
+    signals: list[TradeSignal] = []
 
     if direction_mode in ["LONG", "BOTH"]:
         long_signals = _generate_long_signals_vec(df, parameters, parameters_hash)
@@ -117,13 +110,12 @@ def generate_signals_vectorized(
 
 
 def _generate_long_signals_vec(
-    df: pl.DataFrame, parameters: Dict[str, Any], parameters_hash: str
-) -> List[TradeSignal]:
+    df: pl.DataFrame, parameters: dict[str, Any], parameters_hash: str
+) -> list[TradeSignal]:
     """Generate LONG signals using Polars expressions."""
 
     rsi_oversold = parameters.get("rsi_oversold", 30.0)
     stoch_rsi_low = parameters.get("stoch_rsi_low", 0.2)
-    min_candles_reversal = parameters.get("min_candles_reversal", 3)
 
     # --- Step 2: Pullback Detection (LONG) ---
     # Condition: Trend is UP AND (RSI < oversold OR StochRSI < low)
@@ -132,7 +124,7 @@ def _generate_long_signals_vec(
 
     # Identify candles where oscillator is extreme
     is_extreme = (pl.col("trend_state") == 1) & (
-        (pl.col("rsi14") < rsi_oversold) | (pl.col("stoch_rsi") < stoch_rsi_low)
+        (pl.col("rsi") < rsi_oversold) | (pl.col("stoch_rsi") < stoch_rsi_low)
     )
 
     # We need to propagate the "active pullback" state forward.
@@ -154,8 +146,8 @@ def _generate_long_signals_vec(
     # 1. Momentum Turn:
     #    RSI low (<40) then rising, OR StochRSI low (<0.3) then rising.
 
-    prev_rsi = pl.col("rsi14").shift(1)
-    rsi_turn_up = (prev_rsi < 40) & (pl.col("rsi14") > prev_rsi)
+    prev_rsi = pl.col("rsi").shift(1)
+    rsi_turn_up = (prev_rsi < 40) & (pl.col("rsi") > prev_rsi)
 
     prev_stoch = pl.col("stoch_rsi").shift(1)
     stoch_turn_up = (prev_stoch < 0.3) & (pl.col("stoch_rsi") > prev_stoch)
@@ -210,7 +202,7 @@ def _generate_long_signals_vec(
     # iterating over Polars rows is slow if many, but signals are sparse.
     for row in signal_df.iter_rows(named=True):
         entry_price = row["close"]
-        atr_val = row["atr14"] if row["atr14"] is not None else 0.002
+        atr_val = row["atr"] if row["atr"] is not None else 0.002
         stop_distance = atr_val * stop_mult
         stop_price = entry_price - stop_distance
         target_price = entry_price + (stop_distance * target_r_mult)
@@ -275,8 +267,8 @@ def _generate_long_signals_vec(
 
 
 def _generate_short_signals_vec(
-    df: pl.DataFrame, parameters: Dict[str, Any], parameters_hash: str
-) -> List[TradeSignal]:
+    df: pl.DataFrame, parameters: dict[str, Any], parameters_hash: str
+) -> list[TradeSignal]:
     """Generate SHORT signals using Polars expressions."""
 
     rsi_overbought = parameters.get("rsi_overbought", 70.0)
@@ -286,7 +278,7 @@ def _generate_short_signals_vec(
     # Condition: Trend is DOWN AND (RSI > overbought OR StochRSI > high)
 
     is_extreme = (pl.col("trend_state") == -1) & (
-        (pl.col("rsi14") > rsi_overbought) | (pl.col("stoch_rsi") > stoch_rsi_high)
+        (pl.col("rsi") > rsi_overbought) | (pl.col("stoch_rsi") > stoch_rsi_high)
     )
 
     pullback_max_age = parameters.get("pullback_max_age", 20)
@@ -300,8 +292,8 @@ def _generate_short_signals_vec(
     # 1. Momentum Turn:
     #    RSI high (>60) then falling, OR StochRSI high (>0.7) then falling.
 
-    prev_rsi = pl.col("rsi14").shift(1)
-    rsi_turn_down = (prev_rsi > 60) & (pl.col("rsi14") < prev_rsi)
+    prev_rsi = pl.col("rsi").shift(1)
+    rsi_turn_down = (prev_rsi > 60) & (pl.col("rsi") < prev_rsi)
 
     prev_stoch = pl.col("stoch_rsi").shift(1)
     stoch_turn_down = (prev_stoch > 0.7) & (pl.col("stoch_rsi") < prev_stoch)
@@ -353,7 +345,7 @@ def _generate_short_signals_vec(
 
     for row in signal_df.iter_rows(named=True):
         entry_price = row["close"]
-        atr_val = row["atr14"] if row["atr14"] is not None else 0.002
+        atr_val = row["atr"] if row["atr"] is not None else 0.002
         stop_distance = atr_val * stop_mult
         stop_price = entry_price + stop_distance  # Stop above for shorts
         target_price = entry_price - (stop_distance * target_r_mult)  # Target below

@@ -117,6 +117,7 @@ def ingest_ohlcv_data(
     use_parquet_cache: bool = True,
     fill_gaps: bool = False,
     return_polars: bool = False,
+    show_progress: bool = True,
 ) -> IngestionResult:
 
     try:
@@ -140,12 +141,7 @@ def ingest_ohlcv_data(
         #         (forward-fill close prices). If False (default), preserve gaps as they
         #         represent actual market closures (weekends, holidays). When False,
         #         is_gap column is still added but all values are False.
-        #         **Note**: Gap filling during ingestion is generally NOT recommended
-        #         as it creates synthetic price data that never occurred. The primary
-        #         use case for gap filling is during **resampling to higher
-        #         timeframes** (e.g., 1-min → 5-min → 1-hour), which will be
-        #         implemented in a future specification. For raw ingestion, gaps should
-        #         be preserved to maintain data integrity.
+        #     show_progress: If True, display progress bars during ingestion.
         # Returns:
         #     IngestionResult: Contains processed data, metrics, and metadata.
         # Raises:
@@ -170,7 +166,7 @@ def ingest_ohlcv_data(
 
         # Initialize progress reporter
 
-        progress = ProgressReporter(show_progress=True)
+        progress = ProgressReporter(show_progress=show_progress)
 
         # Configure Arrow backend if requested
 
