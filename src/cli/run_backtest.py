@@ -448,7 +448,7 @@ def main():
 
     # Parameter Sweep Arguments (Feature 024: Parallel Indicator Parameter Sweep)
     parser.add_argument(
-        "--test_range",
+        "--test-range",
         action="store_true",
         help="Enable interactive parameter sweep mode. Prompts for indicator "
         "parameter ranges and runs backtests across all combinations. "
@@ -458,13 +458,13 @@ def main():
     parser.add_argument(
         "--export",
         type=Path,
-        help="Export sweep results to CSV file (only with --test_range).",
+        help="Export sweep results to CSV file (only with --test-range).",
     )
 
     parser.add_argument(
         "--sequential",
         action="store_true",
-        help="Run parameter sweep sequentially for debugging (only with --test_range).",
+        help="Run parameter sweep sequentially for debugging (only with --test-range).",
     )
 
     args = parser.parse_args()
@@ -639,6 +639,7 @@ Persistent storage not yet implemented."
             generate_combinations,
             run_sweep,
             display_results_table,
+            export_results_to_csv,
         )
         from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
 
@@ -686,6 +687,12 @@ Persistent storage not yet implemented."
         )
 
         display_results_table(sweep_result.results, top_n=10)
+
+        # Export results (Phase 6)
+        if args.export:
+            export_results_to_csv(sweep_result, args.export)
+            print(f"\n[INFO] Sweep results exported to: {args.export}")
+
         return 0
 
     # Validate data file exists

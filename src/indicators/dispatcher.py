@@ -157,8 +157,12 @@ def calculate_indicators(
             name, kwargs = parse_indicator_string(ind_str)
 
             # Apply overrides if present
+            # Apply overrides if present
+            # matching either the full string (rare) or the parsed name
             if ind_str in overrides:
                 kwargs.update(overrides[ind_str])
+            elif name in overrides:
+                kwargs.update(overrides[name])
 
             logger.info(
                 "Parsing indicator: %s -> name=%s, kwargs=%s", ind_str, name, kwargs
@@ -179,19 +183,43 @@ def calculate_indicators(
             if "output_col" not in kwargs:
                 kwargs["output_col"] = ind_str
 
-            # Special handling for stoch_rsi: find the rsi column
-            if name in ("stoch_rsi", "stochrsi") and "rsi_col" not in kwargs:
-                # Look for any rsi column (rsi, rsi14, etc.)
-                rsi_cols = [col for col in df.columns if col.startswith("rsi")]
-                if not rsi_cols:
-                    # If rsi not present, calculate it first with default params
-                    logger.info(
-                        "RSI not found for stoch_rsi, calculating default RSI first"
-                    )
-                    df = REGISTRY["rsi"](df, period=14, output_col="rsi")
-                    kwargs["rsi_col"] = "rsi"
-                else:
-                    kwargs["rsi_col"] = rsi_cols[0]  # Use first found
+            # Special handling for stoch_rsi
+            if name in ("stoch_rsi", "stochrsi"):
+                # Map stoch_period -> period for the stoch calculation
+                if "stoch_period" in kwargs:
+                    kwargs["period"] = kwargs.pop("stoch_period")
+
+                # Handle rsi_period for base RSI calculation
+                # We pop it so it's not passed to calculate_stoch_rsi
+                rsi_period = kwargs.pop("rsi_period", 14)
+
+                if "rsi_col" not in kwargs:
+                    # Look for existing RSI column with matching period
+                    # Heuristic: try "rsi" or "rsi{rsi_period}"
+                    candidates = ["rsi", f"rsi{rsi_period}"]
+                    found_col = next((c for c in candidates if c in df.columns), None)
+
+                    if not found_col:
+                        # Fallback: check any column starting with "rsi"
+                        rsi_cols = [col for col in df.columns if col.startswith("rsi")]
+                        if rsi_cols:
+                            found_col = rsi_cols[0]
+
+                    if not found_col:
+                        # Calculate base RSI
+                        # We MUST output to "rsi" column because generate_signals_vectorized
+                        # expects "rsi" to exist.
+                        logger.info(
+                            "Calculating base RSI for stoch_rsi with period %s",
+                            rsi_period,
+                        )
+                        rsi_out_col = "rsi"
+                        df = REGISTRY["rsi"](
+                            df, period=rsi_period, output_col=rsi_out_col
+                        )
+                        kwargs["rsi_col"] = rsi_out_col
+                    else:
+                        kwargs["rsi_col"] = found_col
 
             df = func(df, **kwargs)
 

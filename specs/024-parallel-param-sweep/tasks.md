@@ -123,9 +123,9 @@
 
 ### Implementation for User Story 5
 
-- [ ] T032 [US5] Add `--export` argument to `src/cli/run_backtest.py`
-- [ ] T033 [US5] Implement `export_results_to_csv()` in `src/backtest/sweep.py`
-- [ ] T034 [US5] Wire export to sweep completion in sweep orchestrator
+- [x] T032 [US5] Add `--export` argument to `src/cli/run_backtest.py`
+- [x] T033 [US5] Implement `export_results_to_csv()` in `src/backtest/sweep.py`
+- [x] T034 [US5] Wire export to sweep completion in sweep orchestrator
 
 **Checkpoint**: CSV export works with all expected columns
 

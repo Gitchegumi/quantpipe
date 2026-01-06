@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
 from typing import Any
+import csv
 
 from rich.progress import (
     Progress,
@@ -622,3 +623,71 @@ def run_sweep(
         successful_count=successful,
         failed_count=failed,
     )
+
+
+def export_results_to_csv(result: SweepResult, output_path: Path) -> None:
+    """Export sweep results to CSV file.
+
+    Args:
+        result: The SweepResult object containing all execution data.
+        output_path: Destination path for the CSV file.
+    """
+    if not result.results:
+        logger.warning("No results to export.")
+        return
+
+    # Determine all unique parameter keys from the first result (assuming consistency)
+    # Flatten structure: {ind: {param: val}} -> "ind_param"
+    param_keys = []
+    first_params = result.results[0].params.params
+    for ind_name, ind_params in first_params.items():
+        for p_name in ind_params:
+            param_keys.append(f"{ind_name}_{p_name}")
+
+    # Define CSV headers
+    headers = [
+        "rank",
+        "sharpe_ratio",
+        "total_pnl",
+        "win_rate",
+        "trade_count",
+        "max_drawdown",
+        "error",
+    ] + param_keys
+
+    try:
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=headers)
+            writer.writeheader()
+
+            # Sort by Sharpe Descending
+            sorted_results = sorted(
+                result.results,
+                key=lambda x: (x.sharpe_ratio if x.sharpe_ratio is not None else -999),
+                reverse=True,
+            )
+
+            for i, r in enumerate(sorted_results):
+                row = {
+                    "rank": i + 1,
+                    "sharpe_ratio": (
+                        f"{r.sharpe_ratio:.4f}" if r.sharpe_ratio is not None else ""
+                    ),
+                    "total_pnl": f"{r.total_pnl:.2f}",
+                    "win_rate": f"{r.win_rate:.4f}",
+                    "trade_count": r.trade_count,
+                    "max_drawdown": f"{r.max_drawdown:.4f}",
+                    "error": r.error or "",
+                }
+
+                # Flatten params
+                for ind_name, ind_params in r.params.params.items():
+                    for p_name, p_val in ind_params.items():
+                        row[f"{ind_name}_{p_name}"] = p_val
+
+                writer.writerow(row)
+
+        logger.info("Sweep results exported to %s", output_path)
+
+    except IOError as e:
+        logger.error("Failed to write export file %s: %s", output_path, e)
