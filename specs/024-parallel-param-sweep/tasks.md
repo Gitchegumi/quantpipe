@@ -106,10 +106,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Integrate `run_parallel()` from `src/backtest/parallel.py` into sweep execution
-- [ ] T029 [US4] Add `--max-workers` argument to `src/cli/run_backtest.py`
-- [ ] T030 [US4] Add `--sequential` argument for debugging mode in `src/cli/run_backtest.py`
-- [ ] T031 [US4] Pass worker configuration through sweep orchestrator in `src/backtest/sweep.py`
+- [x] T028 [US4] Integrate `run_parallel()` from `src/backtest/parallel.py` into sweep execution
+- [x] T029 [US4] Add `--max-workers` argument to `src/cli/run_backtest.py`
+- [x] T030 [US4] Add `--sequential` argument for debugging mode in `src/cli/run_backtest.py`
+- [x] T031 [US4] Pass worker configuration through sweep orchestrator in `src/backtest/sweep.py`
 
 **Checkpoint**: Parallel execution works, speedup observed with multiple workers
 

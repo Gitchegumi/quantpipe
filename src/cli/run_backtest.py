@@ -681,6 +681,8 @@ Persistent storage not yet implemented."
             pairs=args.pair,
             dataset=args.dataset,
             direction=args.direction,
+            max_workers=args.max_workers,
+            sequential=args.sequential,
         )
 
         display_results_table(sweep_result.results, top_n=10)

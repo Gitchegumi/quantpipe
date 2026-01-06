@@ -24,6 +24,8 @@ from rich.progress import (
 from ..config.parameters import StrategyParameters
 from ..models.enums import DirectionMode
 from .engine import run_portfolio_backtest, construct_data_paths
+from .parallel import get_worker_count
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 logger = logging.getLogger(__name__)
@@ -477,11 +479,35 @@ def run_single_backtest(
         return SingleResult(params=params, error=str(e))
 
 
+@dataclass
+class SweepTask:
+    """Container for a single backtest task execution args."""
+
+    params: ParameterSet
+    pair_paths: list[tuple[str, Path]]
+    direction_mode: DirectionMode
+    dataset: str
+    starting_equity: float
+
+
+def execute_sweep_task(task: SweepTask) -> SingleResult:
+    """Worker function to execute a single backtest task."""
+    return run_single_backtest(
+        params=task.params,
+        pair_paths=task.pair_paths,
+        direction_mode=task.direction_mode,
+        starting_equity=task.starting_equity,
+        dataset=task.dataset,
+    )
+
+
 def run_sweep(
     combinations: list[ParameterSet],
     pairs: list[str],
     dataset: str = "test",
     direction: str = "LONG",
+    max_workers: int | None = None,
+    sequential: bool = False,
 ) -> SweepResult:
     """Run parameter sweep backtests sequentially (Phase 4 MVP).
 
@@ -507,6 +533,13 @@ def run_sweep(
     successful = 0
     failed = 0
 
+    # Determine execution mode
+    worker_count = 1
+    if not sequential:
+        worker_count = get_worker_count(max_workers)
+
+    logger.info("Running sweep with %d workers (concurrent)", worker_count)
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -514,27 +547,66 @@ def run_sweep(
         TaskProgressColumn(),
         transient=True,
     ) as progress:
-        task = progress.add_task("Running sweep...", total=len(combinations))
+        task_id = progress.add_task("Running sweep...", total=len(combinations))
 
-        for i, params in enumerate(combinations):
-            progress.update(
-                task, description=f"Testing {params.label} ({i+1}/{len(combinations)})"
-            )
+        if worker_count > 1:
+            # Parallel Execution
+            tasks = [
+                SweepTask(
+                    params=params,
+                    pair_paths=pair_paths,
+                    direction_mode=direction_mode,
+                    dataset=dataset,
+                    starting_equity=2500.0,  # pass default for now
+                )
+                for params in combinations
+            ]
 
-            result = run_single_backtest(
-                params=params,
-                pair_paths=pair_paths,
-                direction_mode=direction_mode,
-                dataset=dataset,
-            )
+            with ProcessPoolExecutor(max_workers=worker_count) as executor:
+                futures = {
+                    executor.submit(execute_sweep_task, task): i
+                    for i, task in enumerate(tasks)
+                }
 
-            results.append(result)
-            if result.error:
-                failed += 1
-            else:
-                successful += 1
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        results.append(result)
+                        if result.error:
+                            failed += 1
+                        else:
+                            successful += 1
+                    except Exception as e:
+                        # This should be caught inside execute_sweep_task, but just in case
+                        logger.error("Parallel task failed: %s", e)
+                        failed += 1
 
-            progress.advance(task)
+                    progress.advance(task_id)
+                    description = f"Tested {len(results)}/{len(combinations)}"
+                    progress.update(task_id, description=description)
+
+        else:
+            # Sequential Execution
+            for i, params in enumerate(combinations):
+                progress.update(
+                    task_id,
+                    description=f"Testing {params.label} ({i+1}/{len(combinations)})",
+                )
+
+                result = run_single_backtest(
+                    params=params,
+                    pair_paths=pair_paths,
+                    direction_mode=direction_mode,
+                    dataset=dataset,
+                )
+
+                results.append(result)
+                if result.error:
+                    failed += 1
+                else:
+                    successful += 1
+
+                progress.advance(task_id)
 
     execution_time = time.time() - start_time
 
