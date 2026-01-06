@@ -4,29 +4,29 @@ This module provides the core data structures and functions for running
 parallel parameter sweeps across indicator configurations.
 """
 
+import csv
 import logging
 import re
 import time
 from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
 from typing import Any
-import csv
 
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
-    TextColumn,
-    BarColumn,
     TaskProgressColumn,
+    TextColumn,
 )
 
 from ..config.parameters import StrategyParameters
 from ..models.enums import DirectionMode
-from .engine import run_portfolio_backtest, construct_data_paths
+from .engine import construct_data_paths, run_portfolio_backtest
 from .parallel import get_worker_count
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 logger = logging.getLogger(__name__)
@@ -689,5 +689,5 @@ def export_results_to_csv(result: SweepResult, output_path: Path) -> None:
 
         logger.info("Sweep results exported to %s", output_path)
 
-    except IOError as e:
+    except OSError as e:
         logger.error("Failed to write export file %s: %s", output_path, e)

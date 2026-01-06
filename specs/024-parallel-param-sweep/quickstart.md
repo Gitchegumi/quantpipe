@@ -12,7 +12,8 @@ poetry run python -m src.cli.run_backtest \
     --pair EURUSD \
     --strategy trend_pullback \
     --direction BOTH \
-    --test_range
+    --test-range \
+    --export results.csv
 ```
 
 ### Example Interactive Session
@@ -54,11 +55,22 @@ Running sweep with 3 parallel workers...
 └─────────────────────────────────────────────────────────┘
 ```
 
+### CSV Export Results
+
+When using `--export results.csv`, the output file contains:
+
+```csv
+rank,sharpe_ratio,total_pnl,win_rate,trades_count,max_drawdown,error,fast_ema_period,slow_ema_period,k_smooth,d_smooth
+1,1.82,847.50,0.583,124,0.15,,15,60,3,3
+2,1.75,812.00,0.561,118,0.12,,20,70,3,3
+...
+```
+
 ## CLI Flags
 
 | Flag              | Description                                     |
 | ----------------- | ----------------------------------------------- |
-| `--test_range`    | Enable interactive parameter sweep mode         |
+| `--test-range`    | Enable interactive parameter sweep mode         |
 | `--max-workers N` | Limit parallel workers (default: CPU cores - 1) |
 | `--sequential`    | Force sequential execution for debugging        |
 | `--export FILE`   | Export results to CSV file                      |

@@ -39,21 +39,23 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path> --dry-run
 """
 
-import io
 import argparse
+import io
 import logging
 import sys
 from contextlib import nullcontext
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import polars as pl
 
+from ..backtest.engine import (
+    construct_data_paths,
+    run_portfolio_backtest,
+)
 from ..backtest.orchestrator import BacktestOrchestrator
-from ..backtest.portfolio.portfolio_simulator import PortfolioSimulator
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
 from ..data_io.formatters import (
@@ -70,15 +72,7 @@ from ..indicators.registry.builtins import register_builtins
 from ..models.core import TradeExecution
 from ..models.directional import BacktestResult
 from ..models.enums import DirectionMode, OutputFormat
-from ..strategy.trend_pullback.signal_generator_vectorized import (
-    generate_signals_vectorized,
-)
 from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-from ..backtest.engine import (
-    construct_data_paths,
-    run_portfolio_backtest,
-    run_multi_symbol_backtest,
-)
 
 
 # Ensure built-in indicators are registered early
@@ -477,7 +471,7 @@ def main():
         import yaml
 
         if args.config.exists():
-            with open(args.config, "r", encoding="utf-8") as f:
+            with open(args.config, encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
 
             logger.info("Loaded config from %s", args.config)
@@ -505,7 +499,7 @@ def main():
         from ..risk.config import RiskConfig
 
         if args.risk_config.exists():
-            with open(args.risk_config, "r", encoding="utf-8") as f:
+            with open(args.risk_config, encoding="utf-8") as f:
                 risk_dict = json.load(f)
             risk_config = RiskConfig.from_dict(risk_dict)
             logger.info(
@@ -633,15 +627,15 @@ Persistent storage not yet implemented."
 
     # Handle --test_range (Feature 024: Parameter Sweep Mode)
     if args.test_range:
-        from .prompts.range_input import collect_all_ranges, confirm_sweep
         from ..backtest.sweep import (
+            display_results_table,
+            export_results_to_csv,
             filter_invalid_combinations,
             generate_combinations,
             run_sweep,
-            display_results_table,
-            export_results_to_csv,
         )
         from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
+        from .prompts.range_input import collect_all_ranges, confirm_sweep
 
         logger.info("Entering parameter sweep mode...")
 
@@ -787,10 +781,11 @@ Persistent storage not yet implemented."
             logger.info("Results written to %s", output_path)
             if args.visualize:
                 try:
+                    from rich.console import Console
+
                     from ..visualization.datashader_viz import (
                         plot_backtest_results,
                     )
-                    from rich.console import Console
 
                     console = Console()
 
@@ -1128,7 +1123,7 @@ Persistent storage not yet implemented."
         # Set default benchmark output path if profiling enabled
         benchmark_path = args.benchmark_out
         if args.profile and not benchmark_path:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
 
         show_progress = sys.stdout.isatty()
@@ -1150,7 +1145,7 @@ Persistent storage not yet implemented."
 
         run_id = (
             f"{args.direction.lower()}_"
-            f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
         )
         logger.info(
             "Running backtest with run_id=%s, pair=%s, strategy=%s",
@@ -1235,8 +1230,9 @@ Persistent storage not yet implemented."
         # T011 Integration: Interactive Visualization
         if args.visualize:
             try:
-                from ..visualization.datashader_viz import plot_backtest_results
                 from rich.console import Console
+
+                from ..visualization.datashader_viz import plot_backtest_results
 
                 console = Console()
                 logger.info("Generating Datashader visualization...")
@@ -1349,7 +1345,7 @@ Persistent storage not yet implemented."
             duplicate_timestamps_removed=0,
             duplicate_first_ts=None,
             duplicate_last_ts=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         # Write report to JSON

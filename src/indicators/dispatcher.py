@@ -5,22 +5,25 @@ Parses indicator definitions (e.g., "ema20", "zscore(20)") and dispatches
 to the appropriate calculation functions, preserving Polars performance.
 """
 
-import re
 import logging
-from typing import Callable, Any
+import re
+from collections.abc import Callable
+from typing import Any
+
 import polars as pl
 
 from src.backtest.vectorized_rolling_window import (
-    calculate_ema,
     calculate_atr,
+    calculate_ema,
     calculate_rsi,
     calculate_stoch_rsi,
 )
 from src.indicators.stats import (
-    calculate_zscore,
     calculate_rolling_mean,
     calculate_rolling_std,
+    calculate_zscore,
 )
+
 
 logger = logging.getLogger(__name__)
 

@@ -135,10 +135,10 @@
 
 **Purpose**: Unit and integration tests for sweep functionality
 
-- [ ] T035 [P] Create `tests/unit/test_range_parser.py` with `parse_range_input()` tests
-- [ ] T036 [P] Create `tests/unit/test_sweep_generation.py` with cartesian product tests
-- [ ] T037 Create `tests/integration/test_parameter_sweep.py` with end-to-end sweep tests
-- [ ] T038 Run all tests: `poetry run pytest tests/unit/test_range_parser.py tests/unit/test_sweep_generation.py tests/integration/test_parameter_sweep.py -v`
+- [x] T035 [P] Create `tests/unit/test_range_parser.py` with `parse_range_input()` tests
+- [x] T036 [P] Create `tests/unit/test_sweep_generation.py` with cartesian product tests
+- [x] T037 Create `tests/integration/test_parameter_sweep.py` with end-to-end sweep tests
+- [x] T038 Run all tests: `poetry run pytest tests/unit/test_range_parser.py tests/unit/test_sweep_generation.py tests/integration/test_parameter_sweep.py -v`
 
 ---
 
@@ -146,11 +146,11 @@
 
 **Purpose**: Code quality and documentation
 
-- [ ] T039 [P] Run Black formatter on all new files
-- [ ] T040 [P] Run Ruff linter on all new files
-- [ ] T041 [P] Run Pylint on all new files (target ≥8.0 score)
-- [ ] T042 Update `quickstart.md` with actual CLI output examples
-- [ ] T043 Manual verification: Run full interactive sweep as documented in plan.md
+- [x] T039 [P] Run Black formatter on all new files
+- [x] T040 [P] Run Ruff linter on all new files
+- [x] T041 [P] Run Pylint on all new files (target ≥8.0 score)
+- [x] T042 Update `quickstart.md` with actual CLI output examples
+- [x] T043 Manual verification: Run full interactive sweep as documented in plan.md
 
 ---
 
