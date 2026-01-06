@@ -68,6 +68,24 @@ def _stoch_rsi_wrapper(
     )
 
 
+def _rsi_wrapper(df: pd.DataFrame, params: dict[str, Any]) -> dict[str, pd.Series]:
+    """Wrapper for RSI computation to match IndicatorSpec signature.
+
+    Args:
+        df: DataFrame containing OHLCV data.
+        params: Parameters including 'period' and optionally 'column'.
+
+    Returns:
+        Dict[str, pd.Series]: Computed RSI series.
+    """
+    from src.indicators.builtin.stochrsi import compute_rsi
+
+    period = params.get("period", 14)
+    column = params.get("column", "close")
+    # compute_rsi returns a Series, wrap it in a dict
+    return {"rsi": compute_rsi(df, period=period, column=column)}
+
+
 def register_builtins() -> None:
     """Register all built-in indicators with the global registry.
 
@@ -187,9 +205,24 @@ def register_builtins() -> None:
     except ValueError:
         logger.debug("Indicator atr already registered")
 
+    # rsi: Generic RSI alias (default 14 period)
+    try:
+        rsi_spec = IndicatorSpec(
+            name="rsi",
+            requires=["close"],
+            provides=["rsi"],
+            compute=_rsi_wrapper,
+            version="1.0.0",
+            params={"period": 14, "column": "close"},
+        )
+        registry.register(rsi_spec)
+        logger.debug("Registered built-in indicator: rsi")
+    except ValueError:
+        logger.debug("Indicator rsi already registered")
+
     logger.debug(
         "Built-in indicators registered: ema20, ema50, atr14, stoch_rsi, "
-        "fast_ema, slow_ema, atr"
+        "fast_ema, slow_ema, atr, rsi"
     )
 
 

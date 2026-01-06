@@ -128,30 +128,40 @@ class Candle:
             is_gap=is_gap,
         )
 
-    # Backward compatibility properties for legacy code
+    # Backward compatibility and semantic properties for strategy use
     @property
     def ema20(self) -> float | None:
         """Backward compatibility: access ema20 from indicators dict."""
-        return self.indicators.get("ema20")
+        return self.indicators.get("ema20") or self.indicators.get("fast_ema")
 
     @property
     def ema50(self) -> float | None:
         """Backward compatibility: access ema50 from indicators dict."""
-        return self.indicators.get("ema50")
+        return self.indicators.get("ema50") or self.indicators.get("slow_ema")
+
+    @property
+    def fast_ema(self) -> float | None:
+        """Semantic access: fast EMA (usually 20 period)."""
+        return self.indicators.get("fast_ema") or self.indicators.get("ema20")
+
+    @property
+    def slow_ema(self) -> float | None:
+        """Semantic access: slow EMA (usually 50 period)."""
+        return self.indicators.get("slow_ema") or self.indicators.get("ema50")
 
     @property
     def atr(self) -> float | None:
-        """Backward compatibility: access atr/atr14 from indicators dict."""
-        return self.indicators.get("atr14") or self.indicators.get("atr")
+        """Access atr or atr14 from indicators dict."""
+        return self.indicators.get("atr") or self.indicators.get("atr14")
 
     @property
     def rsi(self) -> float | None:
-        """Backward compatibility: access rsi from indicators dict."""
-        return self.indicators.get("rsi") or self.indicators.get("stoch_rsi")
+        """Access rsi or rsi14 from indicators dict."""
+        return self.indicators.get("rsi") or self.indicators.get("rsi14")
 
     @property
     def stoch_rsi(self) -> float | None:
-        """Backward compatibility: access stoch_rsi from indicators dict."""
+        """Access stoch_rsi from indicators dict."""
         return self.indicators.get("stoch_rsi")
 
 

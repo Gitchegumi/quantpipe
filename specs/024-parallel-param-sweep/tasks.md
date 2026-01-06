@@ -37,6 +37,22 @@
 
 ---
 
+## Phase 2.5: Fixes & Debugging (CRITICAL)
+
+**Purpose**: Address issues discovered during initial testing regarding registration timing and hardcoded indicator names.
+
+- [x] T008a Ensure indicator registration runs at CLI startup in `src/cli/run_backtest.py`
+- [x] T008b Register `rsi` semantic indicator alias in `src/indicators/registry/builtins.py`
+- [x] T008c Update `signal_generator_vectorized.py` to use semantic indicator names
+- [x] T008d Update `signal_generator.py` to use semantic indicator names
+- [x] T008e Update `trend_classifier.py` to use semantic indicator names
+- [x] T008f Handle hardcoded `atr14` in `src/backtest/orchestrator.py`
+- [x] T008g Address lint issues in `signal_generator_vectorized.py`
+- [x] T008h Refactor `simulate_trades_batch` for per-trade SL/TP (Verified: already supported)
+- [x] T008i Update `orchestrator.py` to handle `simulate_trades_batch` changes (Verified: already handled)
+
+---
+
 ## Phase 3: User Story 1 & 2 - Interactive Parameter Entry + Semantic Names (Priority: P1) 🎯 MVP
 
 **Goal**: CLI prompts user for each indicator parameter, showing defaults, accepting ranges
@@ -71,8 +87,8 @@
 - [x] T019 [P] [US3] Create `SweepResult` dataclass in `src/backtest/sweep.py`
 - [x] T020 [US3] Implement `generate_combinations()` cartesian product in `src/backtest/sweep.py`
 - [x] T021 [US3] Implement `filter_invalid_combinations()` with constraint checking in `src/backtest/sweep.py`
-- [ ] T022 [US3] Implement `run_single_backtest()` worker function in `src/backtest/sweep.py`
-- [ ] T023 [US3] Implement `run_sweep()` orchestrator in `src/backtest/sweep.py`
+- [x] T022 [US3] Implement `run_single_backtest()` worker function in `src/backtest/sweep.py`
+- [x] T023 [US3] Implement `run_sweep()` orchestrator in `src/backtest/sweep.py`
 - [x] T024 [US3] Add confirmation prompt for large sweeps (>500 combinations) in `src/cli/prompts/range_input.py`
 - [x] T025 [US3] Add progress display using Rich during sweep execution in `src/backtest/sweep.py`
 - [x] T026 [US3] Implement results ranking by Sharpe ratio in `src/backtest/sweep.py`

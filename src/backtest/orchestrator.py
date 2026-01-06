@@ -389,7 +389,7 @@ class BacktestOrchestrator:
             >>> candle = Candle(
             ...     timestamp_utc=datetime(2025, 1, 1, tzinfo=timezone.utc),
             ...     open=1.1000, high=1.1010, low=1.0990, close=1.1005,
-            ...     volume=1000.0, ema20=1.1000, ema50=1.0995,
+            ...     volume=1000.0, fast_ema=1.1000, slow_ema=1.0995,
             ...     atr=0.0015, rsi=55.0
             ... )
             >>> result = orchestrator.run_backtest(
@@ -1494,7 +1494,7 @@ class BacktestOrchestrator:
         # Extract arrays for signal construction
         timestamps = df["timestamp_utc"].to_numpy()
         close_prices = df["close"].to_numpy()
-        atr_values = df["atr14"].to_numpy()
+        atr_values = df["atr"].to_numpy()
 
         atr_stop_mult = signal_params.get("atr_stop_mult", 2.0)
         risk_per_trade_pct = signal_params.get("risk_per_trade_pct", 0.01)

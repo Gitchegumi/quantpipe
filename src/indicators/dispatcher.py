@@ -7,7 +7,7 @@ to the appropriate calculation functions, preserving Polars performance.
 
 import re
 import logging
-from typing import Callable
+from typing import Callable, Any
 import polars as pl
 
 from src.backtest.vectorized_rolling_window import (
@@ -31,6 +31,8 @@ IndicatorFunc = Callable[..., pl.DataFrame]
 REGISTRY: dict[str, IndicatorFunc] = {
     # Standard indicators
     "ema": calculate_ema,
+    "fast_ema": calculate_ema,
+    "slow_ema": calculate_ema,
     "atr": calculate_atr,
     "rsi": calculate_rsi,
     "stoch_rsi": calculate_stoch_rsi,
@@ -96,7 +98,18 @@ def parse_indicator_string(indicator_str: str) -> tuple[str, dict]:
         period = int(legacy_match.group(2))
         return name, {"period": period}
 
-    # Fallback: just name (maybe defined with defaults?)
+    # Fallback: handle semantic names without periods
+    if indicator_str == "fast_ema":
+        return "ema", {"period": 20, "output_col": "fast_ema"}
+    if indicator_str == "slow_ema":
+        return "ema", {"period": 50, "output_col": "slow_ema"}
+    if indicator_str == "atr":
+        return "atr", {"period": 14, "output_col": "atr"}
+    if indicator_str == "rsi":
+        return "rsi", {"period": 14, "output_col": "rsi"}
+    if indicator_str == "stoch_rsi":
+        return "stoch_rsi", {"period": 14, "output_col": "stoch_rsi"}
+
     return indicator_str, {}
 
 
@@ -116,13 +129,19 @@ def _parse_value(val_str: str) -> int | float | str:
         return val_str
 
 
-def calculate_indicators(df: pl.DataFrame, indicators: list[str]) -> pl.DataFrame:
+def calculate_indicators(
+    df: pl.DataFrame,
+    indicators: list[str],
+    overrides: dict[str, dict[str, Any]] | None = None,
+) -> pl.DataFrame:
     """
     Calculate a list of indicators and append them to the DataFrame.
 
     Args:
         df: Input Polars DataFrame.
         indicators: List of indicator definition strings (e.g. ["ema20", "atr14"]).
+        overrides: Optional dict mapping indicator strings to parameter overrides.
+                   e.g. {"fast_ema": {"period": 10}}
 
     Returns:
         DataFrame with all calculated indicator columns.
@@ -130,13 +149,27 @@ def calculate_indicators(df: pl.DataFrame, indicators: list[str]) -> pl.DataFram
     if not indicators:
         return df
 
+    if overrides is None:
+        overrides = {}
+
     for ind_str in indicators:
         try:
             name, kwargs = parse_indicator_string(ind_str)
 
+            # Apply overrides if present
+            if ind_str in overrides:
+                kwargs.update(overrides[ind_str])
+
+            logger.info(
+                "Parsing indicator: %s -> name=%s, kwargs=%s", ind_str, name, kwargs
+            )
+
             if name not in REGISTRY:
                 logger.warning(
-                    "Unknown indicator '%s' (parsed from '%s')", name, ind_str
+                    "Unknown indicator '%s' (parsed from '%s'). Registry: %s",
+                    name,
+                    ind_str,
+                    list(REGISTRY.keys()),
                 )
                 continue
 
@@ -150,7 +183,14 @@ def calculate_indicators(df: pl.DataFrame, indicators: list[str]) -> pl.DataFram
             if name in ("stoch_rsi", "stochrsi") and "rsi_col" not in kwargs:
                 # Look for any rsi column (rsi, rsi14, etc.)
                 rsi_cols = [col for col in df.columns if col.startswith("rsi")]
-                if rsi_cols:
+                if not rsi_cols:
+                    # If rsi not present, calculate it first with default params
+                    logger.info(
+                        "RSI not found for stoch_rsi, calculating default RSI first"
+                    )
+                    df = REGISTRY["rsi"](df, period=14, output_col="rsi")
+                    kwargs["rsi_col"] = "rsi"
+                else:
                     kwargs["rsi_col"] = rsi_cols[0]  # Use first found
 
             df = func(df, **kwargs)

@@ -6,10 +6,24 @@ parallel parameter sweeps across indicator configurations.
 
 import logging
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import product
+from pathlib import Path
 from typing import Any
+
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    TaskProgressColumn,
+)
+
+from ..config.parameters import StrategyParameters
+from ..models.enums import DirectionMode
+from .engine import run_portfolio_backtest, construct_data_paths
 
 
 logger = logging.getLogger(__name__)
@@ -349,3 +363,190 @@ def display_results_table(
 
     console.print()
     console.print(table)
+
+
+def run_single_backtest(
+    params: ParameterSet,
+    pair_paths: list[tuple[str, Path]],
+    direction_mode: DirectionMode = DirectionMode.LONG,
+    starting_equity: float = 2500.0,
+    dataset: str = "test",
+) -> SingleResult:
+    """Run a single backtest with specific parameters.
+
+    Args:
+        params: Parameters to test.
+        pair_paths: Pre-constructed lists of (pair, path) tuples.
+        direction_mode: Trading direction (LONG/SHORT/BOTH).
+        starting_equity: Starting capital.
+        dataset: Dataset name (for logging).
+
+    Returns:
+        SingleResult object with performance metrics.
+    """
+    try:
+        # Create base strategy params (with defaults)
+        strategy_params = StrategyParameters()
+
+        # Inject parameter sweep values into strategy parameters
+        # Note: StrategyParameters works with 'ema_fast', 'ema_slow', 'atr_length', 'rsi_length'
+        # ParameterSet uses 'fast_ema', 'slow_ema', 'atr', 'rsi'
+
+        # Mapping: indicator_name -> strategy_param_field
+        # (Only mapping fields that exist in StrategyParameters for consistency)
+        # Note: We also pass all params as override dict to engine, so semantic names are preserved.
+
+        fast_ema_period = params.params.get("fast_ema", {}).get("period")
+        if fast_ema_period:
+            strategy_params.ema_fast = int(fast_ema_period)
+
+        slow_ema_period = params.params.get("slow_ema", {}).get("period")
+        if slow_ema_period:
+            strategy_params.ema_slow = int(slow_ema_period)
+
+        atr_period = params.params.get("atr", {}).get("period")
+        if atr_period:
+            strategy_params.atr_length = int(atr_period)
+
+        rsi_period = params.params.get("rsi", {}).get("period")
+        if rsi_period:
+            strategy_params.rsi_length = int(rsi_period)
+
+        # Run backtest using the engine
+        # We pass params.params as indicator_overrides to support arbitrary indicator sweeping
+        result, _ = run_portfolio_backtest(
+            pair_paths=pair_paths,
+            direction_mode=direction_mode,
+            strategy_params=strategy_params,
+            starting_equity=starting_equity,
+            dry_run=False,
+            show_progress=False,  # Suppress inner progress bars
+            indicator_overrides=params.params,
+        )
+
+        # Extract metrics
+        # Extract metrics
+        # Note: PortfolioResult has flat attributes, not a metrics object
+        trade_count = getattr(result, "total_trades", 0)
+        total_pnl = getattr(result, "total_pnl", 0.0)
+
+        # Calculate derived metrics
+        closed_trades = getattr(result, "closed_trades", [])
+        wins = sum(1 for t in closed_trades if t.pnl_dollars > 0)
+        win_rate = wins / trade_count if trade_count > 0 else 0.0
+
+        # Calculate Max Drawdown from equity curve
+        max_drawdown = 0.0
+        equity_curve = getattr(result, "equity_curve", [])
+        if equity_curve:
+            peak = equity_curve[0][1]
+            for _, equity in equity_curve:
+                if equity > peak:
+                    peak = equity
+                dd = (peak - equity) / peak
+                if dd > max_drawdown:
+                    max_drawdown = dd
+
+        # Calculate Sharpe (Simple trade-based approximation)
+        sharpe_ratio = 0.0
+        if trade_count > 1:
+            # Use pnl_r for return distribution
+            returns = [t.pnl_r for t in closed_trades]
+            if len(returns) > 1:
+                import statistics
+
+                try:
+                    avg_ret = statistics.mean(returns)
+                    std_dev = statistics.stdev(returns)
+                    if std_dev > 0:
+                        sharpe_ratio = avg_ret / std_dev
+                except statistics.StatisticsError:
+                    pass
+
+        return SingleResult(
+            params=params,
+            sharpe_ratio=sharpe_ratio,
+            total_pnl=total_pnl,
+            win_rate=win_rate,
+            trade_count=trade_count,
+            max_drawdown=max_drawdown,
+        )
+
+    except Exception as e:
+        logger.exception("Backtest failed for params %s", params.label)
+        return SingleResult(params=params, error=str(e))
+
+
+def run_sweep(
+    combinations: list[ParameterSet],
+    pairs: list[str],
+    dataset: str = "test",
+    direction: str = "LONG",
+) -> SweepResult:
+    """Run parameter sweep backtests sequentially (Phase 4 MVP).
+
+    Args:
+        combinations: List of parameter sets to test.
+        pairs: List of currency pairs.
+        dataset: Dataset partition.
+        direction: Trading direction.
+
+    Returns:
+        SweepResult containing all results and metadata.
+    """
+    logger.info("Starting sweep with %d combinations", len(combinations))
+
+    start_time = time.time()
+    results = []
+
+    # Construct data paths once (though engine currently reloads data, unfortunately)
+    # TODO: Optimize engine to accept preloaded data
+    pair_paths = construct_data_paths(pairs, dataset)
+    direction_mode = DirectionMode[direction]
+
+    successful = 0
+    failed = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Running sweep...", total=len(combinations))
+
+        for i, params in enumerate(combinations):
+            progress.update(
+                task, description=f"Testing {params.label} ({i+1}/{len(combinations)})"
+            )
+
+            result = run_single_backtest(
+                params=params,
+                pair_paths=pair_paths,
+                direction_mode=direction_mode,
+                dataset=dataset,
+            )
+
+            results.append(result)
+            if result.error:
+                failed += 1
+            else:
+                successful += 1
+
+            progress.advance(task)
+
+    execution_time = time.time() - start_time
+
+    # Rank results
+    ranked = rank_results(results)
+    best = ranked[0].params if ranked else None
+
+    return SweepResult(
+        results=results,
+        best_params=best,
+        execution_time_seconds=execution_time,
+        total_combinations=len(combinations),
+        successful_count=successful,
+        failed_count=failed,
+    )
