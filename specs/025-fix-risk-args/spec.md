@@ -43,6 +43,19 @@ As a user, I want CLI arguments to take precedence over configuration files so t
 
 1. **Given** a configuration file specifying an R:R of 2.0, **When** I run the backtest loading that config BUT specifically providing an R:R argument of 4.0, **Then** the utilized parameter should be 4.0.
 
+### Requirements
+
+- [x] **Risk Argument Mapping**: Map CLI arguments to `StrategyParameters` correctly.
+- [x] **Precedence Logic**: Ensure CLI > Config > Defaults.
+- [x] **Logging**: Log active risk parameters at startup.
+- [x] **Max Position Size**: Add support for `max_position_size` parameter.
+- [ ] **Trailing Stop Support**:
+  - Support `ATR_Trailing` (existing but requires batch engine implementation).
+  - Support `MA_Trailing` (stop follows a Moving Average).
+  - Support `FixedPips_Trailing` (trail price by fixed pips).
+  - Update CLI to accept trailing configuration (`--ma-type`, `--ma-period`).
+  - Update `simulate_trades_batch` to handle dynamic trailing stops.
+
 ## Edge Cases
 
 - **Conflicting Inputs**: If both a risk configuration file and individual risk arguments are provided, the individual arguments must take precedence.

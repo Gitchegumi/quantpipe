@@ -120,6 +120,7 @@ def run_portfolio_backtest(
     show_progress: bool = True,
     timeframe: str = "1m",
     blackout_config: Any = None,
+    risk_config: Any = None,
     indicator_overrides: dict[str, dict[str, Any]] | None = None,
 ):
     """Run time-synchronized portfolio backtest with shared equity.
@@ -149,6 +150,19 @@ def run_portfolio_backtest(
 
     # Phase 1: Load and enrich ALL symbol data first
     symbol_data: dict[str, pl.DataFrame] = {}
+
+    # Define trailing indicator if needed
+    trailing_indicator_def = None
+    if risk_config and risk_config.stop_policy.type == "MA_Trailing":
+        # e.g. "sma_50" or "ema_200"
+        ma_type = risk_config.stop_policy.ma_type.lower()  # "sma" or "ema"
+        period = risk_config.stop_policy.ma_period
+        param_name = f"{ma_type}_{period}"
+        # Store definition for appending to required_indicators
+        # Indicator format: IndicatorConfig(name="sma", params={"period": 50}, output_overrides={"sma": "sma_50"})
+        # Simplified for calculate_indicators: we might need to manually add to dict if not using metadata
+        pass
+
     for pair, data_path in pair_paths:
         logger.info("Loading data for %s from %s", pair, data_path)
 
@@ -205,7 +219,24 @@ def run_portfolio_backtest(
             enriched_df["timestamp_utc"][-1],
         )
 
-    # Phase 2: Generate signals for all symbols
+        # Add dynamic trailing indicator if needed
+        if risk_config and risk_config.stop_policy.type == "MA_Trailing":
+            ma_type = risk_config.stop_policy.ma_type.lower()  # "sma" or "ema"
+            ma_period = risk_config.stop_policy.ma_period
+            # Construct indicator string e.g. "sma50" or "ema200"
+            ind_str = f"{ma_type}{ma_period}"
+
+            # Override output name to be explicit "sma_50" to match simple logic elsewhere
+            overrides = {ind_str: {"output_col": f"{ma_type}_{ma_period}"}}
+
+            ind_df = calculate_indicators(enriched_df, [ind_str], overrides=overrides)
+
+            # Join the new column(s)
+            new_cols = [c for c in ind_df.columns if c not in enriched_df.columns]
+            if new_cols:
+                enriched_df = enriched_df.hstack(ind_df.select(new_cols))
+
+        symbol_data[pair] = enriched_df
     symbol_signals: dict[str, list] = {}
 
     # Build blackout windows if config provided (Feature 023)
@@ -324,6 +355,7 @@ def run_portfolio_backtest(
         risk_per_trade=0.0025,  # 0.25%
         max_positions_per_symbol=1,
         target_r_mult=strategy_params.target_r_mult,
+        risk_config=risk_config,
     )
 
     run_id = (

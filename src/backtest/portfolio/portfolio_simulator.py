@@ -14,8 +14,8 @@ Key features:
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
-
+from typing import Optional, Any
+import numpy as np
 import polars as pl
 
 
@@ -113,6 +113,7 @@ class PortfolioSimulator:
         risk_per_trade: float = 0.0025,  # 0.25%
         max_positions_per_symbol: int = 1,
         target_r_mult: float = 2.0,  # Default 2:1 reward/risk
+        risk_config: Any = None,
     ):
         """Initialize portfolio simulator.
 
@@ -126,6 +127,7 @@ class PortfolioSimulator:
         self.risk_per_trade = risk_per_trade
         self.max_positions_per_symbol = max_positions_per_symbol
         self.target_r_mult = target_r_mult
+        self.risk_config = risk_config
         self.current_equity = starting_equity
         self.closed_trades: list[ClosedTrade] = []
         self.equity_curve: list[tuple[datetime, float]] = []
@@ -275,9 +277,55 @@ class PortfolioSimulator:
 
         # 1. Prepare Price Data (Pandas/Numpy required for batch engine)
         # Assuming df has 'high', 'low', 'close', 'timestamp_utc'
-        # Select minimum columns to reduce overhead
+        # Select minimum columns to reduce overhead, plus any needed indicators
         cols = ["high", "low", "close", "timestamp_utc"]
+
+        # Add required indicator columns for trailing stops
+        trailing_config = {}
+        indicator_cols = []
+
+        if self.risk_config:
+            stop_policy = self.risk_config.stop_policy
+            trailing_config["type"] = stop_policy.type
+            # Fallback for type safety, though Pydantic defaults to 1.0
+            trailing_config["trigger_r"] = getattr(stop_policy, "trail_trigger_r", 1.0)
+
+            if stop_policy.type == "ATR_Trailing":
+                # Assuming ATR is available (engine ensures it)
+                # Usually "atr" or "atr_14". Strategy usually uses "atr"
+                # We check what's in DF
+                if "atr" in df.columns:
+                    cols.append("atr")
+                    indicator_cols.append("atr")
+                elif "atr_14" in df.columns:
+                    cols.append("atr_14")
+                    indicator_cols.append("atr_14")
+                trailing_config["multiplier"] = stop_policy.multiplier
+
+            elif stop_policy.type == "MA_Trailing":
+                ma_col = f"{stop_policy.ma_type.lower()}_{stop_policy.ma_period}"
+                if ma_col in df.columns:
+                    cols.append(ma_col)
+                    indicator_cols.append(ma_col)
+                # Also store which MA col to use
+                trailing_config["ma_col"] = ma_col
+
+            elif stop_policy.type == "FixedPips_Trailing":
+                trailing_config["pips"] = stop_policy.pips
+                # Need is_jpy info logic inside batch or passed here?
+                # Passing symbol allows batch to determine? No, batch is symbol-agnostic pure logic usually?
+                # Actually batch takes price_data, but usually pip value is context specific.
+                # Let's pass pip_size in config
+                is_jpy = "JPY" in symbol.upper()
+                trailing_config["pip_size"] = 0.01 if is_jpy else 0.0001
+
         data_pd = df.select([c for c in cols if c in df.columns]).to_pandas()
+
+        # Extract indicator numpy arrays
+        indicators = {}
+        for col in indicator_cols:
+            if col in data_pd.columns:
+                indicators[col] = data_pd[col].values
 
         # Ensure timestamp column exists for mapping
         ts_col = "timestamp_utc" if "timestamp_utc" in data_pd.columns else "timestamp"
@@ -342,7 +390,11 @@ class PortfolioSimulator:
 
         # 3. Sort entries by entry index and run simulation
         entries.sort(key=lambda e: e["entry_index"])
-        all_results = simulate_trades_batch(entries, data_pd)
+        # 3. Sort entries by entry index and run simulation
+        entries.sort(key=lambda e: e["entry_index"])
+        all_results = simulate_trades_batch(
+            entries, data_pd, trailing_config=trailing_config, indicators=indicators
+        )
 
         # 4. Filter overlapping trades to enforce max_positions_per_symbol
         # Iterate through trades chronologically, only keeping those that don't

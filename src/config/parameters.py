@@ -80,6 +80,7 @@ class StrategyParameters(BaseModel):
     )  # Account balance for position sizing
     max_open_trades: int = Field(default=3, gt=0, le=20)
     max_pair_exposure: int = Field(default=1, gt=0, le=10)
+    max_position_size: float = Field(default=10.0, gt=0.0, le=100.0)
     max_drawdown_threshold: float = Field(default=0.10, gt=0.0, le=0.50)
     recovery_level: float = Field(default=0.05, gt=0.0, le=0.50)
 
