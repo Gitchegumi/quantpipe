@@ -263,7 +263,6 @@ def main():
     parser.add_argument(
         "--starting-balance",
         type=float,
-        default=2500.0,
         help="Starting account balance for position sizing (default: $2500). "
         "All symbols trade against this shared balance.",
     )
@@ -360,14 +359,19 @@ def main():
     parser.add_argument(
         "--risk-pct",
         type=float,
-        default=0.25,
         help="Risk percentage per trade (e.g., 0.25 for 0.25%%). Default: 0.25",
     )
 
     parser.add_argument(
         "--stop-policy",
         type=str,
-        choices=["ATR", "ATR_Trailing", "FixedPips"],
+        choices=[
+            "ATR",
+            "ATR_Trailing",
+            "FixedPips",
+            "FixedPips_Trailing",
+            "MA_Trailing",
+        ],
         default="ATR",
         help="Stop-loss policy type. Default: ATR",
     )
@@ -375,7 +379,6 @@ def main():
     parser.add_argument(
         "--atr-mult",
         type=float,
-        default=2.0,
         help="ATR multiplier for stop distance. Default: 2.0",
     )
 
@@ -393,6 +396,28 @@ def main():
     )
 
     parser.add_argument(
+        "--ma-type",
+        type=str,
+        choices=["SMA", "EMA"],
+        default="SMA",
+        help="Moving average type for MA_Trailing policy. Default: SMA",
+    )
+
+    parser.add_argument(
+        "--ma-period",
+        type=int,
+        default=50,
+        help="Moving average period for MA_Trailing policy. Default: 50",
+    )
+
+    parser.add_argument(
+        "--trail-trigger",
+        type=float,
+        default=1.0,
+        help="R-multiple profit required to activate trailing stop. Default: 1.0",
+    )
+
+    parser.add_argument(
         "--tp-policy",
         type=str,
         choices=["RiskMultiple", "None"],
@@ -403,14 +428,12 @@ def main():
     parser.add_argument(
         "--rr-ratio",
         type=float,
-        default=2.0,
         help="Reward-to-risk ratio for RiskMultiple TP policy. Default: 2.0",
     )
 
     parser.add_argument(
         "--max-position-size",
         type=float,
-        default=10.0,
         help="Maximum position size in lots. Default: 10.0",
     )
 
@@ -466,30 +489,66 @@ def main():
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
 
-    # Load config file if specified (T020: Config file support)
-    if args.config:
+    # -------------------------------------------------------------------------
+    # Parameter Resolution (CLI > Config > Defaults)
+    # -------------------------------------------------------------------------
+    param_overrides = {}
+
+    # Load from config file if present
+    if args.config and args.config.exists():
         import yaml
 
-        if args.config.exists():
+        try:
             with open(args.config, encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-
+                config_data = yaml.safe_load(f) or {}
+                # Assuming config structure matches StrategyParameters flat fields
+                param_overrides.update(config_data)
             logger.info("Loaded config from %s", args.config)
 
-            # Apply config values only if CLI didn't override (T021: CLI precedence)
+            # Legacy: Apply config defaults for non-strategy args
             # Check if user explicitly passed --timeframe (not using default)
             cli_timeframe_default = "1m"
-            if args.timeframe == cli_timeframe_default and "timeframe" in config:
-                args.timeframe = config["timeframe"]
+            if args.timeframe == cli_timeframe_default and "timeframe" in config_data:
+                args.timeframe = config_data["timeframe"]
                 logger.info("Using timeframe from config: %s", args.timeframe)
 
             # Apply other config defaults
-            if "direction" in config and args.direction == "LONG":
-                args.direction = config["direction"]
-            if "dataset" in config and args.dataset == "test":
-                args.dataset = config["dataset"]
-        else:
-            logger.warning("Config file not found: %s", args.config)
+            if "direction" in config_data and args.direction == "LONG":
+                args.direction = config_data["direction"]
+            if "dataset" in config_data and args.dataset == "test":
+                args.dataset = config_data["dataset"]
+
+        except Exception as e:
+            logger.error("Failed to load config file: %s", e)
+    elif args.config:
+        logger.warning("Config file not found: %s", args.config)
+
+    # Override with CLI args if explicitly provided (not None)
+    if args.risk_pct is not None:
+        param_overrides["risk_per_trade_pct"] = args.risk_pct
+    if args.atr_mult is not None:
+        param_overrides["atr_stop_mult"] = args.atr_mult
+    if args.rr_ratio is not None:
+        param_overrides["target_r_mult"] = args.rr_ratio
+    if args.starting_balance is not None:
+        param_overrides["account_balance"] = args.starting_balance
+    if args.max_position_size is not None:
+        param_overrides["max_position_size"] = args.max_position_size
+
+    # Instantiate StrategyParameters (Validation + Defaults)
+    parameters = StrategyParameters(**param_overrides)
+
+    # Log active risk parameters (FR-006)
+    logger.info("Active Risk Parameters:")
+    logger.info("  Risk %%: %.2f", parameters.risk_per_trade_pct)
+    logger.info("  Stop Multiplier (ATR): %.2f", parameters.atr_stop_mult)
+    logger.info("  R:R Ratio: %.2f", parameters.target_r_mult)
+    logger.info("  Max Position Size: %.2f", parameters.max_position_size)
+    logger.info("  Account Balance: %.2f", parameters.account_balance)
+
+    # -------------------------------------------------------------------------
+    # End Parameter Resolution
+    # -------------------------------------------------------------------------
 
     # Construct RiskConfig from CLI args or --risk-config file (T021: FR-004)
     risk_config = None
@@ -519,28 +578,31 @@ def main():
 
         stop_policy = StopPolicyConfig(
             type=args.stop_policy,
-            multiplier=args.atr_mult,
+            multiplier=parameters.atr_stop_mult,  # Use resolved parameter
             period=args.atr_period,
             pips=args.fixed_pips,
+            ma_type=args.ma_type,
+            ma_period=args.ma_period,
+            trail_trigger_r=args.trail_trigger,
         )
 
         tp_policy = TakeProfitPolicyConfig(
             type=args.tp_policy,
-            rr_ratio=args.rr_ratio,
+            rr_ratio=parameters.target_r_mult,  # Use resolved parameter
         )
 
         risk_config = RiskConfig(
-            risk_pct=args.risk_pct,
+            risk_pct=parameters.risk_per_trade_pct,  # Use resolved parameter
             stop_policy=stop_policy,
             take_profit_policy=tp_policy,
-            max_position_size=args.max_position_size,
+            max_position_size=parameters.max_position_size,  # Use resolved parameter
         )
         logger.info(
             "Constructed risk config from CLI: stop=%s (mult=%.1f), tp=%s (rr=%.1f)",
             args.stop_policy,
-            args.atr_mult,
+            parameters.atr_stop_mult,
             args.tp_policy,
-            args.rr_ratio,
+            parameters.target_r_mult,
         )
 
     # Handle --list-strategies (FR-017: List strategies without running backtest)
@@ -691,21 +753,25 @@ Persistent storage not yet implemented."
 
     # Validate data file exists
     # (required for backtest runs, not for listing/registration)
-    if args.data is None:
-        # Data file required for backtest runs
-        if not args.list_strategies and not args.register_strategy:
+    if not args.list_strategies and not args.register_strategy:
+        # Determine data paths
+        if args.data:
+            pair_paths = [args.data]
+        else:
             # Use new construct_data_paths() for multi-pair support (T008-T011)
             pair_paths = construct_data_paths(args.pair, args.dataset)
 
+        # Wrapper to preserve indentation of the existing backtest block
+        if True:
             # Unified backtest path: always use run_portfolio_backtest (1 or N symbols)
             logger.info(
                 "Backtest: %d symbol(s), $%.2f starting balance",
                 len(pair_paths),
-                args.starting_balance,
+                parameters.account_balance,  # Use resolved parameter
             )
 
             # Load strategy parameters
-            parameters = StrategyParameters()
+            # parameters = StrategyParameters() # MOVED UP
             direction_mode = DirectionMode[args.direction]
             show_progress = sys.stdout.isatty()
 
@@ -743,11 +809,12 @@ Persistent storage not yet implemented."
                 pair_paths=pair_paths,
                 direction_mode=direction_mode,
                 strategy_params=parameters,
-                starting_equity=args.starting_balance,
+                starting_equity=parameters.account_balance,
                 dry_run=args.dry_run,
                 show_progress=show_progress,
                 timeframe=args.timeframe,
                 blackout_config=blackout_config,
+                risk_config=risk_config,
             )
 
             # Format and output portfolio results

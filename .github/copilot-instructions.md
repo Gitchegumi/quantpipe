@@ -17,6 +17,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-30
 - N/A (in-memory calendar generation, optional CSV/Parquet export) (023-session-blackouts)
 - Python 3.13 + Rich (existing), itertools (stdlib), concurrent.futures (via existing parallel.py) (024-parallel-param-sweep)
 - N/A (results in memory, optional CSV export) (024-parallel-param-sweep)
+- Python 3.11+ + `poetry`, `pydantic` (025-fix-risk-args)
+- N/A (CLI arguments are transient) (025-fix-risk-args)
 
 - Python 3.13 + numpy, pandas, pydantic, rich (existing); no new dependencies required (002-directional-backtesting)
 - CSV files for price data input; text/JSON files for backtest results output (002-directional-backtesting)
@@ -113,9 +115,9 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 - See Constitution Principle XI for full requirements
 
 ## Recent Changes
+- 025-fix-risk-args: Added Python 3.11+ + `poetry`, `pydantic`
 - 024-parallel-param-sweep: Added Python 3.13 + Rich (existing), itertools (stdlib), concurrent.futures (via existing parallel.py)
 - 023-session-blackouts: Added Python 3.11+ (per pyproject.toml) + pydantic (validation), pandas/polars (timestamps), pytz (timezone handling)
-- 022-strategy-templating: Added Python 3.13 + Click (CLI), pytest (testing), Jinja2 (template rendering)
 
 
 <!-- MANUAL ADDITIONS START -->

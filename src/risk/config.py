@@ -13,16 +13,26 @@ from pydantic import BaseModel, Field, model_validator
 class StopPolicyConfig(BaseModel):
     """Configuration for stop-loss policy."""
 
-    type: Literal["ATR", "ATR_Trailing", "FixedPips"] = "ATR"
+    type: Literal[
+        "ATR", "ATR_Trailing", "FixedPips", "FixedPips_Trailing", "MA_Trailing"
+    ] = "ATR"
     multiplier: float = Field(default=2.0, ge=0.5, le=10.0)
     period: int = Field(default=14, ge=1, le=100)
     pips: float | None = Field(default=None, ge=1, le=500)
+    ma_type: Literal["SMA", "EMA"] | None = "SMA"
+    ma_period: int | None = Field(default=50, ge=1, le=500)
+    trail_trigger_r: float = Field(default=1.0, ge=0.0)
 
     @model_validator(mode="after")
     def validate_policy_params(self) -> "StopPolicyConfig":
         """Validate that required parameters are present for each policy type."""
-        if self.type == "FixedPips" and self.pips is None:
-            raise ValueError("FixedPips policy requires 'pips' parameter")
+        if self.type in ("FixedPips", "FixedPips_Trailing") and self.pips is None:
+            raise ValueError(f"{self.type} policy requires 'pips' parameter")
+        if self.type == "MA_Trailing":
+            if self.ma_type is None:
+                raise ValueError("MA_Trailing policy requires 'ma_type' parameter")
+            if self.ma_period is None:
+                raise ValueError("MA_Trailing policy requires 'ma_period' parameter")
         return self
 
 
