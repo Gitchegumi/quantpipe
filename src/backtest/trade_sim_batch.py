@@ -19,19 +19,20 @@ Architecture Note (T070):
 
 # pylint: disable=unused-import, unused-argument, fixme
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Optional
+
 import numpy as np
 import pandas as pd
 
 
 def simulate_trades_batch(
-    entries: List[Dict[str, Any]],
+    entries: list[dict[str, Any]],
     price_data: pd.DataFrame,
     stop_loss_pct: Optional[float] = None,  # Deprecated: use per-trade values
     take_profit_pct: Optional[float] = None,  # Deprecated: use per-trade values
-    trailing_config: Optional[Dict[str, Any]] = None,
-    indicators: Optional[Dict[str, np.ndarray]] = None,
-) -> List[Dict[str, Any]]:
+    trailing_config: Optional[dict[str, Any]] = None,
+    indicators: Optional[dict[str, np.ndarray]] = None,
+) -> list[dict[str, Any]]:
     """Simulate trade exits in batched/vectorized mode.
 
     Avoids per-trade iteration over full dataset by processing trades
