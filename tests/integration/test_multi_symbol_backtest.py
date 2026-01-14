@@ -27,7 +27,7 @@ class TestMultiSymbolExecution:
         When run_multi_symbol_backtest() is called with both pairs,
         Then both symbols appear in the results.
         """
-        from src.cli.run_backtest import run_multi_symbol_backtest, construct_data_paths
+        from src.backtest.engine import run_multi_symbol_backtest, construct_data_paths
         from src.models.enums import DirectionMode
         from src.config.parameters import StrategyParameters
 
@@ -47,7 +47,7 @@ class TestMultiSymbolExecution:
         # Execute with minimal data to keep test fast
         # Note: Full backtest is expensive, we just verify structure
         params = StrategyParameters()
-        result = run_multi_symbol_backtest(
+        result, _ = run_multi_symbol_backtest(
             pair_paths=pair_paths,
             direction_mode=DirectionMode.BOTH,
             strategy_params=params,

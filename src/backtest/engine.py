@@ -206,8 +206,17 @@ def run_portfolio_backtest(
                     overrides[ind] = {}
                 overrides[ind].update(params)
 
+        # Feature 026: Get custom indicators from strategy
+        # Use getattr for safety with strategies that might not implement the protocol fully yet
+        custom_registry = getattr(strategy, "get_custom_indicators", lambda: {})()
+        if not isinstance(custom_registry, dict):
+            custom_registry = {}
+
         enriched_df = calculate_indicators(
-            enriched_df, required_indicators, overrides=overrides
+            enriched_df,
+            required_indicators,
+            overrides=overrides,
+            custom_registry=custom_registry,
         )
 
         symbol_data[pair] = enriched_df
@@ -229,7 +238,16 @@ def run_portfolio_backtest(
             # Override output name to be explicit "sma_50" to match simple logic elsewhere
             overrides = {ind_str: {"output_col": f"{ma_type}_{ma_period}"}}
 
-            ind_df = calculate_indicators(enriched_df, [ind_str], overrides=overrides)
+            custom_registry = getattr(strategy, "get_custom_indicators", lambda: {})()
+            if not isinstance(custom_registry, dict):
+                custom_registry = {}
+
+            ind_df = calculate_indicators(
+                enriched_df,
+                [ind_str],
+                overrides=overrides,
+                custom_registry=custom_registry,
+            )
 
             # Join the new column(s)
             new_cols = [c for c in ind_df.columns if c not in enriched_df.columns]
@@ -455,8 +473,15 @@ def run_multi_symbol_backtest(
                 "rsi": {"period": strategy_params.rsi_length},
             }
 
+            custom_registry = getattr(strategy, "get_custom_indicators", lambda: {})()
+            if not isinstance(custom_registry, dict):
+                custom_registry = {}
+
             enriched_df = calculate_indicators(
-                enriched_df, required_indicators, overrides=overrides
+                enriched_df,
+                required_indicators,
+                overrides=overrides,
+                custom_registry=custom_registry,
             )
 
             # Create orchestrator

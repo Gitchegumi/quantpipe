@@ -114,7 +114,7 @@ class TestIndependentThreeSymbols:
         # Include a valid symbol and an invalid one
         symbols = [
             CurrencyPair(code="EURUSD"),  # Should exist
-            CurrencyPair(code="INVALID"),  # Won't exist
+            CurrencyPair(code="INVLDX"),  # Won't exist
         ]
 
         runner = IndependentRunner(
@@ -131,7 +131,7 @@ class TestIndependentThreeSymbols:
         # Should have at least one failure (INVALID)
         failures = runner.get_failures()
         assert len(failures) > 0
-        assert "INVALID" in failures
+        assert "INVLDX" in failures
 
         # EURUSD may succeed if dataset exists
         if "EURUSD" in results:
