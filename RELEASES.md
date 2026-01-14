@@ -12,16 +12,65 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.2.2
+### Current Version: 0.2.3
 
 - **Status**: Released
-- **Date**: 2025-12-30
+- **Date**: 2026-01-14
 - **Branch**: main
-- **PR**: #52
+- **PR**: #58, #59
 
 ---
 
 ## Released Versions
+
+### [v0.2.3] - 2026-01-14
+
+**Theme**: Decoupled Indicators & Parallel Parameter Sweeps
+
+**Highlights**:
+
+- **Parallel Parameter Sweeps**: Interactive CLI for defining and running strategy parameter sweeps across thousands of combinations in parallel.
+- **Decoupled Indicators**: Strategies now define their own custom indicators, removing the need for global registry modification.
+- **Risk Management Fixes**: CLI risk arguments (R:R, ATR mult, Risk %) now correctly override configuration defaults.
+
+**Key Features**:
+
+Parallel Parameter Sweep:
+
+- Interactive prompts: `--test-range` triggers wizard for strategy params
+- Parallel execution: Vectorized backtests run on multiple cores
+- Semantic constraints: Filters invalid combinations (e.g., fast > slow)
+- Export: Results saved to CSV for analysis
+
+Decoupled Indicators:
+
+- `Strategy.get_custom_indicators()` protocol method
+- Custom precedence: Strategy indicators override global built-ins
+- No more core code modification needed for custom logic
+
+Risk Argument Fixes:
+
+- `--rr-ratio`, `--atr-mult`, `--risk-pct` correctly wired
+- `--max-position-size` enforcement
+- Configuration precedence: CLI > Config File > Defaults
+
+**Usage**:
+
+```bash
+# Interactive Parameter Sweep
+poetry run python -m src.cli.run_backtest --strategy trend-pullback --test-range
+
+# Custom Strategy with standard indicators
+poetry run python -m src.cli.run_backtest --strategy my-custom-strat
+```
+
+**Related**:
+
+- Feature Specs: 024-parallel-param-sweep, 025-fix-risk-args, 026-decouple-indicators
+- Pull Requests: #58, #59
+- Issues Closed: #54, #57 (related)
+
+---
 
 ### [v0.2.2] - 2025-12-30
 
