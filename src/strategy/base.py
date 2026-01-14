@@ -5,7 +5,7 @@ including declaring their required indicators.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Protocol
+from typing import TYPE_CHECKING, Optional, Protocol, Callable, Any
 
 
 if TYPE_CHECKING:
@@ -111,3 +111,12 @@ class Strategy(Protocol):
             ...         ],
             ...     )
         """
+
+    def get_custom_indicators(self) -> dict[str, Callable[[Any, Any], Any]]:
+        """Define strategy-specific custom indicators.
+
+        Returns:
+            Dictionary mapping indicator name to calculation function.
+            Function signature: (df: pl.DataFrame, **kwargs) -> pl.DataFrame
+        """
+        return {}

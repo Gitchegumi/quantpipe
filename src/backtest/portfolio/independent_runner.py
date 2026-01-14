@@ -174,7 +174,12 @@ class IndependentRunner:
         # Calculate indicators for strategy
         strategy = TREND_PULLBACK_STRATEGY
         required_indicators = strategy.metadata.required_indicators
-        enriched_df = calculate_indicators(enriched_df, required_indicators)
+        custom_registry = getattr(strategy, "get_custom_indicators", lambda: {})()
+        if not isinstance(custom_registry, dict):
+            custom_registry = {}
+        enriched_df = calculate_indicators(
+            enriched_df, required_indicators, custom_registry=custom_registry
+        )
 
         # Create orchestrator
         orchestrator = BacktestOrchestrator(

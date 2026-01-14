@@ -136,6 +136,7 @@ def calculate_indicators(
     df: pl.DataFrame,
     indicators: list[str],
     overrides: dict[str, dict[str, Any]] | None = None,
+    custom_registry: dict[str, Callable] | None = None,
 ) -> pl.DataFrame:
     """
     Calculate a list of indicators and append them to the DataFrame.
@@ -171,7 +172,12 @@ def calculate_indicators(
                 "Parsing indicator: %s -> name=%s, kwargs=%s", ind_str, name, kwargs
             )
 
-            if name not in REGISTRY:
+            if custom_registry and name in custom_registry:
+                func = custom_registry[name]
+                logger.debug("Using custom indicator for '%s' -> %s", name, func)
+            elif name in REGISTRY:
+                func = REGISTRY[name]
+            else:
                 logger.warning(
                     "Unknown indicator '%s' (parsed from '%s'). Registry: %s",
                     name,
@@ -179,8 +185,6 @@ def calculate_indicators(
                     list(REGISTRY.keys()),
                 )
                 continue
-
-            func = REGISTRY[name]
             # Pass the original indicator string as output_col to preserve naming
             # (e.g., rsi14 instead of just rsi)
             if "output_col" not in kwargs:

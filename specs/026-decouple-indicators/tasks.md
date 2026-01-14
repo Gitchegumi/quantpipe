@@ -9,25 +9,25 @@
 
 ## Phase 1: Foundational
 
-- [ ] T001 [US1] Add `get_custom_indicators` method to `Strategy` base class in `src/strategy/base.py`
+- [x] T001 [US1] Add `get_custom_indicators` method to `Strategy` base class in `src/strategy/base.py`
 
 ## Phase 2: User Story 1 - Strategy-Specific Indicators
 
 **Goal**: Enable strategies to define and use custom indicators.
 
-- [ ] T002 [US1] Update `calculate_indicators` in `src/indicators/dispatcher.py` to accept `custom_registry`
-- [ ] T003 [US1] Implement lookup precedence logic (custom > global) in `src/indicators/dispatcher.py`
-- [ ] T004 [US1] Update call site in `src/backtest/engine.py` (`run_portfolio_backtest`) to pass strategy indicators
-- [ ] T005 [US1] Update call site in `src/backtest/engine.py` (`run_multi_symbol_backtest`) to pass strategy indicators
-- [ ] T006 [US1] Update call site in `src/backtest/portfolio/independent_runner.py` (`_run_symbol_backtest`) to pass strategy indicators
+- [x] T002 [US1] Update `calculate_indicators` in `src/indicators/dispatcher.py` to accept `custom_registry`
+- [x] T003 [US1] Implement lookup precedence logic (custom > global) in `src/indicators/dispatcher.py`
+- [x] T004 [US1] Update call site in `src/backtest/engine.py` (`run_portfolio_backtest`) to pass strategy indicators
+- [x] T005 [US1] Update call site in `src/backtest/engine.py` (`run_multi_symbol_backtest`) to pass strategy indicators
+- [x] T006 [US1] Update call site in `src/backtest/portfolio/independent_runner.py` (`_run_symbol_backtest`) to pass strategy indicators
 
 ## Phase 3: User Story 2 - Backward Compatibility & Verification
 
 **Goal**: Ensure existing strategies work and new custom indicators function correctly.
 
-- [ ] T007 [US2] Create reproduction test case `tests/integration/test_custom_indicators.py` verifying custom indicator logic
-- [ ] T008 [US2] Run full integration suite `tests/integration/` to ensure no regressions
-- [ ] T009 [US2] Verify `run_backtest` CLI still works with `trend_pullback` (standard indicators)
+- [x] T007 [US2] Create reproduction test case `tests/integration/test_custom_indicators.py` verifying custom indicator logic
+- [x] T008 [US2] Run full integration suite `tests/integration/` to ensure no regressions
+- [x] T009 [US2] Verify `run_backtest` CLI still works with `trend_pullback` (standard indicators)
 
 ## Implementation Strategy
 

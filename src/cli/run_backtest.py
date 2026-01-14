@@ -756,7 +756,8 @@ Persistent storage not yet implemented."
     if not args.list_strategies and not args.register_strategy:
         # Determine data paths
         if args.data:
-            pair_paths = [args.data]
+            pair_name = args.pair[0] if args.pair else "CUSTOM"
+            pair_paths = [(pair_name, args.data)]
         else:
             # Use new construct_data_paths() for multi-pair support (T008-T011)
             pair_paths = construct_data_paths(args.pair, args.dataset)
