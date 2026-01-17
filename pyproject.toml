@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "trading-strategies"
-version = "0.1.0"
+version = "0.3.0"
 description = "Algorithmic FX trading strategies with backtesting framework"
 authors = ["Trading Strategies Team"]
 readme = "README.md"

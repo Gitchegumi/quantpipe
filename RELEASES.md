@@ -12,16 +12,67 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.2.3
+### Current Version: 0.3.0
 
 - **Status**: Released
-- **Date**: 2026-01-14
+- **Date**: 2026-01-16
 - **Branch**: main
-- **PR**: #58, #59
+- **PR**: #61
 
 ---
 
 ## Released Versions
+
+### [v0.3.0] - 2026-01-16
+
+**Theme**: CTI Prop Firm Integration & Advanced Metrics
+
+**Highlights**:
+
+- Full simulation of City Traders Imperium (CTI) programs: 1-Step, 2-Step, and Instant Funding.
+- Account scaling logic with 4-month periodic reviews and "Independent Lives" tracking (reset on failure).
+- Institutional-grade metrics: Sortino Ratio, Sharpe Ratio, Risk-to-Reward, Profit Factor, Win/Loss Streaks.
+- Advanced visualization of scaling attempts and tier progression.
+
+**Key Features**:
+
+CTI Integration:
+
+- `--cti-mode` (1STEP, 2STEP, INSTANT) argument.
+- `--cti-scaling` flag for multi-year career simulation.
+- Automatic enforcement of Daily Loss and Max Drawdown rules.
+- "Instant Funding" support with specific parameter schema.
+
+Advanced Metrics:
+
+- Sortino Ratio (downside deviation focus).
+- Average Trade Duration.
+- Max Consecutive Wins/Losses.
+- Metrics calculated per "Life" in scaling mode.
+
+Refactoring:
+
+- Decoupled configuration loading (`src/risk/prop_firm/loader.py`).
+- Pydantic V2 migration for core models.
+- Extensive linting and cleanup of risk modules.
+
+**Usage**:
+
+```bash
+# Run CTI 1-Step Challenge
+poetry run python -m src.cli.run_backtest --pair EURUSD --cti-mode 1STEP --starting-balance 10000
+
+# Run CTI Scaling Simulation with Instant Funding
+poetry run python -m src.cli.run_backtest --pair EURUSD --cti-mode INSTANT --cti-scaling --starting-balance 2500
+```
+
+**Related**:
+
+- Spec: 027-cti-metrics-progression
+- Pull Request: #61
+- Closes Issues: #24, #60
+
+---
 
 ### [v0.2.3] - 2026-01-14
 
