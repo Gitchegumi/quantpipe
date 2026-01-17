@@ -2,18 +2,18 @@
 Scaling logic for CTI Prop Firm progression.
 """
 
-from datetime import datetime, timedelta, date, timezone
-from typing import List, Optional, Dict
+from datetime import datetime
+
 from dateutil.relativedelta import relativedelta
 
-from src.models.core import TradeExecution, MetricsSummary
 from src.backtest.metrics import calculate_metrics
+from src.models.core import TradeExecution
 
-from .models import ChallengeConfig, ScalingConfig, LifeResult, ScalingReport
+from .models import ChallengeConfig, LifeResult, ScalingConfig, ScalingReport
 
 
 def evaluate_scaling(
-    executions: List[TradeExecution],
+    executions: list[TradeExecution],
     challenge_config: ChallengeConfig,
     scaling_config: ScalingConfig,
 ) -> ScalingReport:
@@ -34,7 +34,7 @@ def evaluate_scaling(
     # Sort trades
     sorted_execs = sorted(executions, key=lambda x: x.close_timestamp)
 
-    lives: List[LifeResult] = []
+    lives: list[LifeResult] = []
 
     # State
     current_tier_idx = 0
@@ -49,7 +49,7 @@ def evaluate_scaling(
     base_account_size = challenge_config.account_size
 
     current_balance = start_tier_balance
-    current_life_trades: List[TradeExecution] = []
+    current_life_trades: list[TradeExecution] = []
     current_life_start = sorted_execs[0].open_timestamp
     # For the first life, min_review_date is relative to the start of the first trade.
     # For subsequent lives, it's relative to the start of that life (which is the end of the previous life).
@@ -124,7 +124,7 @@ def evaluate_scaling(
         max_daily_loss_pct = challenge_config.max_daily_loss_pct
 
         failed = False
-        fail_reason = ""
+        # fail_reason = ""
 
         # Check Total Drawdown
         if challenge_config.drawdown_type == "STATIC":
@@ -249,11 +249,13 @@ def evaluate_scaling(
             daily_start_balances = {trade_date: current_balance}
 
             if i + 1 < len(sorted_execs):
-                next_review_date = sorted_execs[i + 1].open_timestamp + relativedelta(
-                    months=scaling_config.review_period_months
-                )
+                pass
+                # next_review_date = sorted_execs[i + 1].open_timestamp + relativedelta(
+                #     months=scaling_config.review_period_months
+                # )
             else:
-                next_review_date = datetime.max.replace(tzinfo=timezone.utc)
+                pass
+                # next_review_date = datetime.max.replace(tzinfo=timezone.utc)
 
         # Advance loop
         i += 1

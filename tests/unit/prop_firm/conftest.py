@@ -2,13 +2,15 @@
 Fixtures for Prop Firm unit tests.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone
+
 from src.models.core import TradeExecution
 from src.risk.prop_firm.models import ChallengeConfig
 
 
-@pytest.fixture
+@pytest.fixture()
 def base_config():
     return ChallengeConfig(
         program_id="TEST_10K",
@@ -22,10 +24,10 @@ def base_config():
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def create_trade():
     def _create(pnl_val: float, date_offset_days: int = 0, risk_amount: float = 100.0):
-        base_time = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+        base_time = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
         ts = base_time + timedelta(days=date_offset_days)
 
         # pnl_r = pnl_val / risk_amount
@@ -48,7 +50,7 @@ def create_trade():
     return _create
 
 
-@pytest.fixture
+@pytest.fixture()
 def scaling_config():
     from src.risk.prop_firm.models import ScalingConfig
 

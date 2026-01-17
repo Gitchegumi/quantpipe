@@ -69,6 +69,8 @@
 - [x] T031 [Refactor] Implement CTI Sliding Window Promotion Logic
 - [x] T032 [Refactor] Set Scaling as Default CTI Mode (`--disable-scaling` arg)
 - [x] T033 [UI] Add CTI Payout Metrics and Start/End Dates to Reports
+- [x] T034 [Refactor] Fix Linting Issues & Clean Up Codebase
+- [x] T035 [Fix] Debug INSTANT mode configuration loading crash
 
 ## Implementation Strategy
 

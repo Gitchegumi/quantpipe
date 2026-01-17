@@ -3,11 +3,13 @@ Data models for Prop Firm evaluation and scaling logic.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import List, Dict, Optional, TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
+from pydantic import BaseModel
+
 
 if TYPE_CHECKING:
     from src.models.core import MetricsSummary
@@ -32,7 +34,7 @@ class ScalingConfig(BaseModel):
 
     review_period_months: int
     profit_target_pct: float
-    increments: List[float]
+    increments: list[float]
 
 
 @dataclass(frozen=True)
@@ -53,7 +55,7 @@ class LifeResult:
     # or use 'Any' if we can't import it easily.
     # To keep this module standalone, we might use a simplified dict for now
     # or import if possible. Let's use a dict for independent metrics storage.
-    metrics: Optional["MetricsSummary"] = None
+    metrics: Optional[MetricsSummary] = None
     failure_reason: Optional[str] = None
 
 
@@ -61,12 +63,12 @@ class LifeResult:
 class ScalingReport:
     """Aggregate report of a multi-life simulation."""
 
-    lives: List[LifeResult]
+    lives: list[LifeResult]
     total_duration_days: int
     active_life_index: int
 
     @property
-    def tier_stats(self) -> Dict[float, Dict[str, int]]:
+    def tier_stats(self) -> dict[float, dict[str, int]]:
         """
         Returns stats per tier balance.
         Example: {10000.0: {'PASSED': 2, 'FAILED_DRAWDOWN': 1}}

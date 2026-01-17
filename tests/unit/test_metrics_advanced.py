@@ -15,8 +15,8 @@ from src.backtest.metrics import (
 )
 
 
-@pytest.fixture
-def sample_executions():
+@pytest.fixture(name="sample_executions")
+def fixture_sample_executions():
     base_time = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
     return [
         TradeExecution(

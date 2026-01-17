@@ -2,8 +2,6 @@
 Unit tests for Prop Firm Scaling Logic.
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
 from src.risk.prop_firm.scaling import evaluate_scaling
 
 

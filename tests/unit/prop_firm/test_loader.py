@@ -3,6 +3,7 @@ Unit tests for Prop Firm configuration loader.
 """
 
 import pytest
+
 from src.risk.prop_firm.loader import load_cti_config, load_scaling_plan
 from src.risk.prop_firm.models import ChallengeConfig, ScalingConfig
 
@@ -26,15 +27,24 @@ def test_load_2step_10k():
 
     assert config.account_size == 10000.0
     # 2-Step evaluation logic checking?
-    # The JSON structure for 2-Step might differ slightly or use phase 1 limits.
-    # Logic in loader simply picks 'evaluation' block.
-    # max_trailing_drawdown for 2-Step 10k is 1000 (10%).
-    # Let's verify expectations agains logic.
-    # The JSON for 2-Step usually has "Phase 1" and "Phase 2" separately?
-    # Or just "evaluation" block?
-    # I should check the JSON content if I want to be precise.
-    # But basic check: it shouldn't crash.
     assert config.max_total_drawdown_pct is not None
+
+
+def test_load_instant_2500():
+    """Test loading Instant Funding 2.5k config."""
+    config = load_cti_config("INSTANT", 2500)
+
+    assert isinstance(config, ChallengeConfig)
+    # Instant config 2500 has starting balance 1250, profit target 125, max static dd 6% (75).
+    # loader logic should derive account_size=1250.
+    assert config.account_size == 1250.0
+
+    # Max Static DD 6% in config. (Amount 75 / Balance 1250 = 0.06)
+    assert config.max_total_drawdown_pct == 0.06
+    assert config.drawdown_type == "STATIC"
+
+    # Profit target 125 / 1250 = 0.10 (10%)
+    assert config.profit_target_pct == 0.10
 
 
 def test_invalid_mode():

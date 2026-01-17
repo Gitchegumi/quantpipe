@@ -2,7 +2,6 @@
 Unit tests for Prop Firm Evaluator.
 """
 
-import pytest
 from src.risk.prop_firm.evaluator import evaluate_challenge
 from src.risk.prop_firm.models import ChallengeConfig
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .models import ChallengeConfig, ScalingConfig
 
+
 PRESETS_DIR = Path("src/config/presets/cti")
 
 
@@ -44,7 +45,7 @@ def load_cti_config(mode: str, account_size: int) -> ChallengeConfig:
     if not file_path.exists():
         raise FileNotFoundError(f"Config config file not found: {file_path}")
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
 
     # Find matching account size
@@ -60,24 +61,34 @@ def load_cti_config(mode: str, account_size: int) -> ChallengeConfig:
             f"Account size {account_size} not found for mode {mode}. Available: {available}"
         )
 
+    # Try evaluation rules, then Phase 1 (for multi-step), then parameters (for Instant)
     eval_rules = matching_config.get("evaluation")
     if not eval_rules:
-        # Fallback for multi-phase (use Phase 1 rules)
         eval_rules = matching_config.get("phase1")
+    if not eval_rules:
+        eval_rules = matching_config.get("parameters")
 
     if not eval_rules:
         available = list(matching_config.keys())
         raise KeyError(
-            f"Could not find 'evaluation' or 'phase1' rules in config. Keys: {available}"
+            f"Could not find 'evaluation', 'phase1', or 'parameters' rules in config. Keys: {available}"
         )
 
     # Map JSON fields to ChallengeConfig
-    # Note: JSON percentages are often integers (e.g. 8 for 8%). Model expects float (0.08) or checking logic?
-    # Spec says "max_daily_loss_pct: float". Usually logic uses 0.04. CTI json has "4".
-    # We should convert 4 -> 0.04.
-
     def to_decimal(val):
         return float(val) / 100.0 if val is not None else None
+
+    # Determine base capital (Instant Funding usually has lower starting balance than tier name)
+    # We should use the actual starting balance for calculations if specified.
+    base_capital = eval_rules.get("starting_balance", account_size)
+
+    # Determine Profit Target Pct
+    profit_target_pct = to_decimal(eval_rules.get("profit_target_percentage"))
+    if profit_target_pct is None and eval_rules.get("profit_target_amount"):
+        # Derive percentage from amount
+        profit_target_pct = float(eval_rules["profit_target_amount"]) / float(
+            base_capital
+        )
 
     # Determine drawdown type
     if eval_rules.get("max_static_drawdown_percentage"):
@@ -87,12 +98,17 @@ def load_cti_config(mode: str, account_size: int) -> ChallengeConfig:
         dd_type = "TRAILING"
         max_dd = to_decimal(eval_rules.get("max_trailing_drawdown_percentage"))
 
+    # Determine Daily Loss Pct
+    # Some configs might only have amount? Use Pct if available.
+    max_daily_pct = to_decimal(eval_rules.get("max_daily_drawdown_percentage"))
+
     return ChallengeConfig(
         program_id=f"CTI_{mode}_{account_size}",
-        account_size=float(account_size),
-        max_daily_loss_pct=to_decimal(eval_rules.get("max_daily_drawdown_percentage")),
+        # Use base_capital as the effective account size for simulation rules
+        account_size=float(base_capital),
+        max_daily_loss_pct=max_daily_pct,
         max_total_drawdown_pct=max_dd,
-        profit_target_pct=to_decimal(eval_rules.get("profit_target_percentage")),
+        profit_target_pct=profit_target_pct,
         min_trading_days=eval_rules.get("minimum_profitable_days", 0) or 0,
         max_time_days=eval_rules.get("time_limit_days"),
         drawdown_type=dd_type,
@@ -120,7 +136,7 @@ def load_scaling_plan(mode: str) -> ScalingConfig:
     if not file_path.exists():
         raise FileNotFoundError(f"Scaling plan file not found: {file_path}")
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
 
     criteria = data["criteria"]

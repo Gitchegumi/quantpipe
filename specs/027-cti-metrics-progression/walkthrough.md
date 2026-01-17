@@ -62,5 +62,6 @@ Arguments `--cti-mode` and `--cti-scaling` are correctly registered.
 poetry run python -m src.cli.run_backtest --direction LONG --cti-mode 1STEP --starting-balance 10000 --pair EURUSD
 
 # Run CTI Scaling Simulation
-poetry run python -m src.cli.run_backtest --direction LONG --cti-mode 1STEP --cti-scaling --starting-balance 10000 --pair EURUSD
+poetry run python -m src.cli.run_backtest --direction LONG --cti-mode 1STEP --cti-scaling \
+--starting-balance 10000 --pair EURUSD
 ```

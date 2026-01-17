@@ -2,17 +2,16 @@
 Evaluator for Prop Firm rules (CTI).
 """
 
-import pandas as pd
-import numpy as np
-from datetime import datetime, date, time, timezone
-from typing import List, Optional, Tuple, Dict
+from datetime import UTC, datetime
+from typing import Optional
 
-from src.models.core import TradeExecution, MetricsSummary
+from src.models.core import TradeExecution
+
 from .models import ChallengeConfig, LifeResult
 
 
 def evaluate_challenge(
-    executions: List[TradeExecution],
+    executions: list[TradeExecution],
     config: ChallengeConfig,
     life_id: int = 1,
     start_date: Optional[datetime] = None,
@@ -35,8 +34,8 @@ def evaluate_challenge(
             start_tier_balance=config.account_size,
             end_balance=config.account_size,
             status="INCOMPLETE",  # Or 'NO_TRADES'
-            start_date=datetime.now(timezone.utc),
-            end_date=datetime.now(timezone.utc),
+            start_date=datetime.now(UTC),
+            end_date=datetime.now(UTC),
             trade_count=0,
             pnl=0.0,
             metrics={},
@@ -49,8 +48,8 @@ def evaluate_challenge(
     end_time = sorted_execs[-1].close_timestamp
 
     # Calculate running balance (Closed Balance Only)
-    balance_curve = [config.account_size]
-    dates = [start_time]
+    # balance_curve = [config.account_size]
+    # dates = [start_time]
 
     current_balance = config.account_size
 
@@ -72,11 +71,11 @@ def evaluate_challenge(
     max_total_dd_amount = config.account_size * config.max_total_drawdown_pct
 
     # Daily Loss limit (calculated dynamically)
-    max_daily_loss_pct = (
-        config.max_daily_loss_pct
-        if config.max_daily_loss_pct is not None
-        else float("inf")
-    )
+    # max_daily_loss_pct = (
+    #     config.max_daily_loss_pct
+    #     if config.max_daily_loss_pct is not None
+    #     else float("inf")
+    # )
 
     peak_balance = config.account_size
     low_balance = config.account_size

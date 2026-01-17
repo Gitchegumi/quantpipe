@@ -786,7 +786,7 @@ def format_portfolio_text_output(result, strategy_name: str | None = None) -> st
         # Max drawdown from equity curve
         max_equity = result.starting_equity
         max_drawdown = 0.0
-        for ts, equity in result.equity_curve:
+        for _ts, equity in result.equity_curve:
             if equity > max_equity:
                 max_equity = equity
             drawdown = (max_equity - equity) / max_equity if max_equity > 0 else 0
