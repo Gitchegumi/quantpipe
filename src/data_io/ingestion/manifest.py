@@ -7,7 +7,7 @@ checksums, and schema fingerprints for reproducibility and validation.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Manifest(BaseModel):
@@ -47,11 +47,9 @@ class Manifest(BaseModel):
     )
     version: str = Field(default="1.0.0", description="Manifest schema version")
 
-    class Config:
-        """Pydantic configuration."""
-
-        frozen = True  # Immutable after creation
-        json_schema_extra = {
+    model_config = ConfigDict(
+        frozen=True,
+        json_schema_extra={
             "example": {
                 "dataset_path": "price_data/processed/eurusd/eurusd_2020.parquet",
                 "manifest_sha256": "a" * 64,
@@ -63,4 +61,5 @@ class Manifest(BaseModel):
                 "compression": "zstd",
                 "version": "1.0.0",
             }
-        }
+        },
+    )

@@ -71,7 +71,7 @@ def generate_output_filename(
     return filename
 
 
-def format_text_output(result: BacktestResult) -> str:
+def format_text_output(result: BacktestResult, strategy_name: str | None = None) -> str:
     """
     Format backtest result as human-readable text.
 
@@ -106,6 +106,8 @@ def format_text_output(result: BacktestResult) -> str:
     lines.append("RUN METADATA")
     lines.append("-" * 60)
     lines.append(f"Run ID:           {result.run_id}")
+    if strategy_name:
+        lines.append(f"Strategy:         {strategy_name}")
     lines.append(f"Direction Mode:   {result.direction_mode}")
     # Symbol(s) line (FR-023) - BacktestResult may have attribute 'pair' or 'symbols'
     if hasattr(result, "symbols") and isinstance(getattr(result, "symbols"), list):
@@ -211,6 +213,8 @@ def _format_metrics_summary(metrics) -> list[str]:
     lines.append(f"  Sharpe Estimate:  {metrics.sharpe_estimate:.2f}")
     lines.append(f"  Profit Factor:    {metrics.profit_factor:.2f}")
     lines.append(f"  Max Drawdown (R): {metrics.max_drawdown_r:.2f}")
+    lines.append(f"  Max Consec Wins:  {metrics.max_consecutive_wins}")
+    lines.append(f"  Max Consec Loss:  {metrics.max_consecutive_losses}")
 
     return lines
 
@@ -533,7 +537,9 @@ def _serialize_single_metrics(metrics) -> dict:
     }
 
 
-def format_multi_symbol_text_output(multi_result) -> str:
+def format_multi_symbol_text_output(
+    multi_result, strategy_name: str | None = None
+) -> str:
     """Format multi-symbol independent backtest results as text.
 
     Shows full per-symbol metrics (identical to single-symbol runs) plus
@@ -542,6 +548,7 @@ def format_multi_symbol_text_output(multi_result) -> str:
     Args:
         multi_result: Object with attributes: run_id, direction_mode, start_time,
                      symbols, results (dict[str, BacktestResult]), failures
+        strategy_name: Optional name of the strategy used.
 
     Returns:
         Formatted text string
@@ -558,6 +565,8 @@ def format_multi_symbol_text_output(multi_result) -> str:
     lines.append("RUN METADATA")
     lines.append("-" * 80)
     lines.append(f"Run ID:           {multi_result.run_id}")
+    if strategy_name:
+        lines.append(f"Strategy:         {strategy_name}")
     lines.append(f"Direction Mode:   {multi_result.direction_mode}")
     lines.append(f"Symbols:          {', '.join(multi_result.symbols)}")
     # Timeframe line (FR-015)
@@ -688,7 +697,7 @@ def format_multi_symbol_json_output(multi_result) -> str:
     return json.dumps(data, indent=2)
 
 
-def format_portfolio_text_output(result) -> str:
+def format_portfolio_text_output(result, strategy_name: str | None = None) -> str:
     """Format portfolio-mode backtest results as human-readable text.
 
     Shows full aggregate metrics (same as per-symbol) plus equity curve and
@@ -710,6 +719,8 @@ def format_portfolio_text_output(result) -> str:
     lines.append("RUN METADATA")
     lines.append("-" * 80)
     lines.append(f"Run ID:           {result.run_id}")
+    if strategy_name:
+        lines.append(f"Strategy:         {strategy_name}")
     lines.append(f"Direction Mode:   {result.direction_mode}")
     lines.append(f"Symbols:          {', '.join(result.symbols)}")
     # Timeframe line (T014)
@@ -775,7 +786,7 @@ def format_portfolio_text_output(result) -> str:
         # Max drawdown from equity curve
         max_equity = result.starting_equity
         max_drawdown = 0.0
-        for ts, equity in result.equity_curve:
+        for _ts, equity in result.equity_curve:
             if equity > max_equity:
                 max_equity = equity
             drawdown = (max_equity - equity) / max_equity if max_equity > 0 else 0
@@ -789,6 +800,17 @@ def format_portfolio_text_output(result) -> str:
         lines.append(f"  Expectancy (R):   {expectancy:.2f}")
         lines.append(f"  Profit Factor:    {profit_factor:.2f}")
         lines.append(f"  Max Drawdown:     {max_drawdown:.2%}")
+
+        # Calculate streaks for aggregate
+        import numpy as np
+        from src.backtest.metrics import compute_streaks
+
+        pnl_values = np.array([t.pnl_r for t in trades])
+        max_win_streak = compute_streaks(pnl_values, win=True)
+        max_loss_streak = compute_streaks(pnl_values, win=False)
+
+        lines.append(f"  Max Consec Wins:  {max_win_streak}")
+        lines.append(f"  Max Consec Loss:  {max_loss_streak}")
     lines.append("")
 
     # Per-symbol breakdown

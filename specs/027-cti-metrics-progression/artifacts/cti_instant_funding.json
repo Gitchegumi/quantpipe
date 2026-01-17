@@ -1,0 +1,128 @@
+{
+  "program_name": "Instant Funding",
+  "description": "Instant Funding allows traders to trade live capital from day one without a two‑phase evaluation. To unlock the first payout, traders must hit an 8% profit target (relative to the starting balance) while staying within a 5% trailing drawdown. There is no daily drawdown and no time limit. Traders must log at least three profitable trading days before withdrawing. Once funded, profit share starts at 80% and can reach 100% through VIP tiers.",
+  "starting_account_sizes": [
+    {
+      "account_size": 2500,
+      "currency": "USD",
+      "parameters": {
+        "starting_balance": 1250,
+        "profit_target_amount": 125,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 75,
+        "max_static_drawdown_balance": 1175,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "account_balance": 2500,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 150,
+        "max_static_drawdown_balance": 2350
+      }
+    },
+    {
+      "account_size": 5000,
+      "currency": "USD",
+      "parameters": {
+        "starting_balance": 2500,
+        "profit_target_amount": 250,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 150,
+        "max_static_drawdown_balance": 2350,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "account_balance": 5000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 300,
+        "max_static_drawdown_balance": 4700
+      }
+    },
+    {
+      "account_size": 10000,
+      "currency": "USD",
+      "parameters": {
+        "starting_balance": 5000,
+        "profit_target_amount": 500,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 300,
+        "max_static_drawdown_balance": 4700,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "account_balance": 10000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 600,
+        "max_static_drawdown_balance": 9400
+      }
+    },
+    {
+      "account_size": 20000,
+      "currency": "USD",
+      "parameters": {
+        "starting_balance": 10000,
+        "profit_target_amount": 1000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 600,
+        "max_static_drawdown_balance": 9400,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "account_balance": 20000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 1500,
+        "max_static_drawdown_balance": 23500
+      }
+    },
+    {
+      "account_size": 40000,
+      "currency": "USD",
+      "parameters": {
+        "starting_balance": 20000,
+        "profit_target_amount": 2000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 1200,
+        "max_static_drawdown_balance": 18800,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "account_balance": 40000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 2400,
+        "max_static_drawdown_balance": 37600
+      }
+    },
+    {
+      "account_size": 80000,
+      "currency": "USD",
+      "parameters": {
+        "starting_balance": 40000,
+        "profit_target_amount": 4000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 2400,
+        "max_static_drawdown_balance": 37600,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "account_balance": 80000,
+        "max_static_drawdown_percentage": 6,
+        "max_static_drawdown_amount": 4800,
+        "max_static_drawdown_balance": 76800
+      }
+    }
+  ],
+  "sources": [
+    "The Instant Funding rules use the same 8% profit target and 5% trailing drawdown as the 1‑Step Challenge, with no time limit and at least three profitable trading days. These rules are outlined in the CTI program comparison article and instant funding description【68092022793590†L143-L150】【68092022793590†L214-L218】."
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "program_name": "2-Step Challenge",
+  "description": "Two‑phase evaluation. Phase 1 targets 10% profit with a 5% maximum daily drawdown and 10% static drawdown. Phase 2 targets 5% profit with the same drawdown rules. Traders must log at least three profitable trading days in each phase; there is no time limit. After passing both phases, traders start funded with up to 80–100% profit share while keeping the same drawdown limits.",
+  "starting_account_sizes": [
+    {
+      "account_size": 2500,
+      "currency": "USD",
+      "phase1": {
+        "profit_target_percentage": 10,
+        "profit_target_amount": 250,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 125,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 250,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "phase2": {
+        "profit_target_percentage": 5,
+        "profit_target_amount": 125,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 125,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 250,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 125,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 250
+      }
+    },
+    {
+      "account_size": 5000,
+      "currency": "USD",
+      "phase1": {
+        "profit_target_percentage": 10,
+        "profit_target_amount": 500,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 250,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 500,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "phase2": {
+        "profit_target_percentage": 5,
+        "profit_target_amount": 250,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 250,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 500,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 250,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 500
+      }
+    },
+    {
+      "account_size": 10000,
+      "currency": "USD",
+      "phase1": {
+        "profit_target_percentage": 10,
+        "profit_target_amount": 1000,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 500,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 1000,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "phase2": {
+        "profit_target_percentage": 5,
+        "profit_target_amount": 500,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 500,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 1000,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 500,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 1000
+      }
+    },
+    {
+      "account_size": 25000,
+      "currency": "USD",
+      "phase1": {
+        "profit_target_percentage": 10,
+        "profit_target_amount": 2500,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 1250,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 2500,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "phase2": {
+        "profit_target_percentage": 5,
+        "profit_target_amount": 1250,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 1250,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 2500,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 1250,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 2500
+      }
+    },
+    {
+      "account_size": 50000,
+      "currency": "USD",
+      "phase1": {
+        "profit_target_percentage": 10,
+        "profit_target_amount": 5000,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 2500,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 5000,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "phase2": {
+        "profit_target_percentage": 5,
+        "profit_target_amount": 2500,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 2500,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 5000,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 2500,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 5000
+      }
+    },
+    {
+      "account_size": 100000,
+      "currency": "USD",
+      "phase1": {
+        "profit_target_percentage": 10,
+        "profit_target_amount": 10000,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 5000,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 10000,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "phase2": {
+        "profit_target_percentage": 5,
+        "profit_target_amount": 5000,
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 5000,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 10000,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_daily_drawdown_percentage": 5,
+        "max_daily_drawdown_amount": 5000,
+        "max_static_drawdown_percentage": 10,
+        "max_static_drawdown_amount": 10000
+      }
+    }
+  ],
+  "sources": [
+    "Phase 1 and Phase 2 targets (10% and 5%) with daily and static drawdowns (5% and 10%) and requirement of 3 profitable days per phase are described in CTI’s program comparison article【68092022793590†L170-L196】.",
+    "The same drawdown limits apply to funded accounts, which start at 80% profit share and can rise to 90‑100% with VIP tiers【68092022793590†L185-L192】."
+  ]
+}

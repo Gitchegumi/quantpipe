@@ -8,7 +8,7 @@ results for scan and simulation operations.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PerformanceReport(BaseModel):
@@ -82,10 +82,8 @@ class PerformanceReport(BaseModel):
     )
     created_at: datetime = Field(..., description="Report creation time (UTC)")
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "scan_duration_sec": 721.4,
                 "simulation_duration_sec": 467.2,
@@ -108,3 +106,4 @@ class PerformanceReport(BaseModel):
                 "created_at": "2025-11-11T12:00:00Z",
             }
         }
+    )
