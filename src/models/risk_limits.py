@@ -7,7 +7,7 @@ Per FR-003 and FR-015, the system supports layered risk controls:
 per-strategy limits plus optional global portfolio drawdown threshold.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RiskLimits(BaseModel):
@@ -66,11 +66,7 @@ class RiskLimits(BaseModel):
             raise ValueError("max_position_size must be non-negative")
         return v
 
-    class Config:
-        """Pydantic model configuration."""
-
-        frozen = False
-        validate_assignment = True
+    model_config = ConfigDict(frozen=False, validate_assignment=True)
 
 
 __all__ = ["RiskLimits"]

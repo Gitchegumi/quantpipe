@@ -8,7 +8,7 @@ affecting defaults of other strategies.
 """
 
 from typing import Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class StrategyConfig(BaseModel):
@@ -68,11 +68,7 @@ class StrategyConfig(BaseModel):
                 raise ValueError("Version components must be numeric")
         return v
 
-    class Config:
-        """Pydantic model configuration."""
-
-        frozen = False  # Allow modification for override scenarios
-        validate_assignment = True
+    model_config = ConfigDict(frozen=False, validate_assignment=True)
 
 
 __all__ = ["StrategyConfig"]
