@@ -153,9 +153,13 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
         max_drawdown_r=max_drawdown_r,
         latency_p95_ms=latency_p95_ms,
         latency_mean_ms=latency_mean_ms,
+        sortino_ratio=compute_sortino_ratio(pnl_r_values),
+        avg_trade_duration_seconds=compute_avg_duration(executions),
+        max_consecutive_wins=compute_streaks(pnl_r_values, win=True),
+        max_consecutive_losses=compute_streaks(pnl_r_values, win=False),
     )
 
-    logger.info(
+    logger.debug(
         "Metrics computed: %d trades, win_rate=%.2f%%, expectancy=%.2fR",
         trade_count,
         win_rate * 100,
@@ -163,6 +167,72 @@ def compute_metrics(executions: Sequence[TradeExecution]) -> MetricsSummary:
     )
 
     return metrics
+
+
+def compute_sortino_ratio(pnl_r_series: NDArray[np.float64]) -> float:
+    """
+    Compute Sortino Ratio (Excess Return / Downside Deviation).
+    Assuming Risk Free Rate = 0.
+    """
+    if len(pnl_r_series) < 2:
+        return np.nan
+
+    mean_return = float(np.mean(pnl_r_series))
+
+    # Downside deviation: Standard deviation of negative returns only
+    negative_returns = pnl_r_series[pnl_r_series < 0]
+
+    # If no negative returns, risk is 0 -> Infinite ratio (conceptually).
+    # But usually capped or returned as high value. Or if mean > 0, massive number.
+    # Standard practice: if downside_dev is 0, return NaN or Inf.
+    if len(negative_returns) == 0:
+        return np.inf if mean_return > 0 else np.nan
+
+    # Technically Sortino uses the "Target Return" (0 here) for calculating semi-variance
+    # Semi-variance = sum(min(0, r - target)^2) / N
+    # Here we simplify to std dev of negative returns or use full semi-deviation.
+    # Proper Sortino: sqrt(mean(min(0, returns - target)^2))
+
+    downside_variance = np.mean(np.minimum(0, pnl_r_series) ** 2)
+    downside_dev = np.sqrt(downside_variance)
+
+    if downside_dev == 0:
+        return np.nan
+
+    return float(mean_return / downside_dev)
+
+
+def compute_avg_duration(executions: Sequence[TradeExecution]) -> float:
+    """Compute arithmetic mean of trade durations in seconds."""
+    if not executions:
+        return np.nan
+
+    durations = [
+        (ex.close_timestamp - ex.open_timestamp).total_seconds() for ex in executions
+    ]
+    return float(np.mean(durations))
+
+
+def compute_streaks(pnl_r_series: NDArray[np.float64], win: bool) -> int:
+    """Compute max consecutive wins or losses."""
+    if len(pnl_r_series) == 0:
+        return 0
+
+    # Create boolean array
+    is_hit = (pnl_r_series > 0) if win else (pnl_r_series < 0)
+
+    max_streak = 0
+    current_streak = 0
+
+    for hit in is_hit:
+        if hit:
+            current_streak += 1
+            if current_streak > max_streak:
+                max_streak = current_streak
+        else:
+            current_streak = 0
+
+    return max_streak
 
 
 def compute_rolling_drawdown(pnl_r_series: NDArray[np.float64]) -> NDArray[np.float64]:

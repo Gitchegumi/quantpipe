@@ -1,0 +1,67 @@
+{
+  "program_name": "1-Step Challenge",
+  "description": "Single-phase evaluation with an 8% profit target, 5% trailing drawdown (balance‑based) and no daily drawdown. Traders must achieve the profit target and log at least three profitable trading days; there is no time limit.",
+  "starting_account_sizes": [
+    {
+      "account_size": 2500,
+      "currency": "USD",
+      "evaluation": {
+        "profit_target_percentage": 8,
+        "profit_target_amount": 200,
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 125,
+        "max_daily_drawdown_percentage": null,
+        "max_static_drawdown_percentage": null,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 125
+      }
+    },
+    {
+      "account_size": 5000,
+      "currency": "USD",
+      "evaluation": {
+        "profit_target_percentage": 8,
+        "profit_target_amount": 400,
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 250,
+        "max_daily_drawdown_percentage": null,
+        "max_static_drawdown_percentage": null,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 250
+      }
+    },
+    {
+      "account_size": 10000,
+      "currency": "USD",
+      "evaluation": {
+        "profit_target_percentage": 8,
+        "profit_target_amount": 800,
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 500,
+        "max_daily_drawdown_percentage": null,
+        "max_static_drawdown_percentage": null,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 500
+      }
+    }
+  ],
+  "sources": [
+    "Phase 1 requirements: 8% profit target, 5% trailing drawdown, no daily drawdown, 3 profitable days and unlimited time as described in the CTI blog article on 1‑Step Challenge【334424731157034†L107-L139】 and program comparison【68092022793590†L143-L150】.",
+    "Scaling criteria and increments applicable to this program are described in the scaling plan file."
+  ]
+}

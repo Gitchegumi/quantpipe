@@ -475,3 +475,8 @@ class MetricsSummary:
     max_drawdown_r: float
     latency_p95_ms: float
     latency_mean_ms: float
+    # Advanced Metrics (Feature 027)
+    sortino_ratio: float = float("nan")
+    avg_trade_duration_seconds: float = float("nan")
+    max_consecutive_wins: int = 0
+    max_consecutive_losses: int = 0
