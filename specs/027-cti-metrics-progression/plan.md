@@ -1,79 +1,47 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan - Enhancing Result Output
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+## Goal Description
 
-**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
+Enhance the backtest results output (both standard and CTI reports) to include:
 
-## Summary
+1. **Strategy Name** in the Metadata section.
+2. **Streak Metrics** (Longest Winning/Losing Streak) in the Performance Metrics section.
+3. **Life-Level Stats** (Wins, Losses, Streaks) in the CTI Evaluation output.
 
-[Extract from feature spec: primary requirement + technical approach from research]
+## User Review Required
 
-## Technical Context
+> [!NOTE] > `BacktestResult` model will safely ignore the new `strategy_name` field if not populated, maintaining backward compatibility.
 
-**Language/Version**: Python 3.11+
-**Primary Dependencies**: `pandas`, `numpy`, `structlog` (Project Standard)
-**Storage**: JSON configuration files (read-only CTI presets)
-**Testing**: `pytest` (Unit & Integration)
-**Target Platform**: Windows/Linux (CLI Backtester)
-**Project Type**: Python CLI Tool
-**Performance Goals**: N/A (Offline analysis of backtest results)
-**Constraints**: Must match CTI specific rules exactly; No changes to core backtest engine loop (Post-hoc analysis).
-**Scale/Scope**: < 20 new files, localized to `src/risk/prop_firm` and `src/backtest/metrics.py`.
+## Proposed Changes
 
-## Constitution Check
+### Formatters
 
-_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
+#### [MODIFY] src/data_io/formatters.py
 
-| Principle               | Status | Justification / Notes                                                     |
-| :---------------------- | :----- | :------------------------------------------------------------------------ |
-| **I. Strategy-First**   | PASS   | Feature enhances backtest analysis, does not alter strategy interfaces.   |
-| **II. Risk Management** | PASS   | Core feature purpose: Validating strategies against Prop Firm risk rules. |
-| **III. Backtesting**    | PASS   | Adds new metrics (Sharpe, Sortino) requested by standard.                 |
-| **IV. Monitoring**      | PASS   | N/A (Backtest feature).                                                   |
-| **XII. Task Tracking**  | PASS   | Tasks will be generated sequentially in Phase 2.                          |
-| **VIII. Code Quality**  | PASS   | New modules will follow PEP 8, types, docs.                               |
+- Update `format_text_output` to accept `strategy_name` argument.
+- Update `format_text_output` to print "Strategy: [Name]" in RUN METADATA.
+- Update `_format_metrics_summary` to print `Max Consec Wins` and `Max Consec Losses`.
 
-## Project Structure
+### Evaluator
 
-### Documentation (this feature)
+#### [MODIFY] src/risk/prop_firm/evaluator.py
 
-```text
-specs/027-cti-metrics-progression/
-├── plan.md              # This file
-├── research.md          # Phase 0 output
-├── data-model.md        # Phase 1 output
-├── quickstart.md        # Phase 1 output
-├── contracts/           # N/A (No API)
-└── tasks.md             # Phase 2 output
-```
+- Import `calculate_metrics` from `src.backtest.metrics`.
+- In `evaluate_challenge`, call `calculate_metrics` on the life's trades and populate `LifeResult.metrics`.
 
-### Source Code (repository root)
+### CLI
 
-```text
-src/
-├── backtest/
-│   ├── metrics.py               # [MODIFY] Add Sharpe, Sortino, etc.
-│   └── report.py                # [MODIFY] Add CTI & Scaling sections
-├── config/
-│   └── presets/
-│       └── cti/                 # [NEW] JSON Configs
-├── risk/
-│   └── prop_firm/               # [NEW] Domain Logic
-│       ├── evaluator.py         # Rule checking
-│       ├── loader.py            # Config loading
-│       ├── models.py            # Pydantic definitions
-│       └── scaling.py           # Progression logic
-└── cli/
-    └── run_backtest.py          # [MODIFY] New CLI args
-```
+#### [MODIFY] src/cli/run_backtest.py
 
-**Structure Decision**: Standard "Single project" CLI layout. New domain logic isolated in `src/risk/prop_firm`.
+- Pass `strategy_name` (e.g. `strategy.__class__.__name__`) to `format_text_output`.
+- Update CTI reporting block to read `win_count`, `loss_count`, `max_consecutive_wins`, `max_consecutive_losses` from `life.metrics` and print them.
 
-## Complexity Tracking
+## Verification Plan
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
+### Automated Tests
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-| :-------- | :--------- | :----------------------------------- |
-| None      | N/A        | N/A                                  |
+- Run `poetry run python -m src.cli.run_backtest --cti-mode 1STEP --starting-balance 2500 --pair EURUSD --direction BOTH`
+- Verify output file contains:
+  - `Strategy: [StrategyName]` in metadata.
+  - `Max Consec Wins/Losses` in global metrics.
+  - `Wins: X, Losses: Y, Max Win Streak: A, Max Loss Streak: B` in CTI Life reports.

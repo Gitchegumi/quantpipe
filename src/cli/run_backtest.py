@@ -463,6 +463,22 @@ def main():
         "Example: --sessions NY LONDON (trades only during NY and London hours).",
     )
 
+    # CTI Prop Firm Arguments (Feature 027)
+    parser.add_argument(
+        "--cti-mode",
+        type=str,
+        choices=["1STEP", "2STEP", "INSTANT"],
+        help="Enable CTI Prop Firm evaluation mode (Feature 027). "
+        "Requires --starting-balance to match a valid CTI account size.",
+    )
+
+    parser.add_argument(
+        "--disable-scaling",
+        action="store_true",
+        help="Disable CTI Scaling Plan simulation (defaults to enabled with --cti-mode). "
+        "Checking this runs a standard single-challenge backtest.",
+    )
+
     # Parameter Sweep Arguments (Feature 024: Parallel Indicator Parameter Sweep)
     parser.add_argument(
         "--test-range",
@@ -831,7 +847,16 @@ Persistent storage not yet implemented."
             if output_format == OutputFormat.JSON:
                 output_content = format_portfolio_json_output(result)
             else:
-                output_content = format_portfolio_text_output(result)
+                strategy_name = args.strategy[0] if args.strategy else "UnknownStrategy"
+                if output_format == OutputFormat.JSON:
+                    # JSON for portfolio not fully implemented in this block or uses specific one?
+                    # The code at line 848 (in original file, inferred) handles JSON/Text.
+                    pass
+                    # Actually, let's just update the text call.
+
+                output_content = format_portfolio_text_output(
+                    result, strategy_name=strategy_name
+                )
 
             # Generate output filename
             output_filename = generate_output_filename(
@@ -968,6 +993,274 @@ Persistent storage not yet implemented."
                         e,
                         exc_info=True,
                     )
+
+            # CTI Evaluation (Feature 027)
+            if args.cti_mode:
+                from ..risk.prop_firm.loader import load_cti_config, load_scaling_plan
+                from ..risk.prop_firm.evaluator import evaluate_challenge
+                from ..risk.prop_firm.scaling import evaluate_scaling
+
+                logger.info(
+                    "Running CTI Evaluation mode=%s scaling=%s",
+                    args.cti_mode,
+                    not args.disable_scaling,
+                )
+
+                # Helper to process one set of executions
+                def process_cti(executions, label):
+                    print(f"\n[CTI Evaluation: {label}]")
+                    if not executions:
+                        print("  No trades to evaluate.")
+                        return
+
+                    # Normalize ClosedTrade to TradeExecution if needed
+                    # PortfolioResult uses ClosedTrade (exit_timestamp), TradeExecution uses close_timestamp
+                    if hasattr(executions[0], "exit_timestamp") and not hasattr(
+                        executions[0], "close_timestamp"
+                    ):
+                        from ..models.core import TradeExecution
+                        import pandas as pd
+
+                        norm_executions = []
+                        for t in executions:
+                            # Convert numpy datetime64 to pandas Timestamp (compatible with .date())
+                            open_ts = pd.Timestamp(t.entry_timestamp)
+                            close_ts = pd.Timestamp(t.exit_timestamp)
+
+                            norm_executions.append(
+                                TradeExecution(
+                                    signal_id=getattr(t, "signal_id", "UNKNOWN"),
+                                    direction=t.direction,
+                                    open_timestamp=open_ts,
+                                    entry_fill_price=t.entry_price,
+                                    close_timestamp=close_ts,
+                                    exit_fill_price=t.exit_price,
+                                    exit_reason=t.exit_reason,
+                                    pnl_r=t.pnl_r,
+                                    slippage_entry_pips=0.0,
+                                    slippage_exit_pips=0.0,
+                                    costs_total=0.0,
+                                    stop_price=0.0,
+                                    target_price=0.0,
+                                    risk_amount=t.risk_amount,
+                                    risk_percent=t.risk_percent,
+                                )
+                            )
+                        executions = norm_executions
+
+                    try:
+                        acc_size = parameters.account_balance
+                        if acc_size not in [2500, 5000, 10000, 25000, 50000, 100000]:
+                            logger.warning(
+                                "Account size %.2f might not match CTI presets (Usually 10k, 25k, etc.)",
+                                acc_size,
+                            )
+
+                        # Load base config
+                        challenge_conf = load_cti_config(args.cti_mode, acc_size)
+
+                        if not args.disable_scaling:
+                            # Load scaling plan
+                            scaling_plan = load_scaling_plan(args.cti_mode)
+                            report = evaluate_scaling(
+                                executions, challenge_conf, scaling_plan
+                            )
+
+                            # Build Report String
+                            lines = []
+                            promotions = sum(
+                                1 for l in report.lives if l.status == "PROMOTED"
+                            )
+                            resets = sum(
+                                1 for l in report.lives if l.status.startswith("FAILED")
+                            )
+
+                            # Calculate Payouts (ignore negative life PnLs)
+                            payout_100 = sum(max(0, l.pnl) for l in report.lives)
+                            payout_80 = payout_100 * 0.8
+
+                            lines.append(
+                                f"  Scaling Report (Total Lives: {len(report.lives)} | Promotions: {promotions} | Resets: {resets})"
+                            )
+                            lines.append(
+                                f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
+                            )
+                            for life in report.lives:
+                                target_amt = (
+                                    life.start_tier_balance
+                                    * scaling_plan.profit_target_pct
+                                )
+                                lines.append(
+                                    f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={life.status}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
+                                )
+                                s_str = life.start_date.strftime("%Y-%m-%d %H:%M")
+                                e_str = life.end_date.strftime("%Y-%m-%d %H:%M")
+                                lines.append(f"      Period: {s_str} to {e_str}")
+
+                                if life.metrics:
+                                    m = life.metrics
+                                    lines.append(
+                                        f"      Stats: {m.win_count} Wins, {m.loss_count} Losses | "
+                                        f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
+                                    )
+
+                                if life.status == "FAILED_DRAWDOWN":
+                                    reason = (
+                                        life.failure_reason
+                                        if life.failure_reason
+                                        else "Drawdown Violation"
+                                    )
+                                    # Calculate approx review date (4 months)
+                                    from datetime import timedelta
+
+                                    review_date = life.start_date + timedelta(days=120)
+                                    review_str = review_date.strftime("%Y-%m-%d")
+
+                                    lines.append(
+                                        f"      Failure: {reason} (End: {life.end_date})"
+                                    )
+                                    lines.append(
+                                        f"      Context: Promotion Review was due ~{review_str}"
+                                    )
+                                elif life.status == "PROMOTED":
+                                    lines.append(
+                                        f"      Success: Promoted to Tier Balance ${report.lives[life.life_id].start_tier_balance:.2f} (if next life exists)"
+                                    )
+                                lines.append("")  # Blank line for readability
+                            lines.append(
+                                f"  Active Life Index: {report.active_life_index}"
+                            )
+
+                            # Append to file
+                            with open(output_path, "a", encoding="utf-8") as f:
+                                f.write(f"\n\n[CTI Evaluation: {label}]\n")
+                                f.write("\n".join(lines))
+                                f.write("\n")
+
+                            # Console Summary
+                            print(
+                                f"[CTI Evaluation: {label}] Completed. See results file for details."
+                            )
+
+                        else:
+                            # Single Challenge Evaluation (with Retry on Failure Logic)
+                            remaining_execs = executions
+                            life_id = 1
+                            lives = []
+
+                            header = f"\n[CTI Evaluation: {label}]"
+                            print(header.strip())  # Print header once at start
+                            details = []
+
+                            while remaining_execs:
+                                result = evaluate_challenge(
+                                    remaining_execs, challenge_conf, life_id=life_id
+                                )
+                                lives.append(result)
+
+                                target_amt = (
+                                    result.start_tier_balance
+                                    * challenge_conf.profit_target_pct
+                                )
+                                details.append(
+                                    f"  Life #{result.life_id} [Tier ${result.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={result.status}, PnL=${result.pnl:.2f}, EndBal=${result.end_balance:.2f}"
+                                )
+                                s_str = result.start_date.strftime("%Y-%m-%d %H:%M")
+                                e_str = result.end_date.strftime("%Y-%m-%d %H:%M")
+                                details.append(f"    Period: {s_str} to {e_str}")
+
+                                if result.metrics:
+                                    m = result.metrics
+                                    details.append(
+                                        f"    Stats: {m.win_count} Wins, {m.loss_count} Losses | "
+                                        f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
+                                    )
+
+                                if result.status.startswith("FAILED"):
+                                    reason = (
+                                        result.failure_reason
+                                        if result.failure_reason
+                                        else result.status
+                                    )
+                                    # Calculate approx review date (4 months)
+                                    from datetime import timedelta
+
+                                    review_date = result.start_date + timedelta(
+                                        days=120
+                                    )
+                                    review_str = review_date.strftime("%Y-%m-%d")
+
+                                    details.append(
+                                        f"      Failure: {reason} (End: {result.end_date})"
+                                    )
+                                    details.append(
+                                        f"      Context: Promotion Review was due ~{review_str}"
+                                    )
+                                    # If failed, consume trades up to failure and RETRY with remaining
+                                    if result.trade_count < len(remaining_execs):
+                                        details.append(
+                                            "      -> Resetting to Initial Balance (New Life)..."
+                                        )
+                                        remaining_execs = remaining_execs[
+                                            result.trade_count :
+                                        ]
+                                        life_id += 1
+                                    else:
+                                        details.append(
+                                            "      -> Failed (No more data available to reset)."
+                                        )
+                                        break
+                                else:
+                                    # Passed or Incomplete
+                                    # Passed or Incomplete
+                                    if result.status == "PASSED":
+                                        details.append(
+                                            f"      Success: PASSED (End: {result.end_date})"
+                                        )
+                                    break
+
+                                # Dynamic progress update (overwrite line)
+                                print(
+                                    f"\r  Processing Life #{life_id}... Status={result.status}, PnL=${result.pnl:.2f}",
+                                    end="",
+                                    flush=True,
+                                )
+
+                            # Summary
+                            total_failures = sum(
+                                1 for l in lives if l.status.startswith("FAILED")
+                            )
+                            total_passed = sum(1 for l in lives if l.status == "PASSED")
+                            summary_str = f"\n  Summary: {total_passed} Passed, {total_failures} Failed out of {len(lives)} Attempts."
+
+                            # Append to file
+                            with open(output_path, "a", encoding="utf-8") as f:
+                                f.write(header + "\n")
+                                f.write("\n".join(details))
+                                f.write(summary_str + "\n")
+
+                            # Console Summary
+                            # Clear progress line explicitly and move to new line
+                            print("\r" + " " * 100 + "\r", end="", flush=True)
+                            print(summary_str.strip())
+
+                    except Exception as e:
+                        logger.error("CTI Evaluation Failed: %s", e)
+                        print(f"  Error: {e}")
+
+                # Dispatch based on result type
+                if hasattr(result, "results"):  # Independent MultiSymbolResult
+                    for sym, res in result.results.items():
+                        if res.executions:
+                            process_cti(res.executions, sym)
+                        else:
+                            print(f"\n[CTI Evaluation: {sym}] No trades.")
+                elif hasattr(result, "closed_trades"):  # PortfolioResult
+                    process_cti(result.closed_trades, "PORTFOLIO_AGGREGATE")
+                    # Also check per-symbol breakdowns if needed, but portfolio aggregate is main focus for CTI on portfolio.
+                # Fallback for BacktestResult (if Single mode returns that)
+                elif hasattr(result, "executions"):
+                    process_cti(result.executions, getattr(result, "pair", "SINGLE"))
 
             return 0  # Exit after backtest completes
     elif not args.data.exists():
@@ -1342,16 +1635,20 @@ Persistent storage not yet implemented."
             format_multi_symbol_text_output,
         )
 
+        strategy_name = strategy.__class__.__name__ if strategy else "UnknownStrategy"
         if output_format == OutputFormat.JSON:
             output_content = format_multi_symbol_json_output(result)
         else:
-            output_content = format_multi_symbol_text_output(result)
+            output_content = format_multi_symbol_text_output(
+                result, strategy_name=strategy_name
+            )
     else:
         # Single-symbol formatting
+        strategy_name = strategy.__class__.__name__ if strategy else "UnknownStrategy"
         if output_format == OutputFormat.JSON:
             output_content = format_json_output(result)
         else:
-            output_content = format_text_output(result)
+            output_content = format_text_output(result, strategy_name=strategy_name)
 
     # Generate output filename
     # Derive symbol tag for filename (FR-023)
