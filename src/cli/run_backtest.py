@@ -24,15 +24,15 @@ Usage:
     python -m src.cli.run_backtest --direction LONG --data <csv_path>
 
     # With explicit strategy and pair
-    python -m src.cli.run_backtest --direction LONG --data <csv_path> \
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
         --strategy trend-pullback --pair EURUSD
 
     # Multiple pairs (future support)
-    python -m src.cli.run_backtest --direction LONG --data <csv_path> \
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
         --pair EURUSD GBPUSD USDJPY
 
     # JSON output
-    python -m src.cli.run_backtest --direction LONG --data <csv_path> \
+    python -m src.cli.run_backtest --direction LONG --data <csv_path> \\
         --output-format json
 
     # Dry-run (signals only)
@@ -40,39 +40,30 @@ Usage:
 """
 
 import argparse
-import io
 import logging
 import sys
-from contextlib import nullcontext
-from dataclasses import replace
-from datetime import UTC, datetime
 from pathlib import Path
 
-import pandas as pd
 import polars as pl
 
 from ..backtest.engine import (
     construct_data_paths,
     run_portfolio_backtest,
 )
-from ..backtest.orchestrator import BacktestOrchestrator
+from ..backtest.portfolio.portfolio_simulator import PortfolioResult
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
 from ..data_io.formatters import (
     format_json_output,
     format_text_output,
     generate_output_filename,
+    format_multi_symbol_text_output,
+    format_multi_symbol_json_output,
+    format_portfolio_text_output,
+    format_portfolio_json_output,
 )
-from ..data_io.ingestion import ingest_ohlcv_data  # pylint: disable=no-name-in-module
-from ..data_io.resample import resample_ohlcv
-from ..data_io.resample_cache import resample_with_cache
-from ..data_io.timeframe import parse_timeframe
-from ..indicators.dispatcher import calculate_indicators
 from ..indicators.registry.builtins import register_builtins
-from ..models.core import TradeExecution
-from ..models.directional import BacktestResult
 from ..models.enums import DirectionMode, OutputFormat
-from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
 
 
 # Ensure built-in indicators are registered early
@@ -84,16 +75,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_ACCOUNT_BALANCE: float = 2500.0
 
 
-def main():
+def configure_backtest_parser(
+    parser: argparse.ArgumentParser,
+) -> argparse.ArgumentParser:
     """
-    Main entry point for unified backtest CLI.
-
-    Supports LONG, SHORT, and BOTH direction modes with text/JSON output.
+    Configure the argument parser for backtest arguments.
+    Allows reuse by other CLI entry points (e.g., quantpipe backtest).
     """
-    parser = argparse.ArgumentParser(
-        description="Run trend-pullback backtest with configurable direction"
-    )
-
     parser.add_argument(
         "--direction",
         type=str,
@@ -500,8 +488,13 @@ def main():
         help="Run parameter sweep sequentially for debugging (only with --test-range).",
     )
 
-    args = parser.parse_args()
+    return parser
 
+
+def run_backtest_command(args: argparse.Namespace) -> int:
+    """
+    Execute the backtest logic with the provided arguments.
+    """
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
 
@@ -626,7 +619,6 @@ def main():
         from ..strategy.registry import StrategyRegistry
 
         registry = StrategyRegistry()
-        # Note: Persistent storage not yet implemented
         strategies = registry.list()
 
         if not strategies:
@@ -651,7 +643,6 @@ def main():
             sys.exit(1)
 
         import importlib
-
         from ..strategy.registry import StrategyRegistry
 
         registry = StrategyRegistry()
@@ -712,8 +703,8 @@ Persistent storage not yet implemented."
             generate_combinations,
             run_sweep,
         )
-        from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
         from .prompts.range_input import collect_all_ranges, confirm_sweep
+        from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
 
         logger.info("Entering parameter sweep mode...")
 
@@ -785,8 +776,6 @@ Persistent storage not yet implemented."
             parameters.account_balance,  # Use resolved parameter
         )
 
-        # Load strategy parameters
-        # parameters = StrategyParameters() # MOVED UP
         direction_mode = DirectionMode[args.direction]
         show_progress = sys.stdout.isatty()
 
@@ -800,39 +789,34 @@ Persistent storage not yet implemented."
                 SessionOnlyConfig,
             )
 
-            # Normalize session names (handle abbreviations)
-            # Map 2-letter codes to full session names
-            session_map = {
-                "SY": "SYDNEY",
-                "AS": "ASIA",
-                "EU": "LONDON",
-                "NY": "NY",
-            }
+            # Defaults if flags active but not configured
+            news_cfg = None
+            if args.blackout_news:
+                news_cfg = NewsBlackoutConfig(enabled=True)
 
-            allowed_sessions = []
+            session_cfg = None
+            if args.blackout_sessions:
+                session_cfg = SessionBlackoutConfig(enabled=True)
+
+            whitelist_cfg = None
             if args.sessions:
-                for s in args.sessions:
-                    s_upper = s.upper()
-                    # Map abbreviation or use original if not in map (e.g. strict checking downstream)
-                    canonical = session_map.get(s_upper, s_upper)
-                    allowed_sessions.append(canonical)
+                # Map shorthand to full names if needed, or rely on config parsing
+                whitelist_cfg = SessionOnlyConfig(enabled=True, sessions=args.sessions)
 
             blackout_config = BlackoutConfig(
-                news=NewsBlackoutConfig(enabled=args.blackout_news),
-                sessions=SessionBlackoutConfig(enabled=args.blackout_sessions),
-                session_only=SessionOnlyConfig(
-                    enabled=bool(args.sessions),
-                    allowed_sessions=allowed_sessions,
-                ),
+                enabled=True,
+                session_blackout=session_cfg,
+                news_event=news_cfg,
+                session_filter=whitelist_cfg,
             )
-            logger.info(
-                "Blackout filtering enabled: news=%s, sessions=%s, session_only=%s",
-                args.blackout_news,
-                args.blackout_sessions,
-                allowed_sessions if args.sessions else False,
-            )
+            logger.info("Blackout filtering enabled: %s", blackout_config)
 
-        result, enriched_data = run_portfolio_backtest(
+        # ---------------------------------------------------------------------
+        # Execution (Unified - Independent or Portfolio Mode)
+        # ---------------------------------------------------------------------
+        # Calls execute independent backtests per symbol using run_portfolio_backtest
+
+        result, symbol_data = run_portfolio_backtest(
             pair_paths=pair_paths,
             direction_mode=direction_mode,
             strategy_params=parameters,
@@ -842,920 +826,101 @@ Persistent storage not yet implemented."
             timeframe=args.timeframe,
             blackout_config=blackout_config,
             risk_config=risk_config,
+            # indicator_overrides=None, # Explicitly using defaults
         )
 
-        # Format and output portfolio results
-        from ..data_io.formatters import (
-            format_portfolio_json_output,
-            format_portfolio_text_output,
-        )
+        # Logic to display output
+        out_fmt = OutputFormat(args.output_format)
 
-        output_format = (
-            OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
-        )
+        # For now, we only handle PortfolioResult as implicit strict return type of run_portfolio_backtest
+        # (Legacy single-symbol BacktestResult not returned by this function)
+        if hasattr(result, "equity_curve"):  # Duck typing for PortfolioResult
+            if out_fmt == OutputFormat.TEXT:
+                print(format_portfolio_text_output(result, "trend-pullback"))
+            else:
+                print(format_portfolio_json_output(result))
 
-        if output_format == OutputFormat.JSON:
-            output_content = format_portfolio_json_output(result)
+        # Legacy BacktestResult support (only check if NOT a PortfolioResult)
+        elif hasattr(result, "is_multi_symbol") and result.is_multi_symbol:
+            if out_fmt == OutputFormat.TEXT:
+                print(format_multi_symbol_text_output(result, "trend-pullback"))
+            else:
+                print(format_multi_symbol_json_output(result))
         else:
-            strategy_name = args.strategy[0] if args.strategy else "UnknownStrategy"
-            if output_format == OutputFormat.JSON:
-                # JSON for portfolio not fully implemented in this block or uses specific one?
-                # The code at line 848 (in original file, inferred) handles JSON/Text.
-                pass
-                # Actually, let's just update the text call.
+            if out_fmt == OutputFormat.TEXT:
+                print(format_text_output(result, "trend-pullback"))
+            else:
+                print(format_json_output(result))
 
-            output_content = format_portfolio_text_output(
-                result, strategy_name=strategy_name
-            )
+        # Save to file
+        # Check if args.output is directory or file
+        output_path = args.output
+        if not output_path.exists():
+            output_path.mkdir(parents=True, exist_ok=True)
 
-        # Generate output filename
-        output_filename = generate_output_filename(
+        filename = generate_output_filename(
             direction=direction_mode,
-            output_format=output_format,
+            output_format=out_fmt,
             timestamp=result.start_time,
-            symbol_tag="portfolio",
-            timeframe_tag=(args.timeframe if args.timeframe != "1m" else None),
+            symbol_tag=(
+                result.symbols[0]
+                if hasattr(result, "symbols") and result.symbols
+                else getattr(result, "pair", "multi")
+            ),
+            timeframe_tag=args.timeframe,
         )
 
-        # Write results to file
-        output_path = args.output / output_filename
-        args.output.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(output_content)
-        logger.info("Results written to %s", output_path)
+        full_path = output_path / filename
+        with open(full_path, "w", encoding="utf-8") as f:
+            if hasattr(result, "equity_curve"):  # PortfolioResult
+                if out_fmt == OutputFormat.TEXT:
+                    f.write(format_portfolio_text_output(result, "trend-pullback"))
+                else:
+                    f.write(format_portfolio_json_output(result))
+            elif hasattr(result, "is_multi_symbol") and result.is_multi_symbol:
+                if out_fmt == OutputFormat.TEXT:
+                    f.write(format_multi_symbol_text_output(result, "trend-pullback"))
+                else:
+                    f.write(format_multi_symbol_json_output(result))
+            else:
+                if out_fmt == OutputFormat.TEXT:
+                    f.write(format_text_output(result, "trend-pullback"))
+                else:
+                    f.write(format_json_output(result))
+
+        logger.info("Results saved to %s", full_path)
+
+        # Visualization
         if args.visualize:
-            try:
-                from rich.console import Console
+            from ..visualization.datashader_viz import plot_backtest_results
 
-                from ..visualization.datashader_viz import (
-                    plot_backtest_results,
-                )
+            logger.info("Opening visualization...")
 
-                console = Console()
+            # Prepare data for visualization
+            # If multi-symbol, concat
+            if len(symbol_data) > 1:
+                # Concat all frames
+                dfs = []
+                for sym, df in symbol_data.items():
+                    # Add symbol col if not present
+                    if "symbol" not in df.columns:
+                        df = df.with_columns(pl.lit(sym).alias("symbol"))
+                    dfs.append(df)
 
-                # Show spinner while preparing data
-                with console.status(
-                    "[bold green]Preparing visualization data...[/bold green]"
-                ):
-                    # Combine enriched data (with indicators) for visualization
-                    symbol_dfs = []
-                    for symbol, df in enriched_data.items():
-                        # Add symbol column if not present
-                        if "symbol" not in df.columns:
-                            df = df.with_columns(pl.lit(symbol).alias("symbol"))
-                        symbol_dfs.append(df)
-                    all_symbol_data = pl.concat(symbol_dfs)
-                    # Convert PortfolioResult to BacktestResult-like structure
-                    # For visualization compatibility
+                viz_data = pl.concat(dfs)
+                pair_label = "PORTFOLIO"
+            else:
+                pair_label = list(symbol_data.keys())[0]
+                viz_data = symbol_data[pair_label]
 
-                    # Group executions by symbol
-                    symbol_executions: dict[str, list[TradeExecution]] = {}
-
-                    # Pre-initialize lists for all symbols loaded
-                    unique_symbols = all_symbol_data["symbol"].unique().to_list()
-                    for symbol in unique_symbols:
-                        symbol_executions[symbol] = []
-
-                    for trade in result.closed_trades:
-                        symbol = trade.symbol
-                        if symbol not in symbol_executions:
-                            symbol_executions[symbol] = []
-
-                        exec_obj = TradeExecution(
-                            signal_id=trade.signal_id,
-                            direction=trade.direction,
-                            open_timestamp=trade.entry_timestamp,
-                            entry_fill_price=trade.entry_price,
-                            close_timestamp=trade.exit_timestamp,
-                            exit_fill_price=trade.exit_price,
-                            exit_reason=trade.exit_reason,
-                            pnl_r=trade.pnl_r,
-                            slippage_entry_pips=0.0,
-                            slippage_exit_pips=0.0,
-                            costs_total=0.0,
-                            stop_price=0.0,
-                            target_price=0.0,
-                            portfolio_balance_at_exit=trade.portfolio_balance_at_exit,
-                            risk_percent=trade.risk_percent,
-                            risk_amount=trade.risk_amount,
-                        )
-                        symbol_executions[symbol].append(exec_obj)
-
-                    # Create per-symbol results
-                    results_dict = {}
-                    for symbol, execs in symbol_executions.items():
-                        results_dict[symbol] = BacktestResult(
-                            run_id=f"{result.run_id}_{symbol}",
-                            direction_mode=result.direction_mode,
-                            start_time=result.start_time,
-                            end_time=result.end_time,
-                            data_start_date=result.data_start_date,
-                            data_end_date=result.data_end_date,
-                            total_candles=0,
-                            signals=[],
-                            executions=execs,
-                            metrics=None,
-                            pair=symbol,
-                            timeframe=result.timeframe,
-                        )
-
-                    # Populate executions field with flat list of all trades
-                    executions = [
-                        trade
-                        for symbol_execs in symbol_executions.values()
-                        for trade in symbol_execs
-                    ]
-
-                    viz_result = BacktestResult(
-                        run_id=result.run_id,
-                        direction_mode=result.direction_mode,
-                        start_time=result.start_time,
-                        end_time=result.end_time,
-                        data_start_date=result.data_start_date,
-                        data_end_date=result.data_end_date,
-                        total_candles=0,
-                        signals=[],
-                        executions=executions,
-                        metrics=None,
-                        results=results_dict,
-                        pair="Multi-Symbol",
-                        symbols=list(results_dict.keys()),
-                        timeframe=result.timeframe,
-                    )
-
-                # Spinner ends here, then call plot which logs cleanly
-                plot_backtest_results(
-                    data=all_symbol_data,
-                    result=viz_result,
-                    pair="Portfolio",
-                    show_plot=True,
-                    start_date=args.viz_start,
-                    end_date=args.viz_end,
-                    timeframe=args.timeframe,
-                )
-            except ImportError as e:
-                logger.error(
-                    "Visualization module not found or dependency missing: %s",
-                    e,
-                )
-            except (RuntimeError, TypeError, ValueError, KeyError) as e:
-                logger.error(
-                    "Failed to generate visualization: %s",
-                    e,
-                    exc_info=True,
-                )
-
-        # CTI Evaluation (Feature 027)
-        if args.cti_mode:
-            from ..risk.prop_firm.loader import load_cti_config, load_scaling_plan
-            from ..risk.prop_firm.evaluator import evaluate_challenge
-            from ..risk.prop_firm.scaling import evaluate_scaling
-
-            logger.info(
-                "Running CTI Evaluation mode=%s scaling=%s",
-                args.cti_mode,
-                not args.disable_scaling,
+            plot_backtest_results(
+                data=viz_data,
+                result=result,
+                pair=pair_label,
+                show_plot=True,
+                initial_balance=parameters.account_balance,
+                timeframe=args.timeframe,
+                # date ranges and other configs ignored for now
             )
-
-            # Helper to process one set of executions
-            def process_cti(executions, label):
-                print(f"\n[CTI Evaluation: {label}]")
-                if not executions:
-                    print("  No trades to evaluate.")
-                    return
-
-                # Normalize ClosedTrade to TradeExecution if needed
-                # PortfolioResult uses ClosedTrade (exit_timestamp), TradeExecution uses close_timestamp
-                if hasattr(executions[0], "exit_timestamp") and not hasattr(
-                    executions[0], "close_timestamp"
-                ):
-                    # Use global imports
-
-                    norm_executions = []
-                    for t in executions:
-                        # Convert numpy datetime64 to pandas Timestamp (compatible with .date())
-                        open_ts = pd.Timestamp(t.entry_timestamp)
-                        close_ts = pd.Timestamp(t.exit_timestamp)
-
-                        norm_executions.append(
-                            TradeExecution(
-                                signal_id=getattr(t, "signal_id", "UNKNOWN"),
-                                direction=t.direction,
-                                open_timestamp=open_ts,
-                                entry_fill_price=t.entry_price,
-                                close_timestamp=close_ts,
-                                exit_fill_price=t.exit_price,
-                                exit_reason=t.exit_reason,
-                                pnl_r=t.pnl_r,
-                                slippage_entry_pips=0.0,
-                                slippage_exit_pips=0.0,
-                                costs_total=0.0,
-                                stop_price=0.0,
-                                target_price=0.0,
-                                risk_amount=t.risk_amount,
-                                risk_percent=t.risk_percent,
-                            )
-                        )
-                    executions = norm_executions
-
-                try:
-                    acc_size = parameters.account_balance
-                    if acc_size not in [2500, 5000, 10000, 25000, 50000, 100000]:
-                        logger.warning(
-                            "Account size %.2f might not match CTI presets (Usually 10k, 25k, etc.)",
-                            acc_size,
-                        )
-
-                    # Load base config
-                    challenge_conf = load_cti_config(args.cti_mode, acc_size)
-
-                    if not args.disable_scaling:
-                        # Load scaling plan
-                        scaling_plan = load_scaling_plan(args.cti_mode)
-                        report = evaluate_scaling(
-                            executions, challenge_conf, scaling_plan
-                        )
-
-                        # Build Report String
-                        lines = []
-                        promotions = sum(
-                            1 for l in report.lives if l.status == "PROMOTED"
-                        )
-                        resets = sum(
-                            1 for l in report.lives if l.status.startswith("FAILED")
-                        )
-
-                        # Calculate Payouts (ignore negative life PnLs)
-                        payout_100 = sum(max(0, l.pnl) for l in report.lives)
-                        payout_80 = payout_100 * 0.8
-
-                        lines.append(
-                            f"  Scaling Report (Total Lives: {len(report.lives)} | Promotions: {promotions} | Resets: {resets})"
-                        )
-                        lines.append(
-                            f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
-                        )
-                        for life in report.lives:
-                            target_amt = (
-                                life.start_tier_balance * scaling_plan.profit_target_pct
-                            )
-                            lines.append(
-                                f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={life.status}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
-                            )
-                            s_str = life.start_date.strftime("%Y-%m-%d %H:%M")
-                            e_str = life.end_date.strftime("%Y-%m-%d %H:%M")
-                            lines.append(f"      Period: {s_str} to {e_str}")
-
-                            if life.metrics:
-                                m = life.metrics
-                                lines.append(
-                                    f"      Stats: {m.win_count} Wins, {m.loss_count} Losses | "
-                                    f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
-                                )
-
-                            if life.status == "FAILED_DRAWDOWN":
-                                reason = (
-                                    life.failure_reason
-                                    if life.failure_reason
-                                    else "Drawdown Violation"
-                                )
-                                # Calculate approx review date (4 months)
-                                from datetime import timedelta
-
-                                review_date = life.start_date + timedelta(days=120)
-                                review_str = review_date.strftime("%Y-%m-%d")
-
-                                lines.append(
-                                    f"      Failure: {reason} (End: {life.end_date})"
-                                )
-                                lines.append(
-                                    f"      Context: Promotion Review was due ~{review_str}"
-                                )
-                            elif life.status == "PROMOTED":
-                                lines.append(
-                                    f"      Success: Promoted to Tier Balance ${report.lives[life.life_id].start_tier_balance:.2f} (if next life exists)"
-                                )
-                            lines.append("")  # Blank line for readability
-                        lines.append(f"  Active Life Index: {report.active_life_index}")
-
-                        # Append to file
-                        with open(output_path, "a", encoding="utf-8") as f:
-                            f.write(f"\n\n[CTI Evaluation: {label}]\n")
-                            f.write("\n".join(lines))
-                            f.write("\n")
-
-                        # Console Summary
-                        print(
-                            f"[CTI Evaluation: {label}] Completed. See results file for details."
-                        )
-
-                    else:
-                        # Single Challenge Evaluation (with Retry on Failure Logic)
-                        remaining_execs = executions
-                        life_id = 1
-                        lives = []
-
-                        header = f"\n[CTI Evaluation: {label}]"
-                        print(header.strip())  # Print header once at start
-                        details = []
-
-                        while remaining_execs:
-                            result = evaluate_challenge(
-                                remaining_execs, challenge_conf, life_id=life_id
-                            )
-                            lives.append(result)
-
-                            target_amt = (
-                                result.start_tier_balance
-                                * challenge_conf.profit_target_pct
-                            )
-                            details.append(
-                                f"  Life #{result.life_id} [Tier ${result.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={result.status}, PnL=${result.pnl:.2f}, EndBal=${result.end_balance:.2f}"
-                            )
-                            s_str = result.start_date.strftime("%Y-%m-%d %H:%M")
-                            e_str = result.end_date.strftime("%Y-%m-%d %H:%M")
-                            details.append(f"    Period: {s_str} to {e_str}")
-
-                            if result.metrics:
-                                m = result.metrics
-                                details.append(
-                                    f"    Stats: {m.win_count} Wins, {m.loss_count} Losses | "
-                                    f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
-                                )
-
-                            if result.status.startswith("FAILED"):
-                                reason = (
-                                    result.failure_reason
-                                    if result.failure_reason
-                                    else result.status
-                                )
-                                # Calculate approx review date (4 months)
-                                from datetime import timedelta
-
-                                review_date = result.start_date + timedelta(days=120)
-                                review_str = review_date.strftime("%Y-%m-%d")
-
-                                details.append(
-                                    f"      Failure: {reason} (End: {result.end_date})"
-                                )
-                                details.append(
-                                    f"      Context: Promotion Review was due ~{review_str}"
-                                )
-                                # If failed, consume trades up to failure and RETRY with remaining
-                                if result.trade_count < len(remaining_execs):
-                                    details.append(
-                                        "      -> Resetting to Initial Balance (New Life)..."
-                                    )
-                                    remaining_execs = remaining_execs[
-                                        result.trade_count :
-                                    ]
-                                    life_id += 1
-                                else:
-                                    details.append(
-                                        "      -> Failed (No more data available to reset)."
-                                    )
-                                    break
-                            else:
-                                # Passed or Incomplete
-                                # Passed or Incomplete
-                                if result.status == "PASSED":
-                                    details.append(
-                                        f"      Success: PASSED (End: {result.end_date})"
-                                    )
-                                break
-
-                            # Dynamic progress update (overwrite line)
-                            print(
-                                f"\r  Processing Life #{life_id}... Status={result.status}, PnL=${result.pnl:.2f}",
-                                end="",
-                                flush=True,
-                            )
-
-                        # Summary
-                        total_failures = sum(
-                            1 for l in lives if l.status.startswith("FAILED")
-                        )
-                        total_passed = sum(1 for l in lives if l.status == "PASSED")
-                        summary_str = f"\n  Summary: {total_passed} Passed, {total_failures} Failed out of {len(lives)} Attempts."
-
-                        # Append to file
-                        with open(output_path, "a", encoding="utf-8") as f:
-                            f.write(header + "\n")
-                            f.write("\n".join(details))
-                            f.write(summary_str + "\n")
-
-                        # Console Summary
-                        # Clear progress line explicitly and move to new line
-                        print("\r" + " " * 100 + "\r", end="", flush=True)
-                        print(summary_str.strip())
-
-                except Exception as e:  # pylint: disable=broad-except
-                    logger.error("CTI Evaluation Failed: %s", e)
-                    print(f"  Error: {e}")
-
-            # Dispatch based on result type
-            if hasattr(result, "results"):  # Independent MultiSymbolResult
-                for sym, res in result.results.items():
-                    if res.executions:
-                        process_cti(res.executions, sym)
-                    else:
-                        print(f"\n[CTI Evaluation: {sym}] No trades.")
-            elif hasattr(result, "closed_trades"):  # PortfolioResult
-                process_cti(result.closed_trades, "PORTFOLIO_AGGREGATE")
-                # Also check per-symbol breakdowns if needed, but portfolio aggregate is main focus for CTI on portfolio.
-            # Fallback for BacktestResult (if Single mode returns that)
-            elif hasattr(result, "executions"):
-                process_cti(result.executions, getattr(result, "pair", "SINGLE"))
-
-        return 0  # Exit after backtest completes
-    elif not args.data.exists():
-        print(f"Error: Data file not found: {args.data}", file=sys.stderr)
-        sys.exit(1)
-
-    logger.info("Starting directional backtest")
-    logger.info("Direction: %s", args.direction)
-    logger.info("Strategy: %s", ", ".join(args.strategy))
-    # Optional pair inference if user did not explicitly override default
-    # and data path suggests a different pair
-    inferred_pair = None
-    try:
-        # Examine parts of path for 6-letter currency code (e.g., usdjpy)
-        # reverse for specificity (file/parent dirs first)
-        for part in args.data.parts[::-1]:
-            part_lower = part.lower()
-            if len(part_lower) == 6 and part_lower.isalpha():
-                inferred_pair = part_lower.upper()
-                break
-        if (
-            inferred_pair
-            and len(args.pair) == 1
-            and args.pair[0].upper() != inferred_pair
-        ):
-            logger.info(
-                "Inferred pair '%s' from data path (overriding '%s'). "
-                "Pass --pair to force a different symbol.",
-                inferred_pair,
-                args.pair[0].upper(),
-            )
-            args.pair[0] = inferred_pair  # mutate for subsequent usage
-    except (AttributeError, IndexError, ValueError) as ex:
-        logger.warning("Pair inference failed: %s", ex)
-
-    logger.info("Pair(s): %s", ", ".join(args.pair))
-    logger.info("Data: %s", args.data)
-    logger.info("Dry-run: %s", args.dry_run)
-
-    # Validate Phase 6 (US4) multi-symbol flags
-    if args.correlation_threshold is not None:
-        if not 0.0 <= args.correlation_threshold <= 1.0:
-            print(
-                "Error: --correlation-threshold must be between 0.0 and 1.0. "
-                f"Got: {args.correlation_threshold}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if args.portfolio_mode != "portfolio":
-            logger.warning(
-                "--correlation-threshold only applies to portfolio mode, but "
-                "--portfolio-mode=%s specified. Ignoring threshold.",
-                args.portfolio_mode,
-            )
-
-    if args.snapshot_interval is not None:
-        if args.snapshot_interval <= 0:
-            print(
-                "Error: --snapshot-interval must be positive. "
-                f"Got: {args.snapshot_interval}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if args.portfolio_mode != "portfolio":
-            logger.warning(
-                "--snapshot-interval only applies to portfolio mode, but "
-                "--portfolio-mode=%s specified. Ignoring interval.",
-                args.portfolio_mode,
-            )
-
-    # Log portfolio mode settings
-    if len(args.pair) > 1:
-        logger.info("Portfolio mode: %s", args.portfolio_mode)
-        if args.disable_symbol:
-            logger.info("Disabled symbols: %s", ", ".join(args.disable_symbol))
-        if (
-            args.correlation_threshold is not None
-            and args.portfolio_mode == "portfolio"
-        ):
-            logger.info(
-                "Correlation threshold override: %.2f", args.correlation_threshold
-            )
-        if args.snapshot_interval is not None and args.portfolio_mode == "portfolio":
-            logger.info("Snapshot interval: %d bars", args.snapshot_interval)
-
-    # Create output directory
-    args.output.mkdir(parents=True, exist_ok=True)
-
-    # Initialize profiler if profiling enabled
-    profiler = None
-    if args.profile:
-        from ..backtest.profiling import ProfilingContext
-
-        profiler = ProfilingContext()
-
-    # Use data path directly
-    data_path = Path(args.data)
-    converted_csv = data_path
-    use_arrow = data_path.suffix.lower() == ".parquet"
-
-    logger.info("Using data file: %s", converted_csv)
-
-    # Load strategy parameters (using defaults)
-    parameters = StrategyParameters()
-    logger.info(
-        "Using strategy parameters: EMA(%d/%d), ATR mult: %.1f",
-        parameters.ema_fast,
-        parameters.ema_slow,
-        parameters.atr_stop_mult,
-    )
-
-    # Execute backtest with optional profiling context
-    profiling_ctx = profiler if profiler else nullcontext()
-    with profiling_ctx:
-        # Ingest candles with phase timing
-        if profiler:
-            profiler.start_phase("ingest")
-
-        # Load strategy to get required indicators
-        strategy = TREND_PULLBACK_STRATEGY
-        required_indicators = strategy.metadata.required_indicators
-
-        logger.info(
-            "Strategy: %s v%s",
-            strategy.metadata.name,
-            strategy.metadata.version,
-        )
-        logger.info("Required indicators: %s", required_indicators)
-
-        # Stage 1: Core ingestion (OHLCV only) - Force Polars for vectorized path
-        logger.info("Stage 1/2: Loading OHLCV data...")
-        try:
-            ingestion_result = ingest_ohlcv_data(
-                path=converted_csv,
-                timeframe_minutes=1,
-                mode="columnar",
-                downcast=False,
-                use_arrow=use_arrow,
-                strict_cadence=False,  # FX data has gaps (weekends/holidays)
-                fill_gaps=False,  # Preserve gaps - don't create synthetic price data
-                return_polars=True,  # Always use Polars for vectorized path
-            )
-        except (FileNotFoundError, ValueError, RuntimeError) as e:
-            logger.error("Error during data ingestion: %s", e, exc_info=True)
-            sys.exit(1)
-        logger.info(
-            "✓ Ingested %d rows in %.2fs",
-            len(ingestion_result.data),
-            ingestion_result.metrics.runtime_seconds,
-        )
-
-        # Parse and validate timeframe (T013)
-        try:
-            timeframe = parse_timeframe(args.timeframe)
-            timeframe_minutes = timeframe.period_minutes
-            logger.info("Timeframe: %s (%d minutes)", args.timeframe, timeframe_minutes)
-        except ValueError as e:
-            logger.error("Invalid timeframe: %s", e)
-            sys.exit(1)
-
-        # Stage 1.5: Resample to target timeframe if not 1m (T014)
-
-        enriched_df = ingestion_result.data
-        if isinstance(enriched_df, pd.DataFrame):
-            enriched_df = pl.from_pandas(enriched_df)
-
-        # Renaming 'timestamp' to 'timestamp_utc' if needed
-        if "timestamp" in enriched_df.columns:
-            enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
-
-        if timeframe_minutes > 1:
-            logger.info(
-                "Stage 1.5: Resampling to %dm timeframe...",
-                timeframe_minutes,
-            )
-            original_rows = len(enriched_df)
-
-            # Use caching for resampled data (T027)
-            pair = args.pair[0] if args.pair else "UNKNOWN"
-            enriched_df = resample_with_cache(
-                df=enriched_df,
-                instrument=pair,
-                tf_minutes=timeframe_minutes,
-                resample_fn=resample_ohlcv,
-            )
-
-            logger.info(
-                "✓ Resampled %d → %d bars (%dm)",
-                original_rows,
-                len(enriched_df),
-                timeframe_minutes,
-            )
-
-            # Check for incomplete bar warning (FR-015, T030)
-            if "bar_complete" in enriched_df.columns:
-                incomplete_count = enriched_df.filter(
-                    pl.col("bar_complete").not_()
-                ).height
-                total_bars = len(enriched_df)
-                if total_bars > 0:
-                    incomplete_pct = (incomplete_count / total_bars) * 100
-                    if incomplete_pct > 10.0:
-                        logger.warning(
-                            "%.1f%% of bars are incomplete (threshold: 10%%). "
-                            "This indicates data gaps in the source data.",
-                            incomplete_pct,
-                        )
-
-        # Stage 2: Vectorized indicator calculation
-        logger.info("Stage 2/2: Computing technical indicators (vectorized)...")
-
-        # Calculate indicators dynamically based on strategy requirements
-        enriched_df = calculate_indicators(enriched_df, required_indicators)
-
-        logger.info("✓ Computed indicators: %s", required_indicators)
-
-        # Create orchestrator early to check for optimized path
-        direction_mode = DirectionMode[args.direction]
-        use_optimized_path = True  # Always use vectorized path as per refactor
-
-        # Set default benchmark output path if profiling enabled
-        benchmark_path = args.benchmark_out
-        if args.profile and not benchmark_path:
-            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-            benchmark_path = Path("results/benchmarks") / f"benchmark_{timestamp}.json"
-
-        show_progress = sys.stdout.isatty()
-
-        orchestrator = BacktestOrchestrator(
-            direction_mode=direction_mode,
-            dry_run=args.dry_run,
-            enable_profiling=args.profile,
-            enable_progress=show_progress,
-        )
-
-        # Attach profiler to orchestrator if profiling enabled
-        if profiler:
-            orchestrator.profiler = profiler
-
-        # Single-symbol mode uses vectorized path
-        pair = args.pair[0]
-        strategy_name = args.strategy[0]  # Currently only trend-pullback supported
-
-        run_id = (
-            f"{args.direction.lower()}_"
-            f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-        )
-        logger.info(
-            "Running backtest with run_id=%s, pair=%s, strategy=%s",
-            run_id,
-            pair,
-            strategy_name,
-        )
-
-        # Build signal parameters from strategy config
-        signal_params = parameters.model_dump()
-
-        # Call vectorized backtest with Polars DataFrame
-        logger.info("Using vectorized backtest path (Polars)")
-
-        # Debug: Verify all required indicators are present
-        logger.info("DataFrame columns before backtest: %s", enriched_df.columns)
-        missing = [col for col in required_indicators if col not in enriched_df.columns]
-        if missing:
-            logger.error("Missing required indicators: %s", missing)
-
-        result = orchestrator.run_backtest(
-            candles=enriched_df,
-            pair=pair,
-            run_id=run_id,
-            strategy=TREND_PULLBACK_STRATEGY,
-            **signal_params,
-        )
-
-        # Add timeframe to result for output formatting (FR-015)
-        result = replace(result, timeframe=args.timeframe)
-
-        logger.info("Backtest complete: %s", result.run_id)
-
-        # Calculate metrics (Moved up for availability)
-        dataset_rows = len(enriched_df)
-        trades_simulated = 0
-        if result.metrics:
-            if hasattr(result.metrics, "combined"):
-                trades_simulated = result.metrics.combined.trade_count
-            elif hasattr(result.metrics, "trade_count"):
-                trades_simulated = result.metrics.trade_count
-
-        # Write benchmark artifact if profiling enabled
-        phase_times = {}
-        if args.profile and benchmark_path:
-            import tracemalloc
-
-            from ..backtest.profiling import write_benchmark_record
-
-            # Get phase times from orchestrator if available
-            hotspots = []
-            if profiler:
-                phase_times = profiler.get_phase_times()
-                hotspots = profiler.get_hotspots(n=10)  # SC-008: ≥10 hotspots
-
-            # Memory metrics (approximate if tracemalloc not used)
-            memory_peak_mb = 0.0
-            memory_ratio = 1.0
-            if tracemalloc.is_tracing():
-                _, peak = tracemalloc.get_traced_memory()
-                memory_peak_mb = peak / (1024 * 1024)
-                # Estimate raw dataset size (rough approximation)
-                raw_bytes = (
-                    dataset_rows * 8 * 6
-                )  # 8 bytes per float, 6 columns (OHLC+V+T)
-                memory_ratio = peak / raw_bytes if raw_bytes > 0 else 1.0
-
-            wall_clock_total = sum(phase_times.values()) if phase_times else 0.0
-
-            write_benchmark_record(
-                output_path=benchmark_path,
-                dataset_rows=dataset_rows,
-                trades_simulated=trades_simulated,
-                phase_times=phase_times,
-                wall_clock_total=wall_clock_total,
-                memory_peak_mb=memory_peak_mb,
-                memory_ratio=memory_ratio,
-                hotspots=hotspots,  # Include cProfile hotspots
-            )
-            logger.info("Benchmark artifact written to %s", benchmark_path)
-
-        # T011 Integration: Interactive Visualization
-        if args.visualize:
-            try:
-                from rich.console import Console
-
-                from ..visualization.datashader_viz import plot_backtest_results
-
-                console = Console()
-                logger.info("Generating Datashader visualization...")
-
-                with console.status(
-                    "[bold green]Preparing visualization (Datashader)...[/bold green]"
-                ):
-                    plot_backtest_results(
-                        data=enriched_df,
-                        result=result,
-                        pair=pair,
-                        show_plot=True,
-                        start_date=args.viz_start,
-                        end_date=args.viz_end,
-                        timeframe=args.timeframe,
-                        viz_config=strategy.get_visualization_config(),
-                    )
-
-            except ImportError as e:
-                logger.error(
-                    "Visualization module not found or dependency missing: %s",
-                    e,
-                )
-            except (RuntimeError, TypeError, ValueError, KeyError) as e:
-                logger.error("Failed to generate visualization: %s", e, exc_info=True)
-
-    # Format output (outside profiling context)
-    output_format = (
-        OutputFormat.JSON if args.output_format == "json" else OutputFormat.TEXT
-    )
-
-    # Check if this is a multi-symbol result
-    is_multi_symbol_result = result.is_multi_symbol
-
-    if is_multi_symbol_result:
-        # Multi-symbol formatting (T025)
-        from ..data_io.formatters import (
-            format_multi_symbol_json_output,
-            format_multi_symbol_text_output,
-        )
-
-        strategy_name = strategy.__class__.__name__ if strategy else "UnknownStrategy"
-        if output_format == OutputFormat.JSON:
-            output_content = format_multi_symbol_json_output(result)
-        else:
-            output_content = format_multi_symbol_text_output(
-                result, strategy_name=strategy_name
-            )
-    else:
-        # Single-symbol formatting
-        strategy_name = strategy.__class__.__name__ if strategy else "UnknownStrategy"
-        if output_format == OutputFormat.JSON:
-            output_content = format_json_output(result)
-        else:
-            output_content = format_text_output(result, strategy_name=strategy_name)
-
-    # Generate output filename
-    # Derive symbol tag for filename (FR-023)
-    # Future multi-symbol logic will set 'multi'
-    symbol_tag = None
-    if hasattr(result, "pair") and result.pair:
-        symbol_tag = result.pair.lower()
-    if hasattr(result, "symbols") and result.symbols and len(result.symbols) > 1:
-        symbol_tag = "multi"
-
-    output_filename = generate_output_filename(
-        direction=direction_mode,
-        output_format=output_format,
-        timestamp=result.start_time,
-        symbol_tag=symbol_tag,
-        timeframe_tag=args.timeframe if args.timeframe != "1m" else None,
-    )
-    output_path = args.output / output_filename
-
-    # Write output file
-    output_path.write_text(output_content)
-    logger.info("Results written to %s", output_path)
-
-    # Emit PerformanceReport if requested (Feature 010: T077)
-    if args.emit_perf_report and use_optimized_path:
-        logger.info("Emitting PerformanceReport for optimized backtest")
-        from ..backtest.report_writer import ReportWriter
-        from ..models.performance_report import PerformanceReport
-
-        # Extract metrics from result
-        scan_duration = 0.0
-        simulation_duration = 0.0
-        signal_count = len(result.signals) if result.signals else 0
-        trade_count = len(result.executions) if result.executions else 0
-
-        # Try to extract timing from orchestrator phases if available
-        if hasattr(orchestrator, "_phase_times"):
-            scan_duration = orchestrator._phase_times.get("scan", 0.0)
-            simulation_duration = orchestrator._phase_times.get("simulation", 0.0)
-
-        # Create PerformanceReport
-        # Note: Some fields use placeholder values pending full instrumentation
-        perf_report = PerformanceReport(
-            scan_duration_sec=scan_duration,
-            simulation_duration_sec=simulation_duration,
-            peak_memory_mb=0.0,  # TODO: Add memory tracking
-            manifest_path="",  # TODO: Add manifest tracking
-            manifest_sha256="0" * 64,  # Placeholder
-            candle_count=result.total_candles,
-            signal_count=signal_count,
-            trade_count=trade_count,
-            equivalence_verified=False,  # Not applicable for optimized-only run
-            progress_emission_count=0,  # TODO: Track from progress dispatcher
-            progress_overhead_pct=None,
-            indicator_names=[],  # TODO: Extract from strategy metadata
-            deterministic_mode=False,
-            allocation_count_scan=None,
-            allocation_reduction_pct=None,
-            duplicate_timestamps_removed=0,
-            duplicate_first_ts=None,
-            duplicate_last_ts=None,
-            created_at=datetime.now(UTC),
-        )
-
-        # Write report to JSON
-        writer = ReportWriter(output_dir=str(args.output))
-        report_path = writer.write_report(perf_report)
-        logger.info("PerformanceReport written to %s", report_path)
-        print(f"Performance report: {report_path}")
-    elif args.emit_perf_report and not use_optimized_path:
-        logger.warning(
-            "PerformanceReport emission requested but optimized path not used. "
-            "Skipping report emission."
-        )
-
-    # Print summary to console
-    if output_format == OutputFormat.TEXT:
-        print(output_content)
-    else:
-        print(f"Results saved to: {output_path}")
-        if is_multi_symbol_result:
-            # Multi-symbol summary
-            print(f"Direction: {result.direction_mode}")
-            print(f"Symbols: {', '.join(result.symbols)}")
-            print(f"Successful: {len(result.results)}")
-            print(f"Failed: {len(result.failures)}")
-        else:
-            # Single-symbol summary
-            print(f"Direction: {result.direction_mode}")
-            print(f"Total candles: {result.total_candles}")
-            if result.metrics and hasattr(result.metrics, "combined"):
-                metrics = result.metrics.combined
-                print(f"Trades: {metrics.trade_count}")
-                print(f"Win rate: {metrics.win_rate:.2%}")
-            elif result.metrics:
-                print(f"Trades: {result.metrics.trade_count}")
-                print(f"Win rate: {result.metrics.win_rate:.2%}")
 
     return 0
-
-
-if __name__ == "__main__":
-    # Force UTF-8 encoding for stdout and stderr (only when run as script)
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
-    sys.exit(main())

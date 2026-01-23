@@ -12,9 +12,9 @@ This task list follows a User Story-based execution flow. Each phase represents 
 
 ### Phase 1: Setup
 
-- [ ] T001 Verify project structure and `pyproject.toml` existence for `package-quantpipe-cli` feature
-- [ ] T002 [P] Create `src/cli` directory if it doesn't strictly exist (it does, but verifying context)
-- [ ] T003 Verify `poetry` environment is active and running
+- [x] T001 Verify project structure and `pyproject.toml` existence for `package-quantpipe-cli` feature
+- [x] T002 [P] Create `src/cli` directory if it doesn't strictly exist (it does, but verifying context)
+- [x] T003 Verify `poetry` environment is active and running
 
 ## Checkpoint: Foundation
 
@@ -22,10 +22,10 @@ This task list follows a User Story-based execution flow. Each phase represents 
 
 ### Phase 2: Foundational Components (Splitting Logic)
 
-- [ ] T004 Refactor `src/cli/run_backtest.py` to extract `configure_backtest_parser` function
-- [ ] T005 Refactor `src/cli/run_backtest.py` to extract `run_backtest_command` function
-- [ ] T006 Ensure `src/cli/run_backtest.py` `main()` block calls extracted functions (Backward Compatibility)
-- [ ] T007 [P] Create `src/cli/main.py` entry point file skeleton
+- [x] T004 Refactor `src/cli/run_backtest.py` to extract `configure_backtest_parser` function
+- [x] T005 Refactor `src/cli/run_backtest.py` to extract `run_backtest_command` function
+- [x] T006 Ensure `src/cli/run_backtest.py` `main()` block calls extracted functions (Backward Compatibility)
+- [x] T007 [P] Create `src/cli/main.py` entry point file skeleton
 
 ## Checkpoint: User Story 1 - Install and Verify CLI (MVP!)
 
@@ -41,10 +41,10 @@ This task list follows a User Story-based execution flow. Each phase represents 
 
 ### Phase 3: Installable CLI [US1]
 
-- [ ] T008 [US1] Implement `main()` in `src/cli/main.py` with `argparse` and subcommands support
-- [ ] T009 [US1] Update `pyproject.toml` to add `[tool.poetry.scripts]` mapping `quantpipe = "src.cli.main:main"`
-- [ ] T010 [US1] Verify `poetry install` succeeds
-- [ ] T011 [US1] Verify `poetry run quantpipe --help` works
+- [x] T008 [US1] Implement `main()` in `src/cli/main.py` with `argparse` and subcommands support
+- [x] T009 [US1] Update `pyproject.toml` to add `[tool.poetry.scripts]` mapping `quantpipe = "src.cli.main:main"`
+- [x] T010 [US1] Verify `poetry install` succeeds
+- [x] T011 [US1] Verify `poetry run quantpipe --help` works
 
 ## Checkpoint: User Story 2 - Execute Backtest via CLI
 
@@ -59,9 +59,9 @@ This task list follows a User Story-based execution flow. Each phase represents 
 
 ### Phase 4: Backtest Subcommand [US2]
 
-- [ ] T012 [P] [US2] Wire `backtest` subcommand in `src/cli/main.py` to use `configure_backtest_parser`
-- [ ] T013 [P] [US2] Wire `backtest` subcommand execution in `src/cli/main.py` to use `run_backtest_command`
-- [ ] T014 [US2] Manual verification: Run short backtest via `poetry run quantpipe backtest --dry-run`
+- [x] T012 [P] [US2] Wire `backtest` subcommand in `src/cli/main.py` to use `configure_backtest_parser`
+- [x] T013 [P] [US2] Wire `backtest` subcommand execution in `src/cli/main.py` to use `run_backtest_command`
+- [x] T014 [US2] Manual verification: Run short backtest via `poetry run quantpipe backtest --dry-run`
 
 ## Checkpoint: Polish & Documentation
 
@@ -69,8 +69,8 @@ This task list follows a User Story-based execution flow. Each phase represents 
 
 ### Phase 5: Polish
 
-- [ ] T015 [P] Add docstrings to `src/cli/main.py` explaining subcommand structure
-- [ ] T016 [P] Update `README.md` (if applicable) or create `docs/cli.md` with `quantpipe` usage examples
+- [x] T015 [P] Add docstrings to `src/cli/main.py` explaining subcommand structure
+- [x] T016 [P] Update `README.md` (if applicable) or create `docs/cli.md` with `quantpipe` usage examples
 
 ## Dependencies
 
