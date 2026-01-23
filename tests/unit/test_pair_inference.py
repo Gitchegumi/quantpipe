@@ -4,14 +4,9 @@ from pathlib import Path
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from src.cli.run_backtest import main as run_main  # We will not execute main directly here.
+from src.cli.main import main as run_main
 from src.cli.run_backtest import logger as run_logger
-
-# NOTE: Direct invocation of main() is complex due to argparse & side effects.
-# Instead test inference logic via a small extracted helper approach by
-# simulating the path parts.
-
-from src.cli.run_backtest import argparse  # reuse for constructing args
+import argparse
 
 
 def infer_pair_from_path(p: Path) -> str | None:

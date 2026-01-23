@@ -7,11 +7,11 @@ Verifies that:
 """
 
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, mock_open
 from pathlib import Path
 import pytest
 
-from src.cli.run_backtest import main
+from src.cli.main import main
 from src.models.enums import DirectionMode
 
 
@@ -21,12 +21,9 @@ def mock_dependencies():
     with (
         patch("src.cli.run_backtest.construct_data_paths") as mock_paths,
         patch("src.cli.run_backtest.run_portfolio_backtest") as mock_portfolio,
-        patch("src.cli.run_backtest.run_multi_symbol_backtest") as mock_multi,
-        patch("src.cli.run_backtest.BacktestOrchestrator") as mock_orch,
-        patch("src.cli.run_backtest.ingest_ohlcv_data") as mock_ingest,
-        patch("src.cli.run_backtest.generate_output_filename") as mock_filename,
         patch("pathlib.Path.mkdir"),
-        patch("pathlib.Path.write_text"),
+        patch("pathlib.Path.exists", return_value=True),
+        patch("builtins.open", mock_open()),
     ):
 
         # Setup default returns
@@ -36,30 +33,35 @@ def mock_dependencies():
         ]
 
         # Mock portfolio result
+        from datetime import datetime
+
         mock_result = MagicMock()
-        mock_result.start_time = "20230101_000000"
+        mock_result.start_time = datetime(2023, 1, 1)
         mock_result.direction_mode = DirectionMode.LONG
-        mock_result.end_time = "20230101_000000"
-        mock_result.data_start_date = "2023-01-01"
-        mock_result.data_end_date = "2023-01-01"
+        mock_result.end_time = datetime(2023, 1, 1)
+        mock_result.data_start_date = datetime(2023, 1, 1)
+        mock_result.data_end_date = datetime(2023, 1, 1)
         mock_result.closed_trades = []
+        mock_result.symbols = ["EURUSD", "USDJPY"]
+        mock_result.starting_equity = 10000.0
+        mock_result.final_equity = 11000.0
+        mock_result.total_pnl = 1000.0
+        # PortfolioResult duck typing
+        mock_result.equity_curve = []
 
         mock_portfolio.return_value = (mock_result, {})  # (result, enriched_data)
 
         yield {
             "paths": mock_paths,
             "portfolio": mock_portfolio,
-            "multi": mock_multi,
-            "orch": mock_orch,
-            "ingest": mock_ingest,
         }
 
 
-def test_portfolio_mode_execution_flow(mock_dependencies):
-    """Test that --portfolio-mode executes portfolio path and exits."""
+def test_unified_portfolio_execution_flow(mock_dependencies):
+    """Test that multiple pairs trigger run_portfolio_backtest."""
     test_args = [
-        "run_backtest.py",
-        "--portfolio-mode",
+        "quantpipe",
+        "backtest",
         "--pair",
         "EURUSD",
         "USDJPY",
@@ -76,29 +78,5 @@ def test_portfolio_mode_execution_flow(mock_dependencies):
             assert e.code == 0
 
     # Verification
-    # 1. Portfolio backtest MUST be called
+    # 1. Portfolio backtest MUST be called for multi-symbol
     mock_dependencies["portfolio"].assert_called_once()
-
-    # 2. Multi-symbol (independent) backtest MUST NOT be called
-    mock_dependencies["multi"].assert_not_called()
-
-    # 3. Single-symbol Orchestrator MUST NOT be initialized (double check)
-    mock_dependencies["orch"].assert_not_called()
-
-
-def test_independent_mode_fallback(mock_dependencies):
-    """Verify that WITHOUT --portfolio-mode, it uses the independent path."""
-    test_args = ["run_backtest.py", "--pair", "EURUSD", "USDJPY", "--dry-run"]
-
-    with patch.object(sys, "argv", test_args):
-        try:
-            main()
-        except SystemExit:
-            pass
-
-    # Verification
-    # 1. Portfolio backtest MUST NOT be called
-    mock_dependencies["portfolio"].assert_not_called()
-
-    # 2. Multi-symbol backtest MUST be called
-    mock_dependencies["multi"].assert_called_once()

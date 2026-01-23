@@ -134,8 +134,12 @@ def plot_backtest_results(
     # Initialize HoloViews with Bokeh backend
     hv.extension("bokeh")
 
-    # Handle multi-symbol results
-    if result.is_multi_symbol and result.results:
+    # Handle multi-symbol results (either legacy is_multi_symbol or new PortfolioResult with >1 symbols)
+    is_multi = getattr(result, "is_multi_symbol", False)
+    if not is_multi and hasattr(result, "symbols") and len(result.symbols) > 1:
+        is_multi = True
+
+    if is_multi and hasattr(result, "results"):
         return _create_multi_symbol_layout(
             data,
             result,

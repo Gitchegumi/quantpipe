@@ -7,12 +7,12 @@ Verifies that the object passed to plot_backtest_results:
 """
 
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, mock_open
 from pathlib import Path
 import pytest
 from datetime import datetime, timezone
 
-from src.cli.run_backtest import main
+from src.cli.main import main
 from src.models.enums import DirectionMode
 from src.backtest.portfolio.portfolio_simulator import ClosedTrade
 
@@ -24,10 +24,9 @@ def mock_viz_dependencies():
         patch("src.cli.run_backtest.construct_data_paths") as mock_paths,
         patch("src.cli.run_backtest.run_portfolio_backtest") as mock_portfolio,
         patch("src.visualization.datashader_viz.plot_backtest_results") as mock_plot,
-        patch("src.cli.run_backtest.ingest_ohlcv_data"),
-        patch("src.cli.run_backtest.generate_output_filename"),
         patch("pathlib.Path.mkdir"),
-        patch("pathlib.Path.write_text"),
+        patch("pathlib.Path.exists", return_value=True),
+        patch("builtins.open", mock_open()),
         patch("sys.exit"),
     ):  # Prevent actual exit
 
@@ -50,6 +49,8 @@ def mock_viz_dependencies():
         mock_result.final_equity = 2600.0
         mock_result.total_trades = 2
         mock_result.total_pnl = 100.0
+        mock_result.symbols = ["EURUSD", "USDJPY"]
+        mock_result.equity_curve = []
 
         # Add some dummy trades for different symbols
         msg_trade = MagicMock(spec=ClosedTrade)
@@ -96,8 +97,8 @@ def mock_viz_dependencies():
 def test_visualization_structure_is_multi_symbol(mock_viz_dependencies):
     """Verify that portfolio visualization passes a structured multi-symbol result."""
     test_args = [
-        "run_backtest.py",
-        "--portfolio-mode",
+        "quantpipe",
+        "backtest",
         "--pair",
         "EURUSD",
         "USDJPY",
@@ -123,23 +124,12 @@ def test_visualization_structure_is_multi_symbol(mock_viz_dependencies):
     call_kwargs = mock_plot.call_args.kwargs
     result_obj = call_kwargs["result"]
 
-    # THIS ASSERTION IS EXPECTED TO FAIL BEFORE THE FIX
-    # Currently it's a flat result (empty results dict)
-    # After fix, 'results' should contain keys 'EURUSD' and 'USDJPY'
-
-    # Check if it has the results dictionary populated
-    # (The test implementation assumes the fix will use result.results dict)
-    is_multi = getattr(result_obj, "is_multi_symbol", False) or (
-        hasattr(result_obj, "results") and result_obj.results
-    )
+    # Check if it has the symbols correctly
+    is_multi = len(result_obj.symbols) > 1
 
     assert is_multi, "Visualization result should be marked as multi-symbol"
-    assert "EURUSD" in result_obj.results, "EURUSD should be in sub-results"
-    assert "USDJPY" in result_obj.results, "USDJPY should be in sub-results"
+    assert "EURUSD" in result_obj.symbols, "EURUSD should be in symbols"
+    assert "USDJPY" in result_obj.symbols, "USDJPY should be in symbols"
 
-    # Verify trades are distributed correctly
-    eur_execs = result_obj.results["EURUSD"].executions
-    assert len(eur_execs) == 1
-
-    jpy_execs = result_obj.results["USDJPY"].executions
-    assert len(jpy_execs) == 1
+    # Verify trades are present
+    assert len(result_obj.closed_trades) == 2

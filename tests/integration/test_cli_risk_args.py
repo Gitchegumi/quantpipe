@@ -5,7 +5,7 @@ Integration tests for CLI risk argument mapping and precedence.
 from unittest.mock import MagicMock, patch, mock_open
 import pytest
 import textwrap
-from src.cli.run_backtest import main
+from src.cli.main import main
 import io
 
 
@@ -37,6 +37,7 @@ def mock_run_portfolio_backtest():
         mock_result.closed_trades = []
         mock_result.equity_curve = []
         mock_result.per_symbol_trades = {}
+        mock_result.symbols = ["EURUSD"]
         mock_result.data_start_date = datetime(2024, 1, 1)
         mock_result.data_end_date = datetime(2024, 1, 31)
 
@@ -59,7 +60,8 @@ def mock_path_exists():
 def test_cli_risk_args_override_defaults(mock_run_portfolio_backtest):
     """Test that CLI arguments override default values."""
     test_args = [
-        "run_backtest",
+        "quantpipe",
+        "backtest",
         "--risk-pct",
         "0.5",
         "--atr-mult",
@@ -107,7 +109,8 @@ def test_cli_precedence_over_config(mock_run_portfolio_backtest):
     )
 
     test_args = [
-        "run_backtest",
+        "quantpipe",
+        "backtest",
         "--config",
         "config.yaml",
         "--risk-pct",
@@ -138,7 +141,7 @@ def test_cli_precedence_over_config(mock_run_portfolio_backtest):
 
 def test_defaults_when_no_args(mock_run_portfolio_backtest):
     """Test that defaults are used when no CLI args or config provided."""
-    test_args = ["run_backtest", "--data", "dummy.csv"]
+    test_args = ["quantpipe", "backtest", "--data", "dummy.csv"]
 
     with patch("sys.argv", test_args):
         main()
