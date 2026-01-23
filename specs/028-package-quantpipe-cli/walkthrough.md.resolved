@@ -1,0 +1,77 @@
+# QuantPipe CLI Walkthrough
+
+This document outlines the usage of the newly implemented `quantpipe` CLI.
+
+## Installation
+
+The CLI is installed as a script via `poetry`.
+
+```bash
+poetry install
+```
+
+## Basic Usage
+
+Run the top-level command to see available subcommands:
+
+```bash
+poetry run quantpipe --help
+```
+
+## Backtest Command
+
+The [backtest](file:///e:/GitHub/trading-strategies/src/cli/run_backtest.py#508-939) command is the primary entry point for running trading simulations.
+
+### Examples
+
+**1. Basic Long-Only Backtest (Test Dataset)**
+
+```bash
+poetry run quantpipe backtest --direction LONG --pair EURUSD --dataset test
+```
+
+**2. Multi-Symbol Portfolio Backtest**
+
+Runs backtest on multiple pairs with shared capital ($2,500 default).
+
+```bash
+poetry run quantpipe backtest --pair EURUSD GBPUSD USDJPY --direction BOTH
+```
+
+**3. JSON Output**
+
+Generate machine-readable JSON output (useful for pipelines).
+
+```bash
+poetry run quantpipe backtest --direction LONG --pair EURUSD --output-format json
+```
+
+**4. Visualization**
+
+Open an interactive Datashader chart (requires GUI environment).
+*Note: Depending on environment, this may open a browser window or be blocking.*
+
+```bash
+poetry run quantpipe backtest --visualize --pair EURUSD
+```
+
+**5. Parameter Sweep (Interactive)**
+
+Launch the interactive parameter sweep wizard.
+
+```bash
+poetry run quantpipe backtest --test-range
+```
+
+## Output Files
+
+Results are saved to the [results/](file:///e:/GitHub/trading-strategies/src/visualization/interactive.py#23-37) directory by default.
+
+- **Text Reports**: `results/backtest_{direction}_{symbol_or_multi}_{timeframe}_{timestamp}.txt`
+- **JSON Reports**: `results/backtest_{direction}_{symbol_or_multi}_{timeframe}_{timestamp}.json`
+
+Text reports include:
+- Execution Metadata
+- Performance Metrics (Win Rate, Expectancy, Sharpe, etc.)
+- Portfolio Summary (for multi-symbol)
+- Top Conflicts (for BOTH mode)

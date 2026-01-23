@@ -121,7 +121,6 @@ Python projects MUST use Poetry. Prohibit requirements.txt. All dependencies in 
 ## Recent Changes
 - 027-cti-metrics-progression: Added Python 3.11+ + `pandas`, `numpy`, `structlog` (Project Standard)
 - 026-decouple-indicators: Added Python 3.11+ + Polars (data processing), Strategy Base Class
-- 025-fix-risk-args: Added Python 3.11+ + `poetry`, `pydantic`
 
 
 <!-- MANUAL ADDITIONS START -->

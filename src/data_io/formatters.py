@@ -845,6 +845,18 @@ def format_portfolio_json_output(result) -> str:
     Returns:
         JSON string
     """
+    import pandas as pd
+
+    def to_iso(ts):
+        """Convert timestamp to ISO format, handling numpy.datetime64."""
+        if ts is None:
+            return None
+        if hasattr(ts, "isoformat"):
+            return ts.isoformat()
+        try:
+            return pd.Timestamp(ts).isoformat()
+        except:
+            return str(ts)
 
     # Calculate aggregate metrics from closed trades
     trades = result.closed_trades
@@ -908,14 +920,10 @@ def format_portfolio_json_output(result) -> str:
         "run_id": result.run_id,
         "direction_mode": result.direction_mode,
         "mode": "portfolio",
-        "start_time": result.start_time.isoformat(),
-        "end_time": result.end_time.isoformat(),
-        "data_start_date": (
-            result.data_start_date.isoformat() if result.data_start_date else None
-        ),
-        "data_end_date": (
-            result.data_end_date.isoformat() if result.data_end_date else None
-        ),
+        "start_time": to_iso(result.start_time),
+        "end_time": to_iso(result.end_time),
+        "data_start_date": to_iso(result.data_start_date),
+        "data_end_date": to_iso(result.data_end_date),
         "symbols": result.symbols,
         "portfolio": {
             "starting_equity": result.starting_equity,
@@ -930,8 +938,25 @@ def format_portfolio_json_output(result) -> str:
         "metrics": metrics,
         "per_symbol": result.per_symbol_trades,
         "equity_curve": [
-            {"timestamp": ts.isoformat(), "equity": equity}
+            {"timestamp": to_iso(ts), "equity": equity}
             for ts, equity in result.equity_curve
+        ],
+        "closed_trades": [
+            {
+                "symbol": t.symbol,
+                "signal_id": t.signal_id,
+                "direction": t.direction,
+                "entry_timestamp": to_iso(t.entry_timestamp),
+                "exit_timestamp": to_iso(t.exit_timestamp),
+                "entry_price": t.entry_price,
+                "exit_price": t.exit_price,
+                "exit_reason": t.exit_reason,
+                "pnl_dollars": t.pnl_dollars,
+                "pnl_r": t.pnl_r,
+                "risk_amount": t.risk_amount,
+                "portfolio_balance_at_exit": t.portfolio_balance_at_exit,
+            }
+            for t in result.closed_trades
         ],
     }
 
