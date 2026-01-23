@@ -12,18 +12,59 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.3.0
+### Current Version: 0.4.0
 
 - **Status**: Released
-- **Date**: 2026-01-16
+- **Date**: 2026-01-23
 - **Branch**: main
-- **PR**: #61
+- **PR**: #64
 
 ---
 
 ## Released Versions
 
-### [v0.3.0] - 2026-01-16
+### [v0.4.0] - 2026-01-23
+
+**Theme**: Unified CLI & Packaging
+
+**Highlights**:
+
+- **Unified Entry Point**: Replaced manual module execution with a standardized `quantpipe` console command.
+- **Subcommand Architecture**: Introduced `backtest` subcommand to house primary simulation logic, paving the way for `ingest` and `optimize` commands.
+- **Improved Performance Metrics**: Refactored `run_backtest.py` to better handle `PortfolioResult` objects and standardized JSON/Text output formatting.
+- **Visual Stability**: Enhanced `datashader_viz.py` stability for portfolio results via robust duck-typing for symbol detection.
+
+**Key Features**:
+
+QuantPipe CLI:
+
+- `quantpipe backtest` subcommand supporting all legacy flags.
+- `--output-format json` support for portfolio-mode results.
+- Automatic installation via `pip install .` or `poetry install`.
+
+Refactoring & Quality:
+
+- Extraction of core CLI logic into reusable parser and commander functions.
+- Fixed `AttributeError` in results formatting for multi-symbol simulations.
+- Resolved integration test regressions across the suite.
+
+**Usage**:
+
+```bash
+# Standard Backtest
+quantpipe backtest --direction BOTH --pair EURUSD --dataset test
+
+# Multi-Symbol Portfolio
+quantpipe backtest --pair EURUSD USDJPY GBPUSD --visualize
+```
+
+**Related**:
+
+- Spec: 028-package-quantpipe-cli
+- Pull Request: #64
+- Closes Issue: #57
+
+### [v0.3.0] - 2026-01-22
 
 **Theme**: CTI Prop Firm Integration & Advanced Metrics
 
