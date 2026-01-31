@@ -26,10 +26,10 @@ This document explains how datasets are prepared and how the backtesting framewo
 
    ```powershell
    # If you converted MT format files:
-   poetry run python -m src.cli.build_dataset --symbol eurusd --raw-path price_data/raw_converted
+   poetry run quantpipe ingest --symbol eurusd --raw-path price_data/raw_converted
 
    # If you already have standard format files (with timestamp,open,high,low,close,volume header):
-   poetry run python -m src.cli.build_dataset --symbol eurusd
+   poetry run quantpipe ingest --symbol eurusd
    ```
 
 4. Generated structure:
@@ -60,7 +60,7 @@ This document explains how datasets are prepared and how the backtesting framewo
 
 | Mode       | Command                      | Purpose                                             |
 | ---------- | ---------------------------- | --------------------------------------------------- |
-| Single run | `src.cli.run_backtest`       | Run on any CSV file                                 |
+| Single run | `quantpipe backtest`         | Run on any CSV file                                 |
 | Split-mode | `src.cli.run_split_backtest` | Automatically evaluate test & validation partitions |
 
 ### Single-Symbol Baseline Behavior

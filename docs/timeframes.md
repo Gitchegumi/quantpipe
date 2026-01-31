@@ -6,13 +6,13 @@ This document describes how to use the multi-timeframe backtesting feature to ru
 
 ```bash
 # Run backtest with 15-minute timeframe
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
     --pair EURUSD \
     --direction LONG \
     --timeframe 15m
 
 # Run with 1-hour timeframe
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
     --pair EURUSD \
     --direction BOTH \
     --timeframe 1h
@@ -116,28 +116,28 @@ Higher timeframes process significantly faster due to fewer bars.
 
 ```bash
 # 5-minute backtest
-poetry run python -m src.cli.run_backtest --pair EURUSD --direction LONG --timeframe 5m
+poetry run quantpipe backtest --pair EURUSD --direction LONG --timeframe 5m
 
 # 4-hour backtest
-poetry run python -m src.cli.run_backtest --pair GBPUSD --direction SHORT --timeframe 4h
+poetry run quantpipe backtest --pair GBPUSD --direction SHORT --timeframe 4h
 ```
 
 ### Custom Timeframes
 
 ```bash
 # 7-minute bars (custom)
-poetry run python -m src.cli.run_backtest --pair USDJPY --timeframe 7m --direction BOTH
+poetry run quantpipe backtest --pair USDJPY --timeframe 7m --direction BOTH
 
 # 90-minute bars (1.5 hours)
-poetry run python -m src.cli.run_backtest --pair EURUSD --timeframe 90m --direction LONG
+poetry run quantpipe backtest --pair EURUSD --timeframe 90m --direction LONG
 ```
 
 ### With Config File
 
 ```bash
 # Use config file defaults
-poetry run python -m src.cli.run_backtest --config backtest_config.yaml
+poetry run quantpipe backtest --config backtest_config.yaml
 
 # Override config timeframe with CLI
-poetry run python -m src.cli.run_backtest --config backtest_config.yaml --timeframe 1h
+poetry run quantpipe backtest --config backtest_config.yaml --timeframe 1h
 ```

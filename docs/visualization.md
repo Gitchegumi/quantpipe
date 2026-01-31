@@ -9,7 +9,7 @@ This document describes the interactive visualization system for backtest result
 Add `--visualize` to any backtest command to open an interactive chart:
 
 ```powershell
-poetry run python -m src.cli.run_backtest --pair EURUSD --direction BOTH --visualize
+poetry run quantpipe backtest --pair EURUSD --direction BOTH --visualize
 ```
 
 ## Features
@@ -117,11 +117,11 @@ All timestamps are normalized to `datetime64[ns]` timezone-naive format using th
 
 ```powershell
 # Basic visualization
-poetry run python -m src.cli.run_backtest --pair EURUSD --visualize --direction BOTH
+poetry run quantpipe backtest --pair EURUSD --visualize --direction BOTH
 
 # With date range
-poetry run python -m src.cli.run_backtest --pair EURUSD --visualize --direction LONG --start-date 2021-01-01 --end-date 2021-01-31
+poetry run quantpipe backtest --pair EURUSD --visualize --direction LONG --start-date 2021-01-01 --end-date 2021-01-31
 
 # Save to file (HTML)
-poetry run python -m src.cli.run_backtest --pair EURUSD --visualize --output-file results.html
+poetry run quantpipe backtest --pair EURUSD --visualize --output-file results.html
 ```

@@ -173,13 +173,13 @@ poetry run pytest tests/performance/benchmark_ingestion.py -v -m performance
 
 ```bash
 # Enable profiling with automatic benchmark output
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH \
   --profile
 
 # Specify custom benchmark output path
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH \
   --profile \
@@ -219,25 +219,25 @@ poetry run python -m src.cli.run_backtest \
 
 ```bash
 # Interactive prompt for fraction (press Enter for default=1.0)
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH
 
 # Quick validation: Process first 25% of dataset
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH \
   --data-frac 0.25
 
 # Test second quartile specifically
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH \
   --data-frac 0.25 \
   --portion 2
 
 # Half dataset (first half)
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH \
   --data-frac 0.5 \
@@ -333,19 +333,19 @@ TOTAL          1,200      100%      4.4×
 
 ```bash
 # Standard optimized run
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH
 
 # With profiling enabled (Phase 4)
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH \
   --profile \
   --benchmark-out ./results/benchmarks/run_001.json
 
 # Deterministic mode for reproducibility
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data ./price_data/processed/eurusd/test/eurusd_test.csv \
   --direction BOTH \
   --deterministic
@@ -419,7 +419,7 @@ Example:
 
 ```bash
 # Run profiling
-poetry run python -m src.cli.run_backtest --data <path> --direction BOTH --profile
+poetry run quantpipe backtest --data <path> --direction BOTH --profile
 
 # Check hotspots in benchmark file
 cat results/benchmarks/benchmark_*.json | jq '.hotspots[] | {function, cumtime}'
@@ -818,7 +818,7 @@ def test_eurusd_equivalence():
 **Basic Backtest** (Polars ingestion automatic):
 
 ```bash
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
   --data price_data/processed/eurusd/eurusd_2020.csv \
   --direction BOTH
 ```

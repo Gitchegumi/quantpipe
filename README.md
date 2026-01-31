@@ -15,10 +15,10 @@ The project is motivated in part by the requirements of proprietary trading firm
 poetry install
 
 # 2. Run a sample backtest (uses default test dataset)
-poetry run python -m src.cli.run_backtest --pair EURUSD --direction LONG
+poetry run quantpipe backtest --pair EURUSD --direction LONG
 
 # 3. (Optional) JSON output with validate dataset
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --pair EURUSD `
 --dataset validate `
 --direction BOTH `
@@ -72,13 +72,13 @@ price_data/
 
 ```powershell
 # Uses: price_data/processed/eurusd/test/eurusd_test.parquet (or .csv if .parquet not found)
-poetry run python -m src.cli.run_backtest --pair EURUSD --direction LONG
+poetry run quantpipe backtest --pair EURUSD --direction LONG
 
 # Uses: price_data/processed/usdjpy/validate/usdjpy_validate.parquet (or .csv if .parquet not found)
-poetry run python -m src.cli.run_backtest --pair USDJPY --dataset validate --direction BOTH
+poetry run quantpipe backtest --pair USDJPY --dataset validate --direction BOTH
 
 # Custom data path (overrides auto-construction)
-poetry run python -m src.cli.run_backtest --data custom/path/data.csv --direction LONG
+poetry run quantpipe backtest --data custom/path/data.csv --direction LONG
 ```
 
 **File Format Support**: Both Parquet (.parquet) and CSV (.csv) formats are supported. Parquet files are loaded directly for optimal performance, while CSV files are automatically preprocessed (MetaTrader format conversion) and cached as Parquet for future runs.
@@ -104,13 +104,13 @@ Run strategies on higher timeframes by resampling from 1-minute data:
 
 ```powershell
 # 15-minute bars
-poetry run python -m src.cli.run_backtest --pair EURUSD --direction BOTH --timeframe 15m
+poetry run quantpipe backtest --pair EURUSD --direction BOTH --timeframe 15m
 
 # 1-hour bars
-poetry run python -m src.cli.run_backtest --pair EURUSD --direction LONG --timeframe 1h
+poetry run quantpipe backtest --pair EURUSD --direction LONG --timeframe 1h
 
 # Arbitrary timeframes (7m, 90m, etc.)
-poetry run python -m src.cli.run_backtest --pair EURUSD --timeframe 7m --direction BOTH
+poetry run quantpipe backtest --pair EURUSD --timeframe 7m --direction BOTH
 ```
 
 Supported formats: `Xm` (minutes), `Xh` (hours), `Xd` (days). Any positive integer works.
@@ -123,17 +123,17 @@ Run multiple strategies simultaneously with weighted portfolio aggregation:
 
 ```powershell
 # Register and list strategies
-poetry run python -m src.cli.run_backtest --register-strategy alpha --strategy-module my_strategies.alpha
-poetry run python -m src.cli.run_backtest --list-strategies
+poetry run quantpipe backtest --register-strategy alpha --strategy-module my_strategies.alpha
+poetry run quantpipe backtest --list-strategies
 
 # Execute specific strategies with custom weights
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --pair EURUSD `
 --strategies alpha beta `
 --weights 0.6 0.4
 
 # Equal-weight fallback (no weights specified)
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --pair EURUSD `
 --strategies alpha beta gamma
 ```
@@ -143,7 +143,7 @@ See `specs/006-multi-strategy/spec.md` for details on strategy registration, fil
 Example (signals only):
 
 ```powershell
-poetry run python -m src.cli.run_backtest --pair EURUSD --dry-run
+poetry run quantpipe backtest --pair EURUSD --dry-run
 ```
 
 ## Multi-Symbol Portfolio Backtesting
@@ -156,7 +156,7 @@ Each symbol runs in isolation with separate capital and risk limits:
 
 ```powershell
 # Run 3 symbols independently
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --direction BOTH `
 --pair EURUSD GBPUSD USDJPY `
 --portfolio-mode independent
@@ -175,7 +175,7 @@ Shared capital pool with correlation tracking and dynamic allocation:
 
 ```powershell
 # Run portfolio mode with custom correlation threshold
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --direction BOTH `
 --pair EURUSD GBPUSD USDJPY `
 --portfolio-mode portfolio `
@@ -197,7 +197,7 @@ Exclude specific symbols at runtime:
 
 ```powershell
 # Run all pairs except GBPUSD
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --direction LONG `
 --pair EURUSD GBPUSD USDJPY NZDUSD `
 --disable-symbol GBPUSD
@@ -247,12 +247,12 @@ The backtesting engine achieves production-grade performance through columnar op
 
 ```powershell
 # Standard optimized backtest (Polars automatic)
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --pair EURUSD `
 --direction BOTH
 
 # Profile with first 25% of data
-poetry run python -m src.cli.run_backtest `
+poetry run quantpipe backtest `
 --pair EURUSD `
 --direction BOTH `
 --data-frac 0.25 `
@@ -278,7 +278,7 @@ See `docs/performance.md` for complete optimization guide, architecture details,
 Add `--visualize` to any backtest command for interactive charting:
 
 ```powershell
-poetry run python -m src.cli.run_backtest --pair EURUSD --direction BOTH --visualize
+poetry run quantpipe backtest --pair EURUSD --direction BOTH --visualize
 ```
 
 **Features:**
