@@ -141,7 +141,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build time series datasets with test/validation splits",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=\"\"\"
+        epilog="""
 Examples:
   # Build dataset for a specific symbol
   poetry run python -m src.cli.build_dataset --symbol eurusd
@@ -155,7 +155,7 @@ Examples:
   # Specify custom paths
   poetry run python -m src.cli.build_dataset --symbol eurusd \\
     --raw-path custom/raw --output-path custom/processed
-        \"\"\",
+        """,
     )
 
     configure_ingest_parser(parser)
