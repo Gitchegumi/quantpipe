@@ -20,32 +20,8 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 
-def main() -> int:
-    """Build dataset CLI entry point.
-
-    Returns:
-        Exit code (0 for success, 1 for failure)
-    """
-    parser = argparse.ArgumentParser(
-        description="Build time series datasets with test/validation splits",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Build dataset for a specific symbol
-  poetry run python -m src.cli.build_dataset --symbol eurusd
-
-  # Build datasets for all symbols
-  poetry run python -m src.cli.build_dataset --all
-
-  # Force rebuild even if output exists
-  poetry run python -m src.cli.build_dataset --all --force
-
-  # Specify custom paths
-  poetry run python -m src.cli.build_dataset --symbol eurusd \\
-    --raw-path custom/raw --output-path custom/processed
-        """,
-    )
-
+def configure_ingest_parser(parser: argparse.ArgumentParser) -> None:
+    """Configure the argument parser for the 'ingest' command."""
     parser.add_argument(
         "--symbol",
         type=str,
@@ -86,8 +62,9 @@ Examples:
         help="Logging level (default: INFO)",
     )
 
-    args = parser.parse_args()
 
+def run_ingest_command(args: argparse.Namespace) -> int:
+    """Execute the 'ingest' command."""
     # Configure logging
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -97,7 +74,6 @@ Examples:
     # Validate arguments
     if not args.symbol and not args.all:
         console.print("[red]Error: Must specify either --symbol or --all[/red]")
-        parser.print_help()
         return 1
 
     if args.symbol and args.all:
@@ -154,6 +130,37 @@ Examples:
         console.print(f"\n[red]✗ Unexpected error: {e}[/red]")
         logger.error("Build failed with exception", exc_info=True)
         return 1
+
+
+def main() -> int:
+    """Build dataset CLI entry point.
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    parser = argparse.ArgumentParser(
+        description="Build time series datasets with test/validation splits",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Build dataset for a specific symbol
+  poetry run python -m src.cli.build_dataset --symbol eurusd
+
+  # Build datasets for all symbols
+  poetry run python -m src.cli.build_dataset --all
+
+  # Force rebuild even if output exists
+  poetry run python -m src.cli.build_dataset --all --force
+
+  # Specify custom paths
+  poetry run python -m src.cli.build_dataset --symbol eurusd \\
+    --raw-path custom/raw --output-path custom/processed
+        """,
+    )
+
+    configure_ingest_parser(parser)
+    args = parser.parse_args()
+    return run_ingest_command(args)
 
 
 def _display_symbol_result(symbol: str, metadata) -> None:
