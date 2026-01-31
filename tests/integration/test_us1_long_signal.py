@@ -123,8 +123,10 @@ class TestUS1LongSignalIntegration:
             "ema_fast": parameters.ema_fast,
             "ema_slow": parameters.ema_slow,
             "rsi_period": parameters.rsi_length,
-            "atr_multiplier": parameters.atr_stop_mult,
+            "stop_loss_atr_multiplier": parameters.atr_stop_mult,
             "risk_reward_ratio": parameters.target_r_mult,
+            "risk_per_trade_pct": parameters.risk_per_trade_pct,
+            "account_balance": parameters.account_balance,
             # Test defaults
             "trend_cross_count_threshold": 3,
             "rsi_oversold": parameters.oversold_threshold,
