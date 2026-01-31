@@ -12,16 +12,62 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.4.0
+### Current Version: 0.5.0
 
 - **Status**: Released
-- **Date**: 2026-01-23
+- **Date**: 2026-01-31
 - **Branch**: main
-- **PR**: #64
+- **PR**: #69
 
 ---
 
 ## Released Versions
+
+### [v0.5.0] - 2026-01-31
+
+**Theme**: CLI Expansion: Scaffold & Ingest
+
+**Highlights**:
+
+- **Strategy Scaffolding**: New `quantpipe scaffold` command to instantly generate boilerplate for new trading strategies.
+- **Unified Data Ingestion**: Migrated data processing tools to `quantpipe ingest`, archiving legacy scripts.
+- **Integration Test Reliability**: Fixed critical parameter naming and signal generation bugs in the integration test suite.
+- **Documentation Update**: Comprehensive updates to docs reflecting the new CLI structure.
+
+**Key Features**:
+
+Strategy Scaffolding:
+
+- `quantpipe scaffold <name>`: Generates directory structure, strategy class, and config.
+- Auto-registration of new strategies (optional with `--no-register`).
+- Support for descriptions and tags.
+
+Unified Ingestion:
+
+- `quantpipe ingest`: Replaces legacy `build_dataset.py` script.
+- Supports bulk processing (`--all`) or single symbol (`--symbol`).
+- Standardized logging and path management.
+
+Quality & Infrastructure:
+
+- **Fix**: Resolved `AttributeError` for `StrategyParameters` in integration tests (PR #66).
+- **Fix**: Corrected signal generation logic in integration tests (PR #67).
+- **Cleanup**: Removed obsolete `run_long_backtest.py` and `build_dataset.py`.
+
+**Usage**:
+
+```bash
+# Create a new strategy
+poetry run quantpipe scaffold my_new_strategy --tags "trend,breakout" --description "A simple breakout strategy"
+
+# Process new data
+poetry run quantpipe ingest --symbol EURUSD --force
+```
+
+**Related**:
+
+- Pull Requests: #65, #66, #67, #68, #69
+- Closes Issue: #63
 
 ### [v0.4.0] - 2026-01-23
 
