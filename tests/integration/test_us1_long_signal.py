@@ -127,8 +127,8 @@ class TestUS1LongSignalIntegration:
             "risk_reward_ratio": parameters.target_r_mult,
             # Test defaults
             "trend_cross_count_threshold": 3,
-            "rsi_oversold": 30.0,
-            "rsi_overbought": 70.0,
+            "rsi_oversold": parameters.oversold_threshold,
+            "rsi_overbought": parameters.overbought_threshold,
             "stoch_rsi_low": 0.2,
             "stoch_rsi_high": 0.8,
             "prioritize_recent": True,
