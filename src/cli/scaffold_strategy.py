@@ -29,19 +29,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from src.strategy.scaffold.generator import ScaffoldGenerator
+from ..strategy.scaffold.generator import ScaffoldGenerator
 
 
-def main() -> int:
-    """Main entry point for scaffold command.
-
-    Returns:
-        Exit code (0 for success, non-zero for errors).
-    """
-    parser = argparse.ArgumentParser(
-        description="Scaffold a new trading strategy from template.",
-        prog="python -m src.cli.scaffold_strategy",
-    )
+def configure_scaffold_parser(parser: argparse.ArgumentParser) -> None:
+    """Configure the argument parser for the 'scaffold' command."""
     parser.add_argument(
         "name",
         type=str,
@@ -71,8 +63,9 @@ def main() -> int:
         help="Skip auto-registration in strategy registry",
     )
 
-    args = parser.parse_args()
 
+def run_scaffold_command(args: argparse.Namespace) -> int:
+    """Execute the 'scaffold' command."""
     # Parse tags
     tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else []
 
@@ -107,9 +100,24 @@ def main() -> int:
     print("  1. Edit strategy.py to implement your signal logic")
     print("  2. Update required_indicators in metadata")
     print("  3. Run a backtest to test your strategy")
-    print(f"\n  poetry run python -m src.cli.run_backtest --strategy {args.name}")
+    print(f"\n  poetry run quantpipe backtest --strategy {args.name}")
 
     return 0
+
+
+def main() -> int:
+    """Main entry point for scaffold command.
+
+    Returns:
+        Exit code (0 for success, non-zero for errors).
+    """
+    parser = argparse.ArgumentParser(
+        description="Scaffold a new trading strategy from template.",
+        prog="python -m src.cli.scaffold_strategy",
+    )
+    configure_scaffold_parser(parser)
+    args = parser.parse_args()
+    return run_scaffold_command(args)
 
 
 def _print_registration_instructions(name: str) -> None:
