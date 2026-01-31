@@ -120,8 +120,8 @@ def run_v2_backtest(
         "atr_multiplier": parameters.atr_stop_mult,
         "risk_reward_ratio": parameters.target_r_mult,
         "trend_cross_count_threshold": 3,
-        "rsi_oversold": parameters.rsi_oversold,
-        "rsi_overbought": parameters.rsi_overbought,
+        "rsi_oversold": parameters.oversold_threshold,
+        "rsi_overbought": parameters.overbought_threshold,
         "stoch_rsi_low": 0.2,
         "stoch_rsi_high": 0.8,
         "prioritize_recent": True,
@@ -301,7 +301,7 @@ class TestSignalCountByDirection:
         params_conservative = StrategyParameters(
             risk_per_trade_pct=0.25,
             account_balance=10000.0,
-            rsi_oversold=20.0,
+            oversold_threshold=20.0,
         )
 
         result_conservative = run_v2_backtest(
