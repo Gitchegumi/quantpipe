@@ -9,7 +9,7 @@ with indicators and risk management.
 Generate a new strategy scaffold:
 
 ```bash
-poetry run python -m src.cli.scaffold_strategy my_strategy
+poetry run quantpipe new_strategy --name my_strategy
 ```
 
 This creates `src/strategy/my_strategy/` with template files ready to customize.
@@ -288,7 +288,7 @@ See these strategies for reference:
 Run a backtest:
 
 ```bash
-poetry run python -m src.cli.run_backtest \
+poetry run quantpipe backtest \
     --strategy simple_momentum \
     --data price_data/EURUSD_15m.csv \
     --manifest price_data/manifest.yaml
