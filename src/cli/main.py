@@ -3,6 +3,7 @@ import sys
 from typing import Optional
 
 from .run_backtest import configure_backtest_parser, run_backtest_command
+from .build_dataset import configure_ingest_parser, run_ingest_command
 
 
 def main(args: Optional[list[str]] = None) -> int:
@@ -27,12 +28,24 @@ def main(args: Optional[list[str]] = None) -> int:
     configure_backtest_parser(backtest_parser)
 
     # -------------------------------------------------------------------------
+    # Subcommand: ingest
+    # -------------------------------------------------------------------------
+    ingest_parser = subparsers.add_parser(
+        "ingest",
+        help="Build time series datasets",
+        description="Build time series datasets with test/validation splits from raw CSV data.",
+    )
+    configure_ingest_parser(ingest_parser)
+
+    # -------------------------------------------------------------------------
     # Parse & Execute
     # -------------------------------------------------------------------------
     parsed_args = parser.parse_args(args)
 
     if parsed_args.command == "backtest":
         return run_backtest_command(parsed_args)
+    if parsed_args.command == "ingest":
+        return run_ingest_command(parsed_args)
 
     return 0
 
