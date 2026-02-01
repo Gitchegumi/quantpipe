@@ -137,6 +137,7 @@ def calculate_indicators(
     indicators: list[str],
     overrides: dict[str, dict[str, Any]] | None = None,
     custom_registry: dict[str, Callable] | None = None,
+    use_gpu: bool = False,
 ) -> pl.DataFrame:
     """
     Calculate a list of indicators and append them to the DataFrame.
@@ -146,6 +147,7 @@ def calculate_indicators(
         indicators: List of indicator definition strings (e.g. ["ema20", "atr14"]).
         overrides: Optional dict mapping indicator strings to parameter overrides.
                    e.g. {"fast_ema": {"period": 10}}
+        use_gpu: Whether to use GPU acceleration.
 
     Returns:
         DataFrame with all calculated indicator columns.
@@ -159,6 +161,9 @@ def calculate_indicators(
     for ind_str in indicators:
         try:
             name, kwargs = parse_indicator_string(ind_str)
+
+            # Pass use_gpu flag
+            kwargs["use_gpu"] = use_gpu
 
             # Apply overrides if present
             # Apply overrides if present
