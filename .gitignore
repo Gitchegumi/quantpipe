@@ -239,6 +239,7 @@ src/strategy/*/
 !src/strategy/scaffold/
 !src/strategy/trend_pullback/
 !src/strategy/simple_momentum/
+!src/strategy/zscore_mean_reversion/
 
 # Also ignore any strategies created in root /strategy/ directory (scaffold default)
 /strategy/
