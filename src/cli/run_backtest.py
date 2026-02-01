@@ -40,8 +40,10 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
@@ -75,6 +77,33 @@ logger = logging.getLogger(__name__)
 DEFAULT_ACCOUNT_BALANCE: float = 2500.0
 
 
+def _is_interactive() -> bool:
+    """Check if the current session is interactive (attached to a TTY)."""
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
+    """Interactively prompt user for input with validation and coercion."""
+    while True:
+        try:
+            raw = input(msg).strip()
+            if raw == "":
+                return None
+
+            if choices is not None and raw not in [str(c) for c in choices]:
+                print(f"Invalid choice. Choose one of: {', '.join(map(str, choices))}")
+                continue
+
+            val = coerce(raw)
+            if not validate(val):
+                print("Invalid value.")
+                continue
+            return val
+        except (ValueError, EOFError):
+            print("Invalid input format.")
+            continue
+
+
 def configure_backtest_parser(
     parser: argparse.ArgumentParser,
 ) -> argparse.ArgumentParser:
@@ -86,7 +115,7 @@ def configure_backtest_parser(
         "--direction",
         type=str,
         choices=["LONG", "SHORT", "BOTH"],
-        default="LONG",
+        default=None,
         help="Trading direction: LONG (buy only), SHORT (sell only), or BOTH",
     )
 
@@ -101,8 +130,8 @@ def configure_backtest_parser(
         "--strategy",
         type=str,
         nargs="+",
-        default=["trend-pullback"],
-        help="Strategy name(s) to run (default: trend-pullback). Supports multiple: \
+        default=None,
+        help="Strategy name(s) to run (e.g., trend-pullback). Supports multiple: \
             --strategy strat1 strat2",
     )
 
@@ -110,8 +139,8 @@ def configure_backtest_parser(
         "--pair",
         type=str,
         nargs="+",
-        default=["EURUSD"],
-        help="Currency pair(s) to backtest (default: EURUSD). Supports multiple: \
+        default=None,
+        help="Currency pair(s) to backtest (e.g., EURUSD). Supports multiple: \
             --pair EURUSD GBPUSD. When used without --data, auto-constructs path from \
             price_data/processed/<pair>/",
     )
@@ -128,7 +157,7 @@ def configure_backtest_parser(
     parser.add_argument(
         "--timeframe",
         type=str,
-        default="1m",
+        default=None,
         help="Timeframe for backtesting (default: 1m). Resamples 1-minute data to "
         "target timeframe. Supports: Xm (minutes), Xh (hours), Xd (days). "
         "Examples: 1m, 5m, 15m, 1h, 4h, 1d, 7m, 90m",
@@ -430,7 +459,7 @@ def configure_backtest_parser(
         "--blackout-sessions",
         action="store_true",
         help="Enable session-gap blackout filtering. Blocks new entries during "
-        "NY close → Asian open transition (low liquidity period). "
+        "NY close \u2192 Asian open transition (low liquidity period). "
         "See specs/023-session-blackouts for details.",
     )
 
@@ -488,6 +517,12 @@ def configure_backtest_parser(
         help="Run parameter sweep sequentially for debugging (only with --test-range).",
     )
 
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Bypass interactive prompts and use defaults/fail on missing flags.",
+    )
+
     return parser
 
 
@@ -497,6 +532,86 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     """
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
+
+    # -------------------------------------------------------------------------
+    # Interactive Prompts for Missing Flags (Feature 026)
+    # -------------------------------------------------------------------------
+    if not args.list_strategies and not args.register_strategy:
+        is_interactive = _is_interactive() and not args.non_interactive
+        missing = []
+
+        # Collect missing required flags
+        if args.strategy is None:
+            missing.append("--strategy")
+        if args.pair is None and not args.data:
+            missing.append("--pair")
+        if args.direction is None:
+            missing.append("--direction")
+        if args.timeframe is None:
+            missing.append("--timeframe")
+        if args.starting_balance is None:
+            missing.append("--starting-balance")
+
+        # Handle missing flags
+        if missing:
+            if not is_interactive:
+                # Default to safe values if not interactive (backward compatibility)
+                # except for balance/direction where defaults are desired
+                if args.strategy is None:
+                    args.strategy = ["trend-pullback"]
+                if args.pair is None and not args.data:
+                    args.pair = ["EURUSD"]
+                if args.direction is None:
+                    args.direction = "LONG"
+                if args.timeframe is None:
+                    args.timeframe = "1m"
+                if args.starting_balance is None:
+                    args.starting_balance = DEFAULT_ACCOUNT_BALANCE
+            else:
+                print(f"Missing required flags: {', '.join(missing)}")
+
+                # 1. Strategy
+                if args.strategy is None:
+                    available = ["trend-pullback"]
+                    print(f"Available strategies: {', '.join(available)}")
+                    s = _prompt("? Strategy [trend-pullback]: ", choices=available)
+                    args.strategy = [s] if s else ["trend-pullback"]
+
+                # 2. Pair(s)
+                if args.pair is None and not args.data:
+                    raw = _prompt("? Pair(s) (e.g., EURUSD, space-separated) [EURUSD]: ")
+                    if raw:
+                        args.pair = raw.replace(",", " ").upper().split()
+                    else:
+                        args.pair = ["EURUSD"]
+
+                # 3. Direction
+                if args.direction is None:
+                    choices = ["LONG", "SHORT", "BOTH"]
+                    d = _prompt("? Direction (LONG/SHORT/BOTH) [LONG]: ", choices=choices)
+                    args.direction = d if d else "LONG"
+
+                # 4. Timeframe
+                if args.timeframe is None:
+                    t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) [1m]: ")
+                    args.timeframe = t if t else "1m"
+
+                # 5. Starting Balance
+                if args.starting_balance is None:
+                    b = _prompt(
+                        "? Starting balance (USD) [2500.0]: ",
+                        coerce=float,
+                        validate=lambda x: x > 0,
+                    )
+                    args.starting_balance = b if b else DEFAULT_ACCOUNT_BALANCE
+
+                # 6. CTI Simulation
+                if args.cti_mode is None:
+                    yn = _prompt("? Run in CTI Prop Firm mode? (y/n) [n]: ", choices=["y", "n"])
+                    if yn == "y":
+                        choices = ["1STEP", "2STEP", "INSTANT"]
+                        mode = _prompt("? CTI Mode (1STEP/2STEP/INSTANT) [2STEP]: ", choices=choices)
+                        args.cti_mode = mode if mode else "2STEP"
 
     # -------------------------------------------------------------------------
     # Parameter Resolution (CLI > Config > Defaults)
@@ -562,13 +677,13 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     # Construct RiskConfig from CLI args or --risk-config file (T021: FR-004)
     risk_config = None
     if hasattr(args, "risk_config") and args.risk_config:
-        import json
+        import json as _json_risk
 
         from ..risk.config import RiskConfig
 
         if args.risk_config.exists():
             with open(args.risk_config, encoding="utf-8") as f:
-                risk_dict = json.load(f)
+                risk_dict = _json_risk.load(f)
             risk_config = RiskConfig.from_dict(risk_dict)
             logger.info(
                 "Loaded risk config from %s: %s",
@@ -775,6 +890,36 @@ Persistent storage not yet implemented."
             len(pair_paths),
             parameters.account_balance,  # Use resolved parameter
         )
+
+        # -----------------------------------------------------------------
+        # Assemble & Write Run Manifest (Feature 026)
+        # -----------------------------------------------------------------
+        resolved_cfg = {
+            "direction": args.direction,
+            "strategy": args.strategy[0] if isinstance(args.strategy, list) else args.strategy,
+            "pairs": [p.upper() for p in (args.pair or [])],
+            "starting_balance": float(parameters.account_balance),
+            "cti": {
+                "enabled": bool(args.cti_mode),
+                "mode": args.cti_mode,
+                "scaling_enabled": not args.disable_scaling,
+            },
+            "timeframe": args.timeframe,
+            "dataset": args.dataset,
+            "dry_run": args.dry_run,
+        }
+
+        print("\nResolved Config:")
+        print(json.dumps(resolved_cfg, indent=2))
+
+        ts_manifest = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+        run_dir = Path("runs") / ts_manifest
+        try:
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.json").write_text(json.dumps(resolved_cfg, indent=2), encoding="utf-8")
+            logger.info("Run manifest written to %s/run.json", run_dir)
+        except Exception as e:
+            logger.warning("Failed to write run manifest: %s", e)
 
         direction_mode = DirectionMode[args.direction]
         show_progress = sys.stdout.isatty()
@@ -1083,8 +1228,8 @@ Persistent storage not yet implemented."
                             details.append(summary_line)
 
                             if eval_result.status == "PROMOTED":
-                                print(f"    ✓ PROMOTED to funded account!")
-                                details.append(f"    ✓ PROMOTED to funded account!")
+                                print(f"    \u2713 PROMOTED to funded account!")
+                                details.append(f"    \u2713 PROMOTED to funded account!")
                                 break
 
                             # If failed, retry with remaining executions if any left
