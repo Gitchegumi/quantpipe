@@ -25,6 +25,7 @@ from ..strategy.trend_pullback.signal_generator_vectorized import (
     generate_signals_vectorized,
 )
 from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
+from ..strategy.zscore_mean_reversion import ZSCORE_STRATEGY
 
 from .orchestrator import BacktestOrchestrator
 from .portfolio.portfolio_simulator import PortfolioSimulator
@@ -33,6 +34,12 @@ logger = logging.getLogger(__name__)
 
 # Default account balance for multi-symbol concurrent PnL calculation (FR-003)
 DEFAULT_ACCOUNT_BALANCE: float = 2500.0
+
+# Map of available strategy instances
+STRATEGY_MAP = {
+    "trend-pullback": TREND_PULLBACK_STRATEGY,
+    "zscore-mean-reversion": ZSCORE_STRATEGY,
+}
 
 
 def construct_data_paths(
@@ -189,16 +196,19 @@ def run_portfolio_backtest(
         if "timestamp" in enriched_df.columns:
             enriched_df = enriched_df.rename({"timestamp": "timestamp_utc"})
 
+        # Get strategy from map or fallback to TREND_PULLBACK
+        strategy_name = strategy_params.strategy_name if hasattr(strategy_params, 'strategy_name') else "trend-pullback"
+        strategy = STRATEGY_MAP.get(strategy_name, TREND_PULLBACK_STRATEGY)
+        
         # Calculate indicators
-        strategy = TREND_PULLBACK_STRATEGY
         required_indicators = strategy.metadata.required_indicators
 
         # Map strategy parameters to indicator overrides
         overrides = {
-            "fast_ema": {"period": strategy_params.ema_fast},
-            "slow_ema": {"period": strategy_params.ema_slow},
-            "atr": {"period": strategy_params.atr_length},
-            "rsi": {"period": strategy_params.rsi_length},
+            "fast_ema": {"period": getattr(strategy_params, "ema_fast", 20)},
+            "slow_ema": {"period": getattr(strategy_params, "ema_slow", 50)},
+            "atr": {"period": getattr(strategy_params, "atr_length", 14)},
+            "rsi": {"period": getattr(strategy_params, "rsi_length", 14)},
         }
 
         # Apply explicit overrides (e.g. from parameter sweep)
@@ -336,12 +346,47 @@ def run_portfolio_backtest(
         # Include pair in parameters for position sizing (JPY has different pip value)
         params = strategy_params.model_dump()
         params["pair"] = pair
-        signals = generate_signals_vectorized(
-            df,
-            parameters=params,
-            direction_mode=direction_mode.value,
-            use_gpu=use_gpu,
-        )
+
+        # Get strategy
+        strategy_name = strategy_params.strategy_name if hasattr(strategy_params, 'strategy_name') else "trend-pullback"
+        strategy = STRATEGY_MAP.get(strategy_name, TREND_PULLBACK_STRATEGY)
+
+        # Vectorized or standard signal generation
+        if strategy_name == "trend-pullback" and hasattr(strategy, 'scan_vectorized'):
+             signals = generate_signals_vectorized(
+                df,
+                parameters=params,
+                direction_mode=direction_mode.value,
+                use_gpu=use_gpu,
+            )
+        else:
+            # Fallback to standard generate_signals if scan_vectorized not available or different strategy
+            # For zscore and others, we convert df to list of candles for generate_signals
+            from ..models.core import Candle
+            
+            # Map Polars rows to Candle objects
+            records = df.to_dicts()
+            candles = []
+            for r in records:
+                # Extract indicators
+                indicator_keys = [k for k in r.keys() if k not in ["timestamp_utc", "open", "high", "low", "close", "volume"]]
+                indicators = {k: r[k] for k in indicator_keys}
+                
+                candles.append(Candle(
+                    timestamp_utc=r["timestamp_utc"],
+                    open=r["open"],
+                    high=r["high"],
+                    low=r["low"],
+                    close=r["close"],
+                    volume=r["volume"],
+                    indicators=indicators
+                ))
+            
+            signals = strategy.generate_signals(
+                candles=candles,
+                parameters=params,
+                direction=direction_mode.value
+            )
 
         # Apply blackout filtering if windows exist
         if blackout_windows and signals:
