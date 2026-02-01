@@ -14,6 +14,7 @@ Test Coverage:
 # - redefined-outer-name: pytest fixtures intentionally shadow fixture names
 # - unused-argument: parameters in mock strategy required for interface compliance
 
+from datetime import UTC, datetime
 import pytest
 
 from src.models.performance_report import PerformanceReport
@@ -91,6 +92,7 @@ def test_indicator_mapping_matches_registry(mock_strategy_with_indicators):
         progress_overhead_pct=0.5,
         indicator_names=list(declared_indicators),
         deterministic_mode=True,
+        created_at=datetime.now(UTC),
     )
 
     # Verify exact match
@@ -124,6 +126,7 @@ def test_indicator_mapping_order_preserved(mock_strategy_with_indicators):
         progress_overhead_pct=0.5,
         indicator_names=list(declared_indicators),
         deterministic_mode=True,
+        created_at=datetime.now(UTC),
     )
 
     # Verify order preservation
@@ -159,6 +162,7 @@ def test_indicator_mapping_zero_indicators(mock_strategy_zero_indicators):
         progress_overhead_pct=0.3,
         indicator_names=list(declared_indicators),
         deterministic_mode=False,
+        created_at=datetime.now(UTC),
     )
 
     # Verify empty list handled correctly
@@ -209,6 +213,7 @@ def test_indicator_mapping_mismatch_detection():
         progress_overhead_pct=0.5,
         indicator_names=["ema20", "ema50", "atr14", "rsi14"],  # Extra indicator
         deterministic_mode=True,
+        created_at=datetime.now(UTC),
     )
 
     # Detect mismatch
@@ -230,6 +235,7 @@ def test_indicator_mapping_mismatch_detection():
         progress_overhead_pct=0.5,
         indicator_names=["ema20", "ema50"],  # Missing atr14
         deterministic_mode=True,
+        created_at=datetime.now(UTC),
     )
 
     # Detect mismatch
@@ -280,6 +286,7 @@ def test_indicator_mapping_audit_trail():
         progress_overhead_pct=0.8,
         indicator_names=list(declared_indicators),
         deterministic_mode=True,
+        created_at=datetime.now(UTC),
     )
 
     # Verify audit trail completeness
