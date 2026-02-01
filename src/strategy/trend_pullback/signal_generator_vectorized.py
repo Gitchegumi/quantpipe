@@ -71,10 +71,7 @@ def generate_signals_vectorized(
 
     cross_threshold = parameters.get("trend_cross_count_threshold", 3)
 
-    if use_gpu:
-        # Research note: GPU acceleration for trend classification
-        # We could use CuPy to accelerate the rolling count if performance bottleneck
-        pass
+    # Optimized via Polars native engine
 
     # Calculate crossovers (where relationship changes)
     # 1 where EMA20 > EMA50, 0 otherwise
@@ -151,10 +148,7 @@ def _generate_long_signals_vec(
         pass
 
     # Use rolling_max on the boolean (cast to int) to check if any in window was true
-    # We shift by 1 because the *current* candle being extreme counts, but we also want
-    # to know if a previous candle started the pullback.
-    # Actually, if the current candle is extreme, we are in a pullback.
-    # If a previous candle (up to max_age) was extreme, we are still in a pullback.
+    # Optimized via Polars native engine
     pullback_active = (
         is_extreme.cast(pl.Int8).rolling_max(window_size=pullback_max_age).fill_null(0)
         == 1
@@ -312,10 +306,7 @@ def _generate_short_signals_vec(
         is_extreme.cast(pl.Int8).rolling_max(window_size=pullback_max_age).fill_null(0)
         == 1
     ) & (pl.col("trend_state") == -1)
-
-    # --- Step 3: Reversal Detection (SHORT) ---
-    # 1. Momentum Turn:
-    #    RSI high (>60) then falling, OR StochRSI high (>0.7) then falling.
+    # Optimized via Polars native engine
 
     prev_rsi = pl.col("rsi").shift(1)
     rsi_turn_down = (prev_rsi > 60) & (pl.col("rsi") < prev_rsi)
