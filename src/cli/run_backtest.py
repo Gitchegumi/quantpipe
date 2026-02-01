@@ -890,6 +890,216 @@ Persistent storage not yet implemented."
 
         logger.info("Results saved to %s", full_path)
 
+        # ---------------------------------------------------------------------
+        # CTI Evaluation (Feature 027)
+        # ---------------------------------------------------------------------
+        if args.cti_mode:
+            from ..risk.prop_firm.loader import load_cti_config, load_scaling_plan
+            from ..risk.prop_firm.evaluator import evaluate_challenge
+            from ..risk.prop_firm.scaling import evaluate_scaling
+
+            logger.info(
+                "Running CTI Evaluation mode=%s scaling=%s",
+                args.cti_mode,
+                not args.disable_scaling,
+            )
+
+            # Helper to process one set of executions
+            def process_cti(executions, label):
+                print(f"\n[CTI Evaluation: {label}]")
+                if not executions:
+                    print("  No trades to evaluate.")
+                    return
+
+                # Normalize ClosedTrade to TradeExecution if needed
+                # PortfolioResult uses ClosedTrade (exit_timestamp), TradeExecution uses close_timestamp
+                if hasattr(executions[0], "exit_timestamp") and not hasattr(
+                    executions[0], "close_timestamp"
+                ):
+                    from ..models.core import TradeExecution
+                    import pandas as pd
+
+                    norm_executions = []
+                    for t in executions:
+                        # Convert numpy datetime64 to pandas Timestamp (compatible with .date())
+                        open_ts = pd.Timestamp(t.entry_timestamp)
+                        close_ts = pd.Timestamp(t.exit_timestamp)
+
+                        norm_executions.append(
+                            TradeExecution(
+                                signal_id=getattr(t, "signal_id", "UNKNOWN"),
+                                direction=t.direction,
+                                open_timestamp=open_ts,
+                                entry_fill_price=t.entry_price,
+                                close_timestamp=close_ts,
+                                exit_fill_price=t.exit_price,
+                                exit_reason=t.exit_reason,
+                                pnl_r=t.pnl_r,
+                                slippage_entry_pips=0.0,
+                                slippage_exit_pips=0.0,
+                                costs_total=0.0,
+                                stop_price=0.0,
+                                target_price=0.0,
+                                risk_amount=t.risk_amount,
+                                risk_percent=t.risk_percent,
+                            )
+                        )
+                    executions = norm_executions
+
+                try:
+                    acc_size = parameters.account_balance
+                    # Valid CTI account sizes per presets
+                    valid_sizes = [2500, 5000, 10000, 25000, 50000, 100000]
+                    if acc_size not in valid_sizes:
+                        logger.warning(
+                            "Account size %.2f might not match CTI presets (Usually 10k, 25k, etc.)",
+                            acc_size,
+                        )
+
+                    # Load base config
+                    challenge_conf = load_cti_config(args.cti_mode, int(acc_size))
+
+                    if not args.disable_scaling:
+                        # Load scaling plan
+                        scaling_plan = load_scaling_plan(args.cti_mode)
+                        report = evaluate_scaling(
+                            executions, challenge_conf, scaling_plan
+                        )
+
+                        # Build Report String
+                        lines = []
+                        promotions = sum(
+                            1 for l in report.lives if l.status == "PROMOTED"
+                        )
+                        resets = sum(
+                            1 for l in report.lives if l.status.startswith("FAILED")
+                        )
+
+                        # Calculate Payouts (ignore negative life PnLs)
+                        payout_100 = sum(max(0, l.pnl) for l in report.lives)
+                        payout_80 = payout_100 * 0.8
+
+                        lines.append(
+                            f"  Scaling Report (Total Lives: {len(report.lives)} | Promotions: {promotions} | Resets: {resets})"
+                        )
+                        lines.append(
+                            f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
+                        )
+                        for life in report.lives:
+                            target_amt = (
+                                life.start_tier_balance * scaling_plan.profit_target_pct
+                            )
+                            lines.append(
+                                f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={life.status}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
+                            )
+                            s_str = life.start_date.strftime("%Y-%m-%d %H:%M")
+                            e_str = life.end_date.strftime("%Y-%m-%d %H:%M")
+                            lines.append(f"      Period: {s_str} to {e_str}")
+
+                            if life.metrics:
+                                m = life.metrics
+                                lines.append(
+                                    f"      Stats: {m.win_count} Wins, {m.loss_count} Losses | "
+                                    f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
+                                )
+
+                            if life.status == "FAILED_DRAWDOWN":
+                                reason = (
+                                    life.failure_reason
+                                    if life.failure_reason
+                                    else "Drawdown Violation"
+                                )
+                                from datetime import timedelta
+
+                                review_date = life.start_date + timedelta(days=120)
+                                review_str = review_date.strftime("%Y-%m-%d")
+
+                                lines.append(
+                                    f"      Failure: {reason} (End: {life.end_date})"
+                                )
+                                lines.append(
+                                    f"      Context: Promotion Review was due ~{review_str}"
+                                )
+                            elif life.status == "PROMOTED":
+                                lines.append(
+                                    f"      Success: Promoted to Tier Balance ${life.end_balance:.2f} (if next life exists)"
+                                )
+                            lines.append("")  # Blank line for readability
+                        lines.append(f"  Active Life Index: {report.active_life_index}")
+
+                        # Append to file
+                        with open(full_path, "a", encoding="utf-8") as f:
+                            f.write(f"\n\n[CTI Evaluation: {label}]\n")
+                            f.write("\n".join(lines))
+                            f.write("\n")
+
+                        # Console Summary
+                        print(
+                            f"[CTI Evaluation: {label}] Completed. See results file for details."
+                        )
+                        for line in lines:
+                            print(line)
+
+                    else:
+                        # Single Challenge Evaluation (with Retry on Failure Logic)
+                        remaining_execs = executions
+                        life_id = 1
+                        lives = []
+
+                        header = f"\n[CTI Evaluation: {label}]"
+                        print(header.strip())
+                        details = []
+
+                        while remaining_execs:
+                            eval_result = evaluate_challenge(
+                                remaining_execs, challenge_conf, life_id=life_id
+                            )
+                            lives.append(eval_result)
+
+                            target_amt = (
+                                eval_result.start_tier_balance
+                                * challenge_conf.profit_target_pct
+                            )
+                            summary_line = (
+                                f"  Life #{eval_result.life_id} [Target ${target_amt:.0f}]: "
+                                f"Status={eval_result.status}, PnL=${eval_result.pnl:.2f}, "
+                                f"Balance=${eval_result.end_balance:.2f}"
+                            )
+                            print(summary_line)
+                            details.append(summary_line)
+
+                            if eval_result.status == "PROMOTED":
+                                print(f"    ✓ PROMOTED to funded account!")
+                                details.append(f"    ✓ PROMOTED to funded account!")
+                                break
+
+                            # If failed, retry with remaining executions if any left
+                            if eval_result.last_execution_index < len(remaining_execs):
+                                remaining_execs = remaining_execs[
+                                    eval_result.last_execution_index + 1 :
+                                ]
+                                life_id += 1
+                            else:
+                                break
+
+                        # Append to file
+                        with open(full_path, "a", encoding="utf-8") as f:
+                            f.write(f"\n\n[CTI Evaluation: {label}]\n")
+                            f.write("\n".join(details))
+                            f.write("\n")
+
+                except Exception as exc:
+                    logger.error("CTI Evaluation failed: %s", exc, exc_info=True)
+                    print(f"Error during CTI Evaluation: {exc}")
+
+            # Run CTI processing
+            if hasattr(result, "closed_trades"):
+                # PortfolioResult
+                process_cti(result.closed_trades, "Portfolio")
+            elif hasattr(result, "executions") and result.executions:
+                # BacktestResult
+                process_cti(result.executions, result.pair or "Single")
+
         # Visualization
         if args.visualize:
             from ..visualization.datashader_viz import plot_backtest_results
