@@ -5,6 +5,7 @@
     {
       "account_size": 2500,
       "currency": "USD",
+      "cost": 34,
       "phase1": {
         "profit_target_percentage": 10,
         "profit_target_amount": 250,
@@ -36,6 +37,7 @@
     {
       "account_size": 5000,
       "currency": "USD",
+      "cost": 47,
       "phase1": {
         "profit_target_percentage": 10,
         "profit_target_amount": 500,
@@ -67,6 +69,7 @@
     {
       "account_size": 10000,
       "currency": "USD",
+      "cost": 84,
       "phase1": {
         "profit_target_percentage": 10,
         "profit_target_amount": 1000,
@@ -98,6 +101,7 @@
     {
       "account_size": 25000,
       "currency": "USD",
+      "cost": 152,
       "phase1": {
         "profit_target_percentage": 10,
         "profit_target_amount": 2500,
@@ -129,6 +133,7 @@
     {
       "account_size": 50000,
       "currency": "USD",
+      "cost": 279,
       "phase1": {
         "profit_target_percentage": 10,
         "profit_target_amount": 5000,
@@ -160,6 +165,7 @@
     {
       "account_size": 100000,
       "currency": "USD",
+      "cost": 519,
       "phase1": {
         "profit_target_percentage": 10,
         "profit_target_amount": 10000,

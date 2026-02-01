@@ -70,5 +70,5 @@
     "maximum_number_of_accounts": 2,
     "notes": "The scaling plan caps each funded account at $200,000 and allows a maximum total allocation of $400,000 across two accounts【334424731157034†L431-L437】."
   },
-  "additional_notes": "Each increase adds 50% of the original starting balance (e.g., a $100k account grows to $112.5k, then $125k, etc.), maintaining the same trailing drawdown structure【334424731157034†L431-L439】."
+  "additional_notes": "Each increase adds 50% of the original challenge level (e.g., a $100k account grows to $112.5k, then $125k, etc.), maintaining the same trailing drawdown structure【334424731157034†L431-L439】."
 }

@@ -1,10 +1,11 @@
 {
   "program_name": "Instant Funding",
-  "description": "Instant Funding allows traders to trade live capital from day one without a two‑phase evaluation. To unlock the first payout, traders must hit an 8% profit target (relative to the starting balance) while staying within a 5% trailing drawdown. There is no daily drawdown and no time limit. Traders must log at least three profitable trading days before withdrawing. Once funded, profit share starts at 80% and can reach 100% through VIP tiers.",
+  "description": "Instant Funding allows traders to trade live capital from day one without a two‑phase evaluation. To unlock the first payout, traders must hit an 8% profit target (relative to the challenge level) while staying within a 5% trailing drawdown. There is no daily drawdown and no time limit. Traders must log at least three profitable trading days before withdrawing. Once funded, profit share starts at 80% and can reach 100% through VIP tiers.",
   "starting_account_sizes": [
     {
       "account_size": 2500,
       "currency": "USD",
+      "cost": 129,
       "parameters": {
         "starting_balance": 1250,
         "profit_target_amount": 125,
@@ -24,6 +25,7 @@
     {
       "account_size": 5000,
       "currency": "USD",
+      "cost": 259,
       "parameters": {
         "starting_balance": 2500,
         "profit_target_amount": 250,
@@ -44,6 +46,7 @@
     {
       "account_size": 10000,
       "currency": "USD",
+      "cost": 519,
       "parameters": {
         "starting_balance": 5000,
         "profit_target_amount": 500,
@@ -64,6 +67,7 @@
     {
       "account_size": 20000,
       "currency": "USD",
+      "cost": 1039,
       "parameters": {
         "starting_balance": 10000,
         "profit_target_amount": 1000,
@@ -84,6 +88,7 @@
     {
       "account_size": 40000,
       "currency": "USD",
+      "cost": 2079,
       "parameters": {
         "starting_balance": 20000,
         "profit_target_amount": 2000,
@@ -104,6 +109,7 @@
     {
       "account_size": 80000,
       "currency": "USD",
+      "cost": 4159,
       "parameters": {
         "starting_balance": 40000,
         "profit_target_amount": 4000,

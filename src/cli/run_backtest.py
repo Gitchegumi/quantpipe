@@ -84,6 +84,17 @@ def _is_interactive() -> bool:
 
 def _prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
     """Interactively prompt user for input with validation and coercion."""
+    if choices:
+        # Append choices to msg if not already there
+        choice_str = f" ({'/'.join(map(str, choices))})"
+        if choice_str.strip() not in msg:
+            # Insert before the last colon if present
+            if ":" in msg:
+                parts = msg.rsplit(":", 1)
+                msg = f"{parts[0]}{choice_str}:{parts[1]}"
+            else:
+                msg = f"{msg}{choice_str}"
+
     while True:
         try:
             raw = input(msg).strip()
@@ -280,7 +291,7 @@ def configure_backtest_parser(
     parser.add_argument(
         "--starting-balance",
         type=float,
-        help="Starting account balance for position sizing (default: $2500). "
+        help="Starting account balance / Challenge Level (default: $2500). "
         "All symbols trade against this shared balance.",
     )
 
@@ -629,7 +640,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 # 3. Direction
                 if args.direction is None:
                     choices = ["LONG", "SHORT", "BOTH"]
-                    d = _prompt("? Direction (LONG/SHORT/BOTH) [LONG]: ", choices=choices)
+                    d = _prompt("? Direction [LONG]: ", choices=choices)
                     args.direction = d if d else "LONG"
 
                 # 4. Timeframe
@@ -637,10 +648,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) [1m]: ")
                     args.timeframe = t if t else "1m"
 
-                # 5. Starting Balance
+                # 5. Challenge Level
                 if args.starting_balance is None:
                     b = _prompt(
-                        "? Starting balance (USD) [2500.0]: ",
+                        "? Challenge Level (USD) [2500.0]: ",
                         coerce=float,
                         validate=lambda x: x > 0,
                     )
@@ -655,10 +666,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                 # 6. CTI Simulation
                 if args.cti_mode is None:
-                    yn = _prompt("? Run in CTI Prop Firm mode? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Run in CTI Prop Firm mode? [n]: ", choices=["y", "n"])
                     if yn == "y":
                         choices = ["1STEP", "2STEP", "INSTANT"]
-                        mode = _prompt("? CTI Mode (1STEP/2STEP/INSTANT) [2STEP]: ", choices=choices)
+                        mode = _prompt("? CTI Mode [2STEP]: ", choices=choices)
                         args.cti_mode = mode if mode else "2STEP"
 
                 # 7. Risk Parameters
@@ -681,7 +692,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 elif "MA_Trailing" in args.stop_policy:
                     # ma-type, ma-period
                     if args.ma_type == "SMA": # Default is SMA, confirm if interactive
-                        mt = _prompt("? MA Type (SMA/EMA) [SMA]: ", choices=["SMA", "EMA"])
+                        mt = _prompt("? MA Type [SMA]: ", choices=["SMA", "EMA"])
                         args.ma_type = mt if mt else "SMA"
                     if args.ma_period == 50: # Default 50
                         mp = _prompt("? MA Period [50]: ", coerce=int, validate=lambda x: x > 0)
@@ -709,7 +720,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 
                 # Sessions
                 if args.sessions is None:
-                    yn = _prompt("? Limit trading to specific sessions? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Limit trading to specific sessions? [n]: ", choices=["y", "n"])
                     if yn == "y":
                         raw = _prompt("? Sessions (space-separated, e.g., NY EU AS SY): ")
                         if raw:
@@ -721,7 +732,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                 # News Blackout
                 if not args.blackout_news:
-                    yn = _prompt("? Enable news event blackout filtering? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Enable news event blackout filtering? [n]: ", choices=["y", "n"])
                     args.blackout_news = (yn == "y")
 
     # -------------------------------------------------------------------------
@@ -1001,7 +1012,7 @@ Persistent storage not yet implemented."
 
         # Unified backtest path: always use run_portfolio_backtest (1 or N symbols)
         logger.info(
-            "Backtest: %d symbol(s), $%.2f starting balance",
+            "Backtest: %d symbol(s), $%.2f challenge level",
             len(pair_paths),
             parameters.account_balance,  # Use resolved parameter
         )
@@ -1013,7 +1024,7 @@ Persistent storage not yet implemented."
             "direction": args.direction,
             "strategy": args.strategy[0] if isinstance(args.strategy, list) else args.strategy,
             "pairs": [p.upper() for p in (args.pair or [])],
-            "starting_balance": float(parameters.account_balance),
+            "challenge_level": float(parameters.account_balance),
             "cti": {
                 "enabled": bool(args.cti_mode),
                 "mode": args.cti_mode,
@@ -1241,8 +1252,28 @@ Persistent storage not yet implemented."
                     if not args.disable_scaling:
                         # Load scaling plan
                         scaling_plan = load_scaling_plan(args.cti_mode)
+                        
+                        # Construct cost map for buy-backs (Feature Request)
+                        try:
+                            import json as _json_cost
+                            cost_file = Path("src/config/presets/cti") / (
+                                "cti_instant_funding.json" if args.cti_mode == "INSTANT" else
+                                "cti_1_step_challenge.json" if args.cti_mode == "1STEP" else
+                                "cti_2_step_challenge.json"
+                            )
+                            # Handle relative path if running from root
+                            if not cost_file.exists():
+                                cost_file = Path.cwd() / cost_file
+
+                            with open(cost_file, encoding="utf-8") as f:
+                                cost_data = _json_cost.load(f)
+                            cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in cost_data["starting_account_sizes"]}
+                        except Exception as e:
+                            logger.warning("Could not build cost map for CTI buy-back simulation: %s", e)
+                            cost_map = None
+
                         report = evaluate_scaling(
-                            executions, challenge_conf, scaling_plan
+                            executions, challenge_conf, scaling_plan, cost_map=cost_map
                         )
 
                         # Build Report String
@@ -1256,10 +1287,13 @@ Persistent storage not yet implemented."
 
                         # Calculate Payouts (ignore negative life PnLs)
                         payout_100 = sum(max(0, l.pnl) for l in report.lives)
-                        payout_80 = payout_100 * 0.8
+                        payout_80 = payout_100 * challenge_conf.payout_share
 
                         lines.append(
                             f"  Scaling Report (Total Lives: {len(report.lives)} | Promotions: {promotions} | Resets: {resets})"
+                        )
+                        lines.append(
+                            f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
                         )
                         lines.append(
                             f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
