@@ -25,7 +25,7 @@ from ..strategy.trend_pullback.signal_generator_vectorized import (
     generate_signals_vectorized,
 )
 from ..strategy.trend_pullback.strategy import TREND_PULLBACK_STRATEGY
-from ..strategy.zscore_mean_reversion.strategy import ZSCORE_STRATEGY
+from ..strategy.zscore_mean_reversion import ZSCORE_STRATEGY
 
 from .orchestrator import BacktestOrchestrator
 from .portfolio.portfolio_simulator import PortfolioSimulator
