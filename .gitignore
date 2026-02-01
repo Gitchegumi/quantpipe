@@ -223,6 +223,12 @@ results/*
 /data/raw/
 ./runs/
 
+# Private Strategies Sandbox
+private_strategies/*
+!private_strategies/README.md
+!private_strategies/__init__.py
+!private_strategies/test_strat.py
+
 # =============================================================================
 # User-Created Strategies (022-strategy-templating)
 # =============================================================================
