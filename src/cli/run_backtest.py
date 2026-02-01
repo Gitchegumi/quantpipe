@@ -798,16 +798,34 @@ Persistent storage not yet implemented."
             if args.blackout_sessions:
                 session_cfg = SessionBlackoutConfig(enabled=True)
 
+            # Normalize session names (handle abbreviations)
+            # Map 2-letter codes to full session names
+            session_map = {
+                "SY": "SYDNEY",
+                "AS": "ASIA",
+                "EU": "LONDON",
+                "NY": "NY",
+            }
+
+            allowed_sessions = []
+            if args.sessions:
+                for s in args.sessions:
+                    s_upper = s.upper()
+                    # Map abbreviation or use original if not in map
+                    canonical = session_map.get(s_upper, s_upper)
+                    allowed_sessions.append(canonical)
+
             whitelist_cfg = None
             if args.sessions:
                 # Map shorthand to full names if needed, or rely on config parsing
-                whitelist_cfg = SessionOnlyConfig(enabled=True, sessions=args.sessions)
+                whitelist_cfg = SessionOnlyConfig(
+                    enabled=True, allowed_sessions=allowed_sessions
+                )
 
             blackout_config = BlackoutConfig(
-                enabled=True,
-                session_blackout=session_cfg,
-                news_event=news_cfg,
-                session_filter=whitelist_cfg,
+                news=news_cfg or NewsBlackoutConfig(),
+                sessions=session_cfg or SessionBlackoutConfig(),
+                session_only=whitelist_cfg or SessionOnlyConfig(),
             )
             logger.info("Blackout filtering enabled: %s", blackout_config)
 
