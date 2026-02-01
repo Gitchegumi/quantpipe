@@ -398,7 +398,7 @@ def configure_backtest_parser(
             "FixedPips_Trailing",
             "MA_Trailing",
         ],
-        default="ATR",
+        default=None,
         help="Stop-loss policy type. Default: ATR",
     )
 
@@ -447,7 +447,7 @@ def configure_backtest_parser(
         "--tp-policy",
         type=str,
         choices=["RiskMultiple", "None"],
-        default="RiskMultiple",
+        default=None,
         help="Take-profit policy type. Default: RiskMultiple",
     )
 
@@ -560,6 +560,18 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             missing.append("--timeframe")
         if args.starting_balance is None:
             missing.append("--starting-balance")
+        # Risk Management (New Required Flags)
+        if args.risk_pct is None:
+            missing.append("--risk-pct")
+        if args.stop_policy is None:
+            missing.append("--stop-policy")
+        if args.tp_policy is None:
+            missing.append("--tp-policy")
+        # rr-ratio is conditional on tp-policy, but usually required if tp=RiskMultiple
+        # We handle this in logic or just check if user provided it.
+        # Simplest is to treat it as "missing" if None, but with a default in prompt.
+        if args.rr_ratio is None:
+            missing.append("--rr-ratio")
 
         # Handle missing flags
         if missing:
@@ -577,6 +589,16 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 # Removed default assignment for starting_balance to allow config file precedence
                 # if args.starting_balance is None:
                 #    args.starting_balance = DEFAULT_ACCOUNT_BALANCE
+                
+                # Risk Defaults (for non-interactive runs without explicit flags)
+                if args.risk_pct is None:
+                    args.risk_pct = 0.25
+                if args.stop_policy is None:
+                    args.stop_policy = "ATR"
+                if args.tp_policy is None:
+                    args.tp_policy = "RiskMultiple"
+                if args.rr_ratio is None:
+                    args.rr_ratio = 2.0
             else:
                 print(f"Missing required flags: {', '.join(missing)}")
 
@@ -629,6 +651,49 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                         choices = ["1STEP", "2STEP", "INSTANT"]
                         mode = _prompt("? CTI Mode (1STEP/2STEP/INSTANT) [2STEP]: ", choices=choices)
                         args.cti_mode = mode if mode else "2STEP"
+
+                # 7. Risk Parameters
+                print("\n[Risk Management]")
+                
+                # Risk %
+                if args.risk_pct is None:
+                    args.risk_pct = _prompt("? Risk % per trade [0.25]: ", coerce=float, validate=lambda x: 0 < x <= 100) or 0.25
+
+                # Stop Policy
+                stop_choices = ["ATR", "ATR_Trailing", "FixedPips", "FixedPips_Trailing", "MA_Trailing"]
+                if args.stop_policy is None:
+                    sp = _prompt(f"? Stop Policy [ATR]: ", choices=stop_choices)
+                    args.stop_policy = sp if sp else "ATR"
+
+                # Conditional prompts based on stop policy
+                if "FixedPips" in args.stop_policy:
+                    if args.fixed_pips is None:
+                        args.fixed_pips = _prompt("? Fixed Pips (e.g., 20.0): ", coerce=float) or 20.0
+                elif "MA_Trailing" in args.stop_policy:
+                    # ma-type, ma-period
+                    if args.ma_type == "SMA": # Default is SMA, confirm if interactive
+                        mt = _prompt("? MA Type (SMA/EMA) [SMA]: ", choices=["SMA", "EMA"])
+                        args.ma_type = mt if mt else "SMA"
+                    if args.ma_period == 50: # Default 50
+                        mp = _prompt("? MA Period [50]: ", coerce=int, validate=lambda x: x > 0)
+                        args.ma_period = mp if mp else 50
+                elif "ATR" in args.stop_policy:
+                    # atr-mult, atr-period
+                    if args.atr_mult is None:
+                        args.atr_mult = _prompt("? ATR Multiplier [2.0]: ", coerce=float) or 2.0
+                    if args.atr_period == 14: # Default 14
+                        ap = _prompt("? ATR Period [14]: ", coerce=int, validate=lambda x: x > 0)
+                        args.atr_period = ap if ap else 14
+                
+                # TP Policy
+                tp_choices = ["RiskMultiple", "None"]
+                if args.tp_policy is None:
+                    tp = _prompt("? Take Profit Policy [RiskMultiple]: ", choices=tp_choices)
+                    args.tp_policy = tp if tp else "RiskMultiple"
+
+                if args.tp_policy == "RiskMultiple":
+                    if args.rr_ratio is None:
+                        args.rr_ratio = _prompt("? Reward-to-Risk Ratio [2.0]: ", coerce=float) or 2.0
 
     # -------------------------------------------------------------------------
     # Parameter Resolution (CLI > Config > Defaults)
