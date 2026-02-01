@@ -1,6 +1,6 @@
 {
   "program_name": "Instant Funding",
-  "description": "Instant Funding allows traders to trade live capital from day one without a two‑phase evaluation. To unlock the first payout, traders must hit an 8% profit target (relative to the starting balance) while staying within a 5% trailing drawdown. There is no daily drawdown and no time limit. Traders must log at least three profitable trading days before withdrawing. Once funded, profit share starts at 80% and can reach 100% through VIP tiers.",
+  "description": "Instant Funding allows traders to trade live capital from day one without a two‑phase evaluation. To unlock the first payout, traders must hit an 8% profit target (relative to the challenge level) while staying within a 5% trailing drawdown. There is no daily drawdown and no time limit. Traders must log at least three profitable trading days before withdrawing. Once funded, profit share starts at 80% and can reach 100% through VIP tiers.",
   "starting_account_sizes": [
     {
       "account_size": 2500,

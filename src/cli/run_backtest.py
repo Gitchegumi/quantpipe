@@ -280,7 +280,7 @@ def configure_backtest_parser(
     parser.add_argument(
         "--starting-balance",
         type=float,
-        help="Starting account balance for position sizing (default: $2500). "
+        help="Starting account balance / Challenge Level (default: $2500). "
         "All symbols trade against this shared balance.",
     )
 
@@ -637,10 +637,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) [1m]: ")
                     args.timeframe = t if t else "1m"
 
-                # 5. Starting Balance
+                # 5. Challenge Level
                 if args.starting_balance is None:
                     b = _prompt(
-                        "? Starting balance (USD) [2500.0]: ",
+                        "? Challenge Level (USD) [2500.0]: ",
                         coerce=float,
                         validate=lambda x: x > 0,
                     )
@@ -1001,7 +1001,7 @@ Persistent storage not yet implemented."
 
         # Unified backtest path: always use run_portfolio_backtest (1 or N symbols)
         logger.info(
-            "Backtest: %d symbol(s), $%.2f starting balance",
+            "Backtest: %d symbol(s), $%.2f challenge level",
             len(pair_paths),
             parameters.account_balance,  # Use resolved parameter
         )
@@ -1013,7 +1013,7 @@ Persistent storage not yet implemented."
             "direction": args.direction,
             "strategy": args.strategy[0] if isinstance(args.strategy, list) else args.strategy,
             "pairs": [p.upper() for p in (args.pair or [])],
-            "starting_balance": float(parameters.account_balance),
+            "challenge_level": float(parameters.account_balance),
             "cti": {
                 "enabled": bool(args.cti_mode),
                 "mode": args.cti_mode,
