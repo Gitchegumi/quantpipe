@@ -73,6 +73,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Feature 023-GPU: Optional GPU Acceleration (2026-02-01)
+
+- **Optional GPU Acceleration (CUDA/CuPy)**
+  - Added `--gpu`, `--cuda`, and `--gpu-accel` CLI flags to enable GPU-accelerated processing.
+  - Implemented `src/backtest/gpu_utils.py` for automatic GPU detection and CuPy integration.
+  - Added GPU support hooks to `calculate_indicators` and `generate_signals_vectorized`.
+  - Implemented graceful fallback to CPU when CuPy or compatible hardware is unavailable.
+  - Added unit tests for GPU detection and execution path verification.
+
 ### Added - Feature 009: Optimize & Decouple Ingestion Process (2025-11-08)
 
 - **High-Performance Core Ingestion (User Story 1)**

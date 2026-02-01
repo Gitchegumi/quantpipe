@@ -129,6 +129,7 @@ def run_portfolio_backtest(
     blackout_config: Any = None,
     risk_config: Any = None,
     indicator_overrides: dict[str, dict[str, Any]] | None = None,
+    use_gpu: bool = False,
 ):
     """Run time-synchronized portfolio backtest with shared equity.
 
@@ -144,6 +145,7 @@ def run_portfolio_backtest(
         dry_run: If True, generate signals only without execution
         show_progress: If True, show progress bars
         indicator_overrides: Optional overrides for indicator parameters (for sweeps)
+        use_gpu: Whether to use GPU acceleration
 
     Returns:
         Tuple of (PortfolioResult, enriched_data dict) where enriched_data maps
@@ -227,6 +229,7 @@ def run_portfolio_backtest(
             required_indicators,
             overrides=overrides,
             custom_registry=custom_registry,
+            use_gpu=use_gpu,
         )
 
         symbol_data[pair] = enriched_df
@@ -257,6 +260,7 @@ def run_portfolio_backtest(
                 [ind_str],
                 overrides=overrides,
                 custom_registry=custom_registry,
+                use_gpu=use_gpu,
             )
 
             # Join the new column(s)
@@ -353,6 +357,7 @@ def run_portfolio_backtest(
                 df,
                 parameters=params,
                 direction_mode=direction_mode.value,
+                use_gpu=use_gpu,
             )
         else:
             # Fallback to standard generate_signals if scan_vectorized not available or different strategy
