@@ -572,6 +572,11 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         # Simplest is to treat it as "missing" if None, but with a default in prompt.
         if args.rr_ratio is None:
             missing.append("--rr-ratio")
+        # Filtering (New Required Flags)
+        if args.sessions is None:
+            missing.append("--sessions")
+        if not args.blackout_news:
+            missing.append("--blackout-news")
 
         # Handle missing flags
         if missing:
@@ -599,6 +604,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     args.tp_policy = "RiskMultiple"
                 if args.rr_ratio is None:
                     args.rr_ratio = 2.0
+                if args.sessions is None:
+                    args.sessions = None # "all"
+                if not args.blackout_news:
+                    args.blackout_news = False
             else:
                 print(f"Missing required flags: {', '.join(missing)}")
 
@@ -694,6 +703,26 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 if args.tp_policy == "RiskMultiple":
                     if args.rr_ratio is None:
                         args.rr_ratio = _prompt("? Reward-to-Risk Ratio [2.0]: ", coerce=float) or 2.0
+
+                # 8. Filtering
+                print("\n[Filtering]")
+                
+                # Sessions
+                if args.sessions is None:
+                    yn = _prompt("? Limit trading to specific sessions? (y/n) [n]: ", choices=["y", "n"])
+                    if yn == "y":
+                        raw = _prompt("? Sessions (space-separated, e.g., NY EU AS SY): ")
+                        if raw:
+                            args.sessions = raw.replace(",", " ").upper().split()
+                        else:
+                            args.sessions = None # Fallback to all if user provided nothing
+                    else:
+                        args.sessions = None # "all"
+
+                # News Blackout
+                if not args.blackout_news:
+                    yn = _prompt("? Enable news event blackout filtering? (y/n) [n]: ", choices=["y", "n"])
+                    args.blackout_news = (yn == "y")
 
     # -------------------------------------------------------------------------
     # Parameter Resolution (CLI > Config > Defaults)
