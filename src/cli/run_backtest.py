@@ -1241,8 +1241,28 @@ Persistent storage not yet implemented."
                     if not args.disable_scaling:
                         # Load scaling plan
                         scaling_plan = load_scaling_plan(args.cti_mode)
+                        
+                        # Construct cost map for buy-backs (Feature Request)
+                        try:
+                            import json as _json_cost
+                            cost_file = Path("src/config/presets/cti") / (
+                                "cti_instant_funding.json" if args.cti_mode == "INSTANT" else
+                                "cti_1_step_challenge.json" if args.cti_mode == "1STEP" else
+                                "cti_2_step_challenge.json"
+                            )
+                            # Handle relative path if running from root
+                            if not cost_file.exists():
+                                cost_file = Path.cwd() / cost_file
+
+                            with open(cost_file, encoding="utf-8") as f:
+                                cost_data = _json_cost.load(f)
+                            cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in cost_data["starting_account_sizes"]}
+                        except Exception as e:
+                            logger.warning("Could not build cost map for CTI buy-back simulation: %s", e)
+                            cost_map = None
+
                         report = evaluate_scaling(
-                            executions, challenge_conf, scaling_plan
+                            executions, challenge_conf, scaling_plan, cost_map=cost_map
                         )
 
                         # Build Report String
@@ -1256,10 +1276,13 @@ Persistent storage not yet implemented."
 
                         # Calculate Payouts (ignore negative life PnLs)
                         payout_100 = sum(max(0, l.pnl) for l in report.lives)
-                        payout_80 = payout_100 * 0.8
+                        payout_80 = payout_100 * challenge_conf.payout_share
 
                         lines.append(
                             f"  Scaling Report (Total Lives: {len(report.lives)} | Promotions: {promotions} | Resets: {resets})"
+                        )
+                        lines.append(
+                            f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
                         )
                         lines.append(
                             f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"

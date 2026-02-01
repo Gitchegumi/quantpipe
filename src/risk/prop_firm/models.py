@@ -27,6 +27,8 @@ class ChallengeConfig(BaseModel):
     max_time_days: Optional[int] = None
     drawdown_type: str = "TRAILING"  # TRAILING or STATIC
     drawdown_mode: str = "CLOSED_BALANCE"
+    cost: float = 0.0
+    payout_share: float = 0.8
 
 
 class ScalingConfig(BaseModel):
@@ -66,6 +68,9 @@ class ScalingReport:
     lives: list[LifeResult]
     total_duration_days: int
     active_life_index: int
+    wallet_balance: float = 0.0
+    net_payouts: float = 0.0
+    total_costs: float = 0.0
 
     @property
     def tier_stats(self) -> dict[float, dict[str, int]]:

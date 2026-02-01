@@ -113,6 +113,8 @@ def load_cti_config(mode: str, account_size: int) -> ChallengeConfig:
         max_time_days=eval_rules.get("time_limit_days"),
         drawdown_type=dd_type,
         drawdown_mode="CLOSED_BALANCE",
+        cost=float(matching_config.get("cost", 0.0)),
+        payout_share=float(matching_config.get("payout_share", 0.8)),
     )
 
 

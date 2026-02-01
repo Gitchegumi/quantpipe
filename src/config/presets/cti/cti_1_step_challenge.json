@@ -5,6 +5,7 @@
     {
       "account_size": 2500,
       "currency": "USD",
+      "cost": 29,
       "evaluation": {
         "profit_target_percentage": 8,
         "profit_target_amount": 200,
@@ -24,6 +25,7 @@
     {
       "account_size": 5000,
       "currency": "USD",
+      "cost": 44,
       "evaluation": {
         "profit_target_percentage": 8,
         "profit_target_amount": 400,
@@ -43,6 +45,7 @@
     {
       "account_size": 10000,
       "currency": "USD",
+      "cost": 74,
       "evaluation": {
         "profit_target_percentage": 8,
         "profit_target_amount": 800,
