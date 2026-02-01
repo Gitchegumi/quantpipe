@@ -84,6 +84,17 @@ def _is_interactive() -> bool:
 
 def _prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
     """Interactively prompt user for input with validation and coercion."""
+    if choices:
+        # Append choices to msg if not already there
+        choice_str = f" ({'/'.join(map(str, choices))})"
+        if choice_str.strip() not in msg:
+            # Insert before the last colon if present
+            if ":" in msg:
+                parts = msg.rsplit(":", 1)
+                msg = f"{parts[0]}{choice_str}:{parts[1]}"
+            else:
+                msg = f"{msg}{choice_str}"
+
     while True:
         try:
             raw = input(msg).strip()
@@ -629,7 +640,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 # 3. Direction
                 if args.direction is None:
                     choices = ["LONG", "SHORT", "BOTH"]
-                    d = _prompt("? Direction (LONG/SHORT/BOTH) [LONG]: ", choices=choices)
+                    d = _prompt("? Direction [LONG]: ", choices=choices)
                     args.direction = d if d else "LONG"
 
                 # 4. Timeframe
@@ -655,10 +666,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                 # 6. CTI Simulation
                 if args.cti_mode is None:
-                    yn = _prompt("? Run in CTI Prop Firm mode? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Run in CTI Prop Firm mode? [n]: ", choices=["y", "n"])
                     if yn == "y":
                         choices = ["1STEP", "2STEP", "INSTANT"]
-                        mode = _prompt("? CTI Mode (1STEP/2STEP/INSTANT) [2STEP]: ", choices=choices)
+                        mode = _prompt("? CTI Mode [2STEP]: ", choices=choices)
                         args.cti_mode = mode if mode else "2STEP"
 
                 # 7. Risk Parameters
@@ -681,7 +692,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 elif "MA_Trailing" in args.stop_policy:
                     # ma-type, ma-period
                     if args.ma_type == "SMA": # Default is SMA, confirm if interactive
-                        mt = _prompt("? MA Type (SMA/EMA) [SMA]: ", choices=["SMA", "EMA"])
+                        mt = _prompt("? MA Type [SMA]: ", choices=["SMA", "EMA"])
                         args.ma_type = mt if mt else "SMA"
                     if args.ma_period == 50: # Default 50
                         mp = _prompt("? MA Period [50]: ", coerce=int, validate=lambda x: x > 0)
@@ -709,7 +720,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 
                 # Sessions
                 if args.sessions is None:
-                    yn = _prompt("? Limit trading to specific sessions? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Limit trading to specific sessions? [n]: ", choices=["y", "n"])
                     if yn == "y":
                         raw = _prompt("? Sessions (space-separated, e.g., NY EU AS SY): ")
                         if raw:
@@ -721,7 +732,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                 # News Blackout
                 if not args.blackout_news:
-                    yn = _prompt("? Enable news event blackout filtering? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Enable news event blackout filtering? [n]: ", choices=["y", "n"])
                     args.blackout_news = (yn == "y")
 
     # -------------------------------------------------------------------------
