@@ -1033,12 +1033,8 @@ Persistent storage not yet implemented."
                             f.write("\n".join(lines))
                             f.write("\n")
 
-                        # Console Summary
-                        print(
-                            f"[CTI Evaluation: {label}] Completed. See results file for details."
-                        )
-                        for line in lines:
-                            print(line)
+                        # Console Summary (Concise)
+                        print(f"✓ CTI Evaluation [{label}]: {len(report.lives)} lives, {promotions} promotions, {resets} resets. Payout (80%): ${payout_80:,.2f}")
 
                     else:
                         # Single Challenge Evaluation (with Retry on Failure Logic)
