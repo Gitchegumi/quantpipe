@@ -364,6 +364,15 @@ def configure_backtest_parser(
         "Example: --config backtest_config.yaml",
     )
 
+    # GPU Acceleration flags (Feature 023-GPU)
+    parser.add_argument(
+        "--gpu",
+        "--cuda",
+        "--gpu-accel",
+        action="store_true",
+        help="Enable GPU acceleration for indicators and scanning using CuPy/CUDA.",
+    )
+
     # Risk Management Arguments (Feature 021: FR-004 - Runtime policy selection)
     parser.add_argument(
         "--risk-config",
@@ -989,6 +998,7 @@ Persistent storage not yet implemented."
             timeframe=args.timeframe,
             blackout_config=blackout_config,
             risk_config=risk_config,
+            use_gpu=args.gpu,
             # indicator_overrides=None, # Explicitly using defaults
         )
 

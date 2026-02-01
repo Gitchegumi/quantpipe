@@ -100,12 +100,12 @@ def test_ingestion_module_no_gpu_references():
     # GPU-specific terms that should NOT appear
     gpu_terms = [
         "cudf",
-        "cupy",
-        "cuda",
+        # "cupy", # Allowed for optional GPU accel (Issue #23)
+        # "cuda", # Allowed for optional GPU accel (Issue #23)
         ".gpu(",
         "gpu=",
         "device=",
-        "to_gpu",
+        # "to_gpu", # Allowed for optional GPU accel (Issue #23)
         "rapids",
     ]
 
@@ -208,7 +208,7 @@ def test_no_gpu_in_dependencies():
     # GPU libraries that should NOT be dependencies
     gpu_deps = [
         "cudf",
-        "cupy",
+        # "cupy", # Optional for Issue #23
         "torch",
         "tensorflow",
         "jax",
