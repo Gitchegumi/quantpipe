@@ -574,8 +574,9 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     args.direction = "LONG"
                 if args.timeframe is None:
                     args.timeframe = "1m"
-                if args.starting_balance is None:
-                    args.starting_balance = DEFAULT_ACCOUNT_BALANCE
+                # Removed default assignment for starting_balance to allow config file precedence
+                # if args.starting_balance is None:
+                #    args.starting_balance = DEFAULT_ACCOUNT_BALANCE
             else:
                 print(f"Missing required flags: {', '.join(missing)}")
 
@@ -612,7 +613,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                         coerce=float,
                         validate=lambda x: x > 0,
                     )
-                    args.starting_balance = b if b else DEFAULT_ACCOUNT_BALANCE
+                    # If user enters nothing, we leave it None for now to allow config override
+                    # unless strictly interactive mode requires a value.
+                    # But for now, let's just stick to the original logic for interactive:
+                    if b:
+                        args.starting_balance = b
+                    # If b is None (user hit enter), we DON'T default here if we want config to win.
+                    # BUT, the prompt says [2500.0], implying default.
+                    # Let's fix the non-interactive path instead.
 
                 # 6. CTI Simulation
                 if args.cti_mode is None:
@@ -667,6 +675,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         param_overrides["account_balance"] = args.starting_balance
     if args.max_position_size is not None:
         param_overrides["max_position_size"] = args.max_position_size
+
+    # Fallback to default account balance if not in config AND not in CLI
+    if "account_balance" not in param_overrides:
+        param_overrides["account_balance"] = DEFAULT_ACCOUNT_BALANCE
 
     # Instantiate StrategyParameters (Validation + Defaults)
     parameters = StrategyParameters(**param_overrides)
