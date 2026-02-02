@@ -128,13 +128,23 @@ def evaluate_scaling(
                 # Funded Scaling Logic (Sliding Window)
                 if trade.close_timestamp >= min_review_date:
                     target = start_tier_balance * scaling_config.profit_target_pct
-                    if tier_profit_accrued >= target:
-                        # Check profitable months requirement in the sliding window
-                        window_start = trade.close_timestamp - relativedelta(months=scaling_config.review_period_months)
-                        prof_months = sum(1 for (y, m), p in monthly_pnls.items() if datetime(y, m, 1, tzinfo=window_start.tzinfo) >= window_start and p > 0)
-                        if prof_months >= 2:
-                            status = "SCALED_UP"
-                            promoted = True
+                    
+                    # Calculate profit in the sliding 4-month window
+                    window_start = trade.close_timestamp - relativedelta(months=scaling_config.review_period_months)
+                    window_pnl = 0.0
+                    prof_months = 0
+                    
+                    for (y, m), p in monthly_pnls.items():
+                        month_dt = datetime(y, m, 1, tzinfo=window_start.tzinfo)
+                        if month_dt >= window_start:
+                            window_pnl += p
+                            if p > 0:
+                                prof_months += 1
+                    
+                    # Scale if profit in window >= 10% AND at least 2 months were profitable
+                    if window_pnl >= target and prof_months >= 2:
+                        status = "SCALED_UP"
+                        promoted = True
 
         if failed or promoted:
             # Calculate final profit at end of this life attempt
@@ -142,15 +152,18 @@ def evaluate_scaling(
             # For funded, we reset monthly, so tier_profit_accrued is the source of truth.
             profit_at_end = tier_profit_accrued
             
+            payout_at_end = 0.0
             if not is_in_evaluation and profit_at_end > 0:
                 # Calculate any remaining payout not yet captured by the monthly trigger
-                # (e.g. if promoted mid-month)
+                # (e.g. if promoted/failed mid-month)
                 remaining_profit = current_balance - start_tier_balance
                 if remaining_profit > 0:
-                    payout = remaining_profit * challenge_config.payout_share
-                    total_payouts += payout
-                    life_withdrawals += payout
-                    wallet_balance += payout
+                    payout_at_end = remaining_profit * challenge_config.payout_share
+                    total_payouts += payout_at_end
+                    life_withdrawals += payout_at_end
+            
+            # Important: Capture the wallet balance AFTER the final payout but BEFORE the next life cost
+            wallet_balance_before_next_life = wallet_balance + payout_at_end
 
             lives.append(LifeResult(
                 life_id=life_id_counter,
@@ -162,11 +175,15 @@ def evaluate_scaling(
                 trade_count=len(current_life_trades),
                 pnl=profit_at_end,
                 beginning_wallet_balance=beginning_wallet,
-                new_wallet_balance=wallet_balance,
+                new_wallet_balance=wallet_balance_before_next_life,
                 life_withdrawals=life_withdrawals,
                 buyback_cost=pending_buyback_cost,
                 metrics=calculate_metrics(current_life_trades),
             ))
+            
+            # Now apply the payout to the actual running wallet balance
+            wallet_balance = wallet_balance_before_next_life
+            
             life_id_counter += 1
             life_withdrawals = 0.0
             
@@ -206,6 +223,9 @@ def evaluate_scaling(
             current_life_trades = []
             current_life_start = trade.close_timestamp
             peak_balance = current_balance
+            # Note: monthly_pnls should PERSIST because we need them for the sliding window
+            # across life resets if the user buys back the same tier? 
+            # Actually, CTI resets the 4-month clock on a new account.
             monthly_pnls = {}
             tier_profit_accrued = 0.0
             min_review_date = current_life_start + relativedelta(months=scaling_config.review_period_months)
