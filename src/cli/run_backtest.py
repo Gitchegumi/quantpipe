@@ -1306,6 +1306,9 @@ Persistent storage not yet implemented."
                             lines.append(
                                 f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={status_label}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
                             )
+                            if life.buyback_cost > 0:
+                                lines.append(f"      Buyback: Instant Funded tier ${life.start_tier_balance:,.0f} | Cost: ${life.buyback_cost:,.2f}")
+                            
                             lines.append(f"      Starting Wallet Balance: ${life.beginning_wallet_balance:,.2f}")
                             if life.life_withdrawals > 0:
                                 lines.append(f"      Life withdrawals: ${life.life_withdrawals:,.2f}")
