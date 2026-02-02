@@ -550,6 +550,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     """
     Execute the backtest logic with the provided arguments.
     """
+    if args.profile:
+        import cProfile
+        import pstats
+        import io
+
+        pr = cProfile.Profile()
+        pr.enable()
+
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
 
@@ -1302,11 +1310,17 @@ Persistent storage not yet implemented."
                             target_amt = (
                                 life.start_tier_balance * scaling_plan.profit_target_pct
                             )
-                            status_label = "Active" if life.status == "IN_PROGRESS" else life.status
+                            status_label = "Active" if life.status == "Active" else life.status
                             lines.append(
                                 f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={status_label}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
                             )
-                            lines.append(f"      Wallet Balance: ${life.beginning_wallet_balance:,.2f}")
+                            if life.buyback_cost > 0:
+                                lines.append(f"      Buyback: Instant Funded tier ${life.start_tier_balance:,.0f} | Cost: ${life.buyback_cost:,.2f}")
+                            
+                            lines.append(f"      Starting Wallet Balance: ${life.beginning_wallet_balance:,.2f}")
+                            if life.life_withdrawals > 0:
+                                lines.append(f"      Life withdrawals: ${life.life_withdrawals:,.2f}")
+                            
                             s_str = life.start_date.strftime("%Y-%m-%d %H:%M")
                             e_str = life.end_date.strftime("%Y-%m-%d %H:%M")
                             lines.append(f"      Period: {s_str} to {e_str}")
@@ -1324,23 +1338,14 @@ Persistent storage not yet implemented."
                                     if life.failure_reason
                                     else "Drawdown Violation"
                                 )
-                                from datetime import timedelta
-
-                                review_date = life.start_date + timedelta(days=120)
-                                review_str = review_date.strftime("%Y-%m-%d")
-
-                                lines.append(
-                                    f"      Failure: {reason} (End: {life.end_date})"
-                                )
-                                lines.append(
-                                    f"      Context: Promotion Review was due ~{review_str}"
-                                )
-                                lines.append(f"      New Wallet Balance: ${life.new_wallet_balance:,.2f}")
+                                lines.append(f"      Failure: {reason} (End: {life.end_date})")
                             elif life.status == "PROMOTED":
                                 lines.append(
                                     f"      Success: Promoted to Tier Balance ${life.end_balance:.2f} (if next life exists)"
                                 )
-                                lines.append(f"      New Wallet Balance: ${life.new_wallet_balance:,.2f}")
+                            
+                            if life.status != "Active":
+                                lines.append(f"      Ending Wallet Balance: ${life.new_wallet_balance:,.2f}")
                             lines.append("")  # Blank line for readability
                         lines.append(f"  Active Life Index: {report.active_life_index}")
 
@@ -1413,8 +1418,20 @@ Persistent storage not yet implemented."
                 # BacktestResult
                 process_cti(result.executions, result.pair or "Single")
 
-        # Visualization
-        if args.visualize:
+    if args.profile:
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats(30)  # Top 30 hotspots
+        print("\n" + "="*80)
+        print("PERFORMANCE PROFILE (Top 30 Hotspots)")
+        print("="*80)
+        print(s.getvalue())
+        print("="*80 + "\n")
+
+    # Visualization
+    if args.visualize:
             from ..visualization.datashader_viz import plot_backtest_results
 
             logger.info("Opening visualization...")
