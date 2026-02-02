@@ -136,10 +136,14 @@ def evaluate_scaling(
         if failed or promoted:
             # Payout Logic (Upon promotion or failure, collect profit)
             profit_at_end = current_balance - start_tier_balance
+            
+            beginning_wallet = wallet_balance
             if profit_at_end > 0:
                 payout = profit_at_end * challenge_config.payout_share
                 total_payouts += payout
-                wallet_balance += payout
+                # User Requirement: New wallet balance = (Beginning wallet balance * .8) + PnL if PnL > 0
+                # We assume PnL here refers to the profit payout (80%)
+                wallet_balance = (wallet_balance * 0.8) + payout
 
             # Close Life
             life_result = LifeResult(
@@ -151,6 +155,8 @@ def evaluate_scaling(
                 end_date=trade.close_timestamp,
                 trade_count=len(current_life_trades),
                 pnl=profit_at_end,
+                beginning_wallet_balance=beginning_wallet,
+                new_wallet_balance=wallet_balance,
                 metrics=calculate_metrics(current_life_trades),
             )
             lives.append(life_result)
@@ -211,6 +217,8 @@ def evaluate_scaling(
         end_date=(sorted_execs[-1].close_timestamp if sorted_execs else current_life_start),
         trade_count=len(current_life_trades),
         pnl=current_balance - start_tier_balance,
+        beginning_wallet_balance=wallet_balance,
+        new_wallet_balance=wallet_balance,
         metrics=calculate_metrics(current_life_trades),
     )
     lives.append(life_result)

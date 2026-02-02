@@ -51,12 +51,8 @@ class LifeResult:
     end_date: datetime
     trade_count: int
     pnl: float
-    # Note: MetricsSummary is defined in src.models.core, but we avoid
-    # circular imports by storing it as a generic object or dict if needed,
-    # or importing it inside methods. For now, we'll omit strict typing
-    # or use 'Any' if we can't import it easily.
-    # To keep this module standalone, we might use a simplified dict for now
-    # or import if possible. Let's use a dict for independent metrics storage.
+    beginning_wallet_balance: float = 0.0
+    new_wallet_balance: float = 0.0
     metrics: Optional[MetricsSummary] = None
     failure_reason: Optional[str] = None
 
