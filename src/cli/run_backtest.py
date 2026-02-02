@@ -1302,11 +1302,14 @@ Persistent storage not yet implemented."
                             target_amt = (
                                 life.start_tier_balance * scaling_plan.profit_target_pct
                             )
-                            status_label = "Active" if life.status == "IN_PROGRESS" else life.status
+                            status_label = "Active" if life.status == "Active" else life.status
                             lines.append(
                                 f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={status_label}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
                             )
-                            lines.append(f"      Wallet Balance: ${life.beginning_wallet_balance:,.2f}")
+                            lines.append(f"      Starting Wallet Balance: ${life.beginning_wallet_balance:,.2f}")
+                            if life.life_withdrawals > 0:
+                                lines.append(f"      Life withdrawals: ${life.life_withdrawals:,.2f}")
+                            
                             s_str = life.start_date.strftime("%Y-%m-%d %H:%M")
                             e_str = life.end_date.strftime("%Y-%m-%d %H:%M")
                             lines.append(f"      Period: {s_str} to {e_str}")
@@ -1324,23 +1327,14 @@ Persistent storage not yet implemented."
                                     if life.failure_reason
                                     else "Drawdown Violation"
                                 )
-                                from datetime import timedelta
-
-                                review_date = life.start_date + timedelta(days=120)
-                                review_str = review_date.strftime("%Y-%m-%d")
-
-                                lines.append(
-                                    f"      Failure: {reason} (End: {life.end_date})"
-                                )
-                                lines.append(
-                                    f"      Context: Promotion Review was due ~{review_str}"
-                                )
-                                lines.append(f"      New Wallet Balance: ${life.new_wallet_balance:,.2f}")
+                                lines.append(f"      Failure: {reason} (End: {life.end_date})")
                             elif life.status == "PROMOTED":
                                 lines.append(
                                     f"      Success: Promoted to Tier Balance ${life.end_balance:.2f} (if next life exists)"
                                 )
-                                lines.append(f"      New Wallet Balance: ${life.new_wallet_balance:,.2f}")
+                            
+                            if life.status != "Active":
+                                lines.append(f"      Ending Wallet Balance: ${life.new_wallet_balance:,.2f}")
                             lines.append("")  # Blank line for readability
                         lines.append(f"  Active Life Index: {report.active_life_index}")
 

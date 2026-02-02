@@ -53,6 +53,8 @@ class LifeResult:
     pnl: float
     beginning_wallet_balance: float = 0.0
     new_wallet_balance: float = 0.0
+    life_withdrawals: float = 0.0
+    buyback_cost: float = 0.0
     metrics: Optional[MetricsSummary] = None
     failure_reason: Optional[str] = None
 

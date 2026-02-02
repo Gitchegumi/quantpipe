@@ -33,8 +33,6 @@ def evaluate_scaling(
     is_in_evaluation = challenge_config.program_id in ["1STEP", "2STEP"]
     current_step = 1 if is_in_evaluation else 0
     
-    # We use the increments from the scaling config (which represent funded tiers)
-    # but the initial life starts at the challenge level.
     current_tier_idx = 0
     start_tier_balance = scaling_config.increments[0]
     base_account_size = challenge_config.account_size
@@ -43,7 +41,6 @@ def evaluate_scaling(
     current_life_trades: list[TradeExecution] = []
     current_life_start = sorted_execs[0].open_timestamp
     
-    # Review period only applies to funded accounts (Instant or post-eval)
     min_review_date = current_life_start + relativedelta(months=scaling_config.review_period_months) if not is_in_evaluation else None
 
     # Daily Balance Tracking
@@ -54,6 +51,7 @@ def evaluate_scaling(
     peak_balance = current_balance
     monthly_pnls = {}
     life_id_counter = 1
+    life_withdrawals = 0.0
 
     i = 0
     while i < len(sorted_execs):
@@ -68,16 +66,14 @@ def evaluate_scaling(
                 if profit > 0:
                     payout = profit * challenge_config.payout_share
                     total_payouts += payout
-                    # Wallet Tax: (Old Balance * 0.8) + New Payout
+                    life_withdrawals += payout
                     wallet_balance = (wallet_balance * 0.8) + payout
-                    # Reset balance to tier start after payout
                     current_balance = start_tier_balance
                     peak_balance = current_balance
             
             daily_start_balances[trade_date] = current_balance
             current_day = trade_date
 
-        # Scale P&L relative to current tier size vs base size
         scale_factor = start_tier_balance / base_account_size
         base_pnl = trade.pnl_r * trade.risk_amount
         if trade.risk_amount == 0 and trade.pnl_r != 0:
@@ -91,7 +87,6 @@ def evaluate_scaling(
         if current_balance > peak_balance:
             peak_balance = current_balance
 
-        # Failure Checks
         max_dd_amount = start_tier_balance * challenge_config.max_total_drawdown_pct
         failed = False
         floor = start_tier_balance - max_dd_amount if challenge_config.drawdown_type == "STATIC" else peak_balance - max_dd_amount
@@ -107,17 +102,12 @@ def evaluate_scaling(
                 status = "FAILED_DAILY"
                 failed = True
 
-        # Promotion / Step Logic
         promoted = False
         if not failed:
             profit = current_balance - start_tier_balance
-            
             if is_in_evaluation:
-                # Evaluation Stage Logic
-                # Step 1: 10% target, Step 2: 5% target
                 step_target_pct = 0.10 if current_step == 1 else 0.05
                 target = start_tier_balance * step_target_pct
-                
                 if profit >= target:
                     if challenge_config.program_id == "2STEP" and current_step == 1:
                         status = "STEP_1_PASSED"
@@ -129,11 +119,9 @@ def evaluate_scaling(
                         current_step = 0
                         promoted = True
             else:
-                # Funded Scaling Logic
                 if trade.close_timestamp >= min_review_date:
                     target = start_tier_balance * scaling_config.profit_target_pct
                     if profit >= target:
-                        # Check profitable months requirement
                         window_start = trade.close_timestamp - relativedelta(months=scaling_config.review_period_months)
                         prof_months = sum(1 for (y, m), p in monthly_pnls.items() if datetime(y, m, 1, tzinfo=window_start.tzinfo) >= window_start and p > 0)
                         if prof_months >= 2:
@@ -144,12 +132,13 @@ def evaluate_scaling(
             profit_at_end = current_balance - start_tier_balance
             beginning_wallet = wallet_balance
             
-            # Final payout if funded and ending in profit
             if not is_in_evaluation and profit_at_end > 0:
                 payout = profit_at_end * challenge_config.payout_share
                 total_payouts += payout
+                life_withdrawals += payout
                 wallet_balance = (wallet_balance * 0.8) + payout
 
+            # Record LifeResult
             lives.append(LifeResult(
                 life_id=life_id_counter,
                 start_tier_balance=start_tier_balance,
@@ -161,47 +150,43 @@ def evaluate_scaling(
                 pnl=profit_at_end,
                 beginning_wallet_balance=beginning_wallet,
                 new_wallet_balance=wallet_balance,
+                life_withdrawals=life_withdrawals,
                 metrics=calculate_metrics(current_life_trades),
             ))
             life_id_counter += 1
+            life_withdrawals = 0.0 # Reset for next life
 
-            # Handle Transitions
             if failed:
-                # Reset to Instant Funding path upon failure
                 is_in_evaluation = False 
                 current_step = 0
-                
-                # Buy-back: Pick highest affordable Instant tier from cost_map
-                # We expect cost_map keys to be the final account sizes (not challenge levels)
                 next_tier_balance = scaling_config.increments[0]
+                buyback_cost = 0.0
                 if cost_map:
-                    # Find highest tier where cost <= wallet_balance
                     affordable = sorted([t for t, c in cost_map.items() if c <= wallet_balance], reverse=True)
                     if affordable:
                         next_tier_balance = affordable[0]
-                    
                     buyback_cost = cost_map.get(next_tier_balance, challenge_config.cost)
                     wallet_balance -= buyback_cost
                     total_costs += buyback_cost
                 else:
-                    total_costs += challenge_config.cost
-                    wallet_balance -= challenge_config.cost
-
+                    buyback_cost = challenge_config.cost
+                    total_costs += buyback_cost
+                    wallet_balance -= buyback_cost
+                
                 start_tier_balance = next_tier_balance
-                # Sync tier index
                 try:
                     current_tier_idx = scaling_config.increments.index(start_tier_balance)
                 except ValueError:
                     current_tier_idx = 0
+                
+                # Update the last life with its buyback cost if applicable (or just note it)
+                # We'll note it in the NEXT life's starting logic in CLI
             elif status == "STEP_1_PASSED":
-                # Step 2 stays at same balance but target changes (handled in logic above)
                 start_tier_balance = start_tier_balance 
             else:
-                # Scaled up or Promoted to Funded
                 current_tier_idx = min(current_tier_idx + (1 if status == "SCALED_UP" else 0), len(scaling_config.increments) - 1)
                 start_tier_balance = scaling_config.increments[current_tier_idx]
 
-            # Reset State for Next Life
             current_balance = start_tier_balance
             current_life_trades = []
             current_life_start = trade.close_timestamp
@@ -212,7 +197,6 @@ def evaluate_scaling(
 
         i += 1
 
-    # Final active state
     lives.append(LifeResult(
         life_id=life_id_counter,
         start_tier_balance=start_tier_balance,
@@ -224,6 +208,7 @@ def evaluate_scaling(
         pnl=current_balance - start_tier_balance,
         beginning_wallet_balance=wallet_balance,
         new_wallet_balance=wallet_balance,
+        life_withdrawals=life_withdrawals,
         metrics=calculate_metrics(current_life_trades),
     ))
 
