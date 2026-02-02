@@ -25,6 +25,7 @@ def evaluate_scaling(
     lives: list[LifeResult] = []
 
     # Financial Tracking
+    # Initial challenge cost is handled here
     wallet_balance = -challenge_config.cost
     total_costs = challenge_config.cost
     total_payouts = 0.0
@@ -53,6 +54,7 @@ def evaluate_scaling(
     life_id_counter = 1
     life_withdrawals = 0.0
     pending_buyback_cost = 0.0
+    beginning_wallet = wallet_balance
 
     i = 0
     while i < len(sorted_execs):
@@ -131,7 +133,6 @@ def evaluate_scaling(
 
         if failed or promoted:
             profit_at_end = current_balance - start_tier_balance
-            beginning_wallet = wallet_balance
             
             if not is_in_evaluation and profit_at_end > 0:
                 payout = profit_at_end * challenge_config.payout_share
@@ -156,8 +157,7 @@ def evaluate_scaling(
             ))
             life_id_counter += 1
             life_withdrawals = 0.0
-            pending_buyback_cost = 0.0
-
+            
             if failed:
                 is_in_evaluation = False 
                 current_step = 0
@@ -181,9 +181,11 @@ def evaluate_scaling(
                     current_tier_idx = 0
             elif status == "STEP_1_PASSED":
                 start_tier_balance = start_tier_balance 
+                pending_buyback_cost = 0.0
             else:
                 current_tier_idx = min(current_tier_idx + (1 if status == "SCALED_UP" else 0), len(scaling_config.increments) - 1)
                 start_tier_balance = scaling_config.increments[current_tier_idx]
+                pending_buyback_cost = 0.0
 
             current_balance = start_tier_balance
             current_life_trades = []
@@ -192,6 +194,7 @@ def evaluate_scaling(
             monthly_pnls = {}
             daily_start_balances = {trade_date: current_balance}
             min_review_date = current_life_start + relativedelta(months=scaling_config.review_period_months) if not is_in_evaluation else None
+            beginning_wallet = wallet_balance
 
         i += 1
 
@@ -204,7 +207,7 @@ def evaluate_scaling(
         end_date=sorted_execs[-1].close_timestamp,
         trade_count=len(current_life_trades),
         pnl=current_balance - start_tier_balance,
-        beginning_wallet_balance=wallet_balance,
+        beginning_wallet_balance=beginning_wallet,
         new_wallet_balance=wallet_balance,
         life_withdrawals=life_withdrawals,
         buyback_cost=pending_buyback_cost,
