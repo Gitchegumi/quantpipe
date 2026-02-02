@@ -249,3 +249,4 @@ src/strategy/*/
 
 # Also ignore any strategies created in root /strategy/ directory (scaffold default)
 /strategy/
+/runs/
