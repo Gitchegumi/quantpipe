@@ -550,6 +550,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     """
     Execute the backtest logic with the provided arguments.
     """
+    if args.profile:
+        import cProfile
+        import pstats
+        import io
+
+        pr = cProfile.Profile()
+        pr.enable()
+
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
 
@@ -1410,8 +1418,20 @@ Persistent storage not yet implemented."
                 # BacktestResult
                 process_cti(result.executions, result.pair or "Single")
 
-        # Visualization
-        if args.visualize:
+    if args.profile:
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats(30)  # Top 30 hotspots
+        print("\n" + "="*80)
+        print("PERFORMANCE PROFILE (Top 30 Hotspots)")
+        print("="*80)
+        print(s.getvalue())
+        print("="*80 + "\n")
+
+    # Visualization
+    if args.visualize:
             from ..visualization.datashader_viz import plot_backtest_results
 
             logger.info("Opening visualization...")
