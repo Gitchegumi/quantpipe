@@ -52,6 +52,7 @@ def evaluate_scaling(
     monthly_pnls = {}
     life_id_counter = 1
     life_withdrawals = 0.0
+    pending_buyback_cost = 0.0
 
     i = 0
     while i < len(sorted_execs):
@@ -138,7 +139,6 @@ def evaluate_scaling(
                 life_withdrawals += payout
                 wallet_balance = (wallet_balance * 0.8) + payout
 
-            # Record LifeResult
             lives.append(LifeResult(
                 life_id=life_id_counter,
                 start_tier_balance=start_tier_balance,
@@ -151,36 +151,34 @@ def evaluate_scaling(
                 beginning_wallet_balance=beginning_wallet,
                 new_wallet_balance=wallet_balance,
                 life_withdrawals=life_withdrawals,
+                buyback_cost=pending_buyback_cost,
                 metrics=calculate_metrics(current_life_trades),
             ))
             life_id_counter += 1
-            life_withdrawals = 0.0 # Reset for next life
+            life_withdrawals = 0.0
+            pending_buyback_cost = 0.0
 
             if failed:
                 is_in_evaluation = False 
                 current_step = 0
                 next_tier_balance = scaling_config.increments[0]
-                buyback_cost = 0.0
                 if cost_map:
                     affordable = sorted([t for t, c in cost_map.items() if c <= wallet_balance], reverse=True)
                     if affordable:
                         next_tier_balance = affordable[0]
-                    buyback_cost = cost_map.get(next_tier_balance, challenge_config.cost)
-                    wallet_balance -= buyback_cost
-                    total_costs += buyback_cost
+                    pending_buyback_cost = cost_map.get(next_tier_balance, challenge_config.cost)
+                    wallet_balance -= pending_buyback_cost
+                    total_costs += pending_buyback_cost
                 else:
-                    buyback_cost = challenge_config.cost
-                    total_costs += buyback_cost
-                    wallet_balance -= buyback_cost
+                    pending_buyback_cost = challenge_config.cost
+                    total_costs += pending_buyback_cost
+                    wallet_balance -= pending_buyback_cost
                 
                 start_tier_balance = next_tier_balance
                 try:
                     current_tier_idx = scaling_config.increments.index(start_tier_balance)
                 except ValueError:
                     current_tier_idx = 0
-                
-                # Update the last life with its buyback cost if applicable (or just note it)
-                # We'll note it in the NEXT life's starting logic in CLI
             elif status == "STEP_1_PASSED":
                 start_tier_balance = start_tier_balance 
             else:
@@ -209,6 +207,7 @@ def evaluate_scaling(
         beginning_wallet_balance=wallet_balance,
         new_wallet_balance=wallet_balance,
         life_withdrawals=life_withdrawals,
+        buyback_cost=pending_buyback_cost,
         metrics=calculate_metrics(current_life_trades),
     ))
 
