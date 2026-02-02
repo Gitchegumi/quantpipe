@@ -33,6 +33,8 @@ def evaluate_scaling(
     is_in_evaluation = challenge_config.program_id in ["1STEP", "2STEP"]
     current_step = 1 if is_in_evaluation else 0
     
+    # We use the increments from the scaling config (which represent funded tiers)
+    # but the initial life starts at the challenge level.
     current_tier_idx = 0
     start_tier_balance = scaling_config.increments[0]
     base_account_size = challenge_config.account_size
@@ -66,6 +68,7 @@ def evaluate_scaling(
                 if profit > 0:
                     payout = profit * challenge_config.payout_share
                     total_payouts += payout
+                    # Wallet Tax: (Old Balance * 0.8) + New Payout
                     wallet_balance = (wallet_balance * 0.8) + payout
                     # Reset balance to tier start after payout
                     current_balance = start_tier_balance
@@ -74,6 +77,7 @@ def evaluate_scaling(
             daily_start_balances[trade_date] = current_balance
             current_day = trade_date
 
+        # Scale P&L relative to current tier size vs base size
         scale_factor = start_tier_balance / base_account_size
         base_pnl = trade.pnl_r * trade.risk_amount
         if trade.risk_amount == 0 and trade.pnl_r != 0:
@@ -110,6 +114,7 @@ def evaluate_scaling(
             
             if is_in_evaluation:
                 # Evaluation Stage Logic
+                # Step 1: 10% target, Step 2: 5% target
                 step_target_pct = 0.10 if current_step == 1 else 0.05
                 target = start_tier_balance * step_target_pct
                 
@@ -162,17 +167,35 @@ def evaluate_scaling(
 
             # Handle Transitions
             if failed:
-                # Buy-back: Restart at bottom of scaling (Instant)
+                # Reset to Instant Funding path upon failure
                 is_in_evaluation = False 
                 current_step = 0
+                
+                # Buy-back: Pick highest affordable Instant tier from cost_map
+                # We expect cost_map keys to be the final account sizes (not challenge levels)
                 next_tier_balance = scaling_config.increments[0]
                 if cost_map:
+                    # Find highest tier where cost <= wallet_balance
                     affordable = sorted([t for t, c in cost_map.items() if c <= wallet_balance], reverse=True)
-                    if affordable: next_tier_balance = affordable[0]
-                    wallet_balance -= cost_map.get(next_tier_balance, challenge_config.cost)
+                    if affordable:
+                        next_tier_balance = affordable[0]
+                    
+                    buyback_cost = cost_map.get(next_tier_balance, challenge_config.cost)
+                    wallet_balance -= buyback_cost
+                    total_costs += buyback_cost
+                else:
+                    total_costs += challenge_config.cost
+                    wallet_balance -= challenge_config.cost
+
                 start_tier_balance = next_tier_balance
+                # Sync tier index
+                try:
+                    current_tier_idx = scaling_config.increments.index(start_tier_balance)
+                except ValueError:
+                    current_tier_idx = 0
             elif status == "STEP_1_PASSED":
-                start_tier_balance = base_account_size # Step 2 stays same size
+                # Step 2 stays at same balance but target changes (handled in logic above)
+                start_tier_balance = start_tier_balance 
             else:
                 # Scaled up or Promoted to Funded
                 current_tier_idx = min(current_tier_idx + (1 if status == "SCALED_UP" else 0), len(scaling_config.increments) - 1)
@@ -194,7 +217,7 @@ def evaluate_scaling(
         life_id=life_id_counter,
         start_tier_balance=start_tier_balance,
         end_balance=current_balance,
-        status="IN_PROGRESS",
+        status="Active",
         start_date=current_life_start,
         end_date=sorted_execs[-1].close_timestamp,
         trade_count=len(current_life_trades),
