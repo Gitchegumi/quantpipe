@@ -1315,7 +1315,8 @@ Persistent storage not yet implemented."
                         
                         for attempt in report.attempts:
                             status_label = attempt.status
-                            lines.append(f"    Attempt #{attempt.attempt_id}: Status={status_label}, Total PnL=${attempt.total_pnl:,.2f}")
+                            levels_count = len(attempt.levels)
+                            lines.append(f"    Attempt #{attempt.attempt_id}: Levels Achieved={levels_count}, Total PnL=${attempt.total_pnl:,.2f}")
                             
                             for level in attempt.levels:
                                 target_amt = (
