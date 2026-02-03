@@ -6,7 +6,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from src.backtest.metrics import calculate_metrics
 from src.models.core import TradeExecution
-from .models import ChallengeConfig, LifeResult, ScalingConfig, ScalingReport
+from .models import AttemptResult, ChallengeConfig, LevelResult, ScalingConfig, ScalingReport
 
 
 def evaluate_scaling(
@@ -19,10 +19,11 @@ def evaluate_scaling(
     Simulate scaling progression with resets and periodic reviews.
     """
     if not executions:
-        return ScalingReport(lives=[], total_duration_days=0, active_life_index=-1)
+        return ScalingReport(attempts=[], total_duration_days=0, active_attempt_index=-1)
 
     sorted_execs = sorted(executions, key=lambda x: x.close_timestamp)
-    lives: list[LifeResult] = []
+    attempts: list[AttemptResult] = []
+    current_attempt_levels: list[LevelResult] = []
 
     # Financial Tracking
     wallet_balance = -challenge_config.cost
@@ -38,21 +39,22 @@ def evaluate_scaling(
     base_account_size = challenge_config.account_size
 
     current_balance = start_tier_balance
-    current_life_trades: list[TradeExecution] = []
-    current_life_start = sorted_execs[0].open_timestamp
+    current_level_trades: list[TradeExecution] = []
+    current_level_start = sorted_execs[0].open_timestamp
     
     # Review period check starts after min period
-    min_review_date = current_life_start + relativedelta(months=scaling_config.review_period_months)
+    min_review_date = current_level_start + relativedelta(months=scaling_config.review_period_months)
 
     # Daily Balance Tracking
     daily_start_balances = {}
-    current_day = current_life_start.date()
+    current_day = current_level_start.date()
     daily_start_balances[current_day] = current_balance
 
     peak_balance = current_balance
     monthly_pnls = {}
-    tier_profit_accrued = 0.0
-    life_id_counter = 1
+    level_profit_accrued = 0.0
+    attempt_id_counter = 1
+    level_id_counter = 1
     life_withdrawals = 0.0
     pending_buyback_cost = 0.0
     beginning_wallet = wallet_balance
@@ -86,8 +88,8 @@ def evaluate_scaling(
 
         scaled_pnl = base_pnl * scale_factor
         current_balance += scaled_pnl
-        tier_profit_accrued += scaled_pnl
-        current_life_trades.append(trade)
+        level_profit_accrued += scaled_pnl
+        current_level_trades.append(trade)
         monthly_pnls[trade_month] = monthly_pnls.get(trade_month, 0.0) + scaled_pnl
 
         if current_balance > peak_balance:
@@ -114,7 +116,7 @@ def evaluate_scaling(
                 # Evaluation Stage Logic
                 step_target_pct = 0.10 if current_step == 1 else 0.05
                 target = start_tier_balance * step_target_pct
-                if tier_profit_accrued >= target:
+                if level_profit_accrued >= target:
                     if challenge_config.program_id == "2STEP" and current_step == 1:
                         status = "STEP_1_PASSED"
                         current_step = 2
@@ -147,47 +149,53 @@ def evaluate_scaling(
                         promoted = True
 
         if failed or promoted:
-            # Calculate final profit at end of this life attempt
-            # For evaluations, we don't have monthly payouts, so current_balance works.
-            # For funded, we reset monthly, so tier_profit_accrued is the source of truth.
-            profit_at_end = tier_profit_accrued
+            # Calculate final profit at end of this segment
+            profit_at_end = level_profit_accrued
             
             payout_at_end = 0.0
             if not is_in_evaluation and profit_at_end > 0:
-                # Calculate any remaining payout not yet captured by the monthly trigger
-                # (e.g. if promoted/failed mid-month)
                 remaining_profit = current_balance - start_tier_balance
                 if remaining_profit > 0:
                     payout_at_end = remaining_profit * challenge_config.payout_share
                     total_payouts += payout_at_end
                     life_withdrawals += payout_at_end
             
-            # Important: Capture the wallet balance AFTER the final payout but BEFORE the next life cost
-            wallet_balance_before_next_life = wallet_balance + payout_at_end
+            wallet_balance_before_next = wallet_balance + payout_at_end
 
-            lives.append(LifeResult(
-                life_id=life_id_counter,
+            current_attempt_levels.append(LevelResult(
+                level_id=level_id_counter,
                 start_tier_balance=start_tier_balance,
                 end_balance=current_balance,
-                status=status if not failed else status,
-                start_date=current_life_start,
+                status=status,
+                start_date=current_level_start,
                 end_date=trade.close_timestamp,
-                trade_count=len(current_life_trades),
+                trade_count=len(current_level_trades),
                 pnl=profit_at_end,
                 beginning_wallet_balance=beginning_wallet,
-                new_wallet_balance=wallet_balance_before_next_life,
+                new_wallet_balance=wallet_balance_before_next,
                 life_withdrawals=life_withdrawals,
                 buyback_cost=pending_buyback_cost,
-                metrics=calculate_metrics(current_life_trades),
+                metrics=calculate_metrics(current_level_trades),
             ))
             
-            # Now apply the payout to the actual running wallet balance
-            wallet_balance = wallet_balance_before_next_life
-            
-            life_id_counter += 1
+            wallet_balance = wallet_balance_before_next
+            level_id_counter += 1
             life_withdrawals = 0.0
             
             if failed:
+                # Close Attempt
+                attempts.append(AttemptResult(
+                    attempt_id=attempt_id_counter,
+                    levels=current_attempt_levels,
+                    status="FAILED",
+                    total_pnl=sum(l.pnl for l in current_attempt_levels)
+                ))
+                
+                # Setup Next Attempt
+                attempt_id_counter += 1
+                level_id_counter = 1
+                current_attempt_levels = []
+                
                 is_in_evaluation = False 
                 current_step = 0
                 next_tier_balance = scaling_config.increments[0]
@@ -209,7 +217,6 @@ def evaluate_scaling(
                 except ValueError:
                     current_tier_idx = 0
             elif status == "STEP_1_PASSED":
-                # Step 2 stays at same balance but target changes
                 start_tier_balance = start_tier_balance 
                 pending_buyback_cost = 0.0
             else:
@@ -218,42 +225,46 @@ def evaluate_scaling(
                 start_tier_balance = scaling_config.increments[current_tier_idx]
                 pending_buyback_cost = 0.0
 
-            # Reset State for Next Life/Step
+            # Reset State for Next Level
             current_balance = start_tier_balance
-            current_life_trades = []
-            current_life_start = trade.close_timestamp
+            current_level_trades = []
+            current_level_start = trade.close_timestamp
             peak_balance = current_balance
-            # Note: monthly_pnls should PERSIST because we need them for the sliding window
-            # across life resets if the user buys back the same tier? 
-            # Actually, CTI resets the 4-month clock on a new account.
             monthly_pnls = {}
-            tier_profit_accrued = 0.0
-            min_review_date = current_life_start + relativedelta(months=scaling_config.review_period_months)
+            level_profit_accrued = 0.0
+            min_review_date = current_level_start + relativedelta(months=scaling_config.review_period_months)
             beginning_wallet = wallet_balance
 
         i += 1
 
     # Final active state
-    lives.append(LifeResult(
-        life_id=life_id_counter,
+    current_attempt_levels.append(LevelResult(
+        level_id=level_id_counter,
         start_tier_balance=start_tier_balance,
         end_balance=current_balance,
         status="Active",
-        start_date=current_life_start,
+        start_date=current_level_start,
         end_date=sorted_execs[-1].close_timestamp,
-        trade_count=len(current_life_trades),
-        pnl=tier_profit_accrued,
+        trade_count=len(current_level_trades),
+        pnl=level_profit_accrued,
         beginning_wallet_balance=beginning_wallet,
         new_wallet_balance=wallet_balance,
         life_withdrawals=life_withdrawals,
         buyback_cost=pending_buyback_cost,
-        metrics=calculate_metrics(current_life_trades),
+        metrics=calculate_metrics(current_level_trades),
+    ))
+    
+    attempts.append(AttemptResult(
+        attempt_id=attempt_id_counter,
+        levels=current_attempt_levels,
+        status="ACTIVE",
+        total_pnl=sum(l.pnl for l in current_attempt_levels)
     ))
 
     return ScalingReport(
-        lives=lives,
+        attempts=attempts,
         total_duration_days=(sorted_execs[-1].close_timestamp - sorted_execs[0].open_timestamp).days,
-        active_life_index=len(lives) - 1,
+        active_attempt_index=len(attempts) - 1,
         wallet_balance=wallet_balance,
         net_payouts=total_payouts,
         total_costs=total_costs,

@@ -1286,19 +1286,25 @@ Persistent storage not yet implemented."
 
                         # Build Report String
                         lines = []
-                        promotions = sum(
-                            1 for l in report.lives if l.status == "PROMOTED"
-                        )
+                        total_levels = sum(len(a.levels) for a in report.attempts)
+                        
+                        # Promotions: Any level that resulted in SCALED_UP or PROMOTED_TO_FUNDED
+                        promotions = 0
+                        for a in report.attempts:
+                            for l in a.levels:
+                                if l.status in ["SCALED_UP", "PROMOTED_TO_FUNDED", "STEP_1_PASSED"]:
+                                    promotions += 1
+                        
                         resets = sum(
-                            1 for l in report.lives if l.status.startswith("FAILED")
+                            1 for a in report.attempts if a.status == "FAILED"
                         )
 
-                        # Calculate Payouts (ignore negative life PnLs)
-                        payout_100 = sum(max(0, l.pnl) for l in report.lives)
+                        # Calculate Payouts
+                        payout_100 = sum(max(0, l.pnl) for a in report.attempts for l in a.levels)
                         payout_80 = payout_100 * challenge_conf.payout_share
 
                         lines.append(
-                            f"  Scaling Report (Total Lives: {len(report.lives)} | Promotions: {promotions} | Resets: {resets})"
+                            f"  Scaling Report (Total Attempts: {len(report.attempts)} | Total Levels: {total_levels} | Promotions: {promotions} | Resets: {resets})"
                         )
                         lines.append(
                             f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
@@ -1306,48 +1312,54 @@ Persistent storage not yet implemented."
                         lines.append(
                             f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
                         )
-                        for life in report.lives:
-                            target_amt = (
-                                life.start_tier_balance * scaling_plan.profit_target_pct
-                            )
-                            status_label = "Active" if life.status == "Active" else life.status
-                            lines.append(
-                                f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={status_label}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
-                            )
-                            if life.buyback_cost > 0:
-                                lines.append(f"      Buyback: Instant Funded tier ${life.start_tier_balance:,.0f} | Cost: ${life.buyback_cost:,.2f}")
+                        
+                        for attempt in report.attempts:
+                            status_label = attempt.status
+                            lines.append(f"    Attempt #{attempt.attempt_id}: Status={status_label}, Total PnL=${attempt.total_pnl:,.2f}")
                             
-                            lines.append(f"      Starting Wallet Balance: ${life.beginning_wallet_balance:,.2f}")
-                            if life.life_withdrawals > 0:
-                                lines.append(f"      Life withdrawals: ${life.life_withdrawals:,.2f}")
-                            
-                            s_str = life.start_date.strftime("%Y-%m-%d %H:%M")
-                            e_str = life.end_date.strftime("%Y-%m-%d %H:%M")
-                            lines.append(f"      Period: {s_str} to {e_str}")
-
-                            if life.metrics:
-                                m = life.metrics
+                            for level in attempt.levels:
+                                target_amt = (
+                                    level.start_tier_balance * scaling_plan.profit_target_pct
+                                )
+                                lvl_status = "Active" if level.status == "Active" else level.status
                                 lines.append(
-                                    f"      Stats: {m.win_count} Wins, {m.loss_count} Losses | "
-                                    f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
+                                    f"      Level #{level.level_id} [Tier ${level.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={lvl_status}, PnL=${level.pnl:.2f}, Balance=${level.end_balance:.2f}"
                                 )
+                                if level.buyback_cost > 0:
+                                    lines.append(f"        Buyback: tier ${level.start_tier_balance:,.0f} | Cost: ${level.buyback_cost:,.2f}")
+                                
+                                lines.append(f"        Starting Wallet Balance: ${level.beginning_wallet_balance:,.2f}")
+                                if level.life_withdrawals > 0:
+                                    lines.append(f"        Life withdrawals: ${level.life_withdrawals:,.2f}")
+                                
+                                s_str = level.start_date.strftime("%Y-%m-%d %H:%M")
+                                e_str = level.end_date.strftime("%Y-%m-%d %H:%M")
+                                lines.append(f"        Period: {s_str} to {e_str}")
 
-                            if life.status == "FAILED_DRAWDOWN":
-                                reason = (
-                                    life.failure_reason
-                                    if life.failure_reason
-                                    else "Drawdown Violation"
-                                )
-                                lines.append(f"      Failure: {reason} (End: {life.end_date})")
-                            elif life.status == "PROMOTED":
-                                lines.append(
-                                    f"      Success: Promoted to Tier Balance ${life.end_balance:.2f} (if next life exists)"
-                                )
-                            
-                            if life.status != "Active":
-                                lines.append(f"      Ending Wallet Balance: ${life.new_wallet_balance:,.2f}")
-                            lines.append("")  # Blank line for readability
-                        lines.append(f"  Active Life Index: {report.active_life_index}")
+                                if level.metrics:
+                                    m = level.metrics
+                                    lines.append(
+                                        f"        Stats: {m.win_count} Wins, {m.loss_count} Losses | "
+                                        f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
+                                    )
+                                
+                                if level.status == "FAILED_DRAWDOWN":
+                                    reason = (
+                                        level.failure_reason
+                                        if level.failure_reason
+                                        else "Drawdown Violation"
+                                    )
+                                    lines.append(f"        Failure: {reason} (End: {level.end_date})")
+                                elif level.status in ["SCALED_UP", "PROMOTED_TO_FUNDED"]:
+                                    lines.append(
+                                        f"        Success: Promoted to Tier Balance ${level.end_balance:.2f}"
+                                    )
+                                
+                                if level.status != "Active":
+                                    lines.append(f"        Ending Wallet Balance: ${level.new_wallet_balance:,.2f}")
+                                lines.append("")  # Blank line for readability
+                        
+                        lines.append(f"  Active Attempt Index: {report.active_attempt_index}")
 
                         # Append to file
                         with open(full_path, "a", encoding="utf-8") as f:
@@ -1356,7 +1368,7 @@ Persistent storage not yet implemented."
                             f.write("\n")
 
                         # Console Summary (Concise)
-                        print(f"✓ CTI Evaluation [{label}]: {len(report.lives)} lives, {promotions} promotions, {resets} resets. Payout (80%): ${payout_80:,.2f}")
+                        print(f"✓ CTI Evaluation [{label}]: {len(report.attempts)} attempts, {promotions} promotions, {resets} resets. Payout (80%): ${payout_80:,.2f}")
 
                     else:
                         # Single Challenge Evaluation (with Retry on Failure Logic)
