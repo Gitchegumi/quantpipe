@@ -1,6 +1,6 @@
 # ![Logo](./images/QuantPipe_Logo.png)
 
-QuantPipe is an open-source FOREX automated trading infrastructure designed for strategy backtesting, forward testing, and live execution using the Match-Trader API or MetaTrader (MT4/MT5). It allows traders and developers to research strategies offline and deploy the same logic into automated trading environments.
+QuantPipe is an open-source platform for developing, testing, validating, and live trading your strategies using the Match-Trader API or MetaTrader (MT4/MT5). It allows traders and developers to research strategies offline and deploy the same logic into automated trading environments.
 
 ## Overview
 
