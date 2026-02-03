@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from ..models.metadata import BuildSummary, MetadataRecord, SkipReason, SkippedSymbol
+from ..infrastructure.duckdb.vault import DuckDBVault
 
 logger = logging.getLogger(__name__)
 
@@ -369,8 +370,10 @@ def write_outputs(
     validation_partition: pd.DataFrame,
     metadata: MetadataRecord,
     output_base: str,
+    save_to_vault: bool = True,
+    vault_path: str = "data/vault.duckdb",
 ) -> None:
-    """Write CSV partitions and metadata JSON files.
+    """Write CSV partitions, metadata JSON files, and optionally to DuckDB.
 
     Args:
         symbol: Symbol identifier
@@ -378,6 +381,8 @@ def write_outputs(
         validation_partition: Validation partition DataFrame
         metadata: MetadataRecord model instance
         output_base: Base output directory path
+        save_to_vault: If True, also ingest into DuckDB vault
+        vault_path: Path to DuckDB database file
 
     Implementation: T012
     """
@@ -403,6 +408,22 @@ def write_outputs(
         len(validation_partition),
     )
 
+    # Optional: Write to DuckDB Vault
+    if save_to_vault:
+        try:
+            vault = DuckDBVault(db_path=vault_path)
+            # Combine partitions for vault (or store separately if needed)
+            full_df = pd.concat([test_partition, validation_partition])
+            # Ensure timestamp column
+            if "timestamp" not in full_df.columns and "timestamp_utc" in full_df.columns:
+                full_df = full_df.rename(columns={"timestamp_utc": "timestamp"})
+            
+            vault.ingest_df(full_df, symbol, "1m") # Base timeframe is 1m
+            vault.close()
+            logger.info("Ingested %s into DuckDB vault at %s", symbol, vault_path)
+        except Exception as e:
+            logger.error("Failed to save %s to DuckDB vault: %s", symbol, e)
+
     # Write metadata JSON
     metadata_file = output_path / "metadata.json"
     with open(metadata_file, "w", encoding="utf-8") as f:
@@ -412,7 +433,11 @@ def write_outputs(
 
 
 def build_symbol_dataset(
-    symbol: str, raw_path: str, output_path: str
+    symbol: str, 
+    raw_path: str, 
+    output_path: str,
+    save_to_vault: bool = True,
+    vault_path: str = "data/vault.duckdb",
 ) -> dict[str, Any]:
     """Build complete dataset for a single symbol (US1 integration).
 
@@ -420,6 +445,8 @@ def build_symbol_dataset(
         symbol: Symbol identifier
         raw_path: Path to raw data directory
         output_path: Path to processed output directory
+        save_to_vault: If True, also ingest into DuckDB vault
+        vault_path: Path to DuckDB database file
 
     Returns:
         Build result summary for this symbol with keys:
@@ -499,7 +526,13 @@ def build_symbol_dataset(
 
         # Write outputs
         write_outputs(
-            symbol, test_partition, validation_partition, metadata, output_path
+            symbol, 
+            test_partition, 
+            validation_partition, 
+            metadata, 
+            output_path,
+            save_to_vault=save_to_vault,
+            vault_path=vault_path,
         )
 
         logger.info("Successfully built dataset for symbol %s", symbol)
@@ -525,7 +558,11 @@ def build_symbol_dataset(
 
 
 def build_all_symbols(
-    raw_path: str, output_path: str, force: bool = False
+    raw_path: str, 
+    output_path: str, 
+    force: bool = False,
+    save_to_vault: bool = True,
+    vault_path: str = "data/vault.duckdb",
 ) -> BuildSummary:
     """Build datasets for all discovered symbols (US2 orchestration).
 
@@ -533,6 +570,8 @@ def build_all_symbols(
         raw_path: Path to raw data directory
         output_path: Path to processed output directory
         force: Force rebuild if True (currently ignored - future enhancement)
+        save_to_vault: If True, also ingest into DuckDB vault
+        vault_path: Path to DuckDB database file
 
     Returns:
         Consolidated BuildSummary model instance
@@ -566,7 +605,13 @@ def build_all_symbols(
 
     # Process each symbol
     for symbol in symbols:
-        result = build_symbol_dataset(symbol, raw_path, output_path)
+        result = build_symbol_dataset(
+            symbol, 
+            raw_path, 
+            output_path, 
+            save_to_vault=save_to_vault, 
+            vault_path=vault_path
+        )
 
         if result["success"]:
             processed_symbols.append(symbol)

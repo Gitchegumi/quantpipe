@@ -155,6 +155,7 @@ class IndependentRunner:
         ingestion_result = ingest_ohlcv_data(
             path=dataset_path,
             timeframe_minutes=1,
+            symbol=pair.code,
             mode="columnar",
             downcast=False,
             use_arrow=use_arrow,

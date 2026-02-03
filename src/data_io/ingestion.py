@@ -54,6 +54,7 @@ from src.data_io.schema import (
     validate_required_columns,
 )
 from src.data_io.timezone_validate import validate_utc_timezone
+from src.infrastructure.duckdb.vault import DuckDBVault
 
 
 if TYPE_CHECKING:
@@ -110,11 +111,14 @@ class IngestionResult:
 def ingest_ohlcv_data(
     path: str,
     timeframe_minutes: int,
+    symbol: Optional[str] = None,
     mode: str = "columnar",
     downcast: bool = False,
     use_arrow: bool = True,
     strict_cadence: bool = True,
     use_parquet_cache: bool = True,
+    save_to_vault: bool = False,
+    vault_path: str = "data/vault.duckdb",
     fill_gaps: bool = False,
     return_polars: bool = False,
     show_progress: bool = True,
@@ -214,9 +218,23 @@ def ingest_ohlcv_data(
 
             csv_path = Path(path)
 
-            # Check if input is already Parquet
+            # Check if input is a DuckDB vault
+            if csv_path.suffix.lower() == ".duckdb":
+                logger.info("Loading from DuckDB vault: %s", csv_path)
+                if not symbol:
+                    raise ValueError("Symbol must be specified when loading from DuckDB vault.")
+                
+                vault = DuckDBVault(db_path=str(csv_path))
+                # For now, we fetch all data. In the future, we can add date range filters to fetch_range.
+                # Assuming '1m' for timeframe_minutes=1
+                tf_str = f"{timeframe_minutes}m"
+                df = vault.fetch_range(symbol, tf_str, "1900-01-01", "2100-01-01")
+                vault.close()
+                input_row_count = len(df)
+                logger.info("✓ Loaded %d rows from DuckDB vault", input_row_count)
 
-            if csv_path.suffix.lower() == ".parquet":
+            # Check if input is already Parquet
+            elif csv_path.suffix.lower() == ".parquet":
 
                 logger.info("Loading Parquet file directly: %s", csv_path)
 
@@ -609,6 +627,24 @@ def ingest_ohlcv_data(
                 core_hash = compute_dataframe_hash(
                     df, CORE_COLUMNS, is_polars=return_polars
                 )
+
+                # Optional: Save to DuckDB vault
+                if save_to_vault:
+                    if not symbol:
+                        logger.warning("Symbol not provided, skipping vault save.")
+                    else:
+                        progress.start_stage(IngestionStage.FINALIZE, f"Saving {symbol} to DuckDB vault")
+                        vault = DuckDBVault(db_path=vault_path)
+                        # Ensure we have a pandas DF for ingestion
+                        save_df = df.to_pandas() if return_polars else df.copy()
+                        # Use timestamp_utc as the primary timestamp
+                        if "timestamp_utc" in save_df.columns:
+                            save_df = save_df.rename(columns={"timestamp_utc": "timestamp"})
+                        
+                        tf_str = f"{timeframe_minutes}m"
+                        vault.ingest_df(save_df, symbol, tf_str)
+                        vault.close()
+                        logger.info("✓ Saved data to DuckDB vault: %s", vault_path)
 
         # Timer context has exited - now we can access elapsed time
 

@@ -179,6 +179,7 @@ def run_portfolio_backtest(
         ingestion_result = ingest_ohlcv_data(
             path=data_path,
             timeframe_minutes=1,
+            symbol=pair,
             mode="columnar",
             downcast=False,
             use_arrow=use_arrow,
@@ -494,6 +495,7 @@ def run_multi_symbol_backtest(
             ingestion_result = ingest_ohlcv_data(
                 path=data_path,
                 timeframe_minutes=1,
+                symbol=pair,
                 mode="columnar",
                 downcast=False,
                 use_arrow=use_arrow,

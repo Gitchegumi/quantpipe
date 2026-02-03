@@ -55,6 +55,27 @@ def configure_ingest_parser(parser: argparse.ArgumentParser) -> None:
     )
 
     parser.add_argument(
+        "--save-to-vault",
+        action="store_true",
+        default=True,
+        help="Save processed data to DuckDB vault (default: True)",
+    )
+
+    parser.add_argument(
+        "--no-vault",
+        action="store_false",
+        dest="save_to_vault",
+        help="Disable saving to DuckDB vault",
+    )
+
+    parser.add_argument(
+        "--vault-path",
+        type=str,
+        default="data/vault.duckdb",
+        help="Path to DuckDB vault file (default: data/vault.duckdb)",
+    )
+
+    parser.add_argument(
         "--log-level",
         type=str,
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -94,7 +115,13 @@ def run_ingest_command(args: argparse.Namespace) -> int:
             console.print(
                 f"\n[cyan]Building dataset for symbol: {args.symbol}[/cyan]\n"
             )
-            result = build_symbol_dataset(args.symbol, args.raw_path, args.output_path)
+            result = build_symbol_dataset(
+                args.symbol, 
+                args.raw_path, 
+                args.output_path,
+                save_to_vault=args.save_to_vault,
+                vault_path=args.vault_path
+            )
 
             if result["success"]:
                 metadata = result["metadata"]
@@ -113,7 +140,13 @@ def run_ingest_command(args: argparse.Namespace) -> int:
             console.print(f"Raw path: {args.raw_path}")
             console.print(f"Output path: {args.output_path}\n")
 
-            summary = build_all_symbols(args.raw_path, args.output_path, args.force)
+            summary = build_all_symbols(
+                args.raw_path, 
+                args.output_path, 
+                args.force,
+                save_to_vault=args.save_to_vault,
+                vault_path=args.vault_path
+            )
 
             _display_build_summary(summary)
 
