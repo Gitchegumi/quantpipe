@@ -27,7 +27,7 @@ Parquet caching reduces subsequent loads to ≤15s
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING, Optional, List, Dict
 
 import pandas as pd
 import polars as pl
