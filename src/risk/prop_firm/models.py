@@ -40,13 +40,13 @@ class ScalingConfig(BaseModel):
 
 
 @dataclass(frozen=True)
-class LifeResult:
-    """Result of a single 'Life' (Attempt) within a scaling simulation."""
+class LevelResult:
+    """Result of a single 'Level' within an attempt."""
 
-    life_id: int
+    level_id: int
     start_tier_balance: float
     end_balance: float
-    status: str  # PASSED, FAILED_DRAWDOWN, FAILED_DAILY, IN_PROGRESS
+    status: str
     start_date: datetime
     end_date: datetime
     trade_count: int
@@ -60,12 +60,22 @@ class LifeResult:
 
 
 @dataclass(frozen=True)
-class ScalingReport:
-    """Aggregate report of a multi-life simulation."""
+class AttemptResult:
+    """Result of a single 'Attempt' (persists until drawdown)."""
 
-    lives: list[LifeResult]
+    attempt_id: int
+    levels: list[LevelResult]
+    status: str  # ACTIVE or FAILED
+    total_pnl: float = 0.0
+
+
+@dataclass(frozen=True)
+class ScalingReport:
+    """Aggregate report of a multi-attempt simulation."""
+
+    attempts: list[AttemptResult]
     total_duration_days: int
-    active_life_index: int
+    active_attempt_index: int
     wallet_balance: float = 0.0
     net_payouts: float = 0.0
     total_costs: float = 0.0
@@ -74,16 +84,15 @@ class ScalingReport:
     def tier_stats(self) -> dict[float, dict[str, int]]:
         """
         Returns stats per tier balance.
-        Example: {10000.0: {'PASSED': 2, 'FAILED_DRAWDOWN': 1}}
         """
         stats = {}
-        for life in self.lives:
-            balance = life.start_tier_balance
-            if balance not in stats:
-                stats[balance] = {}
+        for attempt in self.attempts:
+            for level in attempt.levels:
+                balance = level.start_tier_balance
+                if balance not in stats:
+                    stats[balance] = {}
 
-            # Count status
-            current_count = stats[balance].get(life.status, 0)
-            stats[balance][life.status] = current_count + 1
+                current_count = stats[balance].get(level.status, 0)
+                stats[balance][level.status] = current_count + 1
 
         return stats

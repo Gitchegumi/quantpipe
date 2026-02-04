@@ -23,6 +23,19 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Released Versions
 
+### [v0.5.1] - 2026-02-03
+
+**Theme**: CTI Evaluation Refinements
+
+**Highlights**:
+
+- **Evaluation Logic**: Fixed metric tracking accuracy during CTI evaluation phases.
+- **Wallet Balance**: Corrected wallet balance calculation and level metrics in result processing.
+
+**Related**:
+
+- Pull Request: #76
+
 ### [v0.5.0] - 2026-01-31
 
 **Theme**: CLI Expansion: Scaffold & Ingest
