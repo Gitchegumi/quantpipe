@@ -5,7 +5,7 @@
     {
       "account_size": 2500,
       "currency": "USD",
-      "cost": 29,
+      "cost": 27,
       "evaluation": {
         "profit_target_percentage": 8,
         "profit_target_amount": 200,
@@ -25,7 +25,7 @@
     {
       "account_size": 5000,
       "currency": "USD",
-      "cost": 44,
+      "cost": 41,
       "evaluation": {
         "profit_target_percentage": 8,
         "profit_target_amount": 400,
@@ -45,7 +45,7 @@
     {
       "account_size": 10000,
       "currency": "USD",
-      "cost": 74,
+      "cost": 76,
       "evaluation": {
         "profit_target_percentage": 8,
         "profit_target_amount": 800,
@@ -60,6 +60,66 @@
         "profit_share_range": "80–100%",
         "max_trailing_drawdown_percentage": 5,
         "max_trailing_drawdown_amount": 500
+      }
+    },
+    {
+      "account_size": 25000,
+      "currency": "USD",
+      "cost": 136,
+      "evaluation": {
+        "profit_target_percentage": 8,
+        "profit_target_amount": 2000,
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 1250,
+        "max_daily_drawdown_percentage": null,
+        "max_static_drawdown_percentage": null,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 250
+      }
+    },
+    {
+      "account_size": 50000,
+      "currency": "USD",
+      "cost": 237,
+      "evaluation": {
+        "profit_target_percentage": 8,
+        "profit_target_amount": 4000,
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 2500,
+        "max_daily_drawdown_percentage": null,
+        "max_static_drawdown_percentage": null,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 250
+      }
+    },
+    {
+      "account_size": 100000,
+      "currency": "USD",
+      "cost": 412,
+      "evaluation": {
+        "profit_target_percentage": 8,
+        "profit_target_amount": 8000,
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 5000,
+        "max_daily_drawdown_percentage": null,
+        "max_static_drawdown_percentage": null,
+        "time_limit_days": null,
+        "minimum_profitable_days": 3
+      },
+      "funded_account": {
+        "profit_share_range": "80–100%",
+        "max_trailing_drawdown_percentage": 5,
+        "max_trailing_drawdown_amount": 250
       }
     }
   ],

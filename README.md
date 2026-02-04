@@ -4,7 +4,7 @@ QuantPipe is an open-source platform for developing, testing, validating, and li
 
 ## Overview
 
-QuantPipe provides a modular framework for developing, testing, and deploying algorithmic trading strategies in the FOREX market. It includes a general-purpose backtesting engine, dataset partitioning tools for test and validation workflows, and reusable risk management components.
+QuantPipe provides a modular framework for developing, testing, validating, and trading algorithmic strategies in the FOREX market. It includes a general-purpose backtesting engine, dataset partitioning tools for test and validation workflows, and reusable risk management components.
 
 The project is motivated in part by the requirements of proprietary trading firms such as City Traders Imperium (CTI), where U.S.-based traders are required to use Match-Trader rather than MetaTrader. As a result, QuantPipe is designed to support multiple execution platforms, including MetaTrader (MT4/MT5) and Match-Trader, while maintaining a single, consistent strategy and risk management codebase across backtesting, forward testing, and live trading.
 
@@ -15,7 +15,7 @@ The project is motivated in part by the requirements of proprietary trading firm
 poetry install
 
 # 2. Run a sample backtest (uses default test dataset)
-poetry run quantpipe backtest --pair EURUSD --direction LONG
+poetry run quantpipe backtest # follow prompts
 
 # 3. (Optional) JSON output with validate dataset
 poetry run quantpipe backtest `
@@ -29,11 +29,11 @@ If you have only raw data, first build processed partitions (see Backtesting doc
 
 ## Data Directory Structure
 
-The `price_data/` directory is excluded from version control (`.gitignore`) and must be created locally. The expected structure is:
+The `price_data/` directory is excluded from version control (`.gitignore`) and must be created locally. You will need to create the `price_data/` directory and the `raw/` directory and populate it with your own price data. I reccomend using [downloading historical data here](https://www.histdata.com/download-free-forex-data/). The expected structure after ingesting the data is:
 
 ```text
 price_data/
-├── processed/
+├── processed/          # This directory is created by the ingest process
 │   ├── eurusd/
 │   │   ├── test/
 │   │   │   ├── eurusd_test.parquet
@@ -44,7 +44,7 @@ price_data/
 │   └── usdjpy/
 │       ├── test/
 │       └── validate/
-├── raw/
+├── raw/                # you will need to create this directory and populate it with your own price data
 │   ├── eurusd/
 │   │   ├── DAT_MT_EURUSD_M1_2000.csv
 │   │   ├── DAT_MT_EURUSD_M1_2001.csv
@@ -55,7 +55,7 @@ price_data/
 │       ├── DAT_MT_USDJPY_M1_2001.csv
 │       ├── ...
 │       └── DAT_MT_USDJPY_M1_2024.csv
-└── raw_converted/                       # Raw MetaTrader data converted to add headers
+└── raw_converted/       # this directory is created by the ingest process
     ├── eurusd/
     │   ├── DAT_MT_EURUSD_M1_2000.csv
     │   ├── DAT_MT_EURUSD_M1_2001.csv
