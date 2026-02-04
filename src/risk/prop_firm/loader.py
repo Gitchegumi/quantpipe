@@ -4,26 +4,13 @@ Configuration loader for Prop Firm presets.
 
 import json
 from pathlib import Path
-
 from .models import ChallengeConfig, ScalingConfig
-
 
 PRESETS_DIR = Path("src/config/presets/cti")
 
-
-def load_cti_config(mode: str, account_size: int) -> ChallengeConfig:
+def load_cti_config(mode: str, account_size: int, tier: str = "STANDARD") -> ChallengeConfig:
     """
     Load CTI challenge configuration for a specific mode and account size.
-
-    Args:
-        mode: "1STEP", "2STEP", or "INSTANT"
-        account_size: Starting account balance (e.g. 10000)
-
-    Returns:
-        ChallengeConfig object
-
-    Raises:
-        ValueError: If mode or account_size is invalid.
     """
     filename_map = {
         "1STEP": "cti_1_step_challenge.json",
@@ -32,109 +19,68 @@ def load_cti_config(mode: str, account_size: int) -> ChallengeConfig:
     }
 
     if mode not in filename_map:
-        raise ValueError(
-            f"Unknown CTI mode: {mode}. Must be one of {list(filename_map.keys())}"
-        )
+        raise ValueError(f"Unknown CTI mode: {mode}")
 
     file_path = PRESETS_DIR / filename_map[mode]
-
     if not file_path.exists():
-        # Fallback for checking from project root if running as module
         file_path = Path.cwd() / file_path
-
-    if not file_path.exists():
-        raise FileNotFoundError(f"Config config file not found: {file_path}")
 
     with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
 
-    # Find matching account size
     matching_config = None
-    for size_config in data.get("starting_account_sizes", []):
-        if size_config["account_size"] == account_size:
-            matching_config = size_config
-            break
+    
+    # Handle nested "programs" structure for Instant
+    if "programs" in data:
+        program_list = data["programs"].get(tier.upper(), [])
+        for item in program_list:
+            # For Instant, tier_name is the key (e.g. 10000)
+            if item.get("tier_name") == account_size:
+                matching_config = item
+                break
+    else:
+        # Standard flat structure for Challenges
+        for item in data.get("starting_account_sizes", []):
+            if item.get("account_size") == account_size:
+                matching_config = item
+                break
 
     if not matching_config:
-        available = [s["account_size"] for s in data.get("starting_account_sizes", [])]
-        raise ValueError(
-            f"Account size {account_size} not found for mode {mode}. Available: {available}"
-        )
+        raise ValueError(f"Account size {account_size} not found for {mode} {tier}")
 
-    # Try evaluation rules, then Phase 1 (for multi-step), then parameters (for Instant)
-    eval_rules = matching_config.get("evaluation")
-    if not eval_rules:
-        eval_rules = matching_config.get("phase1")
-    if not eval_rules:
-        eval_rules = matching_config.get("parameters")
+    # Map to ChallengeConfig
+    # For Instant: use starting_balance as account_size
+    # For Challenge: use account_size
+    base_size = matching_config.get("starting_balance", matching_config.get("account_size"))
+    
+    # Drawdown logic
+    dd_cfg = matching_config.get("drawdown", {})
+    max_dd = dd_cfg.get("total_pct", matching_config.get("max_drawdown_pct", 0.10))
+    dd_type = dd_cfg.get("type", "TRAILING")
+    daily_loss = dd_cfg.get("daily_pct", 0.05 if mode == "2STEP" else None)
 
-    if not eval_rules:
-        available = list(matching_config.keys())
-        raise KeyError(
-            f"Could not find 'evaluation', 'phase1', or 'parameters' rules in config. Keys: {available}"
-        )
-
-    # Map JSON fields to ChallengeConfig
-    def to_decimal(val):
-        return float(val) / 100.0 if val is not None else None
-
-    # Determine base capital (Instant Funding usually has lower starting balance than tier name)
-    # We should use the actual starting balance for calculations if specified.
-    base_capital = eval_rules.get("starting_balance", account_size)
-
-    # Determine Profit Target Pct
-    profit_target_pct = to_decimal(eval_rules.get("profit_target_percentage"))
-    if profit_target_pct is None and eval_rules.get("profit_target_amount"):
-        # Derive percentage from amount
-        profit_target_pct = float(eval_rules["profit_target_amount"]) / float(
-            base_capital
-        )
-
-    # Determine drawdown type
-    if eval_rules.get("max_static_drawdown_percentage"):
-        dd_type = "STATIC"
-        max_dd = to_decimal(eval_rules.get("max_static_drawdown_percentage"))
-    else:
-        dd_type = "TRAILING"
-        max_dd = to_decimal(eval_rules.get("max_trailing_drawdown_percentage"))
-
-    # Determine Daily Loss Pct
-    # Some configs might only have amount? Use Pct if available.
-    max_daily_pct = to_decimal(eval_rules.get("max_daily_drawdown_percentage"))
-
+    # Target logic
+    target_pct = matching_config.get("profit_target_pct", 0.10)
+    
     return ChallengeConfig(
-        program_id=f"CTI_{mode}_{account_size}",
-        # Use base_capital as the effective account size for simulation rules
-        account_size=float(base_capital),
-        max_daily_loss_pct=max_daily_pct,
+        program_id=f"CTI_{mode}_{tier}_{account_size}",
+        account_size=float(base_size),
+        max_daily_loss_pct=daily_loss,
         max_total_drawdown_pct=max_dd,
-        profit_target_pct=profit_target_pct,
-        min_trading_days=eval_rules.get("minimum_profitable_days", 0) or 0,
-        max_time_days=eval_rules.get("time_limit_days"),
+        profit_target_pct=target_pct,
+        min_trading_days=3,
         drawdown_type=dd_type,
-        drawdown_mode="CLOSED_BALANCE",
+        cost=float(matching_config.get("cost", 0.0)),
+        payout_share=0.8
     )
-
 
 def load_scaling_plan(mode: str) -> ScalingConfig:
     """
     Load scaling plan for a given mode.
-
-    Args:
-        mode: "1STEP", "2STEP", or "INSTANT"
     """
-    filename = (
-        "cti_instant_scaling_plan.json"
-        if mode == "INSTANT"
-        else "cti_challenge_scaling_plan.json"
-    )
+    filename = "cti_instant_scaling_plan.json" if mode == "INSTANT" else "cti_challenge_scaling_plan.json"
     file_path = PRESETS_DIR / filename
-
-    if not file_path.exists():
-        file_path = Path.cwd() / file_path
-
-    if not file_path.exists():
-        raise FileNotFoundError(f"Scaling plan file not found: {file_path}")
+    if not file_path.exists(): file_path = Path.cwd() / file_path
 
     with open(file_path, encoding="utf-8") as f:
         data = json.load(f)

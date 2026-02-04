@@ -27,6 +27,8 @@ class ChallengeConfig(BaseModel):
     max_time_days: Optional[int] = None
     drawdown_type: str = "TRAILING"  # TRAILING or STATIC
     drawdown_mode: str = "CLOSED_BALANCE"
+    cost: float = 0.0
+    payout_share: float = 0.8
 
 
 class ScalingConfig(BaseModel):
@@ -38,49 +40,59 @@ class ScalingConfig(BaseModel):
 
 
 @dataclass(frozen=True)
-class LifeResult:
-    """Result of a single 'Life' (Attempt) within a scaling simulation."""
+class LevelResult:
+    """Result of a single 'Level' within an attempt."""
 
-    life_id: int
+    level_id: int
     start_tier_balance: float
     end_balance: float
-    status: str  # PASSED, FAILED_DRAWDOWN, FAILED_DAILY, IN_PROGRESS
+    status: str
     start_date: datetime
     end_date: datetime
     trade_count: int
     pnl: float
-    # Note: MetricsSummary is defined in src.models.core, but we avoid
-    # circular imports by storing it as a generic object or dict if needed,
-    # or importing it inside methods. For now, we'll omit strict typing
-    # or use 'Any' if we can't import it easily.
-    # To keep this module standalone, we might use a simplified dict for now
-    # or import if possible. Let's use a dict for independent metrics storage.
+    beginning_wallet_balance: float = 0.0
+    new_wallet_balance: float = 0.0
+    life_withdrawals: float = 0.0
+    buyback_cost: float = 0.0
     metrics: Optional[MetricsSummary] = None
     failure_reason: Optional[str] = None
 
 
 @dataclass(frozen=True)
-class ScalingReport:
-    """Aggregate report of a multi-life simulation."""
+class AttemptResult:
+    """Result of a single 'Attempt' (persists until drawdown)."""
 
-    lives: list[LifeResult]
+    attempt_id: int
+    levels: list[LevelResult]
+    status: str  # ACTIVE or FAILED
+    total_pnl: float = 0.0
+
+
+@dataclass(frozen=True)
+class ScalingReport:
+    """Aggregate report of a multi-attempt simulation."""
+
+    attempts: list[AttemptResult]
     total_duration_days: int
-    active_life_index: int
+    active_attempt_index: int
+    wallet_balance: float = 0.0
+    net_payouts: float = 0.0
+    total_costs: float = 0.0
 
     @property
     def tier_stats(self) -> dict[float, dict[str, int]]:
         """
         Returns stats per tier balance.
-        Example: {10000.0: {'PASSED': 2, 'FAILED_DRAWDOWN': 1}}
         """
         stats = {}
-        for life in self.lives:
-            balance = life.start_tier_balance
-            if balance not in stats:
-                stats[balance] = {}
+        for attempt in self.attempts:
+            for level in attempt.levels:
+                balance = level.start_tier_balance
+                if balance not in stats:
+                    stats[balance] = {}
 
-            # Count status
-            current_count = stats[balance].get(life.status, 0)
-            stats[balance][life.status] = current_count + 1
+                current_count = stats[balance].get(level.status, 0)
+                stats[balance][level.status] = current_count + 1
 
         return stats

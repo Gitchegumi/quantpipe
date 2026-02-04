@@ -47,9 +47,18 @@ class StrategyRegistry:
     lazy formatting to comply with project standards.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, load_private: bool = True) -> None:
         self._strategies: Dict[str, RegisteredStrategy] = {}
         logger.info("Initialized StrategyRegistry (empty)")
+        
+        if load_private:
+            try:
+                from .loader import load_private_strategies
+                load_private_strategies(self)
+            except ImportError:
+                logger.debug("Private strategy loader not found. Skipping auto-load.")
+            except Exception as e:
+                logger.error("Error during private strategy auto-load: %s", e)
 
     # --- Registration & Retrieval -------------------------------------------------
     def register(

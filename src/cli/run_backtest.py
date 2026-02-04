@@ -84,6 +84,17 @@ def _is_interactive() -> bool:
 
 def _prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
     """Interactively prompt user for input with validation and coercion."""
+    if choices:
+        # Append choices to msg if not already there
+        choice_str = f" ({'/'.join(map(str, choices))})"
+        if choice_str.strip() not in msg:
+            # Insert before the last colon if present
+            if ":" in msg:
+                parts = msg.rsplit(":", 1)
+                msg = f"{parts[0]}{choice_str}:{parts[1]}"
+            else:
+                msg = f"{msg}{choice_str}"
+
     while True:
         try:
             raw = input(msg).strip()
@@ -280,7 +291,7 @@ def configure_backtest_parser(
     parser.add_argument(
         "--starting-balance",
         type=float,
-        help="Starting account balance for position sizing (default: $2500). "
+        help="Starting account balance / Challenge Level (default: $2500). "
         "All symbols trade against this shared balance.",
     )
 
@@ -489,6 +500,36 @@ def configure_backtest_parser(
         "Example: --sessions NY EU (trades only during NY and London hours).",
     )
 
+    parser.add_argument(
+        "--sessions-force-close",
+        action="store_true",
+        help="Force close open trades at the end of the specified session(s).",
+    )
+
+    parser.add_argument(
+        "--sessions-window",
+        type=int,
+        help="Buffer window in minutes before session end to stop new entries (if force-close enabled).",
+    )
+
+    parser.add_argument(
+        "--news-force-close",
+        action="store_true",
+        help="Force close open trades before high-impact news events.",
+    )
+
+    parser.add_argument(
+        "--news-window-before",
+        type=int,
+        help="Minutes before news event to start blackout / force close.",
+    )
+
+    parser.add_argument(
+        "--news-window-after",
+        type=int,
+        help="Minutes after news event to end blackout.",
+    )
+
     # CTI Prop Firm Arguments (Feature 027)
     parser.add_argument(
         "--cti-mode",
@@ -496,6 +537,13 @@ def configure_backtest_parser(
         choices=["1STEP", "2STEP", "INSTANT"],
         help="Enable CTI Prop Firm evaluation mode (Feature 027). "
         "Requires --starting-balance to match a valid CTI account size.",
+    )
+
+    parser.add_argument(
+        "--buyback-strategy",
+        type=str,
+        choices=["1STEP", "2STEP", "INSTANT"],
+        help="Strategy for handling account buybacks after Attempt 1 (defaults to --cti-mode).",
     )
 
     parser.add_argument(
@@ -539,6 +587,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     """
     Execute the backtest logic with the provided arguments.
     """
+    if args.profile:
+        import cProfile
+        import pstats
+        import io
+
+        pr = cProfile.Profile()
+        pr.enable()
+
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
 
@@ -629,7 +685,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 # 3. Direction
                 if args.direction is None:
                     choices = ["LONG", "SHORT", "BOTH"]
-                    d = _prompt("? Direction (LONG/SHORT/BOTH) [LONG]: ", choices=choices)
+                    d = _prompt("? Direction [LONG]: ", choices=choices)
                     args.direction = d if d else "LONG"
 
                 # 4. Timeframe
@@ -637,10 +693,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) [1m]: ")
                     args.timeframe = t if t else "1m"
 
-                # 5. Starting Balance
+                # 5. Challenge Level
                 if args.starting_balance is None:
                     b = _prompt(
-                        "? Starting balance (USD) [2500.0]: ",
+                        "? Challenge Level (USD) [2500.0]: ",
                         coerce=float,
                         validate=lambda x: x > 0,
                     )
@@ -655,11 +711,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                 # 6. CTI Simulation
                 if args.cti_mode is None:
-                    yn = _prompt("? Run in CTI Prop Firm mode? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Run in CTI Prop Firm mode? [n]: ", choices=["y", "n"])
                     if yn == "y":
                         choices = ["1STEP", "2STEP", "INSTANT"]
-                        mode = _prompt("? CTI Mode (1STEP/2STEP/INSTANT) [2STEP]: ", choices=choices)
+                        mode = _prompt("? CTI Mode [2STEP]: ", choices=choices)
                         args.cti_mode = mode if mode else "2STEP"
+                        
+                        bb_mode = _prompt(f"? Buy-back Strategy [{args.cti_mode}]: ", choices=choices)
+                        args.buyback_strategy = bb_mode if bb_mode else args.cti_mode
 
                 # 7. Risk Parameters
                 print("\n[Risk Management]")
@@ -681,7 +740,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 elif "MA_Trailing" in args.stop_policy:
                     # ma-type, ma-period
                     if args.ma_type == "SMA": # Default is SMA, confirm if interactive
-                        mt = _prompt("? MA Type (SMA/EMA) [SMA]: ", choices=["SMA", "EMA"])
+                        mt = _prompt("? MA Type [SMA]: ", choices=["SMA", "EMA"])
                         args.ma_type = mt if mt else "SMA"
                     if args.ma_period == 50: # Default 50
                         mp = _prompt("? MA Period [50]: ", coerce=int, validate=lambda x: x > 0)
@@ -709,20 +768,34 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 
                 # Sessions
                 if args.sessions is None:
-                    yn = _prompt("? Limit trading to specific sessions? (y/n) [n]: ", choices=["y", "n"])
+                    yn = _prompt("? Limit trading to specific sessions? [n]: ", choices=["y", "n"])
                     if yn == "y":
                         raw = _prompt("? Sessions (space-separated, e.g., NY EU AS SY): ")
                         if raw:
                             args.sessions = raw.replace(",", " ").upper().split()
                         else:
                             args.sessions = None # Fallback to all if user provided nothing
+                        
+                        if args.sessions:
+                            fc = _prompt("? Enable forced close for sessions? [n]: ", choices=["y", "n"])
+                            if fc == "y":
+                                args.sessions_force_close = True
+                                args.sessions_window = _prompt("? Session buffer window (minutes) [15]: ", coerce=int) or 15
                     else:
                         args.sessions = None # "all"
 
                 # News Blackout
                 if not args.blackout_news:
-                    yn = _prompt("? Enable news event blackout filtering? (y/n) [n]: ", choices=["y", "n"])
-                    args.blackout_news = (yn == "y")
+                    yn = _prompt("? Enable news event blackout filtering? [n]: ", choices=["y", "n"])
+                    if yn == "y":
+                        args.blackout_news = True
+                        fc = _prompt("? Enable forced close for news? [n]: ", choices=["y", "n"])
+                        if fc == "y":
+                            args.news_force_close = True
+                            args.news_window_before = _prompt("? Minutes before news [10]: ", coerce=int) or 10
+                            args.news_window_after = _prompt("? Minutes after news [30]: ", coerce=int) or 30
+                    else:
+                        args.blackout_news = False
 
     # -------------------------------------------------------------------------
     # Parameter Resolution (CLI > Config > Defaults)
@@ -1001,7 +1074,7 @@ Persistent storage not yet implemented."
 
         # Unified backtest path: always use run_portfolio_backtest (1 or N symbols)
         logger.info(
-            "Backtest: %d symbol(s), $%.2f starting balance",
+            "Backtest: %d symbol(s), $%.2f challenge level",
             len(pair_paths),
             parameters.account_balance,  # Use resolved parameter
         )
@@ -1013,7 +1086,7 @@ Persistent storage not yet implemented."
             "direction": args.direction,
             "strategy": args.strategy[0] if isinstance(args.strategy, list) else args.strategy,
             "pairs": [p.upper() for p in (args.pair or [])],
-            "starting_balance": float(parameters.account_balance),
+            "challenge_level": float(parameters.account_balance),
             "cti": {
                 "enabled": bool(args.cti_mode),
                 "mode": args.cti_mode,
@@ -1052,34 +1125,33 @@ Persistent storage not yet implemented."
             # Defaults if flags active but not configured
             news_cfg = None
             if args.blackout_news:
-                news_cfg = NewsBlackoutConfig(enabled=True)
+                news_cfg = NewsBlackoutConfig(
+                    enabled=True,
+                    force_close=getattr(args, "news_force_close", False),
+                    window_before_mins=getattr(args, "news_window_before", 10),
+                    window_after_mins=getattr(args, "news_window_after", 30)
+                )
 
             session_cfg = None
             if args.blackout_sessions:
                 session_cfg = SessionBlackoutConfig(enabled=True)
 
             # Normalize session names (handle abbreviations)
-            # Map 2-letter codes to full session names
-            session_map = {
-                "SY": "SYDNEY",
-                "AS": "ASIA",
-                "EU": "LONDON",
-                "NY": "NY",
-            }
-
+            session_map = {"SY": "SYDNEY", "AS": "ASIA", "EU": "LONDON", "NY": "NY"}
             allowed_sessions = []
             if args.sessions:
                 for s in args.sessions:
                     s_upper = s.upper()
-                    # Map abbreviation or use original if not in map
                     canonical = session_map.get(s_upper, s_upper)
                     allowed_sessions.append(canonical)
 
             whitelist_cfg = None
             if args.sessions:
-                # Map shorthand to full names if needed, or rely on config parsing
                 whitelist_cfg = SessionOnlyConfig(
-                    enabled=True, allowed_sessions=allowed_sessions
+                    enabled=True, 
+                    allowed_sessions=allowed_sessions,
+                    force_close=getattr(args, "sessions_force_close", False),
+                    buffer_window_mins=getattr(args, "sessions_window", 15)
                 )
 
             blackout_config = BlackoutConfig(
@@ -1241,70 +1313,125 @@ Persistent storage not yet implemented."
                     if not args.disable_scaling:
                         # Load scaling plan
                         scaling_plan = load_scaling_plan(args.cti_mode)
+                        
+                        # Construct cost map for buy-backs (Feature Request)
+                        try:
+                            import json as _json_cost
+                            
+                            # Challenge Costs
+                            challenge_file = Path("src/config/presets/cti/cti_2_step_challenge.json")
+                            if not challenge_file.exists(): challenge_file = Path.cwd() / challenge_file
+                            with open(challenge_file, encoding="utf-8") as f:
+                                chal_data = _json_cost.load(f)
+                            cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in chal_data["starting_account_sizes"]}
+                            
+                            # Instant Costs (Priority for buyback)
+                            instant_file = Path("src/config/presets/cti/cti_instant_funding.json")
+                            if not instant_file.exists(): instant_file = Path.cwd() / instant_file
+                            with open(instant_file, encoding="utf-8") as f:
+                                inst_data = _json_cost.load(f)
+                            # Use STANDARD as the default buyback target
+                            instant_cost_map = {float(s["tier_name"]): float(s.get("cost", 0.0)) for s in inst_data["programs"]["STANDARD"]}
+                            
+                        except Exception as e:
+                            logger.warning("Could not build cost map for CTI buy-back simulation: %s", e)
+                            cost_map = None
+                            instant_cost_map = None
+
                         report = evaluate_scaling(
-                            executions, challenge_conf, scaling_plan
+                            executions, challenge_conf, scaling_plan, 
+                            cost_map=cost_map, 
+                            instant_cost_map=instant_cost_map,
+                            buyback_mode=args.buyback_strategy or args.cti_mode
                         )
 
                         # Build Report String
                         lines = []
-                        promotions = sum(
-                            1 for l in report.lives if l.status == "PROMOTED"
-                        )
+                        total_levels = sum(len(a.levels) for a in report.attempts)
+                        
+                        # Promotions: Any level that resulted in SCALED_UP or PROMOTED_TO_FUNDED
+                        promotions = 0
+                        for a in report.attempts:
+                            for l in a.levels:
+                                if l.status in ["SCALED_UP", "PROMOTED_TO_FUNDED", "STEP_1_PASSED"]:
+                                    promotions += 1
+                        
                         resets = sum(
-                            1 for l in report.lives if l.status.startswith("FAILED")
+                            1 for a in report.attempts if a.status == "FAILED"
                         )
 
-                        # Calculate Payouts (ignore negative life PnLs)
-                        payout_100 = sum(max(0, l.pnl) for l in report.lives)
-                        payout_80 = payout_100 * 0.8
+                        # Calculate Payouts
+                        payout_100 = sum(max(0, l.pnl) for a in report.attempts for l in a.levels)
+                        payout_80 = payout_100 * challenge_conf.payout_share
 
                         lines.append(
-                            f"  Scaling Report (Total Lives: {len(report.lives)} | Promotions: {promotions} | Resets: {resets})"
+                            f"  Scaling Report (Total Attempts: {len(report.attempts)} | Total Levels: {total_levels} | Promotions: {promotions} | Resets: {resets})"
+                        )
+                        lines.append(
+                            f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
                         )
                         lines.append(
                             f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
                         )
-                        for life in report.lives:
-                            target_amt = (
-                                life.start_tier_balance * scaling_plan.profit_target_pct
-                            )
-                            lines.append(
-                                f"    Life #{life.life_id} [Tier ${life.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={life.status}, PnL=${life.pnl:.2f}, Balance=${life.end_balance:.2f}"
-                            )
-                            s_str = life.start_date.strftime("%Y-%m-%d %H:%M")
-                            e_str = life.end_date.strftime("%Y-%m-%d %H:%M")
-                            lines.append(f"      Period: {s_str} to {e_str}")
-
-                            if life.metrics:
-                                m = life.metrics
+                        
+                        for attempt in report.attempts:
+                            status_label = attempt.status
+                            levels_count = len(attempt.levels)
+                            lines.append(f"    Attempt #{attempt.attempt_id}: Levels Achieved={levels_count}, Total PnL=${attempt.total_pnl:,.2f}")
+                            
+                            for level in attempt.levels:
+                                target_amt = (
+                                    level.start_tier_balance * scaling_plan.profit_target_pct
+                                )
+                                # Improve labeling for Evaluation steps
+                                label_prefix = "Level"
+                                if level.status == "STEP_1_PASSED":
+                                    label_prefix = "Step 1"
+                                    target_amt = level.start_tier_balance * 0.10
+                                elif level.status == "PROMOTED_TO_FUNDED":
+                                    label_prefix = "Step 2"
+                                    target_amt = level.start_tier_balance * 0.05
+                                
+                                prog_label = level.failure_reason if level.failure_reason else "N/A"
+                                lvl_status = "Active" if level.status == "Active" else level.status
                                 lines.append(
-                                    f"      Stats: {m.win_count} Wins, {m.loss_count} Losses | "
-                                    f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
+                                    f"      {label_prefix} #{level.level_id} [{prog_label} | Tier ${level.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={lvl_status}, PnL=${level.pnl:.2f}, Balance=${level.end_balance:.2f}"
                                 )
+                                if level.buyback_cost > 0:
+                                    lines.append(f"        Buyback: {prog_label} tier ${level.start_tier_balance:,.0f} | Cost: ${level.buyback_cost:,.2f}")
+                                
+                                lines.append(f"        Starting Wallet Balance: ${level.beginning_wallet_balance:,.2f}")
+                                if level.life_withdrawals > 0:
+                                    lines.append(f"        Life withdrawals: ${level.life_withdrawals:,.2f}")
+                                
+                                s_str = level.start_date.strftime("%Y-%m-%d %H:%M")
+                                e_str = level.end_date.strftime("%Y-%m-%d %H:%M")
+                                lines.append(f"        Period: {s_str} to {e_str}")
 
-                            if life.status == "FAILED_DRAWDOWN":
-                                reason = (
-                                    life.failure_reason
-                                    if life.failure_reason
-                                    else "Drawdown Violation"
-                                )
-                                from datetime import timedelta
-
-                                review_date = life.start_date + timedelta(days=120)
-                                review_str = review_date.strftime("%Y-%m-%d")
-
-                                lines.append(
-                                    f"      Failure: {reason} (End: {life.end_date})"
-                                )
-                                lines.append(
-                                    f"      Context: Promotion Review was due ~{review_str}"
-                                )
-                            elif life.status == "PROMOTED":
-                                lines.append(
-                                    f"      Success: Promoted to Tier Balance ${life.end_balance:.2f} (if next life exists)"
-                                )
-                            lines.append("")  # Blank line for readability
-                        lines.append(f"  Active Life Index: {report.active_life_index}")
+                                if level.metrics:
+                                    m = level.metrics
+                                    lines.append(
+                                        f"        Stats: {m.win_count} Wins, {m.loss_count} Losses | "
+                                        f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
+                                    )
+                                
+                                if level.status == "FAILED_DRAWDOWN":
+                                    reason = (
+                                        level.failure_reason
+                                        if level.failure_reason
+                                        else "Drawdown Violation"
+                                    )
+                                    lines.append(f"        Failure: {reason} (End: {level.end_date})")
+                                elif level.status in ["SCALED_UP", "PROMOTED_TO_FUNDED"]:
+                                    lines.append(
+                                        f"        Success: Promoted to Tier Balance ${level.end_balance:.2f}"
+                                    )
+                                
+                                if level.status != "Active":
+                                    lines.append(f"        Ending Wallet Balance: ${level.new_wallet_balance:,.2f}")
+                                lines.append("")  # Blank line for readability
+                        
+                        lines.append(f"  Active Attempt Index: {report.active_attempt_index}")
 
                         # Append to file
                         with open(full_path, "a", encoding="utf-8") as f:
@@ -1313,7 +1440,7 @@ Persistent storage not yet implemented."
                             f.write("\n")
 
                         # Console Summary (Concise)
-                        print(f"✓ CTI Evaluation [{label}]: {len(report.lives)} lives, {promotions} promotions, {resets} resets. Payout (80%): ${payout_80:,.2f}")
+                        print(f"✓ CTI Evaluation [{label}]: {len(report.attempts)} attempts, {promotions} promotions, {resets} resets. Payout (80%): ${payout_80:,.2f}")
 
                     else:
                         # Single Challenge Evaluation (with Retry on Failure Logic)
@@ -1375,8 +1502,20 @@ Persistent storage not yet implemented."
                 # BacktestResult
                 process_cti(result.executions, result.pair or "Single")
 
-        # Visualization
-        if args.visualize:
+    if args.profile:
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats(30)  # Top 30 hotspots
+        print("\n" + "="*80)
+        print("PERFORMANCE PROFILE (Top 30 Hotspots)")
+        print("="*80)
+        print(s.getvalue())
+        print("="*80 + "\n")
+
+    # Visualization
+    if args.visualize:
             from ..visualization.datashader_viz import plot_backtest_results
 
             logger.info("Opening visualization...")
