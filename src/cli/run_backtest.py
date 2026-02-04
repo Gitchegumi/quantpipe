@@ -500,6 +500,36 @@ def configure_backtest_parser(
         "Example: --sessions NY EU (trades only during NY and London hours).",
     )
 
+    parser.add_argument(
+        "--sessions-force-close",
+        action="store_true",
+        help="Force close open trades at the end of the specified session(s).",
+    )
+
+    parser.add_argument(
+        "--sessions-window",
+        type=int,
+        help="Buffer window in minutes before session end to stop new entries (if force-close enabled).",
+    )
+
+    parser.add_argument(
+        "--news-force-close",
+        action="store_true",
+        help="Force close open trades before high-impact news events.",
+    )
+
+    parser.add_argument(
+        "--news-window-before",
+        type=int,
+        help="Minutes before news event to start blackout / force close.",
+    )
+
+    parser.add_argument(
+        "--news-window-after",
+        type=int,
+        help="Minutes after news event to end blackout.",
+    )
+
     # CTI Prop Firm Arguments (Feature 027)
     parser.add_argument(
         "--cti-mode",
@@ -745,13 +775,27 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                             args.sessions = raw.replace(",", " ").upper().split()
                         else:
                             args.sessions = None # Fallback to all if user provided nothing
+                        
+                        if args.sessions:
+                            fc = _prompt("? Enable forced close for sessions? [n]: ", choices=["y", "n"])
+                            if fc == "y":
+                                args.sessions_force_close = True
+                                args.sessions_window = _prompt("? Session buffer window (minutes) [15]: ", coerce=int) or 15
                     else:
                         args.sessions = None # "all"
 
                 # News Blackout
                 if not args.blackout_news:
                     yn = _prompt("? Enable news event blackout filtering? [n]: ", choices=["y", "n"])
-                    args.blackout_news = (yn == "y")
+                    if yn == "y":
+                        args.blackout_news = True
+                        fc = _prompt("? Enable forced close for news? [n]: ", choices=["y", "n"])
+                        if fc == "y":
+                            args.news_force_close = True
+                            args.news_window_before = _prompt("? Minutes before news [10]: ", coerce=int) or 10
+                            args.news_window_after = _prompt("? Minutes after news [30]: ", coerce=int) or 30
+                    else:
+                        args.blackout_news = False
 
     # -------------------------------------------------------------------------
     # Parameter Resolution (CLI > Config > Defaults)
@@ -1081,34 +1125,33 @@ Persistent storage not yet implemented."
             # Defaults if flags active but not configured
             news_cfg = None
             if args.blackout_news:
-                news_cfg = NewsBlackoutConfig(enabled=True)
+                news_cfg = NewsBlackoutConfig(
+                    enabled=True,
+                    force_close=getattr(args, "news_force_close", False),
+                    window_before_mins=getattr(args, "news_window_before", 10),
+                    window_after_mins=getattr(args, "news_window_after", 30)
+                )
 
             session_cfg = None
             if args.blackout_sessions:
                 session_cfg = SessionBlackoutConfig(enabled=True)
 
             # Normalize session names (handle abbreviations)
-            # Map 2-letter codes to full session names
-            session_map = {
-                "SY": "SYDNEY",
-                "AS": "ASIA",
-                "EU": "LONDON",
-                "NY": "NY",
-            }
-
+            session_map = {"SY": "SYDNEY", "AS": "ASIA", "EU": "LONDON", "NY": "NY"}
             allowed_sessions = []
             if args.sessions:
                 for s in args.sessions:
                     s_upper = s.upper()
-                    # Map abbreviation or use original if not in map
                     canonical = session_map.get(s_upper, s_upper)
                     allowed_sessions.append(canonical)
 
             whitelist_cfg = None
             if args.sessions:
-                # Map shorthand to full names if needed, or rely on config parsing
                 whitelist_cfg = SessionOnlyConfig(
-                    enabled=True, allowed_sessions=allowed_sessions
+                    enabled=True, 
+                    allowed_sessions=allowed_sessions,
+                    force_close=getattr(args, "sessions_force_close", False),
+                    buffer_window_mins=getattr(args, "sessions_window", 15)
                 )
 
             blackout_config = BlackoutConfig(
