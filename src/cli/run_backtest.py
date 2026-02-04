@@ -1277,7 +1277,8 @@ Persistent storage not yet implemented."
                             if not instant_file.exists(): instant_file = Path.cwd() / instant_file
                             with open(instant_file, encoding="utf-8") as f:
                                 inst_data = _json_cost.load(f)
-                            instant_cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in inst_data["starting_account_sizes"]}
+                            # Use STANDARD as the default buyback target
+                            instant_cost_map = {float(s["tier_name"]): float(s.get("cost", 0.0)) for s in inst_data["programs"]["STANDARD"]}
                             
                         except Exception as e:
                             logger.warning("Could not build cost map for CTI buy-back simulation: %s", e)

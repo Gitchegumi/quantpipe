@@ -36,17 +36,31 @@ def evaluate_scaling(
     is_in_evaluation = (current_tier_type == "CHALLENGE")
     current_step = 1 if is_in_evaluation else 0 
     
-    current_tier_idx = 0
-    start_tier_balance = scaling_config.increments[0]
-    base_account_size = challenge_config.account_size
+    # Starting Equity vs Tier Size
+    # For Instant, account_size from config is the starting EQUITY
+    start_tier_equity = challenge_config.account_size
+    
+    # Find the nominal tier size (e.g. 10000 if equity is 5000)
+    nominal_current_size = start_tier_equity
+    if current_tier_type == "INSTANT":
+        # Check program_id for PRO tag
+        if "_PRO_" not in challenge_config.program_id:
+            nominal_current_size = start_tier_equity * 2.0
+            
+    # Track the original starting tier for scaling relative to base
+    nominal_start_size = nominal_current_size
 
-    current_balance = start_tier_balance
+    try:
+        current_tier_idx = scaling_config.increments.index(nominal_current_size)
+    except ValueError:
+        current_tier_idx = 0
+
+    current_balance = start_tier_equity
     current_level_trades: list[TradeExecution] = []
     current_level_start = sorted_execs[0].open_timestamp
     
     min_review_date = current_level_start + relativedelta(months=scaling_config.review_period_months)
 
-    # Daily Balance Tracking
     daily_start_balances = {}
     current_day = current_level_start.date()
     daily_start_balances[current_day] = current_balance
@@ -68,35 +82,42 @@ def evaluate_scaling(
 
         if trade_date > current_day:
             if not is_in_evaluation and trade_date.month != current_day.month:
-                profit_this_month = current_balance - start_tier_balance
+                profit_this_month = current_balance - start_tier_equity
                 if profit_this_month > 0:
                     payout = profit_this_month * challenge_config.payout_share
                     total_payouts += payout
                     life_withdrawals += payout
                     wallet_balance += payout
-                    current_balance = start_tier_balance
+                    current_balance = start_tier_equity
                     peak_balance = current_balance
             
             daily_start_balances[trade_date] = current_balance
             current_day = trade_date
 
-        scale_factor = start_tier_balance / base_account_size
+        # Scaling logic: Double the account size at each level for Instant
+        # challenge_config.account_size is the base equity
+        scale_factor = nominal_current_size / nominal_start_size
+        
         base_pnl = trade.pnl_r * trade.risk_amount
         if trade.risk_amount == 0 and trade.pnl_r != 0:
-            base_pnl = trade.pnl_r * (base_account_size * (trade.risk_percent or 0.01))
+            # risk_percent is against the NOMINAL size
+            estimated_risk = nominal_current_size * (trade.risk_percent or 0.01)
+            base_pnl = trade.pnl_r * estimated_risk
+        else:
+            base_pnl = trade.pnl_r * trade.risk_amount * scale_factor
 
-        scaled_pnl = base_pnl * scale_factor
-        current_balance += scaled_pnl
-        level_profit_accrued += scaled_pnl
+        current_balance += base_pnl
+        level_profit_accrued += base_pnl
         current_level_trades.append(trade)
-        monthly_pnls[trade_month] = monthly_pnls.get(trade_month, 0.0) + scaled_pnl
+        monthly_pnls[trade_month] = monthly_pnls.get(trade_month, 0.0) + base_pnl
 
         if current_balance > peak_balance:
             peak_balance = current_balance
 
-        max_dd_amount = start_tier_balance * challenge_config.max_total_drawdown_pct
+        # Drawdown is based on NOMINAL size
+        max_dd_amount = nominal_current_size * challenge_config.max_total_drawdown_pct
         failed = False
-        floor = start_tier_balance - max_dd_amount if challenge_config.drawdown_type == "STATIC" else peak_balance - max_dd_amount
+        floor = start_tier_equity - max_dd_amount if challenge_config.drawdown_type == "STATIC" else peak_balance - max_dd_amount
         
         if current_balance < floor:
             status = "FAILED_DRAWDOWN"
@@ -104,7 +125,7 @@ def evaluate_scaling(
 
         if not failed and challenge_config.max_daily_loss_pct:
             day_start = daily_start_balances.get(trade_date, current_balance)
-            limit = day_start - (start_tier_balance * challenge_config.max_daily_loss_pct)
+            limit = day_start - (nominal_current_size * challenge_config.max_daily_loss_pct)
             if current_balance < limit:
                 status = "FAILED_DAILY"
                 failed = True
@@ -113,7 +134,7 @@ def evaluate_scaling(
         if not failed:
             if is_in_evaluation:
                 target_pct = 0.10 if current_step == 1 else 0.05
-                target_amount = start_tier_balance * target_pct
+                target_amount = start_tier_equity * target_pct
                 
                 if level_profit_accrued >= target_amount:
                     if current_step == 1:
@@ -127,7 +148,7 @@ def evaluate_scaling(
                         promoted = True
             else:
                 if trade.close_timestamp >= min_review_date:
-                    target = start_tier_balance * scaling_config.profit_target_pct
+                    target_amount = start_tier_equity * scaling_config.profit_target_pct
                     window_start = trade.close_timestamp - relativedelta(months=scaling_config.review_period_months)
                     window_pnl = 0.0
                     prof_months = 0
@@ -139,7 +160,7 @@ def evaluate_scaling(
                             if p > 0:
                                 prof_months += 1
                     
-                    if window_pnl >= target and prof_months >= 2:
+                    if window_pnl >= target_amount and prof_months >= 2:
                         status = "SCALED_UP"
                         promoted = True
 
@@ -148,7 +169,7 @@ def evaluate_scaling(
             
             payout_at_end = 0.0
             if not is_in_evaluation and profit_at_end > 0:
-                remaining_profit = current_balance - start_tier_balance
+                remaining_profit = current_balance - start_tier_equity
                 if remaining_profit > 0:
                     payout_at_end = remaining_profit * challenge_config.payout_share
                     total_payouts += payout_at_end
@@ -158,7 +179,7 @@ def evaluate_scaling(
 
             current_attempt_levels.append(LevelResult(
                 level_id=level_id_counter,
-                start_tier_balance=start_tier_balance,
+                start_tier_balance=nominal_current_size,
                 end_balance=current_balance,
                 status=status,
                 start_date=current_level_start,
@@ -189,30 +210,30 @@ def evaluate_scaling(
                 level_id_counter = 1
                 current_attempt_levels = []
                 
-                # Default back to initial selection
-                next_tier_balance = scaling_config.increments[0]
-                
-                # Refined Buyback Logic: Prioritize highest affordable INSTANT
+                # Buyback Preference: Highest affordable Instant
                 buyback_type = "CHALLENGE"
+                nominal_current_size = scaling_config.increments[0]
+                
                 if instant_cost_map:
-                    affordable_instant = sorted([t for t, c in instant_cost_map.items() if c <= wallet_balance], reverse=True)
-                    if affordable_instant:
-                        next_tier_balance = affordable_instant[0]
-                        pending_buyback_cost = instant_cost_map[next_tier_balance]
+                    # Find highest affordable Instant tier
+                    affordable_instants = sorted([t for t, c in instant_cost_map.items() if c <= wallet_balance], reverse=True)
+                    if affordable_instants:
+                        nominal_current_size = affordable_instants[0]
+                        pending_buyback_cost = instant_cost_map[nominal_current_size]
                         buyback_type = "INSTANT"
                     elif cost_map:
-                        # Only check Challenges if NO Instants are affordable
-                        affordable_challenge = sorted([t for t, c in cost_map.items() if c <= wallet_balance], reverse=True)
-                        if affordable_challenge:
-                            next_tier_balance = affordable_challenge[0]
-                            pending_buyback_cost = cost_map[next_tier_balance]
+                        # Fallback to highest affordable Challenge
+                        affordable_challenges = sorted([t for t, c in cost_map.items() if c <= wallet_balance], reverse=True)
+                        if affordable_challenges:
+                            nominal_current_size = affordable_challenges[0]
+                            pending_buyback_cost = cost_map[nominal_current_size]
                             buyback_type = "CHALLENGE"
                         else:
-                            pending_buyback_cost = challenge_config.cost
-                            buyback_type = "CHALLENGE"
+                            # Totally broke? Smallest Challenge
+                            nominal_current_size = scaling_config.increments[0]
+                            pending_buyback_cost = cost_map.get(nominal_current_size, challenge_config.cost)
                     else:
                         pending_buyback_cost = challenge_config.cost
-                        buyback_type = "CHALLENGE"
                 
                 current_tier_type = buyback_type
                 is_in_evaluation = (current_tier_type == "CHALLENGE")
@@ -220,20 +241,33 @@ def evaluate_scaling(
                 
                 wallet_balance -= pending_buyback_cost
                 total_costs += pending_buyback_cost
-                start_tier_balance = next_tier_balance
+                
                 try:
-                    current_tier_idx = scaling_config.increments.index(start_tier_balance)
+                    current_tier_idx = scaling_config.increments.index(nominal_current_size)
                 except ValueError:
                     current_tier_idx = 0
+                    
+                # Set starting equity for the new attempt
+                if current_tier_type == "INSTANT":
+                    # Assume Standard Instant (50% start) for buybacks
+                    start_tier_equity = nominal_current_size / 2.0
+                else:
+                    start_tier_equity = nominal_current_size
+                
+                nominal_start_size = nominal_current_size
             elif status == "STEP_1_PASSED":
-                start_tier_balance = start_tier_balance 
-                pending_buyback_cost = 0.0
+                # Equity and nominal size remain the same for Step 2
+                pass
             else:
-                current_tier_idx = min(current_tier_idx + (1 if status == "SCALED_UP" else 0), len(scaling_config.increments) - 1)
-                start_tier_balance = scaling_config.increments[current_tier_idx]
+                # Scaled up or Promoted to Funded
+                current_tier_idx = min(current_tier_idx + 1, len(scaling_config.increments) - 1)
+                nominal_current_size = scaling_config.increments[current_tier_idx]
+                
+                # After passing a challenge or scaling up, equity = 100% of nominal tier
+                start_tier_equity = nominal_current_size
                 pending_buyback_cost = 0.0
 
-            current_balance = start_tier_balance
+            current_balance = start_tier_equity
             current_level_trades = []
             current_level_start = trade.close_timestamp
             peak_balance = current_balance
@@ -244,9 +278,10 @@ def evaluate_scaling(
 
         i += 1
 
+    # Final active state
     current_attempt_levels.append(LevelResult(
         level_id=level_id_counter,
-        start_tier_balance=start_tier_balance,
+        start_tier_balance=nominal_current_size,
         end_balance=current_balance,
         status="Active",
         start_date=current_level_start,
