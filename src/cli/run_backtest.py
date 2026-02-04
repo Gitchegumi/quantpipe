@@ -1264,24 +1264,30 @@ Persistent storage not yet implemented."
                         # Construct cost map for buy-backs (Feature Request)
                         try:
                             import json as _json_cost
-                            cost_file = Path("src/config/presets/cti") / (
-                                "cti_instant_funding.json" if args.cti_mode == "INSTANT" else
-                                "cti_1_step_challenge.json" if args.cti_mode == "1STEP" else
-                                "cti_2_step_challenge.json"
-                            )
-                            # Handle relative path if running from root
-                            if not cost_file.exists():
-                                cost_file = Path.cwd() / cost_file
-
-                            with open(cost_file, encoding="utf-8") as f:
-                                cost_data = _json_cost.load(f)
-                            cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in cost_data["starting_account_sizes"]}
+                            
+                            # Challenge Costs
+                            challenge_file = Path("src/config/presets/cti/cti_2_step_challenge.json")
+                            if not challenge_file.exists(): challenge_file = Path.cwd() / challenge_file
+                            with open(challenge_file, encoding="utf-8") as f:
+                                chal_data = _json_cost.load(f)
+                            cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in chal_data["starting_account_sizes"]}
+                            
+                            # Instant Costs (Priority for buyback)
+                            instant_file = Path("src/config/presets/cti/cti_instant_funding.json")
+                            if not instant_file.exists(): instant_file = Path.cwd() / instant_file
+                            with open(instant_file, encoding="utf-8") as f:
+                                inst_data = _json_cost.load(f)
+                            instant_cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in inst_data["starting_account_sizes"]}
+                            
                         except Exception as e:
                             logger.warning("Could not build cost map for CTI buy-back simulation: %s", e)
                             cost_map = None
+                            instant_cost_map = None
 
                         report = evaluate_scaling(
-                            executions, challenge_conf, scaling_plan, cost_map=cost_map
+                            executions, challenge_conf, scaling_plan, 
+                            cost_map=cost_map, 
+                            instant_cost_map=instant_cost_map
                         )
 
                         # Build Report String
@@ -1322,12 +1328,22 @@ Persistent storage not yet implemented."
                                 target_amt = (
                                     level.start_tier_balance * scaling_plan.profit_target_pct
                                 )
+                                # Improve labeling for Evaluation steps
+                                label_prefix = "Level"
+                                if level.status == "STEP_1_PASSED":
+                                    label_prefix = "Step 1"
+                                    target_amt = level.start_tier_balance * 0.10
+                                elif level.status == "PROMOTED_TO_FUNDED":
+                                    label_prefix = "Step 2"
+                                    target_amt = level.start_tier_balance * 0.05
+                                
+                                prog_label = level.failure_reason if level.failure_reason else "N/A"
                                 lvl_status = "Active" if level.status == "Active" else level.status
                                 lines.append(
-                                    f"      Level #{level.level_id} [Tier ${level.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={lvl_status}, PnL=${level.pnl:.2f}, Balance=${level.end_balance:.2f}"
+                                    f"      {label_prefix} #{level.level_id} [{prog_label} | Tier ${level.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={lvl_status}, PnL=${level.pnl:.2f}, Balance=${level.end_balance:.2f}"
                                 )
                                 if level.buyback_cost > 0:
-                                    lines.append(f"        Buyback: tier ${level.start_tier_balance:,.0f} | Cost: ${level.buyback_cost:,.2f}")
+                                    lines.append(f"        Buyback: {prog_label} tier ${level.start_tier_balance:,.0f} | Cost: ${level.buyback_cost:,.2f}")
                                 
                                 lines.append(f"        Starting Wallet Balance: ${level.beginning_wallet_balance:,.2f}")
                                 if level.life_withdrawals > 0:
