@@ -200,9 +200,17 @@ def evaluate_scaling(
                 current_step = 0
                 next_tier_balance = scaling_config.increments[0]
                 if cost_map:
-                    affordable = sorted([t for t, c in cost_map.items() if c <= wallet_balance], reverse=True)
+                    # Filter increments to only those present in the cost map (valid starting tiers)
+                    valid_buyback_tiers = sorted([t for t in cost_map.keys() if t in scaling_config.increments], reverse=True)
+                    # Find highest valid tier we can afford
+                    affordable = [t for t in valid_buyback_tiers if cost_map[t] <= wallet_balance]
+                    
                     if affordable:
                         next_tier_balance = affordable[0]
+                    else:
+                        # Fallback to smallest if totally broke
+                        next_tier_balance = scaling_config.increments[0]
+                        
                     pending_buyback_cost = cost_map.get(next_tier_balance, challenge_config.cost)
                     wallet_balance -= pending_buyback_cost
                     total_costs += pending_buyback_cost

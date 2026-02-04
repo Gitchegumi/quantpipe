@@ -37,31 +37,6 @@
       "account_size": 80000,
       "profit_target_for_tier": 8000,
       "profit_share_range": "80–100%"
-    },
-    {
-      "account_size": 160000,
-      "profit_target_for_tier": 16000,
-      "profit_share_range": "80–100%"
-    },
-    {
-      "account_size": 320000,
-      "profit_target_for_tier": 32000,
-      "profit_share_range": "80–100%"
-    },
-    {
-      "account_size": 640000,
-      "profit_target_for_tier": 64000,
-      "profit_share_range": "80–100%"
-    },
-    {
-      "account_size": 1000000,
-      "profit_target_for_tier": 100000,
-      "profit_share_range": "80–100%"
-    },
-    {
-      "account_size": 2000000,
-      "profit_target_for_tier": 200000,
-      "profit_share_range": "80–100%"
     }
   ],
   "caps": {
