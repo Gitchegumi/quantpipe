@@ -787,6 +787,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 # News Blackout
                 if not args.blackout_news:
                     yn = _prompt("? Enable news event blackout filtering? [n]: ", choices=["y", "n"])
+
                     if yn == "y":
                         args.blackout_news = True
                         fc = _prompt("? Enable forced close for news? [n]: ", choices=["y", "n"])
@@ -1366,6 +1367,9 @@ Persistent storage not yet implemented."
 
                         lines.append(
                             f"  Scaling Report (Total Attempts: {len(report.attempts)} | Total Levels: {total_levels} | Promotions: {promotions} | Resets: {resets})"
+                        )
+                        lines.append(
+                            f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
                         )
                         lines.append(
                             f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"

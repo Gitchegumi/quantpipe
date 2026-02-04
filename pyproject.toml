@@ -8,6 +8,7 @@ packages = [{include = "src"}]
 
 [tool.poetry.scripts]
 quantpipe = "src.cli.main:main"
+qp-replay = "src.cli.replay:main"
 
 [tool.poetry.dependencies]
 python = ">=3.12,<4.0"
@@ -19,6 +20,7 @@ jsonschema = "^4.25.1"
 polars = "^1.17.0"
 pyarrow = "^18.0.0"
 psutil = "^6.1.0"
+duckdb = "^1.1.0"
 
 # Optional performance dependencies (install manually if needed):
 # numba = "^0.58.0"  # JIT compilation for trade simulation speedup (10-50x gains)
