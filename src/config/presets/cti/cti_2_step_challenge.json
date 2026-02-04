@@ -5,44 +5,92 @@
     {
       "account_size": 2500,
       "cost": 34,
-      "phase1": {"target_pct": 0.10},
-      "phase2": {"target_pct": 0.05},
-      "drawdown": {"daily_pct": 0.05, "total_pct": 0.10, "type": "STATIC"}
+      "phase1": {
+        "target_pct": 0.10
+      },
+      "phase2": {
+        "target_pct": 0.05
+      },
+      "drawdown": {
+        "daily_pct": 0.05,
+        "total_pct": 0.10,
+        "type": "STATIC"
+      }
     },
     {
       "account_size": 5000,
-      "cost": 47,
-      "phase1": {"target_pct": 0.10},
-      "phase2": {"target_pct": 0.05},
-      "drawdown": {"daily_pct": 0.05, "total_pct": 0.10, "type": "STATIC"}
+      "cost": 48,
+      "phase1": {
+        "target_pct": 0.10
+      },
+      "phase2": {
+        "target_pct": 0.05
+      },
+      "drawdown": {
+        "daily_pct": 0.05,
+        "total_pct": 0.10,
+        "type": "STATIC"
+      }
     },
     {
       "account_size": 10000,
-      "cost": 84,
-      "phase1": {"target_pct": 0.10},
-      "phase2": {"target_pct": 0.05},
-      "drawdown": {"daily_pct": 0.05, "total_pct": 0.10, "type": "STATIC"}
+      "cost": 97,
+      "phase1": {
+        "target_pct": 0.10
+      },
+      "phase2": {
+        "target_pct": 0.05
+      },
+      "drawdown": {
+        "daily_pct": 0.05,
+        "total_pct": 0.10,
+        "type": "STATIC"
+      }
     },
     {
       "account_size": 25000,
-      "cost": 152,
-      "phase1": {"target_pct": 0.10},
-      "phase2": {"target_pct": 0.05},
-      "drawdown": {"daily_pct": 0.05, "total_pct": 0.10, "type": "STATIC"}
+      "cost": 174,
+      "phase1": {
+        "target_pct": 0.10
+      },
+      "phase2": {
+        "target_pct": 0.05
+      },
+      "drawdown": {
+        "daily_pct": 0.05,
+        "total_pct": 0.10,
+        "type": "STATIC"
+      }
     },
     {
       "account_size": 50000,
-      "cost": 279,
-      "phase1": {"target_pct": 0.10},
-      "phase2": {"target_pct": 0.05},
-      "drawdown": {"daily_pct": 0.05, "total_pct": 0.10, "type": "STATIC"}
+      "cost": 314,
+      "phase1": {
+        "target_pct": 0.10
+      },
+      "phase2": {
+        "target_pct": 0.05
+      },
+      "drawdown": {
+        "daily_pct": 0.05,
+        "total_pct": 0.10,
+        "type": "STATIC"
+      }
     },
     {
       "account_size": 100000,
-      "cost": 519,
-      "phase1": {"target_pct": 0.10},
-      "phase2": {"target_pct": 0.05},
-      "drawdown": {"daily_pct": 0.05, "total_pct": 0.10, "type": "STATIC"}
+      "cost": 482,
+      "phase1": {
+        "target_pct": 0.10
+      },
+      "phase2": {
+        "target_pct": 0.05
+      },
+      "drawdown": {
+        "daily_pct": 0.05,
+        "total_pct": 0.10,
+        "type": "STATIC"
+      }
     }
   ]
 }

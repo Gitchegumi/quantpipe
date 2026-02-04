@@ -7,18 +7,39 @@
     "account_must_be_profitable": true
   },
   "increments": [
-    {"account_size": 2500},
-    {"account_size": 5000},
-    {"account_size": 10000},
-    {"account_size": 20000},
-    {"account_size": 40000},
-    {"account_size": 80000},
-    {"account_size": 160000},
-    {"account_size": 320000},
-    {"account_size": 640000},
-    {"account_size": 1280000},
-    {"account_size": 2560000},
-    {"account_size": 4000000}
+    {
+      "account_size": 2500
+    },
+    {
+      "account_size": 5000
+    },
+    {
+      "account_size": 10000
+    },
+    {
+      "account_size": 20000
+    },
+    {
+      "account_size": 40000
+    },
+    {
+      "account_size": 80000
+    },
+    {
+      "account_size": 160000
+    },
+    {
+      "account_size": 320000
+    },
+    {
+      "account_size": 640000
+    },
+    {
+      "account_size": 1000000
+    },
+    {
+      "account_size": 2000000
+    }
   ],
   "logic": "DOUBLE"
 }

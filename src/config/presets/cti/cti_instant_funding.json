@@ -6,14 +6,14 @@
       {
         "tier_name": 2500,
         "starting_balance": 1250,
-        "cost": 69,
+        "cost": 62,
         "profit_target_pct": 0.10,
         "max_drawdown_pct": 0.05
       },
       {
         "tier_name": 5000,
         "starting_balance": 2500,
-        "cost": 129,
+        "cost": 111,
         "profit_target_pct": 0.10,
         "max_drawdown_pct": 0.05
       },
@@ -27,14 +27,14 @@
       {
         "tier_name": 20000,
         "starting_balance": 10000,
-        "cost": 432,
+        "cost": 391,
         "profit_target_pct": 0.10,
         "max_drawdown_pct": 0.05
       },
       {
         "tier_name": 40000,
         "starting_balance": 20000,
-        "cost": 864,
+        "cost": 741,
         "profit_target_pct": 0.10,
         "max_drawdown_pct": 0.05
       },
@@ -48,16 +48,9 @@
     ],
     "PRO": [
       {
-        "tier_name": 2500,
-        "starting_balance": 2500,
-        "cost": 169,
-        "profit_target_pct": 0.10,
-        "max_drawdown_pct": 0.05
-      },
-      {
         "tier_name": 5000,
         "starting_balance": 5000,
-        "cost": 316,
+        "cost": 263,
         "profit_target_pct": 0.10,
         "max_drawdown_pct": 0.05
       },
@@ -71,14 +64,14 @@
       {
         "tier_name": 20000,
         "starting_balance": 20000,
-        "cost": 1054,
+        "cost": 1055,
         "profit_target_pct": 0.10,
         "max_drawdown_pct": 0.05
       },
       {
         "tier_name": 40000,
         "starting_balance": 40000,
-        "cost": 2108,
+        "cost": 2111,
         "profit_target_pct": 0.10,
         "max_drawdown_pct": 0.05
       },
@@ -91,5 +84,17 @@
       }
     ]
   },
-  "scaling_path": [2500, 5000, 10000, 20000, 40000, 80000, 160000, 320000, 640000, 1280000, 2560000, 4000000]
+  "scaling_path": [
+    2500,
+    5000,
+    10000,
+    20000,
+    40000,
+    80000,
+    160000,
+    320000,
+    640000,
+    1000000,
+    2000000
+  ]
 }
