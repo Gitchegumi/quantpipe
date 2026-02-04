@@ -15,6 +15,7 @@ def evaluate_scaling(
     scaling_config: ScalingConfig,
     cost_map: dict[float, float] | None = None,
     instant_cost_map: dict[float, float] | None = None,
+    buyback_mode: str | None = None,
 ) -> ScalingReport:
     """
     Simulate scaling progression with resets and periodic reviews.
@@ -37,17 +38,14 @@ def evaluate_scaling(
     current_step = 1 if is_in_evaluation else 0 
     
     # Starting Equity vs Tier Size
-    # For Instant, account_size from config is the starting EQUITY
     start_tier_equity = challenge_config.account_size
     
-    # Find the nominal tier size (e.g. 10000 if equity is 5000)
+    # Find the nominal tier size
     nominal_current_size = start_tier_equity
     if current_tier_type == "INSTANT":
-        # Check program_id for PRO tag
         if "_PRO_" not in challenge_config.program_id:
             nominal_current_size = start_tier_equity * 2.0
             
-    # Track the original starting tier for scaling relative to base
     nominal_start_size = nominal_current_size
 
     try:
@@ -94,13 +92,10 @@ def evaluate_scaling(
             daily_start_balances[trade_date] = current_balance
             current_day = trade_date
 
-        # Scaling logic: Double the account size at each level for Instant
-        # challenge_config.account_size is the base equity
         scale_factor = nominal_current_size / nominal_start_size
         
         base_pnl = trade.pnl_r * trade.risk_amount
         if trade.risk_amount == 0 and trade.pnl_r != 0:
-            # risk_percent is against the NOMINAL size
             estimated_risk = nominal_current_size * (trade.risk_percent or 0.01)
             base_pnl = trade.pnl_r * estimated_risk
         else:
@@ -114,7 +109,6 @@ def evaluate_scaling(
         if current_balance > peak_balance:
             peak_balance = current_balance
 
-        # Drawdown is based on NOMINAL size
         max_dd_amount = nominal_current_size * challenge_config.max_total_drawdown_pct
         failed = False
         floor = start_tier_equity - max_dd_amount if challenge_config.drawdown_type == "STATIC" else peak_balance - max_dd_amount
@@ -210,30 +204,35 @@ def evaluate_scaling(
                 level_id_counter = 1
                 current_attempt_levels = []
                 
-                # Buyback Preference: Highest affordable Instant
-                buyback_type = "CHALLENGE"
+                # Buyback Strategy: 30% Wallet Budget
+                buyback_budget = max(0.0, wallet_balance * 0.30)
+                active_buyback_mode = buyback_mode if buyback_mode else program_type
+                
+                # Default back to initial selection
+                buyback_type = active_buyback_mode
                 nominal_current_size = scaling_config.increments[0]
                 
+                # Priority: Instant > Challenge (if affordable within budget)
                 if instant_cost_map:
-                    # Find highest affordable Instant tier
-                    affordable_instants = sorted([t for t, c in instant_cost_map.items() if c <= wallet_balance], reverse=True)
+                    affordable_instants = sorted([t for t, c in instant_cost_map.items() if c <= buyback_budget], reverse=True)
                     if affordable_instants:
                         nominal_current_size = affordable_instants[0]
                         pending_buyback_cost = instant_cost_map[nominal_current_size]
                         buyback_type = "INSTANT"
                     elif cost_map:
-                        # Fallback to highest affordable Challenge
-                        affordable_challenges = sorted([t for t, c in cost_map.items() if c <= wallet_balance], reverse=True)
+                        affordable_challenges = sorted([t for t, c in cost_map.items() if c <= buyback_budget], reverse=True)
                         if affordable_challenges:
                             nominal_current_size = affordable_challenges[0]
                             pending_buyback_cost = cost_map[nominal_current_size]
                             buyback_type = "CHALLENGE"
                         else:
-                            # Totally broke? Smallest Challenge
+                            # Totally broke? Smallest Challenge, uses up wallet
                             nominal_current_size = scaling_config.increments[0]
                             pending_buyback_cost = cost_map.get(nominal_current_size, challenge_config.cost)
+                            buyback_type = "CHALLENGE"
                     else:
                         pending_buyback_cost = challenge_config.cost
+                        buyback_type = "CHALLENGE"
                 
                 current_tier_type = buyback_type
                 is_in_evaluation = (current_tier_type == "CHALLENGE")
@@ -247,23 +246,17 @@ def evaluate_scaling(
                 except ValueError:
                     current_tier_idx = 0
                     
-                # Set starting equity for the new attempt
                 if current_tier_type == "INSTANT":
-                    # Assume Standard Instant (50% start) for buybacks
                     start_tier_equity = nominal_current_size / 2.0
                 else:
                     start_tier_equity = nominal_current_size
                 
                 nominal_start_size = nominal_current_size
             elif status == "STEP_1_PASSED":
-                # Equity and nominal size remain the same for Step 2
                 pass
             else:
-                # Scaled up or Promoted to Funded
                 current_tier_idx = min(current_tier_idx + 1, len(scaling_config.increments) - 1)
                 nominal_current_size = scaling_config.increments[current_tier_idx]
-                
-                # After passing a challenge or scaling up, equity = 100% of nominal tier
                 start_tier_equity = nominal_current_size
                 pending_buyback_cost = 0.0
 
@@ -278,10 +271,9 @@ def evaluate_scaling(
 
         i += 1
 
-    # Final active state
     current_attempt_levels.append(LevelResult(
         level_id=level_id_counter,
-        start_tier_balance=nominal_current_size,
+        start_tier_balance=scaling_config.increments[current_tier_idx],
         end_balance=current_balance,
         status="Active",
         start_date=current_level_start,

@@ -510,6 +510,13 @@ def configure_backtest_parser(
     )
 
     parser.add_argument(
+        "--buyback-strategy",
+        type=str,
+        choices=["1STEP", "2STEP", "INSTANT"],
+        help="Strategy for handling account buybacks after Attempt 1 (defaults to --cti-mode).",
+    )
+
+    parser.add_argument(
         "--disable-scaling",
         action="store_true",
         help="Disable CTI Scaling Plan simulation (defaults to enabled with --cti-mode). "
@@ -679,6 +686,9 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                         choices = ["1STEP", "2STEP", "INSTANT"]
                         mode = _prompt("? CTI Mode [2STEP]: ", choices=choices)
                         args.cti_mode = mode if mode else "2STEP"
+                        
+                        bb_mode = _prompt(f"? Buy-back Strategy [{args.cti_mode}]: ", choices=choices)
+                        args.buyback_strategy = bb_mode if bb_mode else args.cti_mode
 
                 # 7. Risk Parameters
                 print("\n[Risk Management]")
@@ -1288,7 +1298,8 @@ Persistent storage not yet implemented."
                         report = evaluate_scaling(
                             executions, challenge_conf, scaling_plan, 
                             cost_map=cost_map, 
-                            instant_cost_map=instant_cost_map
+                            instant_cost_map=instant_cost_map,
+                            buyback_mode=args.buyback_strategy or args.cti_mode
                         )
 
                         # Build Report String
