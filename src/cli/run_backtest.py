@@ -693,32 +693,39 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) [1m]: ")
                     args.timeframe = t if t else "1m"
 
-                # 5. Challenge Level
-                if args.starting_balance is None:
-                    b = _prompt(
-                        "? Challenge Level (USD) [2500.0]: ",
-                        coerce=float,
-                        validate=lambda x: x > 0,
-                    )
-                    # If user enters nothing, we leave it None for now to allow config override
-                    # unless strictly interactive mode requires a value.
-                    # But for now, let's just stick to the original logic for interactive:
-                    if b:
-                        args.starting_balance = b
-                    # If b is None (user hit enter), we DON'T default here if we want config to win.
-                    # BUT, the prompt says [2500.0], implying default.
-                    # Let's fix the non-interactive path instead.
+                # 5. Simulation Type (FR-027 / Issue #83 Refactor)
+                sim_choices = ["City Traders Imperium (CTI)", "Personal Capital"]
+                sim_type = _prompt("? What simulation are you running? [Personal Capital]: ", choices=sim_choices) or "Personal Capital"
 
-                # 6. CTI Simulation
-                if args.cti_mode is None:
-                    yn = _prompt("? Run in CTI Prop Firm mode? [n]: ", choices=["y", "n"])
-                    if yn == "y":
+                if sim_type == "City Traders Imperium (CTI)":
+                    # CTI Props
+                    print("\n[CTI Prop Firm Settings]")
+                    if args.starting_balance is None:
+                        # Map starting_balance to "Challenge Level" for CTI
+                        b = _prompt(
+                            "? Challenge Level (USD) [25000.0]: ",
+                            coerce=float,
+                            validate=lambda x: x > 0,
+                        )
+                        args.starting_balance = b if b else 25000.0
+                    
+                    if args.cti_mode is None:
                         choices = ["1STEP", "2STEP", "INSTANT"]
                         mode = _prompt("? CTI Mode [2STEP]: ", choices=choices)
                         args.cti_mode = mode if mode else "2STEP"
                         
                         bb_mode = _prompt(f"? Buy-back Strategy [{args.cti_mode}]: ", choices=choices)
                         args.buyback_strategy = bb_mode if bb_mode else args.cti_mode
+                else:
+                    # Personal Capital Props
+                    print("\n[Personal Capital Settings]")
+                    if args.starting_balance is None:
+                        b = _prompt(
+                            "? Starting Capital (USD) [2500.0]: ",
+                            coerce=float,
+                            validate=lambda x: x > 0,
+                        )
+                        args.starting_balance = b if b else 2500.0
 
                 # 7. Risk Parameters
                 print("\n[Risk Management]")
