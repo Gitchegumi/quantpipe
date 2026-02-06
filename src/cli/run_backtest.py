@@ -637,6 +637,18 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
 
+    # --- Imports for parameter sweep moved here to prevent UnboundLocalError ---
+    from ..backtest.sweep import (
+        display_results_table,
+        export_results_to_csv,
+        filter_invalid_combinations,
+        generate_combinations,
+        run_sweep,
+    )
+    from .prompts.range_input import collect_all_ranges, confirm_sweep
+    from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
+    # --------------------------------------------------------------------------
+
     # -------------------------------------------------------------------------
     # Interactive Prompts for Missing Flags (Feature 026)
     # -------------------------------------------------------------------------
