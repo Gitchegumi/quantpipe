@@ -775,9 +775,6 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     # 3. Challenge Level (dynamically populated)
                     if args.starting_balance is None:
                         # Logic to load dynamic challenge levels
-                        import json
-                        from pathlib import Path
-
                         PRESETS_DIR = Path("src/config/presets/cti")
                         filename_map = {
                             "1STEP": "cti_1_step_challenge.json",
