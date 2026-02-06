@@ -114,6 +114,45 @@ def _prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
             print("Invalid input format.")
             continue
 
+def _multi_select_prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
+    """Interactively prompt user for multiple inputs with validation and coercion."""
+    if choices:
+        choice_str = f" ({', '.join(map(str, choices))})"
+        if choice_str.strip() not in msg:
+            if ":" in msg:
+                parts = msg.rsplit(":", 1)
+                msg = f"{parts[0]}{choice_str}:{parts[1]}"
+            else:
+                msg = f"{msg}{choice_str}"
+
+    while True:
+        try:
+            raw = input(msg).strip()
+            if raw == "":
+                return [] # Return empty list for no selection
+
+            raw_choices = raw.replace(",", " ").upper().split() # Split by space or comma, convert to uppercase
+
+            valid_selections = []
+            all_valid = True
+            for rc in raw_choices:
+                if choices is not None and rc not in [str(c).upper() for c in choices]: # Validate case-insensitively
+                    print(f"Invalid choice '{rc}'. Choose one or more from: {', '.join(map(str, choices))}")
+                    all_valid = False
+                    break
+                val = coerce(rc)
+                if not validate(val):
+                    print(f"Invalid value '{rc}'.")
+                    all_valid = False
+                    break
+                valid_selections.append(val)
+            
+            if all_valid:
+                return valid_selections
+        except (ValueError, EOFError):
+            print("Invalid input format.")
+            continue
+
 
 def configure_backtest_parser(
     parser: argparse.ArgumentParser,
@@ -679,9 +718,28 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                 # 2. Pair(s)
                 if args.pair is None and not args.data:
-                    raw = _prompt("? Pair(s) (e.g., EURUSD, space-separated) [EURUSD]: ")
-                    if raw:
-                        args.pair = raw.replace(",", " ").upper().split()
+                    # Dynamically get available pairs from price_data/processed/
+                    import os
+                    PRICE_DATA_DIR = Path("price_data/processed")
+                    if not PRICE_DATA_DIR.exists():
+                        PRICE_DATA_DIR = Path.cwd() / PRICE_DATA_DIR
+                    
+                    available_pairs = []
+                    if PRICE_DATA_DIR.exists():
+                        for item in os.listdir(PRICE_DATA_DIR):
+                            if (PRICE_DATA_DIR / item).is_dir():
+                                available_pairs.append(item.upper())
+                    
+                    # Ensure EURUSD is always an option if no other pairs are found
+                    if not available_pairs:
+                        available_pairs.append("EURUSD")
+
+                    selected_pairs = _multi_select_prompt(
+                        "? Pair(s) (e.g., EURUSD, space-separated) [EURUSD]: ",
+                        choices=available_pairs
+                    )
+                    if selected_pairs:
+                        args.pair = selected_pairs
                     else:
                         args.pair = ["EURUSD"]
 
@@ -816,9 +874,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 if args.sessions is None:
                     yn = _prompt("? Limit trading to specific sessions? [n]: ", choices=["y", "n"])
                     if yn == "y":
-                        raw = _prompt("? Sessions (space-separated, e.g., NY EU AS SY): ")
-                        if raw:
-                            args.sessions = raw.replace(",", " ").upper().split()
+                        # Use _multi_select_prompt for sessions
+                        session_choices = ["NY", "EU", "AS", "SY"]
+                        selected_sessions = _multi_select_prompt(
+                            "? Sessions (space-separated, e.g., NY EU AS SY): ", 
+                            choices=session_choices
+                        )
+                        if selected_sessions:
+                            args.sessions = selected_sessions
                         else:
                             args.sessions = None # Fallback to all if user provided nothing
                         
@@ -1043,8 +1106,18 @@ Persistent storage not yet implemented."
             print(f"Error: Registration failed: {exc}", file=sys.stderr)
             sys.exit(1)
 
-    # Handle --test_range (Feature 024: Parameter Sweep Mode)
-    if args.test_range:
+    # Handle parameter sweep mode (Feature 024)
+    # Conditional interactive prompt for testing indicator ranges
+    run_param_sweep = False
+    if is_interactive and not args.test_range: # If interactive and --test-range not explicitly set
+        yn = _prompt("? Would you like to test a range of indicator values? [n]: ", choices=["y", "n"])
+        if yn == "y":
+            run_param_sweep = True
+            args.test_range = True # Set flag to trigger sweep logic
+    elif args.test_range: # If --test-range was explicitly set on CLI
+        run_param_sweep = True
+
+    if run_param_sweep:
         from ..backtest.sweep import (
             display_results_table,
             export_results_to_csv,
