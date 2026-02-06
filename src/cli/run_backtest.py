@@ -669,9 +669,12 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                 # 1. Strategy
                 if args.strategy is None:
-                    available = ["trend-pullback"]
-                    print(f"Available strategies: {', '.join(available)}")
-                    s = _prompt("? Strategy [trend-pullback]: ", choices=available)
+                    from ..strategy.registry import StrategyRegistry
+                    registry = StrategyRegistry()
+                    available_strategies = [strat.name for strat in registry.list()]
+                    
+                    print(f"Available strategies: {', '.join(available_strategies)}")
+                    s = _prompt("? Strategy [trend-pullback]: ", choices=available_strategies)
                     args.strategy = [s] if s else ["trend-pullback"]
 
                 # 2. Pair(s)
@@ -698,24 +701,60 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 sim_type = _prompt("? What simulation are you running? [Personal Capital]: ", choices=sim_choices) or "Personal Capital"
 
                 if sim_type == "City Traders Imperium (CTI)":
-                    # CTI Props
                     print("\n[CTI Prop Firm Settings]")
-                    if args.starting_balance is None:
-                        # Map starting_balance to "Challenge Level" for CTI
-                        b = _prompt(
-                            "? Challenge Level (USD) [25000.0]: ",
-                            coerce=float,
-                            validate=lambda x: x > 0,
-                        )
-                        args.starting_balance = b if b else 25000.0
                     
+                    # 1. CTI Mode
+                    choices = ["1STEP", "2STEP", "INSTANT"]
                     if args.cti_mode is None:
-                        choices = ["1STEP", "2STEP", "INSTANT"]
                         mode = _prompt("? CTI Mode [2STEP]: ", choices=choices)
                         args.cti_mode = mode if mode else "2STEP"
                         
+                    # 2. Buy-back Strategy (depends on cti_mode, use chosen mode as default)
+                    if args.buyback_strategy is None:
                         bb_mode = _prompt(f"? Buy-back Strategy [{args.cti_mode}]: ", choices=choices)
                         args.buyback_strategy = bb_mode if bb_mode else args.cti_mode
+
+                    # 3. Challenge Level (dynamically populated)
+                    if args.starting_balance is None:
+                        # Logic to load dynamic challenge levels
+                        import json
+                        from pathlib import Path
+
+                        PRESETS_DIR = Path("src/config/presets/cti")
+                        filename_map = {
+                            "1STEP": "cti_1_step_challenge.json",
+                            "2STEP": "cti_2_step_challenge.json",
+                            "INSTANT": "cti_instant_funding.json",
+                        }
+                        
+                        file_path = PRESETS_DIR / filename_map.get(args.cti_mode, "cti_2_step_challenge.json") # Default to 2STEP if error
+                        if not file_path.exists():
+                            # If running from root of quantpipe, path needs to be appended to current working dir
+                            file_path = Path.cwd() / file_path
+
+                        challenge_choices = []
+                        try:
+                            with open(file_path, encoding="utf-8") as f:
+                                data = json.load(f)
+                                if "programs" in data and args.cti_mode == "INSTANT":
+                                    program_list = data["programs"].get("STANDARD", [])
+                                    challenge_choices = [str(float(item.get("tier_name"))) for item in program_list if "tier_name" in item]
+                                else:
+                                    challenge_choices = [str(float(item.get("account_size"))) for item in data["starting_account_sizes"] if "account_size" in item]
+                        except Exception as e:
+                            logger.exception("Failed to load CTI challenge levels for mode %s: %s", args.cti_mode, e)
+                            # Fallback to hardcoded values if dynamic load fails
+                            challenge_choices = [str(float(c)) for c in [2500.0, 5000.0, 10000.0, 25000.0, 50000.0, 100000.0]]
+                        
+                        default_challenge = "25000.0" # Common default, adjust based on cti_mode if needed
+
+                        b = _prompt(
+                            f"? Challenge Level (USD) [{default_challenge}]: ",
+                            coerce=float,
+                            validate=lambda x: x > 0 and str(float(x)) in challenge_choices,
+                            choices=challenge_choices # Convert to string for choices
+                        )
+                        args.starting_balance = b if b else float(default_challenge)
                 else:
                     # Personal Capital Props
                     print("\n[Personal Capital Settings]")
