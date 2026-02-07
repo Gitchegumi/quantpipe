@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Optional, Any
 import numpy as np
 import polars as pl
+import pandas as pd
 
 
 logger = logging.getLogger(__name__)
@@ -45,8 +46,9 @@ class ClosedTrade:
     symbol: str
     signal_id: str
     direction: str
-    entry_timestamp: datetime
-    exit_timestamp: datetime
+    direction: str
+    open_timestamp: datetime
+    close_timestamp: datetime
     entry_price: float
     exit_price: float
     exit_reason: str
@@ -178,7 +180,7 @@ class PortfolioSimulator:
             logger.info("Simulated %s: %d trades", symbol, len(symbol_trades))
 
         # Phase 2: Sort all trades by exit timestamp
-        all_trades.sort(key=lambda t: t.exit_timestamp)
+        all_trades.sort(key=lambda t: t.close_timestamp)
         logger.info("Processing %d trades chronologically", len(all_trades))
 
         # Get data bounds
@@ -217,7 +219,7 @@ class PortfolioSimulator:
             trade.portfolio_balance_at_exit = self.current_equity
 
             self.closed_trades.append(trade)
-            self.equity_curve.append((trade.exit_timestamp, self.current_equity))
+            self.equity_curve.append((trade.close_timestamp, self.current_equity))
 
         # Record final equity
         self.equity_curve.append((data_end, self.current_equity))
@@ -461,8 +463,8 @@ class PortfolioSimulator:
                 symbol=symbol,
                 signal_id=entry["signal_id"],
                 direction=entry["direction"],
-                entry_timestamp=timestamps[entry_idx],
-                exit_timestamp=timestamps[exit_idx],
+                open_timestamp=pd.Timestamp(timestamps[entry_idx]),
+                close_timestamp=pd.Timestamp(timestamps[exit_idx]),
                 entry_price=res.get("entry_price", entry["entry_price"]),
                 exit_price=res["exit_price"],
                 exit_reason=exit_reason,

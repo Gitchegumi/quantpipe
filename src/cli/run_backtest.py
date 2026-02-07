@@ -43,10 +43,13 @@ import argparse
 import json
 import logging
 import sys
+import re  # Import re for regex in _prompt
 from datetime import UTC, datetime
 from pathlib import Path
 
+import questionary
 import polars as pl
+from rich.console import Console
 
 from ..backtest.engine import (
     construct_data_paths,
@@ -55,6 +58,15 @@ from ..backtest.engine import (
 from ..backtest.portfolio.portfolio_simulator import PortfolioResult
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
+from src.risk.blackout.config import (
+    BlackoutConfig,
+    NewsBlackoutConfig,
+    SessionBlackoutConfig,
+    SessionOnlyConfig,
+)
+from src.risk.prop_firm.loader import load_cti_config, load_scaling_plan
+from src.risk.prop_firm.scaling import evaluate_scaling
+from src.risk.prop_firm.reporter import format_cti_report
 from ..data_io.formatters import (
     format_json_output,
     format_text_output,
@@ -67,6 +79,8 @@ from ..data_io.formatters import (
 from ..indicators.registry.builtins import register_builtins
 from ..models.enums import DirectionMode, OutputFormat
 
+# --- Initialize Rich Console for cleaner output ---
+console = Console()
 
 # Ensure built-in indicators are registered early
 register_builtins()
@@ -82,37 +96,142 @@ def _is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
-def _prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
-    """Interactively prompt user for input with validation and coercion."""
+# --- Interactive Prompt Utilities using Questionary ---
+
+
+def _prompt(msg: str, default=None, coerce=str, choices=None):
+    """
+    Interactively prompt user for input using questionary arrow-key menus.
+    Handles default values, coercion, and choices for menu selection.
+    """
+    # Extract default value from message using regex if present (e.g., "[default_value]")
+    default_match = re.search(r"\[([^\]]+)\]", msg)
+    if (
+        default is None and default_match
+    ):  # Use default from message if not provided via arg
+        default = default_match.group(1)
+
+    # Clean message for questionary (remove placeholders like [choices] and trailing colon)
+    message = re.sub(r"\s*\[[^\]]+\]\s*:?\s*$", "", msg).strip()
+    message = message.lstrip("? ").strip()  # Remove leading '?' and space
+
     if choices:
-        # Append choices to msg if not already there
-        choice_str = f" ({'/'.join(map(str, choices))})"
-        if choice_str.strip() not in msg:
-            # Insert before the last colon if present
-            if ":" in msg:
-                parts = msg.rsplit(":", 1)
-                msg = f"{parts[0]}{choice_str}:{parts[1]}"
-            else:
-                msg = f"{msg}{choice_str}"
+        # Use questionary.select for menu interaction
+        cleaned_choices = [str(c) for c in choices if isinstance(c, (str, int, float))]
 
-    while True:
+        # Find default choice index if default is in cleaned_choices
+        default_choice_str = str(default) if default is not None else None
+
         try:
-            raw = input(msg).strip()
-            if raw == "":
-                return None
+            choice = questionary.select(
+                message,
+                choices=cleaned_choices,
+                default=(
+                    default_choice_str
+                    if default_choice_str in cleaned_choices
+                    else None
+                ),
+                use_shortcuts=True,  # Enable keyboard shortcuts like '?' for help
+                qmark="?",  # Retain the question mark prefix
+            ).ask()
 
-            if choices is not None and raw not in [str(c) for c in choices]:
-                print(f"Invalid choice. Choose one of: {', '.join(map(str, choices))}")
-                continue
+            if choice is None:  # User cancelled (Ctrl+C)
+                print("\nOperation cancelled.")
+                sys.exit(1)
 
-            val = coerce(raw)
-            if not validate(val):
-                print("Invalid value.")
-                continue
+            return coerce(choice)
+
+        except Exception as e:
+            print(f"\nError during selection prompt: {e}")
+            # Fallback to manual input or default if possible
+            if default is not None:
+                try:
+                    val = coerce(default)
+                    print(f"Falling back to default value: {default}")
+                    return val
+                except ValueError:
+                    pass  # If default also fails coercion, proceed to manual input
+            print("Please enter value manually:")
+            return coerce(input(f"{message} "))  # Manual input fallback
+
+    else:
+        # Use questionary.text for free-form input
+        try:
+            text_input = questionary.text(
+                message,
+                default=str(default) if default is not None else "",
+                # Allow empty input unless coerced value is invalid
+                validate=lambda x: coerce(x) is not None if x else True,
+                qmark="?",
+            ).ask()
+
+            if text_input is None:  # User cancelled
+                print("\nOperation cancelled.")
+                sys.exit(1)
+
+            # If input is empty and a default exists, use the default
+            if text_input == "" and default is not None:
+                return coerce(default)
+
+            # Attempt coercion
+            val = coerce(text_input)
+
             return val
-        except (ValueError, EOFError):
-            print("Invalid input format.")
-            continue
+
+        except Exception as e:  # Catch potential errors during prompt execution
+            print(f"\nError during text prompt: {e}")
+            return (
+                coerce(default) if default is not None else None
+            )  # Fallback to default
+
+
+def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
+    """
+    Interactively prompt user for multiple inputs using questionary.checkbox.
+    Handles default values, coercion, and user cancellation.
+    Assumes choices are presented as a list.
+    """
+    message = msg.replace("? ", "").strip()  # Clean message for questionary
+
+    if choices:
+        # Ensure choices are strings for questionary compatibility
+        string_choices = [str(c) for c in choices if isinstance(c, (str, int, float))]
+
+        # Create Choice objects with checked state for defaults
+        final_choices = []
+        for c in string_choices:
+            is_checked = default is not None and (
+                c == default or (isinstance(default, list) and c in default)
+            )
+            final_choices.append(questionary.Choice(c, checked=is_checked))
+
+        try:
+            selected_choices = questionary.checkbox(
+                message, choices=final_choices, qmark="?"
+            ).ask()
+
+            if selected_choices is None:  # User cancelled
+                print("\nOperation cancelled.")
+                sys.exit(1)
+
+            # Coerce selected choices and return the list
+            coerced_results = [coerce(choice) for choice in selected_choices]
+
+            # Basic validation can be added here if needed beyond simple coercion
+            # For now, assume successful coercion is sufficient validation
+
+            return coerced_results
+
+        except Exception as e:  # Catch potential errors during prompt execution
+            print(f"\nError during checkbox prompt: {e}")
+            # Return empty list on error, or potentially prompt again
+            return []
+
+    else:
+        # Handle case where choices are not provided (should ideally not happen
+        # for multi-select)
+        print("Error: _multi_select_prompt was called without providing choices.")
+        return []
 
 
 def configure_backtest_parser(
@@ -160,7 +279,7 @@ def configure_backtest_parser(
         "--dataset",
         type=str,
         choices=["test", "validate"],
-        default="test",
+        default=None,
         help="Dataset to use when --data not specified (default: test). \
             Looks for price_data/processed/<pair>/<dataset>/<pair>_<dataset>.parquet",
     )
@@ -172,6 +291,14 @@ def configure_backtest_parser(
         help="Timeframe for backtesting (default: 1m). Resamples 1-minute data to "
         "target timeframe. Supports: Xm (minutes), Xh (hours), Xd (days). "
         "Examples: 1m, 5m, 15m, 1h, 4h, 1d, 7m, 90m",
+    )
+
+    parser.add_argument(
+        "--simulation-type",
+        type=str,
+        choices=["Personal Capital", "City Traders Imperium (CTI)"],
+        default=None,
+        help="Simulation type: 'Personal Capital' or 'City Traders Imperium (CTI)'",
     )
 
     parser.add_argument(
@@ -382,6 +509,7 @@ def configure_backtest_parser(
         "--gpu-accel",
         action="store_true",
         help="Enable GPU acceleration for indicators and scanning using CuPy/CUDA.",
+        dest="gpu_accel",
     )
 
     # Risk Management Arguments (Feature 021: FR-004 - Runtime policy selection)
@@ -397,6 +525,7 @@ def configure_backtest_parser(
         "--risk-pct",
         type=float,
         help="Risk percentage per trade (e.g., 0.25 for 0.25%%). Default: 0.25",
+        dest="risk_percent",  # Corrected dest name
     )
 
     parser.add_argument(
@@ -417,6 +546,7 @@ def configure_backtest_parser(
         "--atr-mult",
         type=float,
         help="ATR multiplier for stop distance. Default: 2.0",
+        dest="atr_multiplier",  # Corrected dest name
     )
 
     parser.add_argument(
@@ -460,12 +590,14 @@ def configure_backtest_parser(
         choices=["RiskMultiple", "None"],
         default=None,
         help="Take-profit policy type. Default: RiskMultiple",
+        dest="take_profit_policy",  # Corrected dest name
     )
 
     parser.add_argument(
         "--rr-ratio",
         type=float,
         help="Reward-to-risk ratio for RiskMultiple TP policy. Default: 2.0",
+        dest="reward_risk_ratio",  # Corrected dest name
     )
 
     parser.add_argument(
@@ -501,33 +633,44 @@ def configure_backtest_parser(
     )
 
     parser.add_argument(
+        "--limit-sessions",
+        action="store_true",
+        help="Limit trading to specific sessions (requires --sessions).",
+    )
+
+    parser.add_argument(
         "--sessions-force-close",
         action="store_true",
         help="Force close open trades at the end of the specified session(s).",
+        dest="force_session_close",  # Corrected dest name
     )
 
     parser.add_argument(
         "--sessions-window",
         type=int,
         help="Buffer window in minutes before session end to stop new entries (if force-close enabled).",
+        dest="session_buffer",  # Corrected dest name
     )
 
     parser.add_argument(
         "--news-force-close",
         action="store_true",
         help="Force close open trades before high-impact news events.",
+        dest="force_news_close",  # Corrected dest name
     )
 
     parser.add_argument(
         "--news-window-before",
         type=int,
         help="Minutes before news event to start blackout / force close.",
+        dest="minutes_before_news",  # Corrected dest name
     )
 
     parser.add_argument(
         "--news-window-after",
         type=int,
         help="Minutes after news event to end blackout.",
+        dest="minutes_after_news",  # Corrected dest name
     )
 
     # CTI Prop Firm Arguments (Feature 027)
@@ -577,7 +720,7 @@ def configure_backtest_parser(
     parser.add_argument(
         "--non-interactive",
         action="store_true",
-        help="Bypass interactive prompts and use defaults/fail on missing flags.",
+        help="Bypass interactive prompts and use defaults on missing flags.",
     )
 
     return parser
@@ -589,8 +732,6 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     """
     if args.profile:
         import cProfile
-        import pstats
-        import io
 
         pr = cProfile.Profile()
         pr.enable()
@@ -598,953 +739,719 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     # Setup logging early for --list-strategies and --register-strategy
     setup_logging(level=args.log_level)
 
-    # -------------------------------------------------------------------------
-    # Interactive Prompts for Missing Flags (Feature 026)
-    # -------------------------------------------------------------------------
-    if not args.list_strategies and not args.register_strategy:
-        is_interactive = _is_interactive() and not args.non_interactive
-        missing = []
+    # --- Imports for parameter sweep moved here to prevent UnboundLocalError ---
+    # These imports are only needed if the parameter sweep mode is activated.
+    # Moved here to avoid potential circular dependencies or unnecessary imports
+    # in standard runs.
+    from ..backtest.sweep import (
+        display_results_table,
+        export_results_to_csv,
+        filter_invalid_combinations,
+        generate_combinations,
+        run_sweep,
+    )
+    from .prompts.range_input import (
+        collect_all_ranges,
+        confirm_sweep,
+    )  # Assuming these exist
+    from ..strategy.registry import (
+        StrategyRegistry,
+    )  # Used for dynamic strategy listing
 
-        # Collect missing required flags
-        if args.strategy is None:
-            missing.append("--strategy")
-        if args.pair is None and not args.data:
-            missing.append("--pair")
-        if args.direction is None:
-            missing.append("--direction")
-        if args.timeframe is None:
-            missing.append("--timeframe")
-        if args.starting_balance is None:
-            missing.append("--starting-balance")
-        # Risk Management (New Required Flags)
-        if args.risk_pct is None:
-            missing.append("--risk-pct")
-        if args.stop_policy is None:
-            missing.append("--stop-policy")
-        if args.tp_policy is None:
-            missing.append("--tp-policy")
-        # rr-ratio is conditional on tp-policy, but usually required if tp=RiskMultiple
-        # We handle this in logic or just check if user provided it.
-        # Simplest is to treat it as "missing" if None, but with a default in prompt.
-        if args.rr_ratio is None:
-            missing.append("--rr-ratio")
-        # Filtering (New Required Flags)
-        if args.sessions is None:
-            missing.append("--sessions")
-        if not args.blackout_news:
-            missing.append("--blackout-news")
-
-        # Handle missing flags
-        if missing:
-            if not is_interactive:
-                # Default to safe values if not interactive (backward compatibility)
-                # except for balance/direction where defaults are desired
-                if args.strategy is None:
-                    args.strategy = ["trend-pullback"]
-                if args.pair is None and not args.data:
-                    args.pair = ["EURUSD"]
-                if args.direction is None:
-                    args.direction = "LONG"
-                if args.timeframe is None:
-                    args.timeframe = "1m"
-                # Removed default assignment for starting_balance to allow config file precedence
-                # if args.starting_balance is None:
-                #    args.starting_balance = DEFAULT_ACCOUNT_BALANCE
-                
-                # Risk Defaults (for non-interactive runs without explicit flags)
-                if args.risk_pct is None:
-                    args.risk_pct = 0.25
-                if args.stop_policy is None:
-                    args.stop_policy = "ATR"
-                if args.tp_policy is None:
-                    args.tp_policy = "RiskMultiple"
-                if args.rr_ratio is None:
-                    args.rr_ratio = 2.0
-                if args.sessions is None:
-                    args.sessions = None # "all"
-                if not args.blackout_news:
-                    args.blackout_news = False
-            else:
-                print(f"Missing required flags: {', '.join(missing)}")
-
-                # 1. Strategy
-                if args.strategy is None:
-                    available = ["trend-pullback"]
-                    print(f"Available strategies: {', '.join(available)}")
-                    s = _prompt("? Strategy [trend-pullback]: ", choices=available)
-                    args.strategy = [s] if s else ["trend-pullback"]
-
-                # 2. Pair(s)
-                if args.pair is None and not args.data:
-                    raw = _prompt("? Pair(s) (e.g., EURUSD, space-separated) [EURUSD]: ")
-                    if raw:
-                        args.pair = raw.replace(",", " ").upper().split()
-                    else:
-                        args.pair = ["EURUSD"]
-
-                # 3. Direction
-                if args.direction is None:
-                    choices = ["LONG", "SHORT", "BOTH"]
-                    d = _prompt("? Direction [LONG]: ", choices=choices)
-                    args.direction = d if d else "LONG"
-
-                # 4. Timeframe
-                if args.timeframe is None:
-                    t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) [1m]: ")
-                    args.timeframe = t if t else "1m"
-
-                # 5. Challenge Level
-                if args.starting_balance is None:
-                    b = _prompt(
-                        "? Challenge Level (USD) [2500.0]: ",
-                        coerce=float,
-                        validate=lambda x: x > 0,
-                    )
-                    # If user enters nothing, we leave it None for now to allow config override
-                    # unless strictly interactive mode requires a value.
-                    # But for now, let's just stick to the original logic for interactive:
-                    if b:
-                        args.starting_balance = b
-                    # If b is None (user hit enter), we DON'T default here if we want config to win.
-                    # BUT, the prompt says [2500.0], implying default.
-                    # Let's fix the non-interactive path instead.
-
-                # 6. CTI Simulation
-                if args.cti_mode is None:
-                    yn = _prompt("? Run in CTI Prop Firm mode? [n]: ", choices=["y", "n"])
-                    if yn == "y":
-                        choices = ["1STEP", "2STEP", "INSTANT"]
-                        mode = _prompt("? CTI Mode [2STEP]: ", choices=choices)
-                        args.cti_mode = mode if mode else "2STEP"
-                        
-                        bb_mode = _prompt(f"? Buy-back Strategy [{args.cti_mode}]: ", choices=choices)
-                        args.buyback_strategy = bb_mode if bb_mode else args.cti_mode
-
-                # 7. Risk Parameters
-                print("\n[Risk Management]")
-                
-                # Risk %
-                if args.risk_pct is None:
-                    args.risk_pct = _prompt("? Risk % per trade [0.25]: ", coerce=float, validate=lambda x: 0 < x <= 100) or 0.25
-
-                # Stop Policy
-                stop_choices = ["ATR", "ATR_Trailing", "FixedPips", "FixedPips_Trailing", "MA_Trailing"]
-                if args.stop_policy is None:
-                    sp = _prompt(f"? Stop Policy [ATR]: ", choices=stop_choices)
-                    args.stop_policy = sp if sp else "ATR"
-
-                # Conditional prompts based on stop policy
-                if "FixedPips" in args.stop_policy:
-                    if args.fixed_pips is None:
-                        args.fixed_pips = _prompt("? Fixed Pips (e.g., 20.0): ", coerce=float) or 20.0
-                elif "MA_Trailing" in args.stop_policy:
-                    # ma-type, ma-period
-                    if args.ma_type == "SMA": # Default is SMA, confirm if interactive
-                        mt = _prompt("? MA Type [SMA]: ", choices=["SMA", "EMA"])
-                        args.ma_type = mt if mt else "SMA"
-                    if args.ma_period == 50: # Default 50
-                        mp = _prompt("? MA Period [50]: ", coerce=int, validate=lambda x: x > 0)
-                        args.ma_period = mp if mp else 50
-                elif "ATR" in args.stop_policy:
-                    # atr-mult, atr-period
-                    if args.atr_mult is None:
-                        args.atr_mult = _prompt("? ATR Multiplier [2.0]: ", coerce=float) or 2.0
-                    if args.atr_period == 14: # Default 14
-                        ap = _prompt("? ATR Period [14]: ", coerce=int, validate=lambda x: x > 0)
-                        args.atr_period = ap if ap else 14
-                
-                # TP Policy
-                tp_choices = ["RiskMultiple", "None"]
-                if args.tp_policy is None:
-                    tp = _prompt("? Take Profit Policy [RiskMultiple]: ", choices=tp_choices)
-                    args.tp_policy = tp if tp else "RiskMultiple"
-
-                if args.tp_policy == "RiskMultiple":
-                    if args.rr_ratio is None:
-                        args.rr_ratio = _prompt("? Reward-to-Risk Ratio [2.0]: ", coerce=float) or 2.0
-
-                # 8. Filtering
-                print("\n[Filtering]")
-                
-                # Sessions
-                if args.sessions is None:
-                    yn = _prompt("? Limit trading to specific sessions? [n]: ", choices=["y", "n"])
-                    if yn == "y":
-                        raw = _prompt("? Sessions (space-separated, e.g., NY EU AS SY): ")
-                        if raw:
-                            args.sessions = raw.replace(",", " ").upper().split()
-                        else:
-                            args.sessions = None # Fallback to all if user provided nothing
-                        
-                        if args.sessions:
-                            fc = _prompt("? Enable forced close for sessions? [n]: ", choices=["y", "n"])
-                            if fc == "y":
-                                args.sessions_force_close = True
-                                args.sessions_window = _prompt("? Session buffer window (minutes) [15]: ", coerce=int) or 15
-                    else:
-                        args.sessions = None # "all"
-
-                # News Blackout
-                if not args.blackout_news:
-                    yn = _prompt("? Enable news event blackout filtering? [n]: ", choices=["y", "n"])
-                    if yn == "y":
-                        args.blackout_news = True
-                        fc = _prompt("? Enable forced close for news? [n]: ", choices=["y", "n"])
-                        if fc == "y":
-                            args.news_force_close = True
-                            args.news_window_before = _prompt("? Minutes before news [10]: ", coerce=int) or 10
-                            args.news_window_after = _prompt("? Minutes after news [30]: ", coerce=int) or 30
-                    else:
-                        args.blackout_news = False
-
-    # -------------------------------------------------------------------------
-    # Parameter Resolution (CLI > Config > Defaults)
-    # -------------------------------------------------------------------------
-    param_overrides = {}
-
-    # Load from config file if present
-    if args.config and args.config.exists():
-        import yaml
-
-        try:
-            with open(args.config, encoding="utf-8") as f:
-                config_data = yaml.safe_load(f) or {}
-                # Assuming config structure matches StrategyParameters flat fields
-                param_overrides.update(config_data)
-            logger.info("Loaded config from %s", args.config)
-
-            # Legacy: Apply config defaults for non-strategy args
-            # Check if user explicitly passed --timeframe (not using default)
-            cli_timeframe_default = "1m"
-            if args.timeframe == cli_timeframe_default and "timeframe" in config_data:
-                args.timeframe = config_data["timeframe"]
-                logger.info("Using timeframe from config: %s", args.timeframe)
-
-            # Apply other config defaults
-            if "direction" in config_data and args.direction == "LONG":
-                args.direction = config_data["direction"]
-            if "dataset" in config_data and args.dataset == "test":
-                args.dataset = config_data["dataset"]
-
-        except Exception as e:  # pylint: disable=broad-except
-            logger.error("Failed to load config file: %s", e)
-    elif args.config:
-        logger.warning("Config file not found: %s", args.config)
-
-    # Override with CLI args if explicitly provided (not None)
-    if args.risk_pct is not None:
-        param_overrides["risk_per_trade_pct"] = args.risk_pct
-    if args.atr_mult is not None:
-        param_overrides["atr_stop_mult"] = args.atr_mult
-    if args.rr_ratio is not None:
-        param_overrides["target_r_mult"] = args.rr_ratio
-    if args.starting_balance is not None:
-        param_overrides["account_balance"] = args.starting_balance
-    if args.max_position_size is not None:
-        param_overrides["max_position_size"] = args.max_position_size
-
-    # Fallback to default account balance if not in config AND not in CLI
-    if "account_balance" not in param_overrides:
-        param_overrides["account_balance"] = DEFAULT_ACCOUNT_BALANCE
-
-    # Instantiate StrategyParameters (Validation + Defaults)
-    parameters = StrategyParameters(**param_overrides)
-
-    # Log active risk parameters (FR-006)
-    logger.info("Active Risk Parameters:")
-    logger.info("  Risk %%: %.2f", parameters.risk_per_trade_pct)
-    logger.info("  Stop Multiplier (ATR): %.2f", parameters.atr_stop_mult)
-    logger.info("  R:R Ratio: %.2f", parameters.target_r_mult)
-    logger.info("  Max Position Size: %.2f", parameters.max_position_size)
-    logger.info("  Account Balance: %.2f", parameters.account_balance)
-
-    # -------------------------------------------------------------------------
-    # End Parameter Resolution
-    # -------------------------------------------------------------------------
-
-    # Construct RiskConfig from CLI args or --risk-config file (T021: FR-004)
-    risk_config = None
-    if hasattr(args, "risk_config") and args.risk_config:
-        import json as _json_risk
-
-        from ..risk.config import RiskConfig
-
-        if args.risk_config.exists():
-            with open(args.risk_config, encoding="utf-8") as f:
-                risk_dict = _json_risk.load(f)
-            risk_config = RiskConfig.from_dict(risk_dict)
-            logger.info(
-                "Loaded risk config from %s: %s",
-                args.risk_config,
-                risk_config.stop_policy.type,
-            )
-        else:
-            logger.warning("Risk config file not found: %s", args.risk_config)
-    elif hasattr(args, "stop_policy"):
-        # Construct from individual CLI args
-        from ..risk.config import (
-            RiskConfig,
-            StopPolicyConfig,
-            TakeProfitPolicyConfig,
-        )
-
-        stop_policy = StopPolicyConfig(
-            type=args.stop_policy,
-            multiplier=parameters.atr_stop_mult,  # Use resolved parameter
-            period=args.atr_period,
-            pips=args.fixed_pips,
-            ma_type=args.ma_type,
-            ma_period=args.ma_period,
-            trail_trigger_r=args.trail_trigger,
-        )
-
-        tp_policy = TakeProfitPolicyConfig(
-            type=args.tp_policy,
-            rr_ratio=parameters.target_r_mult,  # Use resolved parameter
-        )
-
-        risk_config = RiskConfig(
-            risk_pct=parameters.risk_per_trade_pct,  # Use resolved parameter
-            stop_policy=stop_policy,
-            take_profit_policy=tp_policy,
-            max_position_size=parameters.max_position_size,  # Use resolved parameter
-        )
-        logger.info(
-            "Constructed risk config from CLI: stop=%s (mult=%.1f), tp=%s (rr=%.1f)",
-            args.stop_policy,
-            parameters.atr_stop_mult,
-            args.tp_policy,
-            parameters.target_r_mult,
-        )
-
-    # Handle --list-strategies (FR-017: List strategies without running backtest)
+    # --- Early Exit for Strategy Listing ---
     if args.list_strategies:
-        from ..strategy.registry import StrategyRegistry
-
         registry = StrategyRegistry()
         strategies = registry.list()
 
-        if not strategies:
-            print("No strategies registered.")
-            print("\nUse --register-strategy to add a new strategy.")
-        else:
-            print(f"Registered Strategies ({len(strategies)}):")
-            print("-" * 60)
-            for strat in strategies:
-                tags_str = ", ".join(strat.tags) if strat.tags else "none"
-                version_str = strat.version or "unversioned"
-                print(f"  {strat.name}")
-                print(f"    Tags: {tags_str}")
-                print(f"    Version: {version_str}")
-                print()
+        console.print("\n[bold cyan]Available Strategies:[/bold cyan]")
+        table = pl.DataFrame(
+            {
+                "Name": [s.name for s in strategies],
+                "Tags": [", ".join(s.tags) for s in strategies],
+                "Version": [s.version for s in strategies],
+            }
+        )
+        console.print(table)
         return 0
 
-    # Handle --register-strategy (FR-001: Strategy registration)
-    if args.register_strategy:
-        if not args.strategy_module:
-            print("Error: --strategy-module required for registration", file=sys.stderr)
-            sys.exit(1)
+    # --- Define Choices for Prompts ---
+    direction_choices = ["LONG", "SHORT", "BOTH"]
+    simulation_choices = ["Personal Capital", "City Traders Imperium (CTI)"]
+    cti_mode_choices = ["1STEP", "2STEP", "INSTANT"]
+    stop_policy_choices = [
+        "ATR",
+        "ATR_Trailing",
+        "FixedPips",
+        "FixedPips_Trailing",
+        "MA_Trailing",
+    ]
+    take_profit_choices = ["RiskMultiple", "None"]
+    yes_no_choices = ["y", "n"]
+    session_choices = ["NY", "EU", "AS", "SY"]  # Common session abbreviations
 
-        import importlib
-        from ..strategy.registry import StrategyRegistry
+    # --- Interactive Prompts for Missing Flags (Feature 026) ---
+    is_interactive = _is_interactive() and not args.non_interactive
+    run_param_sweep = False  # Initialize sweep flag
 
-        registry = StrategyRegistry()
-
-        try:
-            # Import strategy module
-            module = importlib.import_module(args.strategy_module)
-
-            # Look for strategy callable (convention: 'run' or 'execute')
-            if hasattr(module, "run"):
-                func = module.run
-            elif hasattr(module, "execute"):
-                func = module.execute
-            else:
-                print(
-                    f"Error: Module '{args.strategy_module}' \
-must expose 'run' or 'execute' function",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-            # Register strategy
-            registry.register(
-                name=args.register_strategy,
-                func=func,
-                tags=args.strategy_tags,
-                version=args.strategy_version,
-            )
-
-            print(f"Successfully registered strategy: {args.register_strategy}")
-            print(f"  Module: {args.strategy_module}")
-            tags_str = ", ".join(args.strategy_tags) if args.strategy_tags else "none"
-            print(f"  Tags: {tags_str}")
-            print(f"  Version: {args.strategy_version or 'unversioned'}")
-            print(
-                "\nNote: Registration is in-memory only. \
-Persistent storage not yet implemented."
-            )
-
-            return 0
-
-        except ImportError as exc:
-            print(
-                f"Error: Failed to import module '{args.strategy_module}': {exc}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        except ValueError as exc:
-            print(f"Error: Registration failed: {exc}", file=sys.stderr)
-            sys.exit(1)
-
-    # Handle --test_range (Feature 024: Parameter Sweep Mode)
-    if args.test_range:
-        from ..backtest.sweep import (
-            display_results_table,
-            export_results_to_csv,
-            filter_invalid_combinations,
-            generate_combinations,
-            run_sweep,
-        )
-        from .prompts.range_input import collect_all_ranges, confirm_sweep
-        from ..strategy.trend_pullback.strategy import TrendPullbackStrategy
-
-        logger.info("Entering parameter sweep mode...")
-
-        # Load strategy (currently only trend_pullback supported)
-        strategy = TrendPullbackStrategy()
-
-        # Collect parameter ranges from user
-        sweep_config = collect_all_ranges(strategy)
-        if sweep_config is None:
-            print("No parameters to sweep. Exiting.")
-            return 0
-
-        # Generate combinations
-        all_combinations = generate_combinations(sweep_config.ranges)
-        sweep_config.total_combinations = len(all_combinations)
-
-        # Filter invalid combinations
-        valid_combinations, skipped = filter_invalid_combinations(all_combinations)
-        sweep_config.valid_combinations = len(valid_combinations)
-        sweep_config.skipped_count = skipped
-
-        if not valid_combinations:
-            print("No valid combinations after filtering. Exiting.")
-            return 0
-
-        # Confirm with user
-        if not confirm_sweep(sweep_config, len(valid_combinations), skipped):
-            print("Sweep cancelled by user.")
-            return 0
-
-        # Execute sweep
-        print(
-            f"\n[INFO] Starting sweep execution with {len(valid_combinations)} combinations..."
-        )
-
-        sweep_result = run_sweep(
-            combinations=valid_combinations,
-            pairs=args.pair,
-            dataset=args.dataset,
-            direction=args.direction,
-            max_workers=args.max_workers,
-            sequential=args.sequential,
-        )
-
-        display_results_table(sweep_result.results, top_n=10)
-
-        # Export results (Phase 6)
-        if args.export:
-            export_results_to_csv(sweep_result, args.export)
-            print(f"\n[INFO] Sweep results exported to: {args.export}")
-
-        return 0
-
-    # Validate data file exists
-    # (required for backtest runs, not for listing/registration)
+    # Only prompt if not in non-interactive mode and certain flags are missing
     if not args.list_strategies and not args.register_strategy:
-        # Determine data paths
-        if args.data:
-            pair_name = args.pair[0] if args.pair else "CUSTOM"
-            pair_paths = [(pair_name, args.data)]
-        else:
-            # Use new construct_data_paths() for multi-pair support (T008-T011)
-            pair_paths = construct_data_paths(args.pair, args.dataset)
+        # Check for missing required flags that need user input
 
-        # Unified backtest path: always use run_portfolio_backtest (1 or N symbols)
-        logger.info(
-            "Backtest: %d symbol(s), $%.2f challenge level",
-            len(pair_paths),
-            parameters.account_balance,  # Use resolved parameter
-        )
+        # 0. Dataset Prompt (Test vs Validate)
+        if args.dataset is None:
+            if not is_interactive:
+                args.dataset = "test"
+            else:
+                args.dataset = _prompt(
+                    "? Dataset to use ",
+                    default="test",
+                    choices=["test", "validate"],
+                )
 
-        # -----------------------------------------------------------------
-        # Assemble & Write Run Manifest (Feature 026)
-        # -----------------------------------------------------------------
-        resolved_cfg = {
-            "direction": args.direction,
-            "strategy": args.strategy[0] if isinstance(args.strategy, list) else args.strategy,
-            "pairs": [p.upper() for p in (args.pair or [])],
-            "challenge_level": float(parameters.account_balance),
-            "cti": {
-                "enabled": bool(args.cti_mode),
-                "mode": args.cti_mode,
-                "scaling_enabled": not args.disable_scaling,
-            },
-            "timeframe": args.timeframe,
-            "dataset": args.dataset,
-            "dry_run": args.dry_run,
-        }
+        # 1. Strategy Prompt
+        if args.strategy is None:
+            if not is_interactive:
+                args.strategy = ["trend-pullback"]  # Default
+            else:
+                try:
+                    registry = StrategyRegistry()
+                    available_strategies = [strat.name for strat in registry.list()]
 
-        print("\nResolved Config:")
-        print(json.dumps(resolved_cfg, indent=2))
+                    # Filter strategies if a partial match is provided
+                    strategy_input = _prompt(
+                        "? Strategy [trend-pullback] ",
+                        default=(
+                            "trend-pullback"
+                            if "trend-pullback" in available_strategies
+                            else (
+                                available_strategies[0]
+                                if available_strategies
+                                else None
+                            )
+                        ),
+                        choices=available_strategies,
+                    )
+                    args.strategy = (
+                        [strategy_input] if strategy_input else ["trend-pullback"]
+                    )
+                except Exception as e:
+                    logger.error("Could not list strategies: %s. Using default.", e)
+                    args.strategy = ["trend-pullback"]
 
-        ts_manifest = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
-        run_dir = Path("runs") / ts_manifest
+        # 2. Pair Prompt (only if --data is not specified)
+        if args.pair is None and not args.data:
+            if not is_interactive:
+                args.pair = ["EURUSD"]  # Default for non-interactive
+            else:
+                # Dynamically get available pairs from price_data/processed/
+                PRICE_DATA_DIR = Path("price_data/processed")
+                available_pairs = []
+
+                if PRICE_DATA_DIR.exists():
+                    for item in PRICE_DATA_DIR.iterdir():
+                        if item.is_dir() and not item.name.startswith("__"):
+                            available_pairs.append(item.name.upper())
+
+                available_pairs = sorted(list(set(available_pairs)))
+
+                if not available_pairs:
+                    logger.warning("No price data found in %s.", PRICE_DATA_DIR)
+                    logger.warning("Please run 'quantpipe ingest' to process data.")
+                    # Provide a dummy choice or exit?
+                    available_pairs = ["EURUSD"]  # Dummy to prevent crash
+
+                # Multi-select prompt for pairs
+                default_pairs = ["EURUSD"]
+                if not any(p in available_pairs for p in default_pairs):
+                    default_pairs = (
+                        [available_pairs[0]] if available_pairs else ["EURUSD"]
+                    )
+
+                selected_pairs = _multi_select_prompt(
+                    "? Pair(s) (e.g., EURUSD, space-separated) ",
+                    default=default_pairs,
+                    choices=available_pairs,
+                )
+                args.pair = selected_pairs if selected_pairs else ["EURUSD"]
+
+        # 3. Direction Prompt
+        if args.direction is None:
+            if not is_interactive:
+                args.direction = "LONG"  # Default for non-interactive
+            else:
+                d = _prompt("? Direction ", default="LONG", choices=direction_choices)
+                args.direction = d if d else "LONG"
+
+        # 4. Timeframe Prompt
+        if args.timeframe is None:
+            if not is_interactive:
+                args.timeframe = "1m"  # Default for non-interactive
+            else:
+                t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) ", default="1m")
+                args.timeframe = t if t else "1m"
+
+        # 5. Simulation Type (FR-027 / Issue #83 Refactor)
+        if args.simulation_type is None:  # Assuming this arg exists or should be added
+            if not is_interactive:
+                args.simulation_type = "Personal Capital"  # Default for non-interactive
+            else:
+                sim_type = _prompt(
+                    "? What simulation are you running? ",
+                    default="Personal Capital",
+                    choices=simulation_choices,
+                )
+                args.simulation_type = sim_type if sim_type else "Personal Capital"
+
+        # Conditional prompts based on simulation type
+        if args.simulation_type == "City Traders Imperium (CTI)":
+            console.print("\n[CTI Prop Firm Settings]")
+
+            # 1. CTI Mode
+            if args.cti_mode is None:
+                if not is_interactive:
+                    args.cti_mode = "2STEP"  # Default for non-interactive
+                else:
+                    mode = _prompt(
+                        "? CTI Mode ", default="2STEP", choices=cti_mode_choices
+                    )
+                    args.cti_mode = mode if mode else "2STEP"
+
+            # 2. Buy-back Strategy (defaults to selected CTI mode)
+            if args.buyback_strategy is None:
+                if not is_interactive:
+                    args.buyback_strategy = (
+                        args.cti_mode
+                    )  # Default to selected CTI mode
+                else:
+                    bb_mode = _prompt(
+                        "? Buy-back Strategy ",
+                        default=args.cti_mode,
+                        choices=cti_mode_choices,
+                    )
+                    args.buyback_strategy = bb_mode if bb_mode else args.cti_mode
+
+            # 3. Challenge Level (dynamically populated)
+            if args.starting_balance is None:
+                challenge_choices = []
+                PRESETS_DIR = Path("src/config/presets/cti")
+                filename_map = {
+                    "1STEP": "cti_1_step_challenge.json",
+                    "2STEP": "cti_2_step_challenge.json",
+                    "INSTANT": "cti_instant_funding.json",
+                }
+
+                # Resolve file path relative to script or CWD
+                file_path_str = filename_map.get(
+                    args.cti_mode, "cti_2_step_challenge.json"
+                )
+                possible_paths = [
+                    PRESETS_DIR / file_path_str,
+                    Path("src/config/presets/cti")
+                    / file_path_str,  # Relative to workspace root
+                    Path(__file__).parent
+                    / "src/config/presets/cti"
+                    / file_path_str,  # Relative to current script file
+                ]
+
+                resolved_path = None
+                for p in possible_paths:
+                    if p.exists():
+                        resolved_path = p.resolve()
+                        break
+
+                if resolved_path:
+                    try:
+                        with open(resolved_path, encoding="utf-8") as f:
+                            data = json.load(f)
+
+                            if args.cti_mode == "INSTANT" and "programs" in data:
+                                program_list = data.get("programs", {}).get(
+                                    "STANDARD", []
+                                )
+                                challenge_choices = [
+                                    str(float(item.get("tier_name")))
+                                    for item in program_list
+                                    if "tier_name" in item
+                                ]
+                            elif "starting_account_sizes" in data:
+                                challenge_choices = [
+                                    str(float(item.get("account_size")))
+                                    for item in data["starting_account_sizes"]
+                                    if "account_size" in item
+                                ]
+
+                            if not challenge_choices:
+                                raise ValueError("No challenge levels found in file.")
+
+                    except Exception as e:
+                        logger.exception(
+                            "Failed to load CTI challenge levels for mode '%s' from %s: %s",
+                            args.cti_mode,
+                            resolved_path,
+                            e,
+                        )
+                        # Fallback to hardcoded values if dynamic load fails
+                        challenge_choices = [
+                            str(float(c))
+                            for c in [
+                                2500.0,
+                                5000.0,
+                                10000.0,
+                                25000.0,
+                                50000.0,
+                                100000.0,
+                            ]
+                        ]
+                else:  # If file_path does not exist, use hardcoded defaults
+                    challenge_choices = [
+                        str(float(c))
+                        for c in [2500.0, 5000.0, 10000.0, 25000.0, 50000.0, 100000.0]
+                    ]
+
+                default_challenge = "25000.0"
+                if challenge_choices:
+                    if default_challenge not in challenge_choices:
+                        # Try to pick a sensible default if 25000 is not available
+                        if "100000.0" in challenge_choices:
+                            default_challenge = "100000.0"
+                        elif "50000.0" in challenge_choices:
+                            default_challenge = "50000.0"
+                        elif challenge_choices:
+                            default_challenge = challenge_choices[0]
+
+                b = _prompt(
+                    "? Challenge Level (USD) ",
+                    default=default_challenge,
+                    coerce=float,
+                    choices=challenge_choices,
+                )
+                args.starting_balance = b if b else float(default_challenge)
+
+            else:  # Personal Capital Settings
+                console.print("\n[Personal Capital Settings]")
+                if args.starting_balance is None:
+                    if not is_interactive:
+                        args.starting_balance = DEFAULT_ACCOUNT_BALANCE
+                    else:
+                        b = _prompt(
+                            "? Starting Capital (USD) ",
+                            default=str(
+                                DEFAULT_ACCOUNT_BALANCE
+                            ),  # Use default constant
+                            coerce=float,
+                        )
+                        args.starting_balance = b if b else DEFAULT_ACCOUNT_BALANCE
+
+            # 6. Risk Parameters
+            console.print("\n[Risk Management]")
+
+            # Risk % per trade
+            if args.risk_percent is None:
+                if not is_interactive:
+                    args.risk_percent = 0.25
+                else:
+                    rp = _prompt("? Risk % per trade ", default="0.25", coerce=float)
+                    args.risk_percent = rp if rp else 0.25
+
+            # Stop Policy
+            if args.stop_policy is None:
+                if not is_interactive:
+                    args.stop_policy = "ATR"
+                else:
+                    sp = _prompt(
+                        "? Stop Policy ", default="ATR", choices=stop_policy_choices
+                    )
+                    args.stop_policy = sp if sp else "ATR"
+
+            # Take Profit Policy
+            if args.take_profit_policy is None:
+                if not is_interactive:
+                    args.take_profit_policy = "RiskMultiple"
+                else:
+                    tp = _prompt(
+                        "? Take Profit Policy ",
+                        default="RiskMultiple",
+                        choices=take_profit_choices,
+                    )
+                    args.take_profit_policy = tp if tp else "RiskMultiple"
+
+            # Reward-to-Risk Ratio
+            if args.reward_risk_ratio is None:
+                if not is_interactive:
+                    args.reward_risk_ratio = 2.0
+                else:
+                    rrr = _prompt(
+                        "? Reward-to-Risk Ratio ", default="2.0", coerce=float
+                    )
+                    args.reward_risk_ratio = rrr if rrr else 2.0
+
+            # ATR Multiplier (only if ATR or ATR_Trailing is selected)
+            if (
+                args.stop_policy in ["ATR", "ATR_Trailing"]
+                and args.atr_multiplier is None
+            ):
+                if not is_interactive:
+                    args.atr_multiplier = 2.0
+                else:
+                    atm = _prompt("? ATR Multiplier ", default="2.0", coerce=float)
+                    args.atr_multiplier = atm if atm else 2.0
+
+            # ATR Period (only if ATR or ATR_Trailing is selected)
+            if args.stop_policy in ["ATR", "ATR_Trailing"] and args.atr_period is None:
+                if not is_interactive:
+                    args.atr_period = 14
+                else:
+                    atp = _prompt("? ATR Period ", default="14", coerce=int)
+                    args.atr_period = atp if atp else 14
+
+            # 7. Session Management
+            # 7. Session-Only Trading (Feature 026)
+            console.print("\n[Session Management]")
+
+            # Limit trading to specific sessions?
+            if not args.limit_sessions:
+                if not is_interactive:
+                    args.limit_sessions = False
+                else:
+                    yn = _prompt(
+                        "? Limit trading to specific sessions? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
+                    args.limit_sessions = yn == "y"
+
+            if args.limit_sessions and args.sessions is None:
+                selected_sessions = _multi_select_prompt(
+                    "? Sessions (space-separated, e.g., NY EU AS SY) ",
+                    default=["NY"],  # Default to NY if not specified
+                    choices=session_choices,
+                )
+                args.sessions = selected_sessions if selected_sessions else ["NY"]
+            elif not args.limit_sessions and args.sessions is None:
+                args.sessions = []  # Explicitly empty if not limiting
+
+            # Enable forced close for sessions?
+            if not args.force_session_close:
+                if not is_interactive:
+                    args.force_session_close = False
+                else:
+                    yn = _prompt(
+                        "? Enable forced close for sessions? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
+                    args.force_session_close = yn == "y"
+
+            # Session buffer window
+            if args.session_buffer is None:
+                if not is_interactive:
+                    args.session_buffer = 15
+                else:
+                    sb = _prompt(
+                        "? Session buffer window (minutes) ", default="15", coerce=int
+                    )
+                    args.session_buffer = sb if sb else 15
+
+            # 8. News Event Filtering
+            console.print("\n[News Event Filtering]")
+
+            # Enable news event blackout filtering?
+            if not args.blackout_news:
+                if not is_interactive:
+                    args.blackout_news = False
+                else:
+                    yn = _prompt(
+                        "? Enable news event blackout filtering? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
+                    args.blackout_news = yn == "y"
+
+            # Enable forced close for news?
+            if not args.force_news_close:
+                if not is_interactive:
+                    args.force_news_close = False
+                else:
+                    yn = _prompt(
+                        "? Enable forced close for news? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
+                    args.force_news_close = yn == "y"
+
+            # Minutes before/after news
+            if args.minutes_before_news is None:
+                if not is_interactive:
+                    args.minutes_before_news = 10
+                else:
+                    mbn = _prompt("? Minutes before news ", default="10", coerce=int)
+                    args.minutes_before_news = mbn if mbn else 10
+
+            if args.minutes_after_news is None:
+                if not is_interactive:
+                    args.minutes_after_news = 30
+                else:
+                    man = _prompt("? Minutes after news ", default="30", coerce=int)
+                    args.minutes_after_news = man if man else 30
+
+            # 9. Parameter Sweep Mode Prompt
+            # Only prompt if --test-range wasn't explicitly set via CLI
+            if not args.test_range:
+                if not is_interactive:
+                    run_param_sweep = (
+                        False  # Default to not running sweep if non-interactive
+                    )
+                else:
+                    yn = _prompt(
+                        "? Would you like to test a range of indicator values? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
+                    if yn == "y":
+                        run_param_sweep = True
+                        args.test_range = True  # Set flag to trigger sweep logic
+            elif args.test_range:  # If --test-range was explicitly set on CLI
+                run_param_sweep = True
+
+        # --- End of Interactive Prompts ---
+
+    # If running in interactive mode and a parameter sweep was indicated,
+    # load the necessary sweep-related imports.
+    if run_param_sweep or args.test_range:
+        # These imports were moved outside the interactive block earlier,
+        # ensuring they are available if sweep mode is activated.
+        pass  # Imports are already handled above
+
+    # --- Execute Backtest ---
+
+    # If strategy is empty after prompts (user cancelled or no strategy found)
+    if not args.strategy:
+        logger.error("No strategy selected or found. Exiting.")
+        sys.exit(1)
+
+    # Handle parameter sweep mode
+    if args.test_range:
+        logger.info("Starting parameter sweep mode.")
+
+        # Collect ranges for indicators (e.g., ATR period, ATR multiplier, RRR)
+        # This function should prompt the user for ranges if not provided via CLI args
         try:
-            run_dir.mkdir(parents=True, exist_ok=True)
-            (run_dir / "run.json").write_text(json.dumps(resolved_cfg, indent=2), encoding="utf-8")
-            logger.info("Run manifest written to %s/run.json", run_dir)
+            indicator_ranges = collect_all_ranges(
+                args
+            )  # Pass args to reuse values if already set
         except Exception as e:
-            logger.warning("Failed to write run manifest: %s", e)
+            logger.error("Failed to collect indicator ranges: %s", e)
+            return 1
 
-        direction_mode = DirectionMode[args.direction]
-        show_progress = sys.stdout.isatty()
+        # Generate combinations of parameters
+        try:
+            combinations = list(generate_combinations(indicator_ranges))
+        except Exception as e:
+            logger.error("Failed to generate parameter combinations: %s", e)
+            return 1
 
-        # Build blackout config from CLI args (Feature 023)
-        blackout_config = None
-        if args.blackout_sessions or args.blackout_news or args.sessions:
-            from ..risk.blackout.config import (
-                BlackoutConfig,
-                NewsBlackoutConfig,
-                SessionBlackoutConfig,
-                SessionOnlyConfig,
-            )
+        # Filter out invalid combinations (e.g., if a parameter depends on another)
+        try:
+            valid_combinations, skipped = filter_invalid_combinations(combinations)
+        except Exception as e:
+            logger.error("Failed to filter invalid parameter combinations: %s", e)
+            return 1
 
-            # Defaults if flags active but not configured
-            news_cfg = None
-            if args.blackout_news:
-                news_cfg = NewsBlackoutConfig(
-                    enabled=True,
-                    force_close=getattr(args, "news_force_close", False),
-                    window_before_mins=getattr(args, "news_window_before", 10),
-                    window_after_mins=getattr(args, "news_window_after", 30)
-                )
+        if not confirm_sweep(indicator_ranges, len(valid_combinations), skipped):
+            logger.info("Parameter sweep cancelled by user.")
+            return 1  # Indicate cancellation
 
-            session_cfg = None
-            if args.blackout_sessions:
-                session_cfg = SessionBlackoutConfig(enabled=True)
+        # Run the sweep
+        try:
+            results = run_sweep(args, valid_combinations)
+        except Exception as e:
+            logger.error("Error during parameter sweep execution: %s", e)
+            return 1
 
-            # Normalize session names (handle abbreviations)
-            session_map = {"SY": "SYDNEY", "AS": "ASIA", "EU": "LONDON", "NY": "NY"}
-            allowed_sessions = []
-            if args.sessions:
-                for s in args.sessions:
-                    s_upper = s.upper()
-                    canonical = session_map.get(s_upper, s_upper)
-                    allowed_sessions.append(canonical)
+        # Display and export results
+        display_results_table(results)
 
-            whitelist_cfg = None
-            if args.sessions:
-                whitelist_cfg = SessionOnlyConfig(
-                    enabled=True, 
-                    allowed_sessions=allowed_sessions,
-                    force_close=getattr(args, "sessions_force_close", False),
-                    buffer_window_mins=getattr(args, "sessions_window", 15)
-                )
+        if args.csv:  # Assuming --csv argument exists for export path
+            try:
+                export_results_to_csv(results, args.csv)
+                logger.info("Results exported to %s", args.csv)
+            except Exception as e:
+                logger.error("Failed to export results to CSV: %s", e)
 
-            blackout_config = BlackoutConfig(
-                news=news_cfg or NewsBlackoutConfig(),
-                sessions=session_cfg or SessionBlackoutConfig(),
-                session_only=whitelist_cfg or SessionOnlyConfig(),
-            )
-            logger.info("Blackout filtering enabled: %s", blackout_config)
+        logger.info("Parameter sweep finished.")
+        return 0  # Success
 
-        # ---------------------------------------------------------------------
-        # Execution (Unified - Independent or Portfolio Mode)
-        # ---------------------------------------------------------------------
-        # Calls execute independent backtests per symbol using run_portfolio_backtest
+    # --- Standard Backtest Execution ---
 
-        result, symbol_data = run_portfolio_backtest(
+    # If no arguments were passed, and we are not in interactive mode,
+    # it means the user is running `opentrades run backtest` without flags.
+    # We should prompt them if they want to enter interactive mode.
+    if not any(vars(args).values()) and not is_interactive and not args.non_interactive:
+        yn = _prompt(
+            "No arguments provided. Enter interactive mode? ",
+            default="y",
+            choices=["y", "n"],
+        )
+        if yn == "y":
+            # Rerun the function to trigger interactive prompts
+            # Need to simulate new args object with all None values
+            # to force interactive mode
+            new_args = argparse.Namespace()
+            # Populate with None for all expected args
+            for arg_name in vars(args):
+                setattr(new_args, arg_name, None)
+            return run_backtest_command(new_args)  # Recursive call to re-enter prompts
+        else:
+            logger.info("Exiting without running backtest.")
+            return 1
+
+    # --- Execute Backtest ---
+
+    # If strategy is empty after prompts (user cancelled or no strategy found)
+    if not args.strategy:
+        logger.error("No strategy selected or found. Exiting.")
+        sys.exit(1)
+
+    # Construct data paths
+    try:
+        # construct_data_paths expects list of strings for pairs
+        pair_paths = construct_data_paths(args.pair, args.dataset)
+    except SystemExit:
+        return 1
+
+    # Prepare Strategy Parameters
+    # Map args to StrategyParameters
+    try:
+        # Use args values if present, else defaults from model will apply
+        # We need to map CLI arg names to model field names
+        params_dict = {}
+        if args.risk_percent is not None:
+            params_dict["risk_per_trade_pct"] = args.risk_percent
+        if args.atr_multiplier is not None:
+            params_dict["atr_stop_mult"] = args.atr_multiplier
+        if args.atr_period is not None:
+            params_dict["atr_length"] = args.atr_period
+        if args.reward_risk_ratio is not None:
+            params_dict["target_r_mult"] = args.reward_risk_ratio
+        if args.starting_balance is not None:
+            params_dict["account_balance"] = args.starting_balance
+
+        # Set strategy name (taking first one for now as per current limitation)
+        params_dict["strategy_name"] = args.strategy[0]
+
+        strategy_params = StrategyParameters(**params_dict)
+    except Exception as e:
+        logger.error("Invalid strategy parameters: %s", e)
+        return 1
+
+    # Construct Blackout Configuration
+    blackout_config = BlackoutConfig(
+        news=NewsBlackoutConfig(
+            enabled=args.blackout_news if args.blackout_news is not None else False,
+            force_close=(
+                args.force_news_close if args.force_news_close is not None else False
+            ),
+            pre_close_minutes=(
+                args.minutes_before_news if args.minutes_before_news else 10
+            ),
+            post_pause_minutes=(
+                args.minutes_after_news if args.minutes_after_news else 30
+            ),
+        ),
+        # Session gap blackout (default params for now, only enabled flag from CLI)
+        sessions=SessionBlackoutConfig(
+            enabled=(
+                args.blackout_sessions if args.blackout_sessions is not None else False
+            ),
+        ),
+        session_only=SessionOnlyConfig(
+            enabled=args.limit_sessions if args.limit_sessions is not None else False,
+            allowed_sessions=args.sessions if args.sessions else [],
+            force_close=(
+                args.force_session_close
+                if args.force_session_close is not None
+                else False
+            ),
+            pre_close_minutes=args.session_buffer if args.session_buffer else 15,
+        ),
+    )
+
+    # Run Portfolio Backtest
+    try:
+        result, _ = run_portfolio_backtest(
             pair_paths=pair_paths,
-            direction_mode=direction_mode,
-            strategy_params=parameters,
-            starting_equity=parameters.account_balance,
+            direction_mode=DirectionMode[args.direction],
+            strategy_params=strategy_params,
+            starting_equity=args.starting_balance if args.starting_balance else 2500.0,
             dry_run=args.dry_run,
-            show_progress=show_progress,
-            timeframe=args.timeframe,
+            show_progress=True,
+            timeframe=args.timeframe if args.timeframe else "1m",
             blackout_config=blackout_config,
-            risk_config=risk_config,
-            use_gpu=args.gpu,
-            # indicator_overrides=None, # Explicitly using defaults
+            use_gpu=args.gpu_accel,
         )
 
-        # Logic to display output
-        out_fmt = OutputFormat(args.output_format)
-
-        # For now, we only handle PortfolioResult as implicit strict return type of run_portfolio_backtest
-        # (Legacy single-symbol BacktestResult not returned by this function)
-        if hasattr(result, "equity_curve"):  # Duck typing for PortfolioResult
-            if out_fmt == OutputFormat.TEXT:
-                print(format_portfolio_text_output(result, "trend-pullback"))
-            else:
-                print(format_portfolio_json_output(result))
-
-        # Legacy BacktestResult support (only check if NOT a PortfolioResult)
-        elif hasattr(result, "is_multi_symbol") and result.is_multi_symbol:
-            if out_fmt == OutputFormat.TEXT:
-                print(format_multi_symbol_text_output(result, "trend-pullback"))
-            else:
-                print(format_multi_symbol_json_output(result))
+        # Display Results
+        output_content = ""
+        if args.output_format == "json":
+            output_content = format_portfolio_json_output(result)
         else:
-            if out_fmt == OutputFormat.TEXT:
-                print(format_text_output(result, "trend-pullback"))
-            else:
-                print(format_json_output(result))
+            output_content = format_portfolio_text_output(result)
+
+            # CTI Evaluation (Feature 027)
+            if args.simulation_type == "City Traders Imperium (CTI)":
+                try:
+                    account_size = (
+                        int(args.starting_balance) if args.starting_balance else 2500
+                    )
+                    cti_mode = args.cti_mode if args.cti_mode else "2STEP"
+
+                    challenge_config = load_cti_config(cti_mode, account_size)
+                    scaling_config = load_scaling_plan(cti_mode)
+
+                    report = evaluate_scaling(
+                        executions=result.closed_trades,
+                        challenge_config=challenge_config,
+                        scaling_config=scaling_config,
+                        buyback_mode=args.buyback_strategy,
+                    )
+
+                    cti_text = format_cti_report(report)
+                    output_content += "\n" + cti_text
+
+                except Exception as e:
+                    logger.error("Failed to run CTI evaluation: %s", e)
+                    output_content += f"\n\n[CTI Evaluation Failed: {e}]"
+
+        print(output_content)
 
         # Save to file
-        # Check if args.output is directory or file
-        output_path = args.output
-        if not output_path.exists():
-            output_path.mkdir(parents=True, exist_ok=True)
+        results_dir = Path("results")
+        results_dir.mkdir(exist_ok=True)
 
-        filename = generate_output_filename(
-            direction=direction_mode,
-            output_format=out_fmt,
-            timestamp=result.start_time,
-            symbol_tag=(
-                result.symbols[0]
-                if hasattr(result, "symbols") and result.symbols
-                else getattr(result, "pair", "multi")
-            ),
-            timeframe_tag=args.timeframe,
-        )
+        # Determine file extension
+        fmt = args.output_format if args.output_format else "text"
+        ext = "txt" if fmt == "text" else fmt
 
-        full_path = output_path / filename
-        with open(full_path, "w", encoding="utf-8") as f:
-            if hasattr(result, "equity_curve"):  # PortfolioResult
-                if out_fmt == OutputFormat.TEXT:
-                    f.write(format_portfolio_text_output(result, "trend-pullback"))
-                else:
-                    f.write(format_portfolio_json_output(result))
-            elif hasattr(result, "is_multi_symbol") and result.is_multi_symbol:
-                if out_fmt == OutputFormat.TEXT:
-                    f.write(format_multi_symbol_text_output(result, "trend-pullback"))
-                else:
-                    f.write(format_multi_symbol_json_output(result))
-            else:
-                if out_fmt == OutputFormat.TEXT:
-                    f.write(format_text_output(result, "trend-pullback"))
-                else:
-                    f.write(format_json_output(result))
+        filename = f"backtest_{result.run_id}.{ext}"
+        output_path = results_dir / filename
 
-        logger.info("Results saved to %s", full_path)
+        try:
+            output_path.write_text(output_content, encoding="utf-8")
+            logger.info("Results saved to %s", output_path)
+        except Exception as e:
+            logger.error("Failed to save results to file: %s", e)
 
-        # ---------------------------------------------------------------------
-        # CTI Evaluation (Feature 027)
-        # ---------------------------------------------------------------------
-        if args.cti_mode:
-            from ..risk.prop_firm.loader import load_cti_config, load_scaling_plan
-            from ..risk.prop_firm.evaluator import evaluate_challenge
-            from ..risk.prop_firm.scaling import evaluate_scaling
+    except Exception as e:
+        logger.exception("Backtest execution failed: %s", e)
+        return 1
 
-            logger.info(
-                "Running CTI Evaluation mode=%s scaling=%s",
-                args.cti_mode,
-                not args.disable_scaling,
-            )
+    return 0  # Indicate success
 
-            # Helper to process one set of executions
-            def process_cti(executions, label):
-                print(f"\n[CTI Evaluation: {label}]")
-                if not executions:
-                    print("  No trades to evaluate.")
-                    return
 
-                # Normalize ClosedTrade to TradeExecution if needed
-                # PortfolioResult uses ClosedTrade (exit_timestamp), TradeExecution uses close_timestamp
-                if hasattr(executions[0], "exit_timestamp") and not hasattr(
-                    executions[0], "close_timestamp"
-                ):
-                    from ..models.core import TradeExecution
-                    import pandas as pd
-
-                    norm_executions = []
-                    for t in executions:
-                        # Convert numpy datetime64 to pandas Timestamp (compatible with .date())
-                        open_ts = pd.Timestamp(t.entry_timestamp)
-                        close_ts = pd.Timestamp(t.exit_timestamp)
-
-                        norm_executions.append(
-                            TradeExecution(
-                                signal_id=getattr(t, "signal_id", "UNKNOWN"),
-                                direction=t.direction,
-                                open_timestamp=open_ts,
-                                entry_fill_price=t.entry_price,
-                                close_timestamp=close_ts,
-                                exit_fill_price=t.exit_price,
-                                exit_reason=t.exit_reason,
-                                pnl_r=t.pnl_r,
-                                slippage_entry_pips=0.0,
-                                slippage_exit_pips=0.0,
-                                costs_total=0.0,
-                                stop_price=0.0,
-                                target_price=0.0,
-                                risk_amount=t.risk_amount,
-                                risk_percent=t.risk_percent,
-                            )
-                        )
-                    executions = norm_executions
-
-                try:
-                    acc_size = parameters.account_balance
-                    # Valid CTI account sizes per presets
-                    valid_sizes = [2500, 5000, 10000, 25000, 50000, 100000]
-                    if acc_size not in valid_sizes:
-                        logger.warning(
-                            "Account size %.2f might not match CTI presets (Usually 10k, 25k, etc.)",
-                            acc_size,
-                        )
-
-                    # Load base config
-                    challenge_conf = load_cti_config(args.cti_mode, int(acc_size))
-
-                    if not args.disable_scaling:
-                        # Load scaling plan
-                        scaling_plan = load_scaling_plan(args.cti_mode)
-                        
-                        # Construct cost map for buy-backs (Feature Request)
-                        try:
-                            import json as _json_cost
-                            
-                            # Challenge Costs
-                            challenge_file = Path("src/config/presets/cti/cti_2_step_challenge.json")
-                            if not challenge_file.exists(): challenge_file = Path.cwd() / challenge_file
-                            with open(challenge_file, encoding="utf-8") as f:
-                                chal_data = _json_cost.load(f)
-                            cost_map = {float(s["account_size"]): float(s.get("cost", 0.0)) for s in chal_data["starting_account_sizes"]}
-                            
-                            # Instant Costs (Priority for buyback)
-                            instant_file = Path("src/config/presets/cti/cti_instant_funding.json")
-                            if not instant_file.exists(): instant_file = Path.cwd() / instant_file
-                            with open(instant_file, encoding="utf-8") as f:
-                                inst_data = _json_cost.load(f)
-                            # Use STANDARD as the default buyback target
-                            instant_cost_map = {float(s["tier_name"]): float(s.get("cost", 0.0)) for s in inst_data["programs"]["STANDARD"]}
-                            
-                        except Exception as e:
-                            logger.warning("Could not build cost map for CTI buy-back simulation: %s", e)
-                            cost_map = None
-                            instant_cost_map = None
-
-                        report = evaluate_scaling(
-                            executions, challenge_conf, scaling_plan, 
-                            cost_map=cost_map, 
-                            instant_cost_map=instant_cost_map,
-                            buyback_mode=args.buyback_strategy or args.cti_mode
-                        )
-
-                        # Build Report String
-                        lines = []
-                        total_levels = sum(len(a.levels) for a in report.attempts)
-                        
-                        # Promotions: Any level that resulted in SCALED_UP or PROMOTED_TO_FUNDED
-                        promotions = 0
-                        for a in report.attempts:
-                            for l in a.levels:
-                                if l.status in ["SCALED_UP", "PROMOTED_TO_FUNDED", "STEP_1_PASSED"]:
-                                    promotions += 1
-                        
-                        resets = sum(
-                            1 for a in report.attempts if a.status == "FAILED"
-                        )
-
-                        # Calculate Payouts
-                        payout_100 = sum(max(0, l.pnl) for a in report.attempts for l in a.levels)
-                        payout_80 = payout_100 * challenge_conf.payout_share
-
-                        lines.append(
-                            f"  Scaling Report (Total Attempts: {len(report.attempts)} | Total Levels: {total_levels} | Promotions: {promotions} | Resets: {resets})"
-                        )
-                        lines.append(
-                            f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
-                        )
-                        lines.append(
-                            f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
-                        )
-                        
-                        for attempt in report.attempts:
-                            status_label = attempt.status
-                            levels_count = len(attempt.levels)
-                            lines.append(f"    Attempt #{attempt.attempt_id}: Levels Achieved={levels_count}, Total PnL=${attempt.total_pnl:,.2f}")
-                            
-                            for level in attempt.levels:
-                                target_amt = (
-                                    level.start_tier_balance * scaling_plan.profit_target_pct
-                                )
-                                # Improve labeling for Evaluation steps
-                                label_prefix = "Level"
-                                if level.status == "STEP_1_PASSED":
-                                    label_prefix = "Step 1"
-                                    target_amt = level.start_tier_balance * 0.10
-                                elif level.status == "PROMOTED_TO_FUNDED":
-                                    label_prefix = "Step 2"
-                                    target_amt = level.start_tier_balance * 0.05
-                                
-                                prog_label = level.failure_reason if level.failure_reason else "N/A"
-                                lvl_status = "Active" if level.status == "Active" else level.status
-                                lines.append(
-                                    f"      {label_prefix} #{level.level_id} [{prog_label} | Tier ${level.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={lvl_status}, PnL=${level.pnl:.2f}, Balance=${level.end_balance:.2f}"
-                                )
-                                if level.buyback_cost > 0:
-                                    lines.append(f"        Buyback: {prog_label} tier ${level.start_tier_balance:,.0f} | Cost: ${level.buyback_cost:,.2f}")
-                                
-                                lines.append(f"        Starting Wallet Balance: ${level.beginning_wallet_balance:,.2f}")
-                                if level.life_withdrawals > 0:
-                                    lines.append(f"        Life withdrawals: ${level.life_withdrawals:,.2f}")
-                                
-                                s_str = level.start_date.strftime("%Y-%m-%d %H:%M")
-                                e_str = level.end_date.strftime("%Y-%m-%d %H:%M")
-                                lines.append(f"        Period: {s_str} to {e_str}")
-
-                                if level.metrics:
-                                    m = level.metrics
-                                    lines.append(
-                                        f"        Stats: {m.win_count} Wins, {m.loss_count} Losses | "
-                                        f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
-                                    )
-                                
-                                if level.status == "FAILED_DRAWDOWN":
-                                    reason = (
-                                        level.failure_reason
-                                        if level.failure_reason
-                                        else "Drawdown Violation"
-                                    )
-                                    lines.append(f"        Failure: {reason} (End: {level.end_date})")
-                                elif level.status in ["SCALED_UP", "PROMOTED_TO_FUNDED"]:
-                                    lines.append(
-                                        f"        Success: Promoted to Tier Balance ${level.end_balance:.2f}"
-                                    )
-                                
-                                if level.status != "Active":
-                                    lines.append(f"        Ending Wallet Balance: ${level.new_wallet_balance:,.2f}")
-                                lines.append("")  # Blank line for readability
-                        
-                        lines.append(f"  Active Attempt Index: {report.active_attempt_index}")
-
-                        # Append to file
-                        with open(full_path, "a", encoding="utf-8") as f:
-                            f.write(f"\n\n[CTI Evaluation: {label}]\n")
-                            f.write("\n".join(lines))
-                            f.write("\n")
-
-                        # Console Summary (Concise)
-                        print(f"✓ CTI Evaluation [{label}]: {len(report.attempts)} attempts, {promotions} promotions, {resets} resets. Payout (80%): ${payout_80:,.2f}")
-
-                    else:
-                        # Single Challenge Evaluation (with Retry on Failure Logic)
-                        remaining_execs = executions
-                        life_id = 1
-                        lives = []
-
-                        header = f"\n[CTI Evaluation: {label}]"
-                        print(header.strip())
-                        details = []
-
-                        while remaining_execs:
-                            eval_result = evaluate_challenge(
-                                remaining_execs, challenge_conf, life_id=life_id
-                            )
-                            lives.append(eval_result)
-
-                            target_amt = (
-                                eval_result.start_tier_balance
-                                * challenge_conf.profit_target_pct
-                            )
-                            summary_line = (
-                                f"  Life #{eval_result.life_id} [Target ${target_amt:.0f}]: "
-                                f"Status={eval_result.status}, PnL=${eval_result.pnl:.2f}, "
-                                f"Balance=${eval_result.end_balance:.2f}"
-                            )
-                            print(summary_line)
-                            details.append(summary_line)
-
-                            if eval_result.status == "PROMOTED":
-                                print(f"    \u2713 PROMOTED to funded account!")
-                                details.append(f"    \u2713 PROMOTED to funded account!")
-                                break
-
-                            # If failed, retry with remaining executions if any left
-                            if eval_result.last_execution_index < len(remaining_execs):
-                                remaining_execs = remaining_execs[
-                                    eval_result.last_execution_index + 1 :
-                                ]
-                                life_id += 1
-                            else:
-                                break
-
-                        # Append to file
-                        with open(full_path, "a", encoding="utf-8") as f:
-                            f.write(f"\n\n[CTI Evaluation: {label}]\n")
-                            f.write("\n".join(details))
-                            f.write("\n")
-
-                except Exception as exc:
-                    logger.error("CTI Evaluation failed: %s", exc, exc_info=True)
-                    print(f"Error during CTI Evaluation: {exc}")
-
-            # Run CTI processing
-            if hasattr(result, "closed_trades"):
-                # PortfolioResult
-                process_cti(result.closed_trades, "Portfolio")
-            elif hasattr(result, "executions") and result.executions:
-                # BacktestResult
-                process_cti(result.executions, result.pair or "Single")
-
-    if args.profile:
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats(30)  # Top 30 hotspots
-        print("\n" + "="*80)
-        print("PERFORMANCE PROFILE (Top 30 Hotspots)")
-        print("="*80)
-        print(s.getvalue())
-        print("="*80 + "\n")
-
-    # Visualization
-    if args.visualize:
-            from ..visualization.datashader_viz import plot_backtest_results
-
-            logger.info("Opening visualization...")
-
-            # Prepare data for visualization
-            # If multi-symbol, concat
-            if len(symbol_data) > 1:
-                # Concat all frames
-                dfs = []
-                for sym, df in symbol_data.items():
-                    # Add symbol col if not present
-                    if "symbol" not in df.columns:
-                        df = df.with_columns(pl.lit(sym).alias("symbol"))
-                    dfs.append(df)
-
-                viz_data = pl.concat(dfs)
-                pair_label = "PORTFOLIO"
-            else:
-                pair_label = list(symbol_data.keys())[0]
-                viz_data = symbol_data[pair_label]
-
-            plot_backtest_results(
-                data=viz_data,
-                result=result,
-                pair=pair_label,
-                show_plot=True,
-                initial_balance=parameters.account_balance,
-                timeframe=args.timeframe,
-                # date ranges and other configs ignored for now
-            )
-
-    return 0
+# --- Placeholder for Argument Parser Setup ---
+# This part would typically be handled by the main cli script that calls this function.
+# Example:
+# parser = argparse.ArgumentParser(description="Run backtests.")
+# # Add arguments here...
+# args = parser.parse_args()
+# sys.exit(run_backtest_command(args))

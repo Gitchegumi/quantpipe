@@ -67,12 +67,23 @@ TRADING_SESSIONS: dict[str, TradingSession] = {
 }
 
 
+# Session aliases for CLI convenience
+SESSION_ALIASES = {
+    "EU": "LONDON",
+    "AS": "ASIA",
+    "SY": "SYDNEY",
+    "TOKYO": "ASIA",
+    "UK": "LONDON",
+}
+
+
 def get_session(name: str) -> TradingSession:
     """
     Get a trading session by name.
 
     Args:
         name: Session name (case-insensitive): NY, LONDON, ASIA, SYDNEY.
+              Also supports aliases: EU, AS, SY.
 
     Returns:
         TradingSession definition.
@@ -81,8 +92,13 @@ def get_session(name: str) -> TradingSession:
         ValueError: If session name is not recognized.
     """
     key = name.upper()
+
+    # Resolve aliases
+    if key in SESSION_ALIASES:
+        key = SESSION_ALIASES[key]
+
     if key not in TRADING_SESSIONS:
-        valid = ", ".join(TRADING_SESSIONS.keys())
+        valid = ", ".join(list(TRADING_SESSIONS.keys()) + list(SESSION_ALIASES.keys()))
         msg = f"Unknown session '{name}'. Valid sessions: {valid}"
         raise ValueError(msg)
     return TRADING_SESSIONS[key]
