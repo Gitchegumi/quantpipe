@@ -624,6 +624,12 @@ def configure_backtest_parser(
     )
 
     parser.add_argument(
+        "--limit-sessions",
+        action="store_true",
+        help="Limit trading to specific sessions (requires --sessions).",
+    )
+
+    parser.add_argument(
         "--sessions-force-close",
         action="store_true",
         help="Force close open trades at the end of the specified session(s).",
@@ -743,6 +749,22 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     from ..strategy.registry import (
         StrategyRegistry,
     )  # Used for dynamic strategy listing
+
+    # --- Early Exit for Strategy Listing ---
+    if args.list_strategies:
+        registry = StrategyRegistry()
+        strategies = registry.list()
+
+        console.print("\n[bold cyan]Available Strategies:[/bold cyan]")
+        table = pl.DataFrame(
+            {
+                "Name": [s.name for s in strategies],
+                "Tags": [", ".join(s.tags) for s in strategies],
+                "Version": [s.version for s in strategies],
+            }
+        )
+        console.print(table)
+        return 0
 
     # --- Define Choices for Prompts ---
     direction_choices = ["LONG", "SHORT", "BOTH"]
