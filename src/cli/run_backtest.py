@@ -47,7 +47,7 @@ import re  # Import re for regex in _prompt
 from datetime import UTC, datetime
 from pathlib import Path
 
-import questionary  # <<< Added for interactive prompts
+import questionary
 import polars as pl
 from rich.console import Console
 
@@ -58,12 +58,15 @@ from ..backtest.engine import (
 from ..backtest.portfolio.portfolio_simulator import PortfolioResult
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
-from ..risk.blackout.config import (
+from src.risk.blackout.config import (
     BlackoutConfig,
     NewsBlackoutConfig,
     SessionBlackoutConfig,
     SessionOnlyConfig,
 )
+from src.risk.prop_firm.loader import load_cti_config, load_scaling_plan
+from src.risk.prop_firm.scaling import evaluate_scaling
+from src.risk.prop_firm.reporter import format_cti_report
 from ..data_io.formatters import (
     format_json_output,
     format_text_output,
@@ -225,7 +228,8 @@ def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
             return []
 
     else:
-        # Handle case where choices are not provided (should ideally not happen for multi-select)
+        # Handle case where choices are not provided (should ideally not happen
+        # for multi-select)
         print("Error: _multi_select_prompt was called without providing choices.")
         return []
 
@@ -728,8 +732,6 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     """
     if args.profile:
         import cProfile
-        import pstats
-        import io
 
         pr = cProfile.Profile()
         pr.enable()
@@ -739,7 +741,8 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
     # --- Imports for parameter sweep moved here to prevent UnboundLocalError ---
     # These imports are only needed if the parameter sweep mode is activated.
-    # Moved here to avoid potential circular dependencies or unnecessary imports in standard runs.
+    # Moved here to avoid potential circular dependencies or unnecessary imports
+    # in standard runs.
     from ..backtest.sweep import (
         display_results_table,
         export_results_to_csv,
@@ -832,7 +835,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                         [strategy_input] if strategy_input else ["trend-pullback"]
                     )
                 except Exception as e:
-                    logger.error(f"Could not list strategies: {e}. Using default.")
+                    logger.error("Could not list strategies: %s. Using default.", e)
                     args.strategy = ["trend-pullback"]
 
         # 2. Pair Prompt (only if --data is not specified)
@@ -921,7 +924,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     )  # Default to selected CTI mode
                 else:
                     bb_mode = _prompt(
-                        f"? Buy-back Strategy ",
+                        "? Buy-back Strategy ",
                         default=args.cti_mode,
                         choices=cti_mode_choices,
                     )
@@ -982,7 +985,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
                     except Exception as e:
                         logger.exception(
-                            f"Failed to load CTI challenge levels for mode '{args.cti_mode}' from {resolved_path}: {e}"
+                            "Failed to load CTI challenge levels for mode '%s' from %s: %s",
+                            args.cti_mode,
+                            resolved_path,
+                            e,
                         )
                         # Fallback to hardcoded values if dynamic load fails
                         challenge_choices = [
@@ -1234,21 +1240,21 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 args
             )  # Pass args to reuse values if already set
         except Exception as e:
-            logger.error(f"Failed to collect indicator ranges: {e}")
+            logger.error("Failed to collect indicator ranges: %s", e)
             return 1
 
         # Generate combinations of parameters
         try:
             combinations = list(generate_combinations(indicator_ranges))
         except Exception as e:
-            logger.error(f"Failed to generate parameter combinations: {e}")
+            logger.error("Failed to generate parameter combinations: %s", e)
             return 1
 
         # Filter out invalid combinations (e.g., if a parameter depends on another)
         try:
             valid_combinations, skipped = filter_invalid_combinations(combinations)
         except Exception as e:
-            logger.error(f"Failed to filter invalid parameter combinations: {e}")
+            logger.error("Failed to filter invalid parameter combinations: %s", e)
             return 1
 
         if not confirm_sweep(indicator_ranges, len(valid_combinations), skipped):
@@ -1259,7 +1265,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         try:
             results = run_sweep(args, valid_combinations)
         except Exception as e:
-            logger.error(f"Error during parameter sweep execution: {e}")
+            logger.error("Error during parameter sweep execution: %s", e)
             return 1
 
         # Display and export results
@@ -1268,9 +1274,9 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         if args.csv:  # Assuming --csv argument exists for export path
             try:
                 export_results_to_csv(results, args.csv)
-                logger.info(f"Results exported to {args.csv}")
+                logger.info("Results exported to %s", args.csv)
             except Exception as e:
-                logger.error(f"Failed to export results to CSV: {e}")
+                logger.error("Failed to export results to CSV: %s", e)
 
         logger.info("Parameter sweep finished.")
         return 0  # Success
@@ -1288,9 +1294,8 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         )
         if yn == "y":
             # Rerun the function to trigger interactive prompts
-            # Need to simulate new args object with all None values to force interactive mode
-            import argparse
-
+            # Need to simulate new args object with all None values
+            # to force interactive mode
             new_args = argparse.Namespace()
             # Populate with None for all expected args
             for arg_name in vars(args):
@@ -1336,7 +1341,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
         strategy_params = StrategyParameters(**params_dict)
     except Exception as e:
-        logger.error(f"Invalid strategy parameters: {e}")
+        logger.error("Invalid strategy parameters: %s", e)
         return 1
 
     # Construct Blackout Configuration
@@ -1386,10 +1391,55 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         )
 
         # Display Results
+        output_content = ""
         if args.output_format == "json":
-            click.echo(format_portfolio_json_output(result))
+            output_content = format_portfolio_json_output(result)
         else:
-            click.echo(format_portfolio_text_output(result))
+            output_content = format_portfolio_text_output(result)
+
+            # CTI Evaluation (Feature 027)
+            if args.simulation_type == "City Traders Imperium (CTI)":
+                try:
+                    account_size = (
+                        int(args.starting_balance) if args.starting_balance else 2500
+                    )
+                    cti_mode = args.cti_mode if args.cti_mode else "2STEP"
+
+                    challenge_config = load_cti_config(cti_mode, account_size)
+                    scaling_config = load_scaling_plan(cti_mode)
+
+                    report = evaluate_scaling(
+                        executions=result.closed_trades,
+                        challenge_config=challenge_config,
+                        scaling_config=scaling_config,
+                        buyback_mode=args.buyback_strategy,
+                    )
+
+                    cti_text = format_cti_report(report)
+                    output_content += "\n" + cti_text
+
+                except Exception as e:
+                    logger.error("Failed to run CTI evaluation: %s", e)
+                    output_content += f"\n\n[CTI Evaluation Failed: {e}]"
+
+        print(output_content)
+
+        # Save to file
+        results_dir = Path("results")
+        results_dir.mkdir(exist_ok=True)
+
+        # Determine file extension
+        fmt = args.output_format if args.output_format else "text"
+        ext = "txt" if fmt == "text" else fmt
+
+        filename = f"backtest_{result.run_id}.{ext}"
+        output_path = results_dir / filename
+
+        try:
+            output_path.write_text(output_content, encoding="utf-8")
+            logger.info("Results saved to %s", output_path)
+        except Exception as e:
+            logger.error("Failed to save results to file: %s", e)
 
     except Exception as e:
         logger.exception("Backtest execution failed: %s", e)

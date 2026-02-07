@@ -110,4 +110,5 @@ class BlackoutConfig(BaseModel):
     @property
     def any_enabled(self) -> bool:
         """Return True if any blackout type is enabled."""
+        # pylint: disable=no-member
         return self.news.enabled or self.sessions.enabled or self.session_only.enabled
