@@ -68,6 +68,8 @@ def _scan_and_register(
         "__init__.py",
     }
 
+    seen_strategies = set()
+
     # Iterate through items in path
     for item in path.iterdir():
         if item.name.startswith("__") or item.name in excluded_files:

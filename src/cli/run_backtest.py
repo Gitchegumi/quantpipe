@@ -829,53 +829,57 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 import os
 
                 PRICE_DATA_DIR = Path("price_data/processed")
-                current_dir = Path.cwd()
 
                 # Attempt to resolve PRICE_DATA_DIR relative to common locations
                 if not PRICE_DATA_DIR.exists():
-                    if (current_dir / PRICE_DATA_DIR).exists():
-                        PRICE_DATA_DIR = current_dir / PRICE_DATA_DIR
-                    elif (
-                        current_dir.parent / PRICE_DATA_DIR
-                    ).exists():  # Check one level up
-                        PRICE_DATA_DIR = current_dir.parent / PRICE_DATA_DIR
-                    else:  # Fallback if not found
-                        logger.warning(
-                            f"Price data directory '{PRICE_DATA_DIR}' not found relative to {current_dir}. Trying absolute path."
-                        )
-                        PRICE_DATA_DIR = Path(
-                            "/home/dockegumi/.openclaw/workspace/price_data/processed"
-                        )  # Absolute path fallback
+                    pass
 
                 available_pairs = []
-                if PRICE_DATA_DIR.exists() and PRICE_DATA_DIR.is_dir():
-                    try:
-                        for item in os.listdir(PRICE_DATA_DIR):
-                            item_path = PRICE_DATA_DIR / item
-                            if item_path.is_dir():
-                                available_pairs.append(item.upper())
-                    except Exception as e:
-                        logger.error(
-                            f"Error accessing price data directory {PRICE_DATA_DIR}: {e}"
-                        )
+                if PRICE_DATA_DIR.exists():
+                    # Scan for .parquet files
+                    for item in PRICE_DATA_DIR.glob("*.parquet"):
+                        # Filename format: PAIR_TIMEFRAME.parquet or similar?
+                        # Assuming filename starts with PAIR
+                        # But actually user said "processed" directory.
+                        # Usually files are like EURUSD_1h.parquet or similar.
+                        # Or just straight PAIR names if it's a directory structure?
+                        # Let's assume files are named per pair.
+                        # Common pattern: BTCUSDT.parquet or BTCUSDT_1h.parquet
+                        parts = item.stem.split("_")
+                        if parts:
+                            available_pairs.append(parts[0])
 
-                # Provide a default if no pairs are found or error occurs
+                available_pairs = sorted(list(set(available_pairs)))  # Unique pairs
+
                 if not available_pairs:
-                    available_pairs.append("EURUSD")
+                    logger.warning("No price data found in %s.", PRICE_DATA_DIR)
+                    logger.warning("Please run 'quantpipe ingest' to download data.")
+                    # Provide a dummy choice or exit?
+                    # Prompt shouldn't crash.
+                    available_pairs = ["NO_DATA_FOUND"]
 
-                default_pairs = ["EURUSD"]
-                # Ensure default exists in available pairs
-                if not any(p in available_pairs for p in default_pairs):
-                    default_pairs = (
-                        [available_pairs[0]] if available_pairs else ["EURUSD"]
-                    )
-
-                selected_pairs = _multi_select_prompt(
-                    "? Pair(s) (e.g., EURUSD, space-separated) ",
-                    default=default_pairs,
-                    choices=available_pairs,
+                pair_choices = available_pairs
+                default_pair = (
+                    "EURUSD" if "EURUSD" in available_pairs else available_pairs[0]
                 )
-                args.pair = selected_pairs if selected_pairs else ["EURUSD"]
+
+                args.pair = _prompt(
+                    "? Pair(s) to trade ",
+                    default=default_pair,
+                    choices=pair_choices,
+                )
+                if args.pair == "NO_DATA_FOUND":
+                    logger.error("No data found. Exiting.")
+                    return 1
+
+                # Support multiple selection? The prompt returns a string if choices is list of strings?
+                # questionary.checkbox returns list. questionary.select returns string.
+                # _prompt uses select (single choice). The arg is 'pair' (singular/list?).
+                # If the user wants multiple, they probably need a different prompt type or split string.
+                # Argument parser says nargs='*'.
+                # But here we are setting args.pair to a single string from prompt.
+                # We should wrap it in list.
+                args.pair = [args.pair]
 
         # 3. Direction Prompt
         if args.direction is None:

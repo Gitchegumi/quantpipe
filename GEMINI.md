@@ -27,4 +27,9 @@ Python 3.11: Follow standard conventions
 - 011-optimize-batch-simulation: Added Python 3.11 + pandas, numpy, polars, pytest
 
 <!-- MANUAL ADDITIONS START -->
+
+- This project runs using poetry.
+- The terminal is powershell. Do not use bash commands such as `&&`. If you want to link multiple commands, use `;` instead.
+- Don't add files to the git commit until you are ready to commit and push.
+- Don't run `git add <file>` after every single change. Wait until you are ready to commit and push.
 <!-- MANUAL ADDITIONS END -->
