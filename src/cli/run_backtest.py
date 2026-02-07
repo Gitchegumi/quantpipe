@@ -47,6 +47,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
+import questionary
 
 from ..backtest.engine import (
     construct_data_paths,
@@ -83,36 +84,56 @@ def _is_interactive() -> bool:
 
 
 def _prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
-    """Interactively prompt user for input with validation and coercion."""
+    """Interactively prompt user for input using questionary arrow-key menus."""
+    # Extract default from message if present (e.g., "[default_value]")
+    import re
+    default_match = re.search(r'\[([^\]]+)\]', msg)
+    default = default_match.group(1) if default_match else None
+    
+    # Clean message for questionary
+    message = re.sub(r'\s*\[[^\]]+\]\s*:?\s*$', '', msg).strip()
+    message = message.lstrip('? ').strip()
+    
     if choices:
-        # Append choices to msg if not already there
-        choice_str = f" ({'/'.join(map(str, choices))})"
-        if choice_str.strip() not in msg:
-            # Insert before the last colon if present
-            if ":" in msg:
-                parts = msg.rsplit(":", 1)
-                msg = f"{parts[0]}{choice_str}:{parts[1]}"
-            else:
-                msg = f"{msg}{choice_str}"
-
-    while True:
+        # Use questionary.select for arrow-key menu
         try:
-            raw = input(msg).strip()
-            if raw == "":
-                return None
-
-            if choices is not None and raw not in [str(c) for c in choices]:
-                print(f"Invalid choice. Choose one of: {', '.join(map(str, choices))}")
-                continue
-
-            val = coerce(raw)
+            result = questionary.select(
+                message,
+                choices=[str(c) for c in choices],
+                default=str(default) if default and str(default) in [str(c) for c in choices] else None,
+            ).ask()
+            
+            if result is None:  # User cancelled (Ctrl+C)
+                print("\nOperation cancelled.")
+                sys.exit(1)
+            
+            return coerce(result)
+        except Exception as e:
+            print(f"Error during prompt: {e}")
+            return coerce(default) if default else None
+    else:
+        # Use questionary.text for free-form input
+        try:
+            result = questionary.text(
+                message,
+                default=str(default) if default else "",
+            ).ask()
+            
+            if result is None:  # User cancelled
+                print("\nOperation cancelled.")
+                sys.exit(1)
+            
+            if result == "" and default:
+                return coerce(default)
+            
+            val = coerce(result)
             if not validate(val):
                 print("Invalid value.")
-                continue
+                return coerce(default) if default else None
             return val
-        except (ValueError, EOFError):
-            print("Invalid input format.")
-            continue
+        except Exception as e:
+            print(f"Error during prompt: {e}")
+            return coerce(default) if default else None
 
 def _multi_select_prompt(msg: str, coerce=str, validate=lambda x: True, choices=None):
     """Interactively prompt user for multiple inputs with validation and coercion."""
