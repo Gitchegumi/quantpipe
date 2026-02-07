@@ -86,6 +86,10 @@ def _scan_and_register(
             strat_name = item.stem
 
         if strat_file and strat_file.exists():
+            if strat_name in seen_strategies:
+                continue
+            seen_strategies.add(strat_name)
+
             try:
                 # Dynamic import
                 module_name = f"{prefix}.{strat_name}"

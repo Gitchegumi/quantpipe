@@ -58,6 +58,12 @@ from ..backtest.engine import (
 from ..backtest.portfolio.portfolio_simulator import PortfolioResult
 from ..cli.logging_setup import setup_logging
 from ..config.parameters import StrategyParameters
+from ..risk.blackout.config import (
+    BlackoutConfig,
+    NewsBlackoutConfig,
+    SessionBlackoutConfig,
+    SessionOnlyConfig,
+)
 from ..data_io.formatters import (
     format_json_output,
     format_text_output,
@@ -188,19 +194,17 @@ def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
         # Ensure choices are strings for questionary compatibility
         string_choices = [str(c) for c in choices if isinstance(c, (str, int, float))]
 
-        # Format default selections for questionary
-        default_selections = []
-        if default is not None:
-            # Ensure default is treated as a list for consistent processing
-            default_list = default if isinstance(default, list) else [default]
-            # Filter defaults to only include those present in the actual choices
-            default_selections = [
-                str(d) for d in default_list if str(d) in string_choices
-            ]
+        # Create Choice objects with checked state for defaults
+        final_choices = []
+        for c in string_choices:
+            is_checked = default is not None and (
+                c == default or (isinstance(default, list) and c in default)
+            )
+            final_choices.append(questionary.Choice(c, checked=is_checked))
 
         try:
             selected_choices = questionary.checkbox(
-                message, choices=string_choices, default=default_selections, qmark="?"
+                message, choices=final_choices, qmark="?"
             ).ask()
 
             if selected_choices is None:  # User cancelled
@@ -271,7 +275,7 @@ def configure_backtest_parser(
         "--dataset",
         type=str,
         choices=["test", "validate"],
-        default="test",
+        default=None,
         help="Dataset to use when --data not specified (default: test). \
             Looks for price_data/processed/<pair>/<dataset>/<pair>_<dataset>.parquet",
     )
@@ -501,6 +505,7 @@ def configure_backtest_parser(
         "--gpu-accel",
         action="store_true",
         help="Enable GPU acceleration for indicators and scanning using CuPy/CUDA.",
+        dest="gpu_accel",
     )
 
     # Risk Management Arguments (Feature 021: FR-004 - Runtime policy selection)
@@ -788,12 +793,22 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     # Only prompt if not in non-interactive mode and certain flags are missing
     if not args.list_strategies and not args.register_strategy:
         # Check for missing required flags that need user input
-        # We'll refine this logic below to prompt only when truly needed.
+
+        # 0. Dataset Prompt (Test vs Validate)
+        if args.dataset is None:
+            if not is_interactive:
+                args.dataset = "test"
+            else:
+                args.dataset = _prompt(
+                    "? Dataset to use ",
+                    default="test",
+                    choices=["test", "validate"],
+                )
 
         # 1. Strategy Prompt
         if args.strategy is None:
             if not is_interactive:
-                args.strategy = ["trend-pullback"]  # Default for non-interactive
+                args.strategy = ["trend-pullback"]  # Default
             else:
                 try:
                     registry = StrategyRegistry()
@@ -826,60 +841,35 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 args.pair = ["EURUSD"]  # Default for non-interactive
             else:
                 # Dynamically get available pairs from price_data/processed/
-                import os
-
                 PRICE_DATA_DIR = Path("price_data/processed")
-
-                # Attempt to resolve PRICE_DATA_DIR relative to common locations
-                if not PRICE_DATA_DIR.exists():
-                    pass
-
                 available_pairs = []
-                if PRICE_DATA_DIR.exists():
-                    # Scan for .parquet files
-                    for item in PRICE_DATA_DIR.glob("*.parquet"):
-                        # Filename format: PAIR_TIMEFRAME.parquet or similar?
-                        # Assuming filename starts with PAIR
-                        # But actually user said "processed" directory.
-                        # Usually files are like EURUSD_1h.parquet or similar.
-                        # Or just straight PAIR names if it's a directory structure?
-                        # Let's assume files are named per pair.
-                        # Common pattern: BTCUSDT.parquet or BTCUSDT_1h.parquet
-                        parts = item.stem.split("_")
-                        if parts:
-                            available_pairs.append(parts[0])
 
-                available_pairs = sorted(list(set(available_pairs)))  # Unique pairs
+                if PRICE_DATA_DIR.exists():
+                    for item in PRICE_DATA_DIR.iterdir():
+                        if item.is_dir() and not item.name.startswith("__"):
+                            available_pairs.append(item.name.upper())
+
+                available_pairs = sorted(list(set(available_pairs)))
 
                 if not available_pairs:
                     logger.warning("No price data found in %s.", PRICE_DATA_DIR)
-                    logger.warning("Please run 'quantpipe ingest' to download data.")
+                    logger.warning("Please run 'quantpipe ingest' to process data.")
                     # Provide a dummy choice or exit?
-                    # Prompt shouldn't crash.
-                    available_pairs = ["NO_DATA_FOUND"]
+                    available_pairs = ["EURUSD"]  # Dummy to prevent crash
 
-                pair_choices = available_pairs
-                default_pair = (
-                    "EURUSD" if "EURUSD" in available_pairs else available_pairs[0]
+                # Multi-select prompt for pairs
+                default_pairs = ["EURUSD"]
+                if not any(p in available_pairs for p in default_pairs):
+                    default_pairs = (
+                        [available_pairs[0]] if available_pairs else ["EURUSD"]
+                    )
+
+                selected_pairs = _multi_select_prompt(
+                    "? Pair(s) (e.g., EURUSD, space-separated) ",
+                    default=default_pairs,
+                    choices=available_pairs,
                 )
-
-                args.pair = _prompt(
-                    "? Pair(s) to trade ",
-                    default=default_pair,
-                    choices=pair_choices,
-                )
-                if args.pair == "NO_DATA_FOUND":
-                    logger.error("No data found. Exiting.")
-                    return 1
-
-                # Support multiple selection? The prompt returns a string if choices is list of strings?
-                # questionary.checkbox returns list. questionary.select returns string.
-                # _prompt uses select (single choice). The arg is 'pair' (singular/list?).
-                # If the user wants multiple, they probably need a different prompt type or split string.
-                # Argument parser says nargs='*'.
-                # But here we are setting args.pair to a single string from prompt.
-                # We should wrap it in list.
-                args.pair = [args.pair]
+                args.pair = selected_pairs if selected_pairs else ["EURUSD"]
 
         # 3. Direction Prompt
         if args.direction is None:
@@ -1109,10 +1099,11 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     args.atr_period = atp if atp else 14
 
             # 7. Session Management
+            # 7. Session-Only Trading (Feature 026)
             console.print("\n[Session Management]")
 
             # Limit trading to specific sessions?
-            if args.limit_sessions is None:
+            if not args.limit_sessions:
                 if not is_interactive:
                     args.limit_sessions = False
                 else:
@@ -1134,7 +1125,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 args.sessions = []  # Explicitly empty if not limiting
 
             # Enable forced close for sessions?
-            if args.force_session_close is None:
+            if not args.force_session_close:
                 if not is_interactive:
                     args.force_session_close = False
                 else:
@@ -1159,19 +1150,19 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             console.print("\n[News Event Filtering]")
 
             # Enable news event blackout filtering?
-            if args.news_event_blackout is None:
+            if not args.blackout_news:
                 if not is_interactive:
-                    args.news_event_blackout = False
+                    args.blackout_news = False
                 else:
                     yn = _prompt(
                         "? Enable news event blackout filtering? ",
                         default="n",
                         choices=yes_no_choices,
                     )
-                    args.news_event_blackout = yn == "y"
+                    args.blackout_news = yn == "y"
 
             # Enable forced close for news?
-            if args.force_news_close is None:
+            if not args.force_news_close:
                 if not is_interactive:
                     args.force_news_close = False
                 else:
@@ -1309,47 +1300,100 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             logger.info("Exiting without running backtest.")
             return 1
 
-    # Placeholder: In a real implementation, this is where the backtest execution logic would go.
-    # For now, we'll just print the arguments to show they were processed.
-    print("\n--- Backtest Configuration ---")
-    print(f"Strategy: {args.strategy}")
-    print(f"Pair(s): {args.pair}")
-    print(f"Direction: {args.direction}")
-    print(f"Timeframe: {args.timeframe}")
-    print(f"Simulation Type: {args.simulation_type}")
-    if args.simulation_type == "City Traders Imperium (CTI)":
-        print(f"CTI Mode: {args.cti_mode}")
-        print(f"Buy-back Strategy: {args.buyback_strategy}")
-        print(f"Challenge Level (USD): {args.starting_balance}")
-    else:
-        print(f"Starting Capital (USD): {args.starting_balance}")
-    print(f"Risk % per trade: {args.risk_percent}")
-    print(f"Stop Policy: {args.stop_policy}")
-    if args.stop_policy in ["ATR", "ATR_Trailing"]:
-        print(f"ATR Multiplier: {args.atr_multiplier}")
-        print(f"ATR Period: {args.atr_period}")
-    print(f"Take Profit Policy: {args.take_profit_policy}")
-    print(f"Reward-to-Risk Ratio: {args.reward_risk_ratio}")
-    print(
-        f"Limit trading to specific sessions?: {'Yes' if args.limit_sessions else 'No'}"
-    )
-    if args.limit_sessions:
-        print(f"Sessions: {args.sessions}")
-    print(f"Force session close?: {'Yes' if args.force_session_close else 'No'}")
-    print(f"Session buffer window (minutes): {args.session_buffer}")
-    print(
-        f"News event blackout filtering?: {'Yes' if args.news_event_blackout else 'No'}"
-    )
-    print(f"Force news close?: {'Yes' if args.force_news_close else 'No'}")
-    if args.news_event_blackout or args.force_news_close:
-        print(f"Minutes before news: {args.minutes_before_news}")
-        print(f"Minutes after news: {args.minutes_after_news}")
+    # --- Execute Backtest ---
 
-    print("----------------------------")
+    # If strategy is empty after prompts (user cancelled or no strategy found)
+    if not args.strategy:
+        logger.error("No strategy selected or found. Exiting.")
+        sys.exit(1)
 
-    # Placeholder: In a real implementation, this is where the backtest execution logic would go.
-    # For now, we simulate successful completion.
-    logger.info("Backtest configuration processed successfully.")
+    # Construct data paths
+    try:
+        # construct_data_paths expects list of strings for pairs
+        pair_paths = construct_data_paths(args.pair, args.dataset)
+    except SystemExit:
+        return 1
+
+    # Prepare Strategy Parameters
+    # Map args to StrategyParameters
+    try:
+        # Use args values if present, else defaults from model will apply
+        # We need to map CLI arg names to model field names
+        params_dict = {}
+        if args.risk_percent is not None:
+            params_dict["risk_per_trade_pct"] = args.risk_percent
+        if args.atr_multiplier is not None:
+            params_dict["atr_stop_mult"] = args.atr_multiplier
+        if args.atr_period is not None:
+            params_dict["atr_length"] = args.atr_period
+        if args.reward_risk_ratio is not None:
+            params_dict["target_r_mult"] = args.reward_risk_ratio
+        if args.starting_balance is not None:
+            params_dict["account_balance"] = args.starting_balance
+
+        # Set strategy name (taking first one for now as per current limitation)
+        params_dict["strategy_name"] = args.strategy[0]
+
+        strategy_params = StrategyParameters(**params_dict)
+    except Exception as e:
+        logger.error(f"Invalid strategy parameters: {e}")
+        return 1
+
+    # Construct Blackout Configuration
+    blackout_config = BlackoutConfig(
+        news=NewsBlackoutConfig(
+            enabled=args.blackout_news if args.blackout_news is not None else False,
+            force_close=(
+                args.force_news_close if args.force_news_close is not None else False
+            ),
+            pre_close_minutes=(
+                args.minutes_before_news if args.minutes_before_news else 10
+            ),
+            post_pause_minutes=(
+                args.minutes_after_news if args.minutes_after_news else 30
+            ),
+        ),
+        # Session gap blackout (default params for now, only enabled flag from CLI)
+        sessions=SessionBlackoutConfig(
+            enabled=(
+                args.blackout_sessions if args.blackout_sessions is not None else False
+            ),
+        ),
+        session_only=SessionOnlyConfig(
+            enabled=args.limit_sessions if args.limit_sessions is not None else False,
+            allowed_sessions=args.sessions if args.sessions else [],
+            force_close=(
+                args.force_session_close
+                if args.force_session_close is not None
+                else False
+            ),
+            pre_close_minutes=args.session_buffer if args.session_buffer else 15,
+        ),
+    )
+
+    # Run Portfolio Backtest
+    try:
+        result, _ = run_portfolio_backtest(
+            pair_paths=pair_paths,
+            direction_mode=DirectionMode[args.direction],
+            strategy_params=strategy_params,
+            starting_equity=args.starting_balance if args.starting_balance else 2500.0,
+            dry_run=args.dry_run,
+            show_progress=True,
+            timeframe=args.timeframe if args.timeframe else "1m",
+            blackout_config=blackout_config,
+            use_gpu=args.gpu_accel,
+        )
+
+        # Display Results
+        if args.output_format == "json":
+            click.echo(format_portfolio_json_output(result))
+        else:
+            click.echo(format_portfolio_text_output(result))
+
+    except Exception as e:
+        logger.exception("Backtest execution failed: %s", e)
+        return 1
 
     return 0  # Indicate success
 

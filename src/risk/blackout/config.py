@@ -82,6 +82,8 @@ class SessionOnlyConfig(BaseModel):
 
     enabled: bool = False
     allowed_sessions: list[str] = Field(default_factory=list)
+    force_close: bool = False
+    pre_close_minutes: int = Field(default=15, ge=0, le=60)
 
 
 class BlackoutConfig(BaseModel):
