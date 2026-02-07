@@ -160,13 +160,8 @@ def _prompt(msg: str, default=None, coerce=str, choices=None):
             if text_input == "" and default is not None:
                 return coerce(default)
 
-            # Attempt coercion and validation
+            # Attempt coercion
             val = coerce(text_input)
-            if not validate(val):
-                print("Invalid input value.")
-                return (
-                    coerce(default) if default is not None else None
-                )  # Fallback to default
 
             return val
 
@@ -979,9 +974,6 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     "? Challenge Level (USD) ",
                     default=default_challenge,
                     coerce=float,
-                    validate=lambda x: x > 0
-                    and str(float(x))
-                    in challenge_choices,  # Validate against loaded choices
                     choices=challenge_choices,
                 )
                 args.starting_balance = b if b else float(default_challenge)
