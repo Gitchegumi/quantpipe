@@ -12,16 +12,49 @@ This document tracks all official releases of the trading-strategies project.
 
 ## Version Status
 
-### Current Version: 0.5.0
+### Current Version: 0.5.2
 
 - **Status**: Released
-- **Date**: 2026-01-31
+- **Date**: 2026-02-07
 - **Branch**: main
-- **PR**: #69
+- **PR**: #84
 
 ---
 
 ## Released Versions
+
+### [v0.5.2] - 2026-02-07
+
+**Theme**: Interactive CLI Overhaul & CTI Integration
+
+**Highlights**:
+
+- **Major UX Overhaul**: Completely redesigned the `quantpipe backtest` CLI using `questionary` for a modern, interactive experience.
+- **Prop Firm Support**: Explicit branching logic for "Personal Capital" vs "City Traders Imperium (CTI)" simulation modes.
+- **Dynamic Workflows**: Prompts now adapt dynamically based on previous choices (e.g., hiding CTI options when in Personal mode).
+- **Multi-Select Inputs**: Native checkbox support for selecting multiple strategies, pairs, and sessions.
+
+**Key Features**:
+
+1. **Interactive Prompting Flow**:
+   - New "Simulation Type" selection as the primary entry point.
+   - Dynamic population of available strategies and pairs from the filesystem.
+   - Recursive pair discovery in `price_data/processed/`.
+
+2. **CTI Evaluation Restoration**:
+   - Restored and enhanced CTI evaluation reports in backtest results.
+   - Added detailed Payout P&L breakdown (100% Gross vs 80% Net Share).
+   - Fixed timestamp attribute errors in `ClosedTrade` models.
+
+3. **Quality of Life**:
+   - "Limit Trading to Sessions" workflow with multi-select aliases (EU, US, AS).
+   - Smart defaults and validation for all inputs.
+   - Improved error handling for missing data or invalid configurations.
+
+**Related**:
+
+- Pull Request: #84
+- Linked Issues: #83 (Prompt Refactoring), #85 (Interactive Features)
 
 ### [v0.5.1] - 2026-02-03
 
