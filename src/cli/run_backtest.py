@@ -117,7 +117,11 @@ def _prompt(msg: str, default=None, coerce=str, choices=None):
             choice = questionary.select(
                 message,
                 choices=cleaned_choices,
-                default=default_choice_str,
+                default=(
+                    default_choice_str
+                    if default_choice_str in cleaned_choices
+                    else None
+                ),
                 use_shortcuts=True,  # Enable keyboard shortcuts like '?' for help
                 qmark="?",  # Retain the question mark prefix
             ).ask()
@@ -279,6 +283,14 @@ def configure_backtest_parser(
         help="Timeframe for backtesting (default: 1m). Resamples 1-minute data to "
         "target timeframe. Supports: Xm (minutes), Xh (hours), Xd (days). "
         "Examples: 1m, 5m, 15m, 1h, 4h, 1d, 7m, 90m",
+    )
+
+    parser.add_argument(
+        "--simulation-type",
+        type=str,
+        choices=["Personal Capital", "City Traders Imperium (CTI)"],
+        default=None,
+        help="Simulation type: 'Personal Capital' or 'City Traders Imperium (CTI)'",
     )
 
     parser.add_argument(
@@ -768,7 +780,15 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     # Filter strategies if a partial match is provided
                     strategy_input = _prompt(
                         "? Strategy [trend-pullback] ",
-                        default="trend-pullback",
+                        default=(
+                            "trend-pullback"
+                            if "trend-pullback" in available_strategies
+                            else (
+                                available_strategies[0]
+                                if available_strategies
+                                else None
+                            )
+                        ),
                         choices=available_strategies,
                     )
                     args.strategy = (
@@ -821,9 +841,16 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 if not available_pairs:
                     available_pairs.append("EURUSD")
 
+                default_pairs = ["EURUSD"]
+                # Ensure default exists in available pairs
+                if not any(p in available_pairs for p in default_pairs):
+                    default_pairs = (
+                        [available_pairs[0]] if available_pairs else ["EURUSD"]
+                    )
+
                 selected_pairs = _multi_select_prompt(
                     "? Pair(s) (e.g., EURUSD, space-separated) ",
-                    default=["EURUSD"],
+                    default=default_pairs,
                     choices=available_pairs,
                 )
                 args.pair = selected_pairs if selected_pairs else ["EURUSD"]
