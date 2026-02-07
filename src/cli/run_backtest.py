@@ -1207,8 +1207,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             logger.error(f"Failed to filter invalid parameter combinations: {e}")
             return 1
 
-        # Confirm with user before running potentially long sweep
-        if not confirm_sweep(len(valid_combinations), skipped):
+        if not confirm_sweep(indicator_ranges, len(valid_combinations), skipped):
             logger.info("Parameter sweep cancelled by user.")
             return 1  # Indicate cancellation
 
