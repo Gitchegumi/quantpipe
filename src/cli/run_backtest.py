@@ -43,11 +43,11 @@ import argparse
 import json
 import logging
 import sys
-import re # Import re for regex in _prompt
+import re  # Import re for regex in _prompt
 from datetime import UTC, datetime
 from pathlib import Path
 
-import questionary # <<< Added for interactive prompts
+import questionary  # <<< Added for interactive prompts
 import polars as pl
 from rich.console import Console
 
@@ -89,35 +89,37 @@ def _is_interactive() -> bool:
 
 # --- Interactive Prompt Utilities using Questionary ---
 
+
 def _prompt(msg: str, default=None, coerce=str, choices=None):
     """
     Interactively prompt user for input using questionary arrow-key menus.
     Handles default values, coercion, and choices for menu selection.
     """
     # Extract default value from message using regex if present (e.g., "[default_value]")
-    default_match = re.search(r'\[([^\]]+)\]', msg)
-    if default is None and default_match: # Use default from message if not provided via arg
+    default_match = re.search(r"\[([^\]]+)\]", msg)
+    if (
+        default is None and default_match
+    ):  # Use default from message if not provided via arg
         default = default_match.group(1)
 
     # Clean message for questionary (remove placeholders like [choices] and trailing colon)
-    message = re.sub(r'\s*\[[^\]]+\]\s*:?\s*$', '', msg).strip()
-    message = message.lstrip('? ').strip() # Remove leading '?' and space
+    message = re.sub(r"\s*\[[^\]]+\]\s*:?\s*$", "", msg).strip()
+    message = message.lstrip("? ").strip()  # Remove leading '?' and space
 
     if choices:
         # Use questionary.select for menu interaction
         cleaned_choices = [str(c) for c in choices if isinstance(c, (str, int, float))]
-        
+
         # Find default choice index if default is in cleaned_choices
         default_choice_str = str(default) if default is not None else None
-        
+
         try:
             choice = questionary.select(
                 message,
                 choices=cleaned_choices,
                 default=default_choice_str,
-                use_shortcuts=True, # Enable keyboard shortcuts like '?' for help
-                qmark="?", # Retain the question mark prefix
-                validate=lambda x: coerce(x) is not None, # Basic validation via coercion
+                use_shortcuts=True,  # Enable keyboard shortcuts like '?' for help
+                qmark="?",  # Retain the question mark prefix
             ).ask()
 
             if choice is None:  # User cancelled (Ctrl+C)
@@ -135,10 +137,9 @@ def _prompt(msg: str, default=None, coerce=str, choices=None):
                     print(f"Falling back to default value: {default}")
                     return val
                 except ValueError:
-                    pass # If default also fails coercion, proceed to manual input
+                    pass  # If default also fails coercion, proceed to manual input
             print("Please enter value manually:")
-            return coerce(input(f"{message} ")) # Manual input fallback
-
+            return coerce(input(f"{message} "))  # Manual input fallback
 
     else:
         # Use questionary.text for free-form input
@@ -147,14 +148,14 @@ def _prompt(msg: str, default=None, coerce=str, choices=None):
                 message,
                 default=str(default) if default is not None else "",
                 # Allow empty input unless coerced value is invalid
-                validate=lambda x: coerce(x) is not None if x else True, 
-                qmark="?"
+                validate=lambda x: coerce(x) is not None if x else True,
+                qmark="?",
             ).ask()
 
             if text_input is None:  # User cancelled
                 print("\nOperation cancelled.")
                 sys.exit(1)
-            
+
             # If input is empty and a default exists, use the default
             if text_input == "" and default is not None:
                 return coerce(default)
@@ -163,13 +164,17 @@ def _prompt(msg: str, default=None, coerce=str, choices=None):
             val = coerce(text_input)
             if not validate(val):
                 print("Invalid input value.")
-                return coerce(default) if default is not None else None # Fallback to default
+                return (
+                    coerce(default) if default is not None else None
+                )  # Fallback to default
 
             return val
 
         except Exception as e:  # Catch potential errors during prompt execution
             print(f"\nError during text prompt: {e}")
-            return coerce(default) if default is not None else None # Fallback to default
+            return (
+                coerce(default) if default is not None else None
+            )  # Fallback to default
 
 
 def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
@@ -178,7 +183,7 @@ def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
     Handles default values, coercion, and user cancellation.
     Assumes choices are presented as a list.
     """
-    message = msg.replace("? ", "").strip() # Clean message for questionary
+    message = msg.replace("? ", "").strip()  # Clean message for questionary
 
     if choices:
         # Ensure choices are strings for questionary compatibility
@@ -190,14 +195,13 @@ def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
             # Ensure default is treated as a list for consistent processing
             default_list = default if isinstance(default, list) else [default]
             # Filter defaults to only include those present in the actual choices
-            default_selections = [str(d) for d in default_list if str(d) in string_choices]
+            default_selections = [
+                str(d) for d in default_list if str(d) in string_choices
+            ]
 
         try:
             selected_choices = questionary.checkbox(
-                message,
-                choices=string_choices,
-                default=default_selections,
-                qmark="?"
+                message, choices=string_choices, default=default_selections, qmark="?"
             ).ask()
 
             if selected_choices is None:  # User cancelled
@@ -206,7 +210,7 @@ def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
 
             # Coerce selected choices and return the list
             coerced_results = [coerce(choice) for choice in selected_choices]
-            
+
             # Basic validation can be added here if needed beyond simple coercion
             # For now, assume successful coercion is sufficient validation
 
@@ -221,6 +225,7 @@ def _multi_select_prompt(msg: str, default=None, coerce=str, choices=None):
         # Handle case where choices are not provided (should ideally not happen for multi-select)
         print("Error: _multi_select_prompt was called without providing choices.")
         return []
+
 
 def configure_backtest_parser(
     parser: argparse.ArgumentParser,
@@ -504,7 +509,7 @@ def configure_backtest_parser(
         "--risk-pct",
         type=float,
         help="Risk percentage per trade (e.g., 0.25 for 0.25%%). Default: 0.25",
-        dest="risk_percent" # Corrected dest name
+        dest="risk_percent",  # Corrected dest name
     )
 
     parser.add_argument(
@@ -525,7 +530,7 @@ def configure_backtest_parser(
         "--atr-mult",
         type=float,
         help="ATR multiplier for stop distance. Default: 2.0",
-        dest="atr_multiplier" # Corrected dest name
+        dest="atr_multiplier",  # Corrected dest name
     )
 
     parser.add_argument(
@@ -569,14 +574,14 @@ def configure_backtest_parser(
         choices=["RiskMultiple", "None"],
         default=None,
         help="Take-profit policy type. Default: RiskMultiple",
-        dest="take_profit_policy" # Corrected dest name
+        dest="take_profit_policy",  # Corrected dest name
     )
 
     parser.add_argument(
         "--rr-ratio",
         type=float,
         help="Reward-to-risk ratio for RiskMultiple TP policy. Default: 2.0",
-        dest="reward_risk_ratio" # Corrected dest name
+        dest="reward_risk_ratio",  # Corrected dest name
     )
 
     parser.add_argument(
@@ -615,35 +620,35 @@ def configure_backtest_parser(
         "--sessions-force-close",
         action="store_true",
         help="Force close open trades at the end of the specified session(s).",
-        dest="force_session_close" # Corrected dest name
+        dest="force_session_close",  # Corrected dest name
     )
 
     parser.add_argument(
         "--sessions-window",
         type=int,
         help="Buffer window in minutes before session end to stop new entries (if force-close enabled).",
-        dest="session_buffer" # Corrected dest name
+        dest="session_buffer",  # Corrected dest name
     )
 
     parser.add_argument(
         "--news-force-close",
         action="store_true",
         help="Force close open trades before high-impact news events.",
-        dest="force_news_close" # Corrected dest name
+        dest="force_news_close",  # Corrected dest name
     )
 
     parser.add_argument(
         "--news-window-before",
         type=int,
         help="Minutes before news event to start blackout / force close.",
-        dest="minutes_before_news" # Corrected dest name
+        dest="minutes_before_news",  # Corrected dest name
     )
 
     parser.add_argument(
         "--news-window-after",
         type=int,
         help="Minutes after news event to end blackout.",
-        dest="minutes_after_news" # Corrected dest name
+        dest="minutes_after_news",  # Corrected dest name
     )
 
     # CTI Prop Firm Arguments (Feature 027)
@@ -724,44 +729,56 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         generate_combinations,
         run_sweep,
     )
-    from .prompts.range_input import collect_all_ranges, confirm_sweep # Assuming these exist
-    from ..strategy.registry import StrategyRegistry # Used for dynamic strategy listing
-
+    from .prompts.range_input import (
+        collect_all_ranges,
+        confirm_sweep,
+    )  # Assuming these exist
+    from ..strategy.registry import (
+        StrategyRegistry,
+    )  # Used for dynamic strategy listing
 
     # --- Define Choices for Prompts ---
     direction_choices = ["LONG", "SHORT", "BOTH"]
     simulation_choices = ["Personal Capital", "City Traders Imperium (CTI)"]
     cti_mode_choices = ["1STEP", "2STEP", "INSTANT"]
-    stop_policy_choices = ["ATR", "ATR_Trailing", "FixedPips", "FixedPips_Trailing", "MA_Trailing"]
+    stop_policy_choices = [
+        "ATR",
+        "ATR_Trailing",
+        "FixedPips",
+        "FixedPips_Trailing",
+        "MA_Trailing",
+    ]
     take_profit_choices = ["RiskMultiple", "None"]
     yes_no_choices = ["y", "n"]
-    session_choices = ["NY", "EU", "AS", "SY"] # Common session abbreviations
+    session_choices = ["NY", "EU", "AS", "SY"]  # Common session abbreviations
 
     # --- Interactive Prompts for Missing Flags (Feature 026) ---
     is_interactive = _is_interactive() and not args.non_interactive
-    run_param_sweep = False # Initialize sweep flag
+    run_param_sweep = False  # Initialize sweep flag
 
     # Only prompt if not in non-interactive mode and certain flags are missing
     if not args.list_strategies and not args.register_strategy:
         # Check for missing required flags that need user input
         # We'll refine this logic below to prompt only when truly needed.
-        
+
         # 1. Strategy Prompt
         if args.strategy is None:
             if not is_interactive:
-                args.strategy = ["trend-pullback"] # Default for non-interactive
+                args.strategy = ["trend-pullback"]  # Default for non-interactive
             else:
                 try:
                     registry = StrategyRegistry()
                     available_strategies = [strat.name for strat in registry.list()]
-                    
+
                     # Filter strategies if a partial match is provided
                     strategy_input = _prompt(
-                        "? Strategy [trend-pullback] ", 
-                        default="trend-pullback", 
-                        choices=available_strategies
+                        "? Strategy [trend-pullback] ",
+                        default="trend-pullback",
+                        choices=available_strategies,
                     )
-                    args.strategy = [strategy_input] if strategy_input else ["trend-pullback"]
+                    args.strategy = (
+                        [strategy_input] if strategy_input else ["trend-pullback"]
+                    )
                 except Exception as e:
                     logger.error(f"Could not list strategies: {e}. Using default.")
                     args.strategy = ["trend-pullback"]
@@ -769,22 +786,29 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         # 2. Pair Prompt (only if --data is not specified)
         if args.pair is None and not args.data:
             if not is_interactive:
-                args.pair = ["EURUSD"] # Default for non-interactive
+                args.pair = ["EURUSD"]  # Default for non-interactive
             else:
                 # Dynamically get available pairs from price_data/processed/
                 import os
+
                 PRICE_DATA_DIR = Path("price_data/processed")
                 current_dir = Path.cwd()
-                
+
                 # Attempt to resolve PRICE_DATA_DIR relative to common locations
                 if not PRICE_DATA_DIR.exists():
                     if (current_dir / PRICE_DATA_DIR).exists():
-                       PRICE_DATA_DIR = current_dir / PRICE_DATA_DIR
-                    elif (current_dir.parent / PRICE_DATA_DIR).exists(): # Check one level up
-                       PRICE_DATA_DIR = current_dir.parent / PRICE_DATA_DIR
-                    else: # Fallback if not found
-                       logger.warning(f"Price data directory '{PRICE_DATA_DIR}' not found relative to {current_dir}. Trying absolute path.")
-                       PRICE_DATA_DIR = Path("/home/dockegumi/.openclaw/workspace/price_data/processed") # Absolute path fallback
+                        PRICE_DATA_DIR = current_dir / PRICE_DATA_DIR
+                    elif (
+                        current_dir.parent / PRICE_DATA_DIR
+                    ).exists():  # Check one level up
+                        PRICE_DATA_DIR = current_dir.parent / PRICE_DATA_DIR
+                    else:  # Fallback if not found
+                        logger.warning(
+                            f"Price data directory '{PRICE_DATA_DIR}' not found relative to {current_dir}. Trying absolute path."
+                        )
+                        PRICE_DATA_DIR = Path(
+                            "/home/dockegumi/.openclaw/workspace/price_data/processed"
+                        )  # Absolute path fallback
 
                 available_pairs = []
                 if PRICE_DATA_DIR.exists() and PRICE_DATA_DIR.is_dir():
@@ -794,7 +818,9 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                             if item_path.is_dir():
                                 available_pairs.append(item.upper())
                     except Exception as e:
-                        logger.error(f"Error accessing price data directory {PRICE_DATA_DIR}: {e}")
+                        logger.error(
+                            f"Error accessing price data directory {PRICE_DATA_DIR}: {e}"
+                        )
 
                 # Provide a default if no pairs are found or error occurs
                 if not available_pairs:
@@ -803,14 +829,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 selected_pairs = _multi_select_prompt(
                     "? Pair(s) (e.g., EURUSD, space-separated) ",
                     default=["EURUSD"],
-                    choices=available_pairs
+                    choices=available_pairs,
                 )
                 args.pair = selected_pairs if selected_pairs else ["EURUSD"]
 
         # 3. Direction Prompt
         if args.direction is None:
             if not is_interactive:
-                args.direction = "LONG" # Default for non-interactive
+                args.direction = "LONG"  # Default for non-interactive
             else:
                 d = _prompt("? Direction ", default="LONG", choices=direction_choices)
                 args.direction = d if d else "LONG"
@@ -818,37 +844,49 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         # 4. Timeframe Prompt
         if args.timeframe is None:
             if not is_interactive:
-                args.timeframe = "1m" # Default for non-interactive
+                args.timeframe = "1m"  # Default for non-interactive
             else:
                 t = _prompt("? Timeframe (e.g., 1m, 5m, 1h) ", default="1m")
                 args.timeframe = t if t else "1m"
 
         # 5. Simulation Type (FR-027 / Issue #83 Refactor)
-        if args.simulation_type is None: # Assuming this arg exists or should be added
-             if not is_interactive:
-                 args.simulation_type = "Personal Capital" # Default for non-interactive
-             else:
-                 sim_type = _prompt("? What simulation are you running? ", default="Personal Capital", choices=simulation_choices)
-                 args.simulation_type = sim_type if sim_type else "Personal Capital"
+        if args.simulation_type is None:  # Assuming this arg exists or should be added
+            if not is_interactive:
+                args.simulation_type = "Personal Capital"  # Default for non-interactive
+            else:
+                sim_type = _prompt(
+                    "? What simulation are you running? ",
+                    default="Personal Capital",
+                    choices=simulation_choices,
+                )
+                args.simulation_type = sim_type if sim_type else "Personal Capital"
 
         # Conditional prompts based on simulation type
         if args.simulation_type == "City Traders Imperium (CTI)":
             console.print("\n[CTI Prop Firm Settings]")
-            
+
             # 1. CTI Mode
             if args.cti_mode is None:
                 if not is_interactive:
-                    args.cti_mode = "2STEP" # Default for non-interactive
+                    args.cti_mode = "2STEP"  # Default for non-interactive
                 else:
-                    mode = _prompt("? CTI Mode ", default="2STEP", choices=cti_mode_choices)
+                    mode = _prompt(
+                        "? CTI Mode ", default="2STEP", choices=cti_mode_choices
+                    )
                     args.cti_mode = mode if mode else "2STEP"
-                    
+
             # 2. Buy-back Strategy (defaults to selected CTI mode)
             if args.buyback_strategy is None:
-                 if not is_interactive:
-                     args.buyback_strategy = args.cti_mode # Default to selected CTI mode
-                 else:
-                    bb_mode = _prompt(f"? Buy-back Strategy ", default=args.cti_mode, choices=cti_mode_choices)
+                if not is_interactive:
+                    args.buyback_strategy = (
+                        args.cti_mode
+                    )  # Default to selected CTI mode
+                else:
+                    bb_mode = _prompt(
+                        f"? Buy-back Strategy ",
+                        default=args.cti_mode,
+                        choices=cti_mode_choices,
+                    )
                     args.buyback_strategy = bb_mode if bb_mode else args.cti_mode
 
             # 3. Challenge Level (dynamically populated)
@@ -860,148 +898,216 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     "2STEP": "cti_2_step_challenge.json",
                     "INSTANT": "cti_instant_funding.json",
                 }
-                
+
                 # Resolve file path relative to script or CWD
-                file_path_str = filename_map.get(args.cti_mode, "cti_2_step_challenge.json")
+                file_path_str = filename_map.get(
+                    args.cti_mode, "cti_2_step_challenge.json"
+                )
                 possible_paths = [
                     PRESETS_DIR / file_path_str,
-                    Path("src/config/presets/cti") / file_path_str, # Relative to workspace root
-                    Path(__file__).parent / "src/config/presets/cti" / file_path_str # Relative to current script file
+                    Path("src/config/presets/cti")
+                    / file_path_str,  # Relative to workspace root
+                    Path(__file__).parent
+                    / "src/config/presets/cti"
+                    / file_path_str,  # Relative to current script file
                 ]
-                
+
                 resolved_path = None
                 for p in possible_paths:
                     if p.exists():
                         resolved_path = p.resolve()
                         break
-                
+
                 if resolved_path:
                     try:
                         with open(resolved_path, encoding="utf-8") as f:
                             data = json.load(f)
-                            
+
                             if args.cti_mode == "INSTANT" and "programs" in data:
-                                program_list = data.get("programs", {}).get("STANDARD", [])
-                                challenge_choices = [str(float(item.get("tier_name"))) for item in program_list if "tier_name" in item]
+                                program_list = data.get("programs", {}).get(
+                                    "STANDARD", []
+                                )
+                                challenge_choices = [
+                                    str(float(item.get("tier_name")))
+                                    for item in program_list
+                                    if "tier_name" in item
+                                ]
                             elif "starting_account_sizes" in data:
-                                challenge_choices = [str(float(item.get("account_size"))) for item in data["starting_account_sizes"] if "account_size" in item]
-                            
-                            if not challenge_choices: raise ValueError("No challenge levels found in file.")
+                                challenge_choices = [
+                                    str(float(item.get("account_size")))
+                                    for item in data["starting_account_sizes"]
+                                    if "account_size" in item
+                                ]
+
+                            if not challenge_choices:
+                                raise ValueError("No challenge levels found in file.")
 
                     except Exception as e:
-                        logger.exception(f"Failed to load CTI challenge levels for mode '{args.cti_mode}' from {resolved_path}: {e}")
+                        logger.exception(
+                            f"Failed to load CTI challenge levels for mode '{args.cti_mode}' from {resolved_path}: {e}"
+                        )
                         # Fallback to hardcoded values if dynamic load fails
-                        challenge_choices = [str(float(c)) for c in [2500.0, 5000.0, 10000.0, 25000.0, 50000.0, 100000.0]]
-                else: # If file_path does not exist, use hardcoded defaults
-                    challenge_choices = [str(float(c)) for c in [2500.0, 5000.0, 10000.0, 25000.0, 50000.0, 100000.0]]
+                        challenge_choices = [
+                            str(float(c))
+                            for c in [
+                                2500.0,
+                                5000.0,
+                                10000.0,
+                                25000.0,
+                                50000.0,
+                                100000.0,
+                            ]
+                        ]
+                else:  # If file_path does not exist, use hardcoded defaults
+                    challenge_choices = [
+                        str(float(c))
+                        for c in [2500.0, 5000.0, 10000.0, 25000.0, 50000.0, 100000.0]
+                    ]
 
                 default_challenge = "25000.0"
                 if challenge_choices:
                     if default_challenge not in challenge_choices:
                         # Try to pick a sensible default if 25000 is not available
-                        if "100000.0" in challenge_choices: default_challenge = "100000.0"
-                        elif "50000.0" in challenge_choices: default_challenge = "50000.0"
-                        elif challenge_choices: default_challenge = challenge_choices[0]
-                
+                        if "100000.0" in challenge_choices:
+                            default_challenge = "100000.0"
+                        elif "50000.0" in challenge_choices:
+                            default_challenge = "50000.0"
+                        elif challenge_choices:
+                            default_challenge = challenge_choices[0]
+
                 b = _prompt(
                     "? Challenge Level (USD) ",
                     default=default_challenge,
                     coerce=float,
-                    validate=lambda x: x > 0 and str(float(x)) in challenge_choices, # Validate against loaded choices
-                    choices=challenge_choices
+                    validate=lambda x: x > 0
+                    and str(float(x))
+                    in challenge_choices,  # Validate against loaded choices
+                    choices=challenge_choices,
                 )
                 args.starting_balance = b if b else float(default_challenge)
-            
-            else: # Personal Capital Settings
+
+            else:  # Personal Capital Settings
                 console.print("\n[Personal Capital Settings]")
                 if args.starting_balance is None:
-                     if not is_interactive:
-                         args.starting_balance = DEFAULT_ACCOUNT_BALANCE
-                     else:
+                    if not is_interactive:
+                        args.starting_balance = DEFAULT_ACCOUNT_BALANCE
+                    else:
                         b = _prompt(
                             "? Starting Capital (USD) ",
-                            default=str(DEFAULT_ACCOUNT_BALANCE), # Use default constant
+                            default=str(
+                                DEFAULT_ACCOUNT_BALANCE
+                            ),  # Use default constant
                             coerce=float,
                         )
                         args.starting_balance = b if b else DEFAULT_ACCOUNT_BALANCE
 
             # 6. Risk Parameters
             console.print("\n[Risk Management]")
-            
+
             # Risk % per trade
             if args.risk_percent is None:
-                if not is_interactive: args.risk_percent = 0.25
+                if not is_interactive:
+                    args.risk_percent = 0.25
                 else:
                     rp = _prompt("? Risk % per trade ", default="0.25", coerce=float)
                     args.risk_percent = rp if rp else 0.25
-            
+
             # Stop Policy
             if args.stop_policy is None:
-                if not is_interactive: args.stop_policy = "ATR"
+                if not is_interactive:
+                    args.stop_policy = "ATR"
                 else:
-                    sp = _prompt("? Stop Policy ", default="ATR", choices=stop_policy_choices)
+                    sp = _prompt(
+                        "? Stop Policy ", default="ATR", choices=stop_policy_choices
+                    )
                     args.stop_policy = sp if sp else "ATR"
-            
+
             # Take Profit Policy
             if args.take_profit_policy is None:
-                if not is_interactive: args.take_profit_policy = "RiskMultiple"
+                if not is_interactive:
+                    args.take_profit_policy = "RiskMultiple"
                 else:
-                    tp = _prompt("? Take Profit Policy ", default="RiskMultiple", choices=take_profit_choices)
+                    tp = _prompt(
+                        "? Take Profit Policy ",
+                        default="RiskMultiple",
+                        choices=take_profit_choices,
+                    )
                     args.take_profit_policy = tp if tp else "RiskMultiple"
 
             # Reward-to-Risk Ratio
             if args.reward_risk_ratio is None:
-                if not is_interactive: args.reward_risk_ratio = 2.0
+                if not is_interactive:
+                    args.reward_risk_ratio = 2.0
                 else:
-                    rrr = _prompt("? Reward-to-Risk Ratio ", default="2.0", coerce=float)
+                    rrr = _prompt(
+                        "? Reward-to-Risk Ratio ", default="2.0", coerce=float
+                    )
                     args.reward_risk_ratio = rrr if rrr else 2.0
 
             # ATR Multiplier (only if ATR or ATR_Trailing is selected)
-            if args.stop_policy in ["ATR", "ATR_Trailing"] and args.atr_multiplier is None:
-                 if not is_interactive: args.atr_multiplier = 2.0
-                 else:
+            if (
+                args.stop_policy in ["ATR", "ATR_Trailing"]
+                and args.atr_multiplier is None
+            ):
+                if not is_interactive:
+                    args.atr_multiplier = 2.0
+                else:
                     atm = _prompt("? ATR Multiplier ", default="2.0", coerce=float)
                     args.atr_multiplier = atm if atm else 2.0
-            
+
             # ATR Period (only if ATR or ATR_Trailing is selected)
             if args.stop_policy in ["ATR", "ATR_Trailing"] and args.atr_period is None:
-                 if not is_interactive: args.atr_period = 14
-                 else:
-                     atp = _prompt("? ATR Period ", default="14", coerce=int)
-                     args.atr_period = atp if atp else 14
+                if not is_interactive:
+                    args.atr_period = 14
+                else:
+                    atp = _prompt("? ATR Period ", default="14", coerce=int)
+                    args.atr_period = atp if atp else 14
 
             # 7. Session Management
             console.print("\n[Session Management]")
-            
+
             # Limit trading to specific sessions?
             if args.limit_sessions is None:
-                 if not is_interactive: args.limit_sessions = False
-                 else:
-                    yn = _prompt("? Limit trading to specific sessions? ", default="n", choices=yes_no_choices)
+                if not is_interactive:
+                    args.limit_sessions = False
+                else:
+                    yn = _prompt(
+                        "? Limit trading to specific sessions? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
                     args.limit_sessions = yn == "y"
-            
+
             if args.limit_sessions and args.sessions is None:
                 selected_sessions = _multi_select_prompt(
-                    "? Sessions (space-separated, e.g., NY EU AS SY) ", 
-                    default=["NY"], # Default to NY if not specified
-                    choices=session_choices
+                    "? Sessions (space-separated, e.g., NY EU AS SY) ",
+                    default=["NY"],  # Default to NY if not specified
+                    choices=session_choices,
                 )
                 args.sessions = selected_sessions if selected_sessions else ["NY"]
             elif not args.limit_sessions and args.sessions is None:
-                args.sessions = [] # Explicitly empty if not limiting
+                args.sessions = []  # Explicitly empty if not limiting
 
             # Enable forced close for sessions?
             if args.force_session_close is None:
-                 if not is_interactive: args.force_session_close = False
-                 else:
-                    yn = _prompt("? Enable forced close for sessions? ", default="n", choices=yes_no_choices)
+                if not is_interactive:
+                    args.force_session_close = False
+                else:
+                    yn = _prompt(
+                        "? Enable forced close for sessions? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
                     args.force_session_close = yn == "y"
 
             # Session buffer window
             if args.session_buffer is None:
-                if not is_interactive: args.session_buffer = 15
+                if not is_interactive:
+                    args.session_buffer = 15
                 else:
-                    sb = _prompt("? Session buffer window (minutes) ", default="15", coerce=int)
+                    sb = _prompt(
+                        "? Session buffer window (minutes) ", default="15", coerce=int
+                    )
                     args.session_buffer = sb if sb else 15
 
             # 8. News Event Filtering
@@ -1009,28 +1115,40 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
             # Enable news event blackout filtering?
             if args.news_event_blackout is None:
-                 if not is_interactive: args.news_event_blackout = False
-                 else:
-                    yn = _prompt("? Enable news event blackout filtering? ", default="n", choices=yes_no_choices)
+                if not is_interactive:
+                    args.news_event_blackout = False
+                else:
+                    yn = _prompt(
+                        "? Enable news event blackout filtering? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
                     args.news_event_blackout = yn == "y"
 
             # Enable forced close for news?
             if args.force_news_close is None:
-                 if not is_interactive: args.force_news_close = False
-                 else:
-                    yn = _prompt("? Enable forced close for news? ", default="n", choices=yes_no_choices)
+                if not is_interactive:
+                    args.force_news_close = False
+                else:
+                    yn = _prompt(
+                        "? Enable forced close for news? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
                     args.force_news_close = yn == "y"
 
             # Minutes before/after news
             if args.minutes_before_news is None:
-                 if not is_interactive: args.minutes_before_news = 10
-                 else:
+                if not is_interactive:
+                    args.minutes_before_news = 10
+                else:
                     mbn = _prompt("? Minutes before news ", default="10", coerce=int)
                     args.minutes_before_news = mbn if mbn else 10
-            
+
             if args.minutes_after_news is None:
-                 if not is_interactive: args.minutes_after_news = 30
-                 else:
+                if not is_interactive:
+                    args.minutes_after_news = 30
+                else:
                     man = _prompt("? Minutes after news ", default="30", coerce=int)
                     args.minutes_after_news = man if man else 30
 
@@ -1038,26 +1156,32 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             # Only prompt if --test-range wasn't explicitly set via CLI
             if not args.test_range:
                 if not is_interactive:
-                    run_param_sweep = False # Default to not running sweep if non-interactive
+                    run_param_sweep = (
+                        False  # Default to not running sweep if non-interactive
+                    )
                 else:
-                    yn = _prompt("? Would you like to test a range of indicator values? ", default="n", choices=yes_no_choices)
+                    yn = _prompt(
+                        "? Would you like to test a range of indicator values? ",
+                        default="n",
+                        choices=yes_no_choices,
+                    )
                     if yn == "y":
                         run_param_sweep = True
-                        args.test_range = True # Set flag to trigger sweep logic
-            elif args.test_range: # If --test-range was explicitly set on CLI
+                        args.test_range = True  # Set flag to trigger sweep logic
+            elif args.test_range:  # If --test-range was explicitly set on CLI
                 run_param_sweep = True
 
         # --- End of Interactive Prompts ---
-    
+
     # If running in interactive mode and a parameter sweep was indicated,
     # load the necessary sweep-related imports.
     if run_param_sweep or args.test_range:
         # These imports were moved outside the interactive block earlier,
         # ensuring they are available if sweep mode is activated.
-        pass # Imports are already handled above
+        pass  # Imports are already handled above
 
     # --- Execute Backtest ---
-    
+
     # If strategy is empty after prompts (user cancelled or no strategy found)
     if not args.strategy:
         logger.error("No strategy selected or found. Exiting.")
@@ -1070,7 +1194,9 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         # Collect ranges for indicators (e.g., ATR period, ATR multiplier, RRR)
         # This function should prompt the user for ranges if not provided via CLI args
         try:
-            indicator_ranges = collect_all_ranges(args) # Pass args to reuse values if already set
+            indicator_ranges = collect_all_ranges(
+                args
+            )  # Pass args to reuse values if already set
         except Exception as e:
             logger.error(f"Failed to collect indicator ranges: {e}")
             return 1
@@ -1081,59 +1207,63 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         except Exception as e:
             logger.error(f"Failed to generate parameter combinations: {e}")
             return 1
-        
+
         # Filter out invalid combinations (e.g., if a parameter depends on another)
         try:
             valid_combinations, skipped = filter_invalid_combinations(combinations)
         except Exception as e:
             logger.error(f"Failed to filter invalid parameter combinations: {e}")
             return 1
-        
+
         # Confirm with user before running potentially long sweep
         if not confirm_sweep(len(valid_combinations), skipped):
             logger.info("Parameter sweep cancelled by user.")
-            return 1 # Indicate cancellation
+            return 1  # Indicate cancellation
 
         # Run the sweep
         try:
-             results = run_sweep(args, valid_combinations)
+            results = run_sweep(args, valid_combinations)
         except Exception as e:
-             logger.error(f"Error during parameter sweep execution: {e}")
-             return 1
+            logger.error(f"Error during parameter sweep execution: {e}")
+            return 1
 
         # Display and export results
         display_results_table(results)
-        
-        if args.csv: # Assuming --csv argument exists for export path
+
+        if args.csv:  # Assuming --csv argument exists for export path
             try:
                 export_results_to_csv(results, args.csv)
                 logger.info(f"Results exported to {args.csv}")
             except Exception as e:
                 logger.error(f"Failed to export results to CSV: {e}")
-        
+
         logger.info("Parameter sweep finished.")
-        return 0 # Success
+        return 0  # Success
 
     # --- Standard Backtest Execution ---
-    
+
     # If no arguments were passed, and we are not in interactive mode,
     # it means the user is running `opentrades run backtest` without flags.
     # We should prompt them if they want to enter interactive mode.
     if not any(vars(args).values()) and not is_interactive and not args.non_interactive:
-         yn = _prompt("No arguments provided. Enter interactive mode? ", default="y", choices=["y", "n"])
-         if yn == "y":
-             # Rerun the function to trigger interactive prompts
-             # Need to simulate new args object with all None values to force interactive mode
-             import argparse
-             new_args = argparse.Namespace()
-             # Populate with None for all expected args
-             for arg_name in vars(args):
-                 setattr(new_args, arg_name, None)
-             return run_backtest_command(new_args) # Recursive call to re-enter prompts
-         else:
-             logger.info("Exiting without running backtest.")
-             return 1
+        yn = _prompt(
+            "No arguments provided. Enter interactive mode? ",
+            default="y",
+            choices=["y", "n"],
+        )
+        if yn == "y":
+            # Rerun the function to trigger interactive prompts
+            # Need to simulate new args object with all None values to force interactive mode
+            import argparse
 
+            new_args = argparse.Namespace()
+            # Populate with None for all expected args
+            for arg_name in vars(args):
+                setattr(new_args, arg_name, None)
+            return run_backtest_command(new_args)  # Recursive call to re-enter prompts
+        else:
+            logger.info("Exiting without running backtest.")
+            return 1
 
     # Placeholder: In a real implementation, this is where the backtest execution logic would go.
     # For now, we'll just print the arguments to show they were processed.
@@ -1148,7 +1278,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         print(f"Buy-back Strategy: {args.buyback_strategy}")
         print(f"Challenge Level (USD): {args.starting_balance}")
     else:
-          print(f"Starting Capital (USD): {args.starting_balance}")
+        print(f"Starting Capital (USD): {args.starting_balance}")
     print(f"Risk % per trade: {args.risk_percent}")
     print(f"Stop Policy: {args.stop_policy}")
     if args.stop_policy in ["ATR", "ATR_Trailing"]:
@@ -1156,24 +1286,29 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         print(f"ATR Period: {args.atr_period}")
     print(f"Take Profit Policy: {args.take_profit_policy}")
     print(f"Reward-to-Risk Ratio: {args.reward_risk_ratio}")
-    print(f"Limit trading to specific sessions?: {'Yes' if args.limit_sessions else 'No'}")
+    print(
+        f"Limit trading to specific sessions?: {'Yes' if args.limit_sessions else 'No'}"
+    )
     if args.limit_sessions:
         print(f"Sessions: {args.sessions}")
     print(f"Force session close?: {'Yes' if args.force_session_close else 'No'}")
     print(f"Session buffer window (minutes): {args.session_buffer}")
-    print(f"News event blackout filtering?: {'Yes' if args.news_event_blackout else 'No'}")
+    print(
+        f"News event blackout filtering?: {'Yes' if args.news_event_blackout else 'No'}"
+    )
     print(f"Force news close?: {'Yes' if args.force_news_close else 'No'}")
     if args.news_event_blackout or args.force_news_close:
         print(f"Minutes before news: {args.minutes_before_news}")
         print(f"Minutes after news: {args.minutes_after_news}")
-    
+
     print("----------------------------")
-    
+
     # Placeholder: In a real implementation, this is where the backtest execution logic would go.
     # For now, we simulate successful completion.
     logger.info("Backtest configuration processed successfully.")
-    
-    return 0 # Indicate success
+
+    return 0  # Indicate success
+
 
 # --- Placeholder for Argument Parser Setup ---
 # This part would typically be handled by the main cli script that calls this function.
