@@ -1435,86 +1435,11 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         filename = f"backtest_{result.run_id}.{ext}"
         output_path = results_dir / filename
 
-                        lines.append(
-                            f"  Scaling Report (Total Attempts: {len(report.attempts)} | Total Levels: {total_levels} | Promotions: {promotions} | Resets: {resets})"
-                        )
-                        lines.append(
-                            f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
-                        )
-                        lines.append(
-                            f"  Financials: Wallet Balance: ${report.wallet_balance:,.2f} | Total Payouts: ${report.net_payouts:,.2f} | Total Costs: ${report.total_costs:,.2f}"
-                        )
-                        lines.append(
-                            f"  CTI Payout P&L (100%): ${payout_100:,.2f} | (80%): ${payout_80:,.2f}"
-                        )
-                        
-                        for attempt in report.attempts:
-                            status_label = attempt.status
-                            levels_count = len(attempt.levels)
-                            lines.append(f"    Attempt #{attempt.attempt_id}: Levels Achieved={levels_count}, Total PnL=${attempt.total_pnl:,.2f}")
-                            
-                            for level in attempt.levels:
-                                target_amt = (
-                                    level.start_tier_balance * scaling_plan.profit_target_pct
-                                )
-                                # Improve labeling for Evaluation steps
-                                label_prefix = "Level"
-                                if level.status == "STEP_1_PASSED":
-                                    label_prefix = "Step 1"
-                                    target_amt = level.start_tier_balance * 0.10
-                                elif level.status == "PROMOTED_TO_FUNDED":
-                                    label_prefix = "Step 2"
-                                    target_amt = level.start_tier_balance * 0.05
-                                
-                                prog_label = level.failure_reason if level.failure_reason else "N/A"
-                                lvl_status = "Active" if level.status == "Active" else level.status
-                                lines.append(
-                                    f"      {label_prefix} #{level.level_id} [{prog_label} | Tier ${level.start_tier_balance:.0f} | Target ${target_amt:.0f}]: Status={lvl_status}, PnL=${level.pnl:.2f}, Balance=${level.end_balance:.2f}"
-                                )
-                                if level.buyback_cost > 0:
-                                    lines.append(f"        Buyback: {prog_label} tier ${level.start_tier_balance:,.0f} | Cost: ${level.buyback_cost:,.2f}")
-                                
-                                lines.append(f"        Starting Wallet Balance: ${level.beginning_wallet_balance:,.2f}")
-                                if level.life_withdrawals > 0:
-                                    lines.append(f"        Life withdrawals: ${level.life_withdrawals:,.2f}")
-                                
-                                s_str = level.start_date.strftime("%Y-%m-%d %H:%M")
-                                e_str = level.end_date.strftime("%Y-%m-%d %H:%M")
-                                lines.append(f"        Period: {s_str} to {e_str}")
-
-                                if level.metrics:
-                                    m = level.metrics
-                                    lines.append(
-                                        f"        Stats: {m.win_count} Wins, {m.loss_count} Losses | "
-                                        f"MaxWinStreak: {m.max_consecutive_wins}, MaxLossStreak: {m.max_consecutive_losses}"
-                                    )
-                                
-                                if level.status == "FAILED_DRAWDOWN":
-                                    reason = (
-                                        level.failure_reason
-                                        if level.failure_reason
-                                        else "Drawdown Violation"
-                                    )
-                                    lines.append(f"        Failure: {reason} (End: {level.end_date})")
-                                elif level.status in ["SCALED_UP", "PROMOTED_TO_FUNDED"]:
-                                    lines.append(
-                                        f"        Success: Promoted to Tier Balance ${level.end_balance:.2f}"
-                                    )
-                                
-                                if level.status != "Active":
-                                    lines.append(f"        Ending Wallet Balance: ${level.new_wallet_balance:,.2f}")
-                                lines.append("")  # Blank line for readability
-                        
-                        lines.append(f"  Active Attempt Index: {report.active_attempt_index}")
-
-                        # Append to file
-                        with open(full_path, "a", encoding="utf-8") as f:
-                            f.write(f"\n\n[CTI Evaluation: {label}]\n")
-                            f.write("\n".join(lines))
-                            f.write("\n")
-
-                        # Console Summary (Concise)
-                        print(f"✓ CTI Evaluation [{label}]: {len(report.attempts)} attempts, {promotions} promotions, {resets} resets. Payout (80%): ${payout_80:,.2f}")
+        try:
+            output_path.write_text(output_content, encoding="utf-8")
+            logger.info("Results saved to %s", output_path)
+        except Exception as e:
+            logger.error("Failed to save results to file: %s", e)
 
     except Exception as e:
         logger.exception("Backtest execution failed: %s", e)
