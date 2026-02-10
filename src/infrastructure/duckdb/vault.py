@@ -37,11 +37,26 @@ class DuckDBVault:
         Ingests a Pandas DataFrame into the vault.
         Expected columns: timestamp, open, high, low, close, volume
         """
-        # Ensure standard column names
+        # Ensure standard column names and types
         df = df.copy()
         df['symbol'] = symbol
         df['timeframe'] = timeframe
-        
+
+        # Ensure timestamp is datetime
+        if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+        # Ensure numeric columns are float
+        numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # Reorder columns to exactly match table schema: symbol, timeframe, timestamp, open, high, low, close, volume
+        # This avoids positional mismatches in INSERT
+        column_order = ['symbol', 'timeframe', 'timestamp', 'open', 'high', 'low', 'close', 'volume']
+        df = df[column_order]
+
         # Use DuckDB's native registration to insert from dataframe
         self.conn.execute("INSERT OR REPLACE INTO ohlcv SELECT * FROM df")
         logging.info(f"Ingested {len(df)} rows for {symbol} ({timeframe}) into DuckDB vault.")
