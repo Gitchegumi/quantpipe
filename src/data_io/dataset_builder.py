@@ -68,6 +68,12 @@ def discover_symbols(raw_data_path: str) -> list[str]:
 def validate_schema(symbol: str, files: list[str]) -> bool:
     """Validate raw file schema consistency for a symbol.
 
+    Accepts two raw formats:
+      1. Standard: columns {'timestamp', 'open', 'high', 'low', 'close', 'volume'}
+      2. MetaTrader: columns {'date', 'time', 'open', 'high', 'low', 'close', 'volume'}
+
+    All files for a symbol must share the same format.
+
     Args:
         symbol: Symbol identifier
         files: List of raw CSV file paths
@@ -81,35 +87,57 @@ def validate_schema(symbol: str, files: list[str]) -> bool:
         logger.warning("No files provided for schema validation of symbol %s", symbol)
         return False
 
-    reference_columns = None
+    reference_format = None  # Either "standard" or "metatrader"
 
     for file_path in files:
         try:
             # Read only header to check schema
             df_header = pd.read_csv(file_path, nrows=0)
-            current_columns = set(df_header.columns.str.lower())
+            cols = set(df_header.columns.str.lower())
 
-            # Check for required columns
-            missing_columns = REQUIRED_COLUMNS - current_columns
-            if missing_columns:
+            # Check required columns: both formats must have O/H/L/C/V
+            base_required = {"open", "high", "low", "close", "volume"}
+            if not base_required.issubset(cols):
                 logger.error(
-                    "File %s for symbol %s missing required columns: %s",
+                    "File %s for symbol %s missing base OHLCV columns",
                     file_path,
                     symbol,
-                    missing_columns,
+                )
+                return False
+
+            # Determine format
+            if "timestamp" in cols:
+                fmt = "standard"
+                required = base_required | {"timestamp"}
+                missing = required - cols
+                if missing:
+                    logger.error(
+                        "File %s for symbol %s missing standard columns: %s",
+                        file_path,
+                        symbol,
+                        missing,
+                    )
+                    return False
+            elif {"date", "time"}.issubset(cols):
+                fmt = "metatrader"
+            else:
+                logger.error(
+                    "File %s for symbol %s: unrecognized format. Needs 'timestamp' or 'date'+'time'",
+                    file_path,
+                    symbol,
                 )
                 return False
 
             # Check consistency across files
-            if reference_columns is None:
-                reference_columns = current_columns
-            elif current_columns != reference_columns:
+            if reference_format is None:
+                reference_format = fmt
+            elif fmt != reference_format:
                 logger.error(
-                    "Schema mismatch in symbol %s: %s has columns %s, expected %s",
+                    "Schema mismatch in symbol %s: %s is %s, expected %s",
                     symbol,
                     file_path,
-                    current_columns,
-                    reference_columns,
+                    fmt,
+                    reference_format,
                 )
                 return False
 
@@ -120,7 +148,10 @@ def validate_schema(symbol: str, files: list[str]) -> bool:
             return False
 
     logger.debug(
-        "Schema validation passed for symbol %s (%d files)", symbol, len(files)
+        "Schema validation passed for symbol %s (%d files, format=%s)",
+        symbol,
+        len(files),
+        reference_format,
     )
     return True
 
@@ -168,6 +199,10 @@ def detect_gaps_and_overlaps(df: pd.DataFrame, symbol: str) -> tuple[int, int]:
 def merge_and_sort(symbol: str, files: list[str]) -> tuple[pd.DataFrame, int, int]:
     """Merge raw files, sort chronologically, detect gaps/overlaps.
 
+    Handles two raw formats:
+    - Standard: columns include 'timestamp' (ISO format)
+    - MetaTrader: separate 'date' (YYYY.MM.DD) and 'time' (HH:MM) columns
+
     Args:
         symbol: Symbol identifier
         files: List of raw CSV file paths
@@ -185,8 +220,26 @@ def merge_and_sort(symbol: str, files: list[str]) -> tuple[pd.DataFrame, int, in
             df = pd.read_csv(file_path)
             # Normalize column names to lowercase
             df.columns = df.columns.str.lower()
-            # Parse timestamp
+
+            # Convert MetaTraker format to standard 'timestamp'
+            if "timestamp" not in df.columns:
+                if {"date", "time"}.issubset(df.columns):
+                    # Combine date and time into timestamp (MetaTraker format: 2000.05.30 17:27)
+                    df["timestamp"] = pd.to_datetime(
+                        df["date"] + " " + df["time"],
+                        format="%Y.%m.%d %H:%M",
+                        utc=True
+                    )
+                    # Drop original date/time to avoid confusion
+                    df = df.drop(columns=["date", "time"])
+                else:
+                    raise ValueError(
+                        f"File {file_path} missing required columns: 'timestamp' or both 'date' and 'time'"
+                    )
+
+            # Parse timestamp to datetime (UTC)
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+
             dataframes.append(df)
             logger.debug("Loaded %d rows from %s", len(df), file_path)
         except Exception as e:
