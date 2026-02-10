@@ -19,7 +19,60 @@ This document tracks all official releases of the trading-strategies project.
 - **Branch**: main
 - **PR**: #84
 
+### Next Version: 0.6.0
+
+- **Status**: Upcoming
+- **Branch**: issue/80-duckdb-viz-refactor
+- **PR**: #81
+
+**Theme**: Visual Replay Engine & Refined CLI Experience
+
+**Highlights**:
+
+- **DuckDB-Powered Visualization**: Introduces an interactive backtest replay dashboard built on HoloViews/Datashader, reading from a centralized DuckDB vault. Enables smooth exploration of millions of 1-minute candles with trade overlays and portfolio metrics.
+- **Simplified CLI Workflow**: Backtest UX streamlined: concise one-line terminal summary, and an unconditional pre-run prompt to launch the visualizer. Users no longer need to remember flags.
+- **Vault Initialization Support**: Clear in-terminal instructions when the DuckDB vault is missing, guiding users through data ingestion to enable visualization.
+
+**Key Features**:
+
+1. **DuckDB Vault & Replay System**:
+   - Ingests 35 years of MetaTrader data (2000–2025) into `data/vault.duckdb` (8.6M+ rows for EURUSD 1-minute).
+   - `ReplaySession` loads data slices efficiently for interactive exploration.
+   - Standalone `qp-replay` CLI with HoloViews dashboard: candlesticks, indicators, trade markers, portfolio equity curve.
+   - Backtest engine still runs from Parquet (fast); vault is exclusively for visualization (clean separation).
+
+2. **Backtest CLI Improvements**:
+   - Terminal output reduced to essential summary: `✓ 30898 trades | 45.2% win rate | Net P&L: $502.96` plus results file path.
+   - Full detailed results saved to `results/backtest_<id>.txt` or `.json` for later review.
+   - Interactive users are prompted **before** the backtest: "? Would you like to run the visualizer after the backtest? [y/N]".
+   - If DuckDB vault not found, prints helpful instructions: run `poetry run quantpipe ingest` to build it.
+   - Removed `--visualize`, `--viz-start`, `--viz-end` flags—simpler UX, no documentation needed.
+
+3. **Composite Weather Skill** (infrastructure):
+   - New `composite-weather` skill unifies Weather, Air Quality, Solar, and Pollen APIs under a single Google API key.
+   - Implements 24-hour caching to stay within free tier limits.
+   - Used by Daily News Update to provide enriched morning environmental reports.
+
+**Usage**:
+
+```bash
+# First-time setup: ingest data into DuckDB vault
+poetry run quantpipe ingest --symbol EURUSD
+
+# Run backtest with interactive prompt
+poetry run quantpipe backtest --direction LONG
+# → "? Would you like to run the visualizer? (y/N)"
+
+# Visualizer opens in browser with last 3 months of data
+```
+
+**Related**:
+
+- Pull Request: #81 (DuckDB visualization refactor)
+- Linked Issues: #80 (Replay feature), #79 (Vault optimization)
+
 ---
+
 
 ## Released Versions
 
