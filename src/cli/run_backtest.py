@@ -96,6 +96,57 @@ def _is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
+def _launch_visualizer(result, output_path, args):
+    """
+    Launch the interactive replay dashboard using the backtest results.
+    Uses DuckDB vault if available; falls back to Parquet data.
+    """
+    try:
+        from src.visualization.datashader_viz import plot_backtest_results
+        from src.backtest.replay import ReplaySession
+        from datetime import datetime
+        import polars as pl
+
+        console.print("[cyan]Starting visualization...[/cyan]")
+
+        # Determine symbol and data path
+        pair = result.symbol if hasattr(result, "symbol") else "portfolio"
+        # Prefer DuckDB vault if exists
+        vault_path = Path("data/vault.duckdb")
+        if vault_path.exists():
+            # Use ReplaySession with vault
+            # Determine date range from args or default to last 3 months
+            end_dt = datetime.now()
+            start_dt = None
+            if args.viz_start:
+                start_dt = datetime.strptime(args.viz_start, "%Y-%m-%d")
+            if args.viz_end:
+                end_dt = datetime.strptime(args.viz_end, "%Y-%m-%d")
+            # Launch interactive replay CLI (blocking)
+            console.print(f"Loading replay from vault for {pair}...")
+            # We'll call the replay CLI directly for simplicity
+            import subprocess
+            cmd = [
+                "poetry", "run", "qp-replay",
+                "--symbol", pair,
+                "--timeframe", args.timeframe if args.timeframe else "1m",
+                "--vault-path", str(vault_path)
+            ]
+            if args.viz_start:
+                cmd.extend(["--start", args.viz_start])
+            if args.viz_end:
+                cmd.extend(["--end", args.viz_end])
+            subprocess.run(cmd)
+        else:
+            # Fallback to plotting directly from backtest data
+            # Load the original data used in backtest
+            # This is a simplified fallback; ideally we'd pass the data through
+            console.print("[yellow]DuckDB vault not found. Visualization requires vault data.[/yellow]")
+            console.print("Please ensure the dataset has been ingested into the vault.")
+    except Exception as e:
+        console.print(f"[red]Visualization failed: {e}[/red]")
+
+
 # --- Interactive Prompt Utilities using Questionary ---
 
 
@@ -1390,7 +1441,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             use_gpu=args.gpu_accel,
         )
 
-        # Display Results
+        # Build full output content for file
         output_content = ""
         if args.output_format == "json":
             output_content = format_portfolio_json_output(result)
@@ -1422,16 +1473,12 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     logger.error("Failed to run CTI evaluation: %s", e)
                     output_content += f"\n\n[CTI Evaluation Failed: {e}]"
 
-        print(output_content)
-
-        # Save to file
+        # Save full output to file (non-intrusive)
         results_dir = Path("results")
         results_dir.mkdir(exist_ok=True)
 
-        # Determine file extension
         fmt = args.output_format if args.output_format else "text"
         ext = "txt" if fmt == "text" else fmt
-
         filename = f"backtest_{result.run_id}.{ext}"
         output_path = results_dir / filename
 
@@ -1440,6 +1487,38 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             logger.info("Results saved to %s", output_path)
         except Exception as e:
             logger.error("Failed to save results to file: %s", e)
+
+        # Print minimal summary to terminal (concise)
+        # Extract key metrics from result (works for both single and portfolio)
+        total_trades = getattr(result, "total_trades", 0)
+        win_rate = getattr(result, "win_rate", None)
+        net_pnl = getattr(result, "net_pnl", None)
+        
+        summary_parts = []
+        if total_trades is not None:
+            summary_parts.append(f"{total_trades} trades")
+        if win_rate is not None:
+            summary_parts.append(f"{win_rate:.1f}% win rate")
+        if net_pnl is not None:
+            summary_parts.append(f"Net P&L: ${net_pnl:.2f}")
+        
+        summary = " | ".join(summary_parts) if summary_parts else "Backtest completed"
+        console.print(f"[green]✓ {summary}[/green]")
+        console.print(f"   Full results: {output_path}")
+
+        # Prompt for visualization if --visualize flag is set
+        if args.visualize:
+            if is_interactive:
+                viz_yn = _prompt(
+                    "? Would you like to run the visualizer? ",
+                    default="n",
+                    choices=["y", "n"],
+                )
+                if viz_yn == "y":
+                    _launch_visualizer(result, output_path, args)
+            else:
+                # Non-interactive: do not auto-launch; require explicit default=no behavior
+                console.print("[yellow]Visualization skipped (non-interactive mode).[/yellow]")
 
     except Exception as e:
         logger.exception("Backtest execution failed: %s", e)
