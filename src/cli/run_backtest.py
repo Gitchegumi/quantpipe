@@ -1347,6 +1347,10 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             args.visualize = (viz_yn == "y")
         else:
             console.print("[yellow]DuckDB vault not found. Visualization unavailable.[/yellow]")
+            console.print("[white]To enable visualization:[/white]")
+            console.print("  1. Ensure raw price data exists in price_data/raw/")
+            console.print("  2. Run: poetry run quantpipe ingest")
+            console.print("  3. This will build the vault (data/vault.duckdb) with 1-minute data.")
             args.visualize = False
     else:
         args.visualize = False
