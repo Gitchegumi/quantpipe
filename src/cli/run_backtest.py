@@ -96,17 +96,12 @@ def _is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
-def _launch_visualizer(result, output_path, args):
+def _launch_visualizer(result, args):
     """
     Launch the interactive replay dashboard using the backtest results.
     Uses DuckDB vault if available; falls back to Parquet data.
     """
     try:
-        from src.visualization.datashader_viz import plot_backtest_results
-        from src.backtest.replay import ReplaySession
-        from datetime import datetime
-        import polars as pl
-
         console.print("[cyan]Starting visualization...[/cyan]")
 
         # Determine symbol and data path
@@ -115,32 +110,26 @@ def _launch_visualizer(result, output_path, args):
         vault_path = Path("data/vault.duckdb")
         if vault_path.exists():
             # Use ReplaySession with vault
-            # Determine date range from args or default to last 3 months
+            # Default to last 3 months
+            from datetime import datetime, timedelta
             end_dt = datetime.now()
-            start_dt = None
-            if args.viz_start:
-                start_dt = datetime.strptime(args.viz_start, "%Y-%m-%d")
-            if args.viz_end:
-                end_dt = datetime.strptime(args.viz_end, "%Y-%m-%d")
+            start_dt = end_dt - timedelta(days=90)
+            start_str = start_dt.strftime("%Y-%m-%d")
+            end_str = end_dt.strftime("%Y-%m-%d")
             # Launch interactive replay CLI (blocking)
             console.print(f"Loading replay from vault for {pair}...")
-            # We'll call the replay CLI directly for simplicity
             import subprocess
             cmd = [
                 "poetry", "run", "qp-replay",
                 "--symbol", pair,
                 "--timeframe", args.timeframe if args.timeframe else "1m",
-                "--vault-path", str(vault_path)
+                "--vault-path", str(vault_path),
+                "--start", start_str,
+                "--end", end_str
             ]
-            if args.viz_start:
-                cmd.extend(["--start", args.viz_start])
-            if args.viz_end:
-                cmd.extend(["--end", args.viz_end])
             subprocess.run(cmd)
         else:
             # Fallback to plotting directly from backtest data
-            # Load the original data used in backtest
-            # This is a simplified fallback; ideally we'd pass the data through
             console.print("[yellow]DuckDB vault not found. Visualization requires vault data.[/yellow]")
             console.print("Please ensure the dataset has been ingested into the vault.")
     except Exception as e:
@@ -477,24 +466,6 @@ def configure_backtest_parser(
         "--no-aggregate",
         action="store_true",
         help="Disable aggregation, produce only per-strategy outputs",
-    )
-
-    parser.add_argument(
-        "--visualize",
-        action="store_true",
-        help="Open interactive chart with results (requires GUI environment)",
-    )
-
-    parser.add_argument(
-        "--viz-start",
-        type=str,
-        help="Start date for visualization (YYYY-MM-DD). If omitted, defaults to last 3 months.",
-    )
-
-    parser.add_argument(
-        "--viz-end",
-        type=str,
-        help="End date for visualization (YYYY-MM-DD).",
     )
 
     parser.add_argument(
@@ -1506,19 +1477,17 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         console.print(f"[green]✓ {summary}[/green]")
         console.print(f"   Full results: {output_path}")
 
-        # Prompt for visualization if --visualize flag is set
-        if args.visualize:
-            if is_interactive:
-                viz_yn = _prompt(
-                    "? Would you like to run the visualizer? ",
-                    default="n",
-                    choices=["y", "n"],
-                )
-                if viz_yn == "y":
-                    _launch_visualizer(result, output_path, args)
-            else:
-                # Non-interactive: do not auto-launch; require explicit default=no behavior
-                console.print("[yellow]Visualization skipped (non-interactive mode).[/yellow]")
+        # Prompt for visualization in interactive mode (always ask)
+        if is_interactive:
+            viz_yn = _prompt(
+                "? Would you like to run the visualizer? ",
+                default="n",
+                choices=["y", "n"],
+            )
+            if viz_yn == "y":
+                _launch_visualizer(result, args)
+        else:
+            console.print("[yellow]Visualization skipped (non-interactive mode).[/yellow]")
 
     except Exception as e:
         logger.exception("Backtest execution failed: %s", e)
