@@ -1334,6 +1334,23 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         logger.error("No strategy selected or found. Exiting.")
         sys.exit(1)
 
+    # --- Visualization prompt (pre-backtest) ---
+    # Check for DuckDB vault and ask if user wants to visualize after backtest completes
+    if is_interactive:
+        vault_path = Path("data/vault.duckdb")
+        if vault_path.exists():
+            viz_yn = _prompt(
+                "? Would you like to run the visualizer after the backtest? ",
+                default="n",
+                choices=["y", "n"],
+            )
+            args.visualize = (viz_yn == "y")
+        else:
+            console.print("[yellow]DuckDB vault not found. Visualization unavailable.[/yellow]")
+            args.visualize = False
+    else:
+        args.visualize = False
+
     # Construct data paths
     try:
         # construct_data_paths expects list of strings for pairs
@@ -1477,15 +1494,12 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         console.print(f"[green]✓ {summary}[/green]")
         console.print(f"   Full results: {output_path}")
 
-        # Prompt for visualization in interactive mode (always ask)
-        if is_interactive:
-            viz_yn = _prompt(
-                "? Would you like to run the visualizer? ",
-                default="n",
-                choices=["y", "n"],
-            )
-            if viz_yn == "y":
-                _launch_visualizer(result, args)
+        # Launch visualizer if user opted in (pre-backtest prompt)
+        if args.visualize:
+            _launch_visualizer(result, args)
+        elif is_interactive:
+            # Non-interactive already set to False; this branch just clarifies no action
+            pass
         else:
             console.print("[yellow]Visualization skipped (non-interactive mode).[/yellow]")
 
