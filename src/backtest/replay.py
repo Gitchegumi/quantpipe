@@ -92,7 +92,7 @@ class ReplaySession:
                 SELECT
                     MIN(timestamp) as min_ts,
                     MAX(timestamp) as max_ts
-                FROM candles
+                FROM ohlcv
                 WHERE symbol = ? AND timeframe = ?
             """
             result = self.vault.conn.execute(query, [self.symbol, self.timeframe]).fetchone()
