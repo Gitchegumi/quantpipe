@@ -49,6 +49,7 @@ from pathlib import Path
 
 import questionary
 import polars as pl
+import yaml
 from rich.console import Console
 
 from ..backtest.engine import (
@@ -1363,24 +1364,53 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         return 1
 
     # Prepare Strategy Parameters
-    # Map args to StrategyParameters
+    # Load config file if provided
+    config_params = {}
+    if args.config:
+        config_path = Path(args.config)
+        if config_path.exists():
+            try:
+                with open(config_path, encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+                # Only include keys that match StrategyParameters fields
+                allowed_fields = StrategyParameters.__fields__.keys()
+                for key in allowed_fields:
+                    if key in config_data:
+                        config_params[key] = config_data[key]
+                logger.info("Loaded config from %s with %d parameters", config_path, len(config_params))
+            except Exception as e:
+                logger.error("Failed to load config %s: %s", config_path, e)
+                return 1
+        else:
+            logger.warning("Config file %s not found. Using defaults.", config_path)
+
+    # Map args to StrategyParameters, with precedence: CLI > config > defaults
     try:
-        # Use args values if present, else defaults from model will apply
         # We need to map CLI arg names to model field names
         params_dict = {}
-        if args.risk_percent is not None:
-            params_dict["risk_per_trade_pct"] = args.risk_percent
-        if args.atr_multiplier is not None:
-            params_dict["atr_stop_mult"] = args.atr_multiplier
-        if args.atr_period is not None:
-            params_dict["atr_length"] = args.atr_period
-        if args.reward_risk_ratio is not None:
-            params_dict["target_r_mult"] = args.reward_risk_ratio
-        if args.starting_balance is not None:
-            params_dict["account_balance"] = args.starting_balance
+
+        # CLI args with dest names that may differ
+        cli_mapping = {
+            "risk_percent": "risk_per_trade_pct",
+            "atr_multiplier": "atr_stop_mult",
+            "atr_period": "atr_length",
+            "reward_risk_ratio": "target_r_mult",
+            "starting_balance": "account_balance",
+            "max_position_size": "max_position_size",
+        }
+
+        # Start with config params
+        params_dict.update(config_params)
+
+        # Override with CLI args where present
+        for cli_arg, model_field in cli_mapping.items():
+            cli_val = getattr(args, cli_arg, None)
+            if cli_val is not None:
+                params_dict[model_field] = cli_val
 
         # Set strategy name (taking first one for now as per current limitation)
-        params_dict["strategy_name"] = args.strategy[0]
+        if args.strategy:
+            params_dict["strategy_name"] = args.strategy[0]
 
         strategy_params = StrategyParameters(**params_dict)
     except Exception as e:
