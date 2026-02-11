@@ -8,7 +8,7 @@ packages = [{include = "src"}]
 
 [tool.poetry.scripts]
 quantpipe = "src.cli.main:main"
-qp-replay = "src.cli.replay:main"
+qp-replay = "src.backtest.replay:main"
 
 [tool.poetry.dependencies]
 python = ">=3.12,<4.0"
