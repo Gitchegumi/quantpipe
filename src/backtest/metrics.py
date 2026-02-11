@@ -207,9 +207,20 @@ def compute_avg_duration(executions: Sequence[TradeExecution]) -> float:
     if not executions:
         return np.nan
 
-    durations = [
-        (ex.close_timestamp - ex.open_timestamp).total_seconds() for ex in executions
-    ]
+    def to_seconds(td):
+        # Handle numpy.timedelta64
+        if hasattr(td, 'total_seconds'):
+            return td.total_seconds()
+        # numpy.timedelta64: convert to Python timedelta or float seconds
+        try:
+            # Convert to Python timedelta via astype
+            td_py = td.astype('timedelta64[us]').astype('timedelta64[ms]').astype(object)
+            return td_py.total_seconds()
+        except Exception:
+            # Fallback: convert to seconds directly
+            return float(td) / 1e9 if td.dtype.name.startswith('timedelta64') else float(td)
+
+    durations = [to_seconds(ex.close_timestamp - ex.open_timestamp) for ex in executions]
     return float(np.mean(durations))
 
 
