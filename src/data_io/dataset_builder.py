@@ -417,7 +417,7 @@ def build_summary(
         build_completed_at=build_end,
         symbols_processed=symbols_processed,
         symbols_skipped=symbols_skipped,
-        total_rows_processed=total_rows,
+        total_rows_processed=total_rows_processed,
         total_test_rows=total_test_rows,
         total_validation_rows=total_validation_rows,
         duration_seconds=duration,
