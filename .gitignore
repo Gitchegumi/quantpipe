@@ -244,3 +244,8 @@ src/strategy/*/
 # Also ignore any strategies created in root /strategy/ directory (scaffold default)
 /strategy/
 /runs/
+
+# Ignore DuckDB vault
+data/vault.duckdb
+data/vault.duckdb-wal
+
