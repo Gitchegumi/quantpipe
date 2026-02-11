@@ -40,7 +40,7 @@ class DuckDBVault:
         """
         # Ensure standard column names and types
         df = df.copy()
-        df['symbol'] = symbol
+        df['symbol'] = symbol.lower()  # store lowercase for case-insensitive matching
         df['timeframe'] = timeframe
 
         # Ensure timestamp is datetime
@@ -67,7 +67,7 @@ class DuckDBVault:
         query = """
             SELECT timestamp, open, high, low, close, volume
             FROM ohlcv
-            WHERE symbol = ? AND timeframe = ?
+            WHERE LOWER(symbol) = LOWER(?) AND timeframe = ?
             AND timestamp BETWEEN ? AND ?
             ORDER BY timestamp ASC
         """
@@ -76,12 +76,13 @@ class DuckDBVault:
     def get_data_range(self, symbol: str, timeframe: str) -> tuple[Optional[datetime], Optional[datetime]]:
         """
         Returns (min_timestamp, max_timestamp) for the given symbol/timeframe.
+        Symbol lookup is case-insensitive; stored as lowercase.
         """
         try:
             query = """
                 SELECT MIN(timestamp), MAX(timestamp)
                 FROM ohlcv
-                WHERE symbol = ? AND timeframe = ?
+                WHERE LOWER(symbol) = LOWER(?) AND timeframe = ?
             """
             result = self.conn.execute(query, [symbol, timeframe]).fetchone()
             if result and result[0] and result[1]:
@@ -94,7 +95,7 @@ class DuckDBVault:
             return None, None
 
     def list_symbols(self) -> List[str]:
-        """Returns a list of distinct symbols available in the vault."""
+        """Returns a list of distinct symbols available in the vault (as stored)."""
         try:
             query = "SELECT DISTINCT symbol FROM ohlcv ORDER BY symbol"
             results = self.conn.execute(query).fetchall()
