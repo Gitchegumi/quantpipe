@@ -472,6 +472,12 @@ def write_outputs(
     test_path.mkdir(parents=True, exist_ok=True)
     validate_path.mkdir(parents=True, exist_ok=True)
 
+    # Write metadata.json first (so it exists even if later steps fail)
+    metadata_file = output_path / "metadata.json"
+    with open(metadata_file, "w", encoding="utf-8") as f:
+        f.write(metadata.model_dump_json(indent=2))
+    logger.debug("Wrote metadata: %s", metadata_file)
+
     # Write CSV partitions
     test_file = test_path / f"{symbol}_test.csv"
     validation_file = validate_path / f"{symbol}_validate.csv"
