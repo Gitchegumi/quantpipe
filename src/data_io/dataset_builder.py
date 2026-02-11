@@ -141,6 +141,15 @@ def validate_schema(symbol: str, files: list[str]) -> bool:
                     logger.error("File %s for symbol %s: MetaTrader file should have 7 columns", file_path, symbol)
                     return False
 
+            # For standard format, verify required columns are present
+            if fmt == "standard":
+                df_header = pd.read_csv(file_path, nrows=0)
+                cols = set(df_header.columns.str.lower())
+                if not REQUIRED_COLUMNS.issubset(cols):
+                    missing = REQUIRED_COLUMNS - cols
+                    logger.error("File %s for symbol %s: missing required columns: %s", file_path, symbol, missing)
+                    return False
+
             # Check consistency across files
             if reference_format is None:
                 reference_format = fmt

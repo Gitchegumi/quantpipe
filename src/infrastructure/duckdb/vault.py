@@ -36,10 +36,12 @@ class DuckDBVault:
     def ingest_df(self, df: pd.DataFrame, symbol: str, timeframe: str):
         """
         Ingests a Pandas DataFrame into the vault.
-        Expected columns: timestamp, open, high, low, close, volume
+        Expected columns: timestamp, open, high, low, close, volume (case-insensitive)
         """
         # Ensure standard column names and types
         df = df.copy()
+        # Normalize column names to lowercase for case-insensitive matching
+        df = df.rename(columns=lambda x: x.lower())
         df['symbol'] = symbol.lower()  # store lowercase for case-insensitive matching
         df['timeframe'] = timeframe
 
