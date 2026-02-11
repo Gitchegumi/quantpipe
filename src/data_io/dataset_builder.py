@@ -390,7 +390,7 @@ def build_summary(
     build_end: datetime,
     symbols_processed: list[str],
     symbols_skipped: list[SkippedSymbol],
-    total_rows: int,
+    total_rows_processed: int,
     total_test_rows: int,
     total_validation_rows: int,
 ) -> BuildSummary:
@@ -651,7 +651,7 @@ def build_all_symbols(
             build_end=datetime.now(timezone.utc),
             symbols_processed=[],
             symbols_skipped=[],
-            total_rows=0,
+            total_rows_processed=0,
             total_test_rows=0,
             total_validation_rows=0,
         )
