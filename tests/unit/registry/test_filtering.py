@@ -17,7 +17,7 @@ from src.strategy.registry import StrategyRegistry
 
 def test_filter_by_names_single():
     """Test filtering by single strategy name."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -34,7 +34,7 @@ def test_filter_by_names_single():
 
 def test_filter_by_names_multiple():
     """Test filtering by multiple strategy names."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -54,7 +54,7 @@ def test_filter_by_names_multiple():
 
 def test_filter_by_tags_single():
     """Test filtering by single tag."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -73,7 +73,7 @@ def test_filter_by_tags_single():
 
 def test_filter_by_tags_multiple_all_required():
     """Test filtering requires ALL specified tags."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -91,7 +91,7 @@ def test_filter_by_tags_multiple_all_required():
 
 def test_filter_by_names_and_tags():
     """Test combined filtering by names and tags."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -111,7 +111,7 @@ def test_filter_by_names_and_tags():
 
 def test_filter_no_matches():
     """Test filtering with no matches returns empty list."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -125,7 +125,7 @@ def test_filter_no_matches():
 
 def test_filter_tags_no_matches():
     """Test tag filtering with no matches."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -140,7 +140,7 @@ def test_filter_tags_no_matches():
 
 def test_filter_none_returns_all():
     """Test filter with None arguments returns all strategies."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -156,7 +156,7 @@ def test_filter_none_returns_all():
 
 def test_filter_empty_names_returns_all():
     """Test filter with empty names list returns all strategies."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -171,7 +171,7 @@ def test_filter_empty_names_returns_all():
 
 def test_filter_preserves_order():
     """Test that filter preserves insertion order."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -188,7 +188,7 @@ def test_filter_preserves_order():
 
 def test_filter_by_names_case_sensitive():
     """Test that name filtering is case-sensitive."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -204,7 +204,7 @@ def test_filter_by_names_case_sensitive():
 
 def test_filter_partial_tag_match_fails():
     """Test that partial tag matches don't count."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -219,7 +219,7 @@ def test_filter_partial_tag_match_fails():
 
 def test_filter_strategy_with_no_tags():
     """Test filtering strategies that have no tags."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -236,7 +236,7 @@ def test_filter_strategy_with_no_tags():
 
 def test_filter_names_with_duplicates():
     """Test filter handles duplicate names in filter list."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
