@@ -783,7 +783,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
     # --- Early Exit for Strategy Listing ---
     if args.list_strategies:
-        registry = StrategyRegistry(load_private=False)
+        registry = StrategyRegistry()
         strategies = registry.list()
 
         console.print("\n[bold cyan]Available Strategies:[/bold cyan]")
@@ -837,7 +837,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 args.strategy = ["trend-pullback"]  # Default
             else:
                 try:
-                    registry = StrategyRegistry(load_private=False)
+                    registry = StrategyRegistry()
                     available_strategies = [strat.name for strat in registry.list()]
 
                     # Filter strategies if a partial match is provided
