@@ -115,14 +115,7 @@ def _launch_visualizer(result, args):
         # Prefer DuckDB vault if exists
         vault_path = Path("data/vault.duckdb")
         if vault_path.exists():
-            # Use ReplaySession with vault
-            # Default to last 3 months
-            from datetime import datetime, timedelta
-            end_dt = datetime.now()
-            start_dt = end_dt - timedelta(days=90)
-            start_str = start_dt.strftime("%Y-%m-%d")
-            end_str = end_dt.strftime("%Y-%m-%d")
-            # Launch interactive replay CLI (blocking)
+            # Use ReplaySession with vault; let qp-replay auto-detect full data range
             console.print(f"Loading replay from vault for {pair}...")
             import subprocess
             cmd = [
@@ -130,9 +123,12 @@ def _launch_visualizer(result, args):
                 "--symbol", pair,
                 "--timeframe", args.timeframe if args.timeframe else "1m",
                 "--vault-path", str(vault_path),
-                "--start", start_str,
-                "--end", end_str
             ]
+            # Only pass explicit start/end if user provided them in backtest CLI
+            if args.start:
+                cmd.extend(["--start", args.start])
+            if args.end:
+                cmd.extend(["--end", args.end])
             subprocess.run(cmd)
         else:
             # Fallback to plotting directly from backtest data
