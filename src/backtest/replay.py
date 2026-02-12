@@ -167,6 +167,11 @@ Examples:
         default="INFO",
         help="Logging level (default: INFO)",
     )
+    parser.add_argument(
+        "--overlay-indicators",
+        action="store_true",
+        help="Overlay strategy indicator columns from test partition (if available)",
+    )
 
     return parser.parse_args()
 
@@ -265,53 +270,93 @@ def main() -> int:
         hv.extension("bokeh")
         pn.extension()
 
-        # Prepare DataFrame for plotting
+        # Prepare main DataFrame for plotting
         pdf = df.copy()
-        if "timestamp" in pdf.columns:
-            pdf = pdf.rename(columns={"timestamp": "timestamp_utc"})
-            pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
-            pdf = pdf.set_index("timestamp_utc").sort_index()
-            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
+    if "timestamp" in pdf.columns:
+        pdf = pdf.rename(columns={"timestamp": "timestamp_utc"})
+        pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
+        pdf = pdf.set_index("timestamp_utc").sort_index()
+        pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        pdf.index = pd.to_datetime(pdf.index)
+        pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
+
+    # Load indicator overlay from test partition if requested
+    indicator_panes = []
+    if args.overlay_indicators:
+        test_parquet = Path(f"price_data/processed/{symbol.lower()}/test/{symbol.lower()}_test.parquet")
+        if test_parquet.exists():
+            try:
+                test_df = pd.read_parquet(test_parquet)
+                # Align index to pdf's index (timestamp)
+                if "timestamp" in test_df.columns:
+                    test_df = test_df.rename(columns={"timestamp": "timestamp_utc"})
+                    test_df["timestamp_utc"] = pd.to_datetime(test_df["timestamp_utc"])
+                    test_df = test_df.set_index("timestamp_utc").sort_index()
+                # Intersection of indices
+                common_idx = pdf.index.intersection(test_df.index)
+                if len(common_idx) > 0:
+                    pdf = pdf.loc[common_idx]
+                    test_df = test_df.loc[common_idx]
+                    # Identify indicator columns (numeric, not in OHLCV set)
+                    base_cols = {"open", "high", "low", "close", "volume"}
+                    for col in test_df.columns:
+                        if col in base_cols or col == "timestamp_utc":
+                            continue
+                        if pd.api.types.is_numeric_dtype(test_df[col]):
+                            # Create a curve for this indicator
+                            curve = test_df[col].hvplot.line(
+                                xlabel="Time",
+                                ylabel=col,
+                                width=1200,
+                                height=150,
+                                color="orange" if "ema" in col else "cyan" if "rsi" in col else "lime",
+                            ).opts(tools=["pan", "wheel_zoom", "box_zoom", "reset"])
+                            indicator_panes.append(curve)
+                    print(f"Overlayed {len(indicator_panes)} indicator(s) from test partition.")
+            except Exception as e:
+                print(f"Warning: failed to load indicators from {test_parquet}: {e}")
         else:
-            # Assume index is already datetime
-            pdf.index = pd.to_datetime(pdf.index)
-            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
+            print(f"Note: test parquet not found at {test_parquet}; indicators not overlaid.")
 
-        if len(pdf) > 0:
-            xlim = (pdf.index[0], pdf.index[-1])
-        else:
-            xlim = None
+    if len(pdf) > 0:
+        xlim = (pdf.index[0], pdf.index[-1])
+    else:
+        xlim = None
 
-        # Format prices to reasonable precision
-        price_fmt = ".2f" if pdf["close"].mean() > 1 else ".5f"
+    # Format prices to reasonable precision
+    price_fmt = ".2f" if pdf["close"].mean() > 1 else ".5f"
 
-        # Create OHLC chart
-        tooltips = [
-            ("Time", "@time_str"),
-            ("Open", f"@open{{{price_fmt}}}"),
-            ("High", f"@high{{{price_fmt}}}"),
-            ("Low", f"@low{{{price_fmt}}}"),
-            ("Close", f"@close{{{price_fmt}}}"),
-            ("Volume", "@volume{0,0}"),
-        ]
-        chart = pdf.hvplot.ohlc(
-            y=["open", "high", "low", "close"],
-            xlabel="Time",
-            ylabel="Price",
-            width=1200,
-            height=400,
-        ).opts(
-            tools=[
-                "pan",
-                "wheel_zoom",
-                "box_zoom",
-                "reset",
-                HoverTool(tooltips=tooltips, mode="vline"),
-            ],
-            active_tools=["pan", "wheel_zoom"],
-        )
+    # Create OHLC chart
+    tooltips = [
+        ("Time", "@time_str"),
+        ("Open", f"@open{{{price_fmt}}}"),
+        ("High", f"@high{{{price_fmt}}}"),
+        ("Low", f"@low{{{price_fmt}}}"),
+        ("Close", f"@close{{{price_fmt}}}"),
+    ]
+    if "volume" in pdf.columns and pdf["volume"].notna().any():
+        tooltips.append(("Volume", "@volume{0,0}"))
+    chart = pdf.hvplot.ohlc(
+        y=["open", "high", "low", "close"],
+        xlabel="Time",
+        ylabel="Price",
+        width=1200,
+        height=400,
+    ).opts(
+        tools=[
+            "pan",
+            "wheel_zoom",
+            "box_zoom",
+            "reset",
+            HoverTool(tooltips=tooltips, mode="vline"),
+        ],
+        active_tools=["pan", "wheel_zoom"],
+    )
 
-        # Volume bar chart
+    # Volume bar chart (only if volume exists and has data)
+    vol_pane = None
+    if "volume" in pdf.columns and pdf["volume"].notna().any():
         vol_chart = pdf.hvplot.bar(
             y="volume",
             color="gray",
@@ -321,28 +366,36 @@ def main() -> int:
             xlim=xlim,
             ylabel="Volume",
         )
+        vol_pane = vol_chart
 
-        # Dark theme CSS
-        dark_css = """
-        html { background-color: #1a1a2e; }
-        body { color: #e0e0e0 !important; }
-        """
-        pn.config.raw_css.append(dark_css)
+    # Dark theme CSS
+    dark_css = """
+    html { background-color: #1a1a2e; }
+    body { color: #e0e0e0 !important; }
+    """
+    pn.config.raw_css.append(dark_css)
 
-        # Build dashboard
-        header = pn.pane.Markdown(
-            f"# {symbol} Replay\n"
-            f"**Timeframe:** {timeframe}  |  **Bars:** {len(df)}  |  **Range:** {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}",
-            styles={"color": "#e0e0e0", "background": "#1a1a2e"},
-        )
-        layout = (chart + vol_chart).cols(1).opts(shared_axes=True)
+    # Build dashboard: stack price, optional volume, then each indicator
+    panes = [pn.pane.HoloViews(chart, sizing_mode="stretch_width")]
+    if vol_pane is not None:
+        panes.append(pn.pane.HoloViews(vol_pane, sizing_mode="stretch_width"))
+    if indicator_panes:
+        panes.extend([pn.pane.HoloViews(p, sizing_mode="stretch_width") for p in indicator_panes])
 
-        dashboard = pn.Column(
-            header,
-            pn.pane.HoloViews(layout, sizing_mode="stretch_width"),
-            pn.pane.Markdown("Scroll to zoom. Drag to pan. Use toolbar to reset."),
-            styles={"background": "#1a1a2e"},
-        )
+    layout = pn.Column(*panes)
+
+    header = pn.pane.Markdown(
+        f"# {symbol} Replay\n"
+        f"**Timeframe:** {timeframe}  |  **Bars:** {len(pdf)}  |  **Range:** {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}",
+        styles={"color": "#e0e0e0", "background": "#1a1a2e"},
+    )
+
+    dashboard = pn.Column(
+        header,
+        layout,
+        pn.pane.Markdown("Scroll to zoom. Drag to pan. Use toolbar to reset."),
+        styles={"background": "#1a1a2e"},
+    )
 
         print("\nStarting dashboard at http://localhost:5006/")
         print("Press Ctrl+C to stop.\n")
