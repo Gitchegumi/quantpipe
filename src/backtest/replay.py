@@ -3,7 +3,9 @@ from typing import Optional, List, Dict, Any
 import argparse
 import logging
 import pandas as pd
+from pathlib import Path
 from src.infrastructure.duckdb.vault import DuckDBVault
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +13,7 @@ logger = logging.getLogger(__name__)
 class ReplaySession:
     """
     Manages a stateful market replay session, providing candles one-by-one or in chunks.
+    Legacy non-streaming mode for compatibility.
     """
 
     def __init__(
@@ -112,6 +115,138 @@ class ReplaySession:
         self.vault.close()
 
 
+class StreamingReplaySession:
+    """
+    Manages a streaming replay with a bounded display window.
+    Fetches data in chunks and updates Bokeh ColumnDataSource via streaming.
+    """
+
+    def __init__(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_time: datetime,
+        end_time: datetime,
+        vault_path: str = "data/vault.duckdb",
+        max_candles: int = 5000,
+        buffer_size: int = 1000,
+    ):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.start_time = start_time
+        self.end_time = end_time
+        self.vault_path = vault_path
+        self.max_candles = max_candles
+        self.buffer_size = buffer_size
+
+        self.vault = DuckDBVault(db_path=vault_path)
+
+        # State
+        self.current_time = start_time
+        self._buffer = pd.DataFrame()
+        self._buffer_idx = 0
+        self._prefetch_queue = []
+        self._is_playing = False
+        self._replay_speed = 1.0
+
+        # Load initial buffer
+        self._load_next_buffer()
+
+        # Build initial view (first max_candles or all if less)
+        self._view_df = self._buffer.head(self.max_candles).copy() if not self._buffer.empty else pd.DataFrame()
+        if not self._view_df.empty:
+            self._advance_to_end_of_view()
+
+    def _load_next_buffer(self):
+        """Loads the next chunk of data from the vault into the memory buffer."""
+        fetch_end = self.current_time + timedelta(days=1)
+        if fetch_end > self.end_time:
+            fetch_end = self.end_time
+
+        self._buffer = self.vault.fetch_range(
+            self.symbol,
+            self.timeframe,
+            self.current_time.strftime("%Y-%m-%d %H:%M:%S"),
+            fetch_end.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        self._buffer_idx = 0
+
+        if not self._buffer.empty:
+            logger.debug("Replay buffer refilled: %s bars.", len(self._buffer))
+
+    def _advance_to_end_of_view(self):
+        """Advances current_time to the last candle currently in the view."""
+        if not self._view_df.empty:
+            last_ts = self._view_df.index.max() if self._view_df.index.name == "timestamp_utc" else self._view_df["timestamp"].iloc[-1]
+            self.current_time = pd.to_datetime(last_ts).to_pydatetime()
+
+    def get_view_data(self) -> pd.DataFrame:
+        """Returns the current view DataFrame (bounded to max_candles)."""
+        return self._view_df.copy()
+
+    def stream_next_batch(self, batch_size: int = 1) -> pd.DataFrame:
+        """
+        Streams the next batch of candles into the view.
+        Returns the new rows that were added (for Bokeh streaming).
+        """
+        if self._buffer.empty:
+            # Try to load more
+            self._load_next_buffer()
+            if self._buffer.empty:
+                return pd.DataFrame()
+
+        # Take next batch from buffer
+        available = len(self._buffer) - self._buffer_idx
+        n = min(batch_size, available)
+        new_rows = self._buffer.iloc[self._buffer_idx:self._buffer_idx + n]
+
+        # Append to view
+        if self._view_df.empty:
+            self._view_df = new_rows.copy()
+        else:
+            self._view_df = pd.concat([self._view_df, new_rows], ignore_index=True)
+
+        # Maintain bounded window
+        if len(self._view_df) > self.max_candles:
+            # Drop oldest
+            excess = len(self._view_df) - self.max_candles
+            self._view_df = self._view_df.iloc[excess:].reset_index(drop=True)
+
+        # Advance buffer pointer and current_time
+        self._buffer_idx += n
+        self.current_time = new_rows.iloc[-1]["timestamp"]
+
+        # Refill buffer if we've consumed it
+        if self._buffer_idx >= len(self._buffer):
+            self._load_next_buffer()
+
+        return new_rows.copy()
+
+    def is_finished(self) -> bool:
+        """Checks if replay has reached the end."""
+        return self._buffer.empty and self._buffer_idx >= len(self._buffer) and self.current_time >= self.end_time
+
+    def get_progress(self) -> float:
+        """Returns progress percentage through the time range."""
+        if self.start_time == self.end_time:
+            return 0.0
+        total_seconds = (self.end_time - self.start_time).total_seconds()
+        elapsed = (self.current_time - self.start_time).total_seconds()
+        return min(100.0, max(0.0, (elapsed / total_seconds) * 100))
+
+    def reset(self):
+        """Resets the session to the start time."""
+        self.current_time = self.start_time
+        self._buffer_idx = 0
+        self._load_next_buffer()
+        self._view_df = self._buffer.head(self.max_candles).copy() if not self._buffer.empty else pd.DataFrame()
+        if not self._view_df.empty:
+            self._advance_to_end_of_view()
+
+    def close(self):
+        self.vault.close()
+
+
 def _parse_args() -> argparse.Namespace:
     """Parse CLI arguments for the replay command."""
     parser = argparse.ArgumentParser(
@@ -127,6 +262,12 @@ Examples:
 
   # Use custom vault path
   qp-replay --symbol EURUSD --vault-path /path/to/vault.duckdb
+
+  # Fast replay with streaming window (max 5000 candles visible)
+  qp-replay --symbol EURUSD --replay-speed 10 --max-candles 5000
+
+  # Disable streaming for small ranges (loads all at once)
+  qp-replay --symbol EURUSD --no-streaming
         """,
     )
 
@@ -171,6 +312,23 @@ Examples:
         "--overlay-indicators",
         action="store_true",
         help="Overlay strategy indicator columns from test partition (if available)",
+    )
+    parser.add_argument(
+        "--max-candles",
+        type=int,
+        default=5000,
+        help="Maximum number of candles to display at once (default: 5000)",
+    )
+    parser.add_argument(
+        "--replay-speed",
+        type=float,
+        default=1.0,
+        help="Replay speed multiplier (1.0 = real-time, 10.0 = 10x faster)",
+    )
+    parser.add_argument(
+        "--no-streaming",
+        action="store_true",
+        help="Disable streaming replay (load all data, use with caution for large ranges)",
     )
 
     return parser.parse_args()
@@ -244,163 +402,298 @@ def main() -> int:
     print(f"Loading {symbol.upper()} {timeframe} from {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}...")
     print(f"Vault: {vault_path}")
 
-    session = ReplaySession(
-        symbol=symbol,
-        timeframe=timeframe,
-        start_time=start_dt,
-        end_time=end_dt,
-        vault_path=vault_path,
-    )
-    df = session.fetch_all()
-    session.close()
+    # Choose session type based on args
+    if args.no_streaming:
+        # Legacy mode: load all at once
+        session = ReplaySession(
+            symbol=symbol,
+            timeframe=timeframe,
+            start_time=start_dt,
+            end_time=end_dt,
+            vault_path=vault_path,
+        )
+        df = session.fetch_all()
+        session.close()
+
+        if df.empty:
+            print(f"No data in selected range.")
+            return 1
+
+        print(f"Loaded {len(df)} bars (non-streaming mode).")
+    else:
+        # Streaming mode with bounded window
+        session = StreamingReplaySession(
+            symbol=symbol,
+            timeframe=timeframe,
+            start_time=start_dt,
+            end_time=end_dt,
+            vault_path=vault_path,
+            max_candles=args.max_candles,
+        )
+        df = session.get_view_data()
+        print(f"Streaming mode: max {args.max_candles} candles visible. Buffering for smooth replay.")
 
     if df.empty:
         print(f"No data in selected range.")
         return 1
-
-    print(f"Loaded {len(df)} bars.")
 
     # Serve interactive dashboard using Panel + HoloViews
     try:
         import holoviews as hv
         import hvplot.pandas  # noqa: F401
         import panel as pn
-        from bokeh.models import HoverTool
+        from bokeh.models import HoverTool, ColumnDataSource, Button, Div
+        from bokeh.plotting import figure
+        from bokeh.layouts import column, row
+        from bokeh.palettes import Category10
+        from bokeh.models import Span, Label
+        from bokeh.events import ButtonClick
+        import asyncio
+        from threading import Thread, Event
+        import time
 
         hv.extension("bokeh")
         pn.extension()
 
         # Prepare main DataFrame for plotting
         pdf = df.copy()
-    if "timestamp" in pdf.columns:
-        pdf = pdf.rename(columns={"timestamp": "timestamp_utc"})
-        pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
-        pdf = pdf.set_index("timestamp_utc").sort_index()
-        pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        pdf.index = pd.to_datetime(pdf.index)
-        pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
-
-    # Load indicator overlay from test partition if requested
-    indicator_panes = []
-    if args.overlay_indicators:
-        test_parquet = Path(f"price_data/processed/{symbol.lower()}/test/{symbol.lower()}_test.parquet")
-        if test_parquet.exists():
-            try:
-                test_df = pd.read_parquet(test_parquet)
-                # Align index to pdf's index (timestamp)
-                if "timestamp" in test_df.columns:
-                    test_df = test_df.rename(columns={"timestamp": "timestamp_utc"})
-                    test_df["timestamp_utc"] = pd.to_datetime(test_df["timestamp_utc"])
-                    test_df = test_df.set_index("timestamp_utc").sort_index()
-                # Intersection of indices
-                common_idx = pdf.index.intersection(test_df.index)
-                if len(common_idx) > 0:
-                    pdf = pdf.loc[common_idx]
-                    test_df = test_df.loc[common_idx]
-                    # Identify indicator columns (numeric, not in OHLCV set)
-                    base_cols = {"open", "high", "low", "close", "volume"}
-                    for col in test_df.columns:
-                        if col in base_cols or col == "timestamp_utc":
-                            continue
-                        if pd.api.types.is_numeric_dtype(test_df[col]):
-                            # Create a curve for this indicator
-                            curve = test_df[col].hvplot.line(
-                                xlabel="Time",
-                                ylabel=col,
-                                width=1200,
-                                height=150,
-                                color="orange" if "ema" in col else "cyan" if "rsi" in col else "lime",
-                            ).opts(tools=["pan", "wheel_zoom", "box_zoom", "reset"])
-                            indicator_panes.append(curve)
-                    print(f"Overlayed {len(indicator_panes)} indicator(s) from test partition.")
-            except Exception as e:
-                print(f"Warning: failed to load indicators from {test_parquet}: {e}")
+        if "timestamp" in pdf.columns:
+            pdf = pdf.rename(columns={"timestamp": "timestamp_utc"})
+            pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
+            pdf = pdf.set_index("timestamp_utc").sort_index()
+            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
         else:
-            print(f"Note: test parquet not found at {test_parquet}; indicators not overlaid.")
+            pdf.index = pd.to_datetime(pdf.index)
+            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
 
-    if len(pdf) > 0:
-        xlim = (pdf.index[0], pdf.index[-1])
-    else:
-        xlim = None
+        # Load indicator overlay from test partition if requested (for static initial view)
+        indicator_dfs = []
+        if args.overlay_indicators:
+            test_parquet = Path(f"price_data/processed/{symbol.lower()}/test/{symbol.lower()}_test.parquet")
+            if test_parquet.exists():
+                try:
+                    test_df = pd.read_parquet(test_parquet)
+                    # Align index to pdf's index (timestamp)
+                    if "timestamp" in test_df.columns:
+                        test_df = test_df.rename(columns={"timestamp": "timestamp_utc"})
+                        test_df["timestamp_utc"] = pd.to_datetime(test_df["timestamp_utc"])
+                        test_df = test_df.set_index("timestamp_utc").sort_index()
+                    # Intersection of indices with current view
+                    common_idx = pdf.index.intersection(test_df.index)
+                    if len(common_idx) > 0:
+                        test_df = test_df.loc[common_idx]
+                        indicator_dfs.append(test_df)
+                        print(f"Overlayed {len(test_df.columns)} indicator(s) from test partition.")
+                except Exception as e:
+                    print(f"Warning: failed to load indicators from {test_parquet}: {e}")
+            else:
+                print(f"Note: test parquet not found at {test_parquet}; indicators not overlaid.")
 
-    # Format prices to reasonable precision
-    price_fmt = ".2f" if pdf["close"].mean() > 1 else ".5f"
+        # Prepare time-sorted data for streaming
+        if not pdf.index.name == "timestamp_utc":
+            if "timestamp_utc" in pdf.columns:
+                pdf = pdf.set_index("timestamp_utc").sort_index()
+            else:
+                pdf.index = pd.to_datetime(pdf.index)
+                pdf = pdf.sort_index()
 
-    # Create OHLC chart
-    tooltips = [
-        ("Time", "@time_str"),
-        ("Open", f"@open{{{price_fmt}}}"),
-        ("High", f"@high{{{price_fmt}}}"),
-        ("Low", f"@low{{{price_fmt}}}"),
-        ("Close", f"@close{{{price_fmt}}}"),
-    ]
-    if "volume" in pdf.columns and pdf["volume"].notna().any():
-        tooltips.append(("Volume", "@volume{0,0}"))
-    chart = pdf.hvplot.ohlc(
-        y=["open", "high", "low", "close"],
-        xlabel="Time",
-        ylabel="Price",
-        width=1200,
-        height=400,
-    ).opts(
-        tools=[
-            "pan",
-            "wheel_zoom",
-            "box_zoom",
-            "reset",
-            HoverTool(tooltips=tooltips, mode="vline"),
-        ],
-        active_tools=["pan", "wheel_zoom"],
-    )
+        # Create Bokeh ColumnDataSource
+        source = ColumnDataSource(pdf)
 
-    # Volume bar chart (only if volume exists and has data)
-    vol_pane = None
-    if "volume" in pdf.columns and pdf["volume"].notna().any():
-        vol_chart = pdf.hvplot.bar(
-            y="volume",
-            color="gray",
-            alpha=0.3,
-            height=150,
+        # Determine price format
+        price_fmt = ".2f" if pdf["close"].mean() > 1 else ".5f"
+
+        # Create main price chart (Bokeh figure)
+        p = figure(
+            x_axis_type="datetime",
+            title=f"{symbol} {timeframe} Replay (Streaming: {args.max_candles} max candles)",
             width=1200,
-            xlim=xlim,
-            ylabel="Volume",
+            height=500,
+            tools="pan,wheel_zoom,box_zoom,reset,save",
+            active_drag="pan",
+            active_scroll="wheel_zoom",
         )
-        vol_pane = vol_chart
 
-    # Dark theme CSS
-    dark_css = """
-    html { background-color: #1a1a2e; }
-    body { color: #e0e0e0 !important; }
-    """
-    pn.config.raw_css.append(dark_css)
+        # Add candlestick glyphs
+        inc = pdf["close"] > pdf["open"]
+        dec = ~inc
+        up_color = "#00FF00"
+        down_color = "#FF0000"
+        body_width = 30 * 60 * 1000  # 30 minutes for 1m data
 
-    # Build dashboard: stack price, optional volume, then each indicator
-    panes = [pn.pane.HoloViews(chart, sizing_mode="stretch_width")]
-    if vol_pane is not None:
-        panes.append(pn.pane.HoloViews(vol_pane, sizing_mode="stretch_width"))
-    if indicator_panes:
-        panes.extend([pn.pane.HoloViews(p, sizing_mode="stretch_width") for p in indicator_panes])
+        p.segment(pdf.index, pdf["high"], pdf.index, pdf["low"], color="#888888", line_width=1)
+        for cond, color in [(inc, up_color), (dec, down_color)]:
+            subset = pdf[cond]
+            if len(subset) > 0:
+                p.rect(
+                    subset.index,
+                    (subset["open"] + subset["close"]) / 2,
+                    body_width,
+                    abs(subset["close"] - subset["open"]),
+                    fill_color=color,
+                    line_color=color,
+                    line_width=1,
+                )
 
-    layout = pn.Column(*panes)
+        # HoverTool
+        hover = HoverTool(
+            tooltips=[
+                ("Time", "@time_str"),
+                ("Open", f"@open{{{price_fmt}}}"),
+                ("High", f"@high{{{price_fmt}}}"),
+                ("Low", f"@low{{{price_fmt}}}"),
+                ("Close", f"@close{{{price_fmt}}}"),
+            ],
+            mode="vline",
+        )
+        p.add_tools(hover)
 
-    header = pn.pane.Markdown(
-        f"# {symbol} Replay\n"
-        f"**Timeframe:** {timeframe}  |  **Bars:** {len(pdf)}  |  **Range:** {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}",
-        styles={"color": "#e0e0e0", "background": "#1a1a2e"},
-    )
+        # Volume pane
+        vol_fig = None
+        if "volume" in pdf.columns and pdf["volume"].notna().any():
+            vol_fig = figure(
+                x_axis_type="datetime",
+                width=1200,
+                height=150,
+                x_range=p.x_range,
+                tools="",
+                toolbar_location=None,
+            )
+            vol_fig.vbar(x=pdf.index, top=pdf["volume"], width=body_width, fill_color="gray", alpha=0.3)
+            vol_fig.yaxis.axis_label = "Volume"
 
-    dashboard = pn.Column(
-        header,
-        layout,
-        pn.pane.Markdown("Scroll to zoom. Drag to pan. Use toolbar to reset."),
-        styles={"background": "#1a1a2e"},
-    )
+        # Indicator panes
+        indicator_figs = []
+        for ind_df in indicator_dfs:
+            ind_fig = figure(
+                x_axis_type="datetime",
+                width=1200,
+                height=150,
+                x_range=p.x_range,
+                tools="",
+                toolbar_location=None,
+            )
+            for col in ind_df.columns:
+                if col.endswith("_color"):
+                    continue
+                color = "lime"
+                if "ema" in col:
+                    color = "orange"
+                elif "rsi" in col:
+                    color = "cyan"
+                ind_fig.line(ind_df.index, ind_df[col], line_width=1, color=color, legend_label=col)
+            ind_fig.legend.location = "top_left"
+            ind_fig.legend.orientation = "horizontal"
+            indicator_figs.append(ind_fig)
+
+        # Control panel
+        status_div = Div(text=f"<b>Status:</b> Ready | Progress: 0% | View: {len(pdf)} candles", width=500)
+        speed_div = Div(text=f"<b>Speed:</b> {args.replay_speed}x", width=150)
+
+        play_button = Button(label="▶ Play", width=80, button_type="success")
+        pause_button = Button(label="⏸ Pause", width=80, button_type="warning")
+        reset_button = Button(label="⏮ Reset", width=80, button_type="primary")
+
+        # Streaming state
+        streaming_state = {
+            "running": False,
+            "session": session,
+            "replay_speed": args.replay_speed,
+            "timer_id": None,
+        }
+
+        def update_chart():
+            """Periodic callback that advances the replay by one candle and streams it."""
+            state = streaming_state
+            if not state["running"]:
+                return
+
+            new_rows = state["session"].stream_next_batch(batch_size=1)
+            if new_rows.empty or state["session"].is_finished():
+                state["running"] = False
+                play_button.disabled = False
+                pause_button.disabled = True
+                status_div.text = f"<b>Status:</b> Finished | Progress: 100% | View: {len(state['session']._view_df)}"
+                return
+
+            # Prepare data for streaming
+            new_data = {}
+            for col in source.column_names:
+                if col in new_rows.columns:
+                    new_data[col] = [new_rows[col].iloc[0]] if len(new_rows) == 1 else new_rows[col].tolist()
+                elif col == "index":
+                    new_data["index"] = new_rows.index.tolist()
+
+            # Stream with rollover
+            source.stream(new_data, rollover=args.max_candles)
+
+            # Update status
+            progress = state["session"].get_progress()
+            status_div.text = f"<b>Status:</b> Playing | Progress: {progress:.1f}% | View: {len(state['session']._view_df)}"
+
+        def on_play():
+            state = streaming_state
+            state["running"] = True
+            play_button.disabled = True
+            pause_button.disabled = False
+            # Start periodic updates using pn.state.add_periodic_callback
+            from bokeh.document import without_document_lock
+            if state["timer_id"] is None:
+                # Schedule every 60/replay_speed seconds
+                interval_ms = int(60000 / state["replay_speed"])
+                state["timer_id"] = pn.state.add_periodic_callback(update_chart, interval_ms)
+
+        def on_pause():
+            state = streaming_state
+            state["running"] = False
+            play_button.disabled = False
+            pause_button.disabled = True
+            if state["timer_id"] is not None:
+                pn.state.remove_periodic_callback(state["timer_id"])
+                state["timer_id"] = None
+
+        def on_reset():
+            state = streaming_state
+            state["running"] = False
+            if state["timer_id"] is not None:
+                pn.state.remove_periodic_callback(state["timer_id"])
+                state["timer_id"] = None
+            state["session"].reset()
+            initial_df = state["session"].get_view_data()
+            source.data = {
+                col: initial_df[col].tolist() if col in initial_df.columns else []
+                for col in source.column_names
+            }
+            progress = state["session"].get_progress()
+            status_div.text = f"<b>Status:</b> Reset | Progress: {progress:.1f}% | View: {len(initial_df)}"
+            play_button.disabled = False
+            pause_button.disabled = True
+
+        play_button.on_click(on_play)
+        pause_button.on_click(on_pause)
+        reset_button.on_click(on_reset)
+
+        # Layout
+        controls = row(play_button, pause_button, reset_button, speed_div, status_div)
+        layout = column(controls, p)
+        if vol_fig:
+            layout = column(layout, vol_fig)
+        for ind_fig in indicator_figs:
+            layout = column(layout, ind_fig)
+
+        # Dark theme
+        dark_css = """
+        html { background-color: #1a1a2e; }
+        body { color: #e0e0e0 !important; }
+        .bk-root .bk-widget { color: #e0e0e0; }
+        """
+        pn.config.raw_css.append(dark_css)
 
         print("\nStarting dashboard at http://localhost:5006/")
+        print(f"Controls: Play/Pause/Reset. Replay speed: {args.replay_speed}x (1x = real-time)")
         print("Press Ctrl+C to stop.\n")
 
-        pn.serve(dashboard, port=5006, show=False, title=f"{symbol} Replay - QuantPipe")
+        pn.serve(layout, port=5006, show=False, title=f"{symbol} Replay - QuantPipe")
 
     except ImportError as e:
         print(f"\nDashboard dependencies missing: {e}")
