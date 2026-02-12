@@ -105,8 +105,13 @@ def _launch_visualizer(result, args):
     try:
         console.print("[cyan]Starting visualization...[/cyan]")
 
-        # Determine symbol and data path
-        pair = result.symbol if hasattr(result, "symbol") else "portfolio"
+        # Determine symbol: portfolio results have 'symbols' list; pick first
+        if hasattr(result, "symbols") and result.symbols:
+            pair = result.symbols[0]
+        elif hasattr(result, "symbol"):
+            pair = result.symbol
+        else:
+            pair = "portfolio"
         # Prefer DuckDB vault if exists
         vault_path = Path("data/vault.duckdb")
         if vault_path.exists():
