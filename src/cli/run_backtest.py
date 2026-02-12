@@ -526,6 +526,23 @@ def configure_backtest_parser(
         "Example: --config backtest_config.yaml",
     )
 
+    # Visualization replay range (qp-replay integration)
+    parser.add_argument(
+        "--start",
+        type=str,
+        default=None,
+        help="Start date for visualization replay (YYYY-MM-DD). "
+        "Default: earliest available date in vault.",
+    )
+
+    parser.add_argument(
+        "--end",
+        type=str,
+        default=None,
+        help="End date for visualization replay (YYYY-MM-DD). "
+        "Default: latest available date in vault.",
+    )
+
     # GPU Acceleration flags (Feature 023-GPU)
     parser.add_argument(
         "--gpu",
