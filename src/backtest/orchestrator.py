@@ -12,6 +12,7 @@ simulation, and metrics aggregation.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Sequence
 from contextlib import nullcontext
 from datetime import UTC, datetime
@@ -1497,7 +1498,11 @@ class BacktestOrchestrator:
         atr_values = df["atr"].to_numpy()
 
         atr_stop_mult = signal_params.get("atr_stop_mult", 2.0)
-        risk_per_trade_pct = signal_params.get("risk_per_trade_pct", 0.01)
+        risk_per_trade_pct = signal_params.get("risk_per_trade_pct", 0.25)
+        account_balance = signal_params.get("account_balance", 2500.0)
+        pip_value = signal_params.get("pip_value", 10.0)
+        lot_step = signal_params.get("lot_step", 0.01)
+        max_position_size = signal_params.get("max_position_size", 10.0)
 
         for idx in scan_result.signal_indices:
             timestamp_utc = timestamps[idx]
@@ -1510,15 +1515,28 @@ class BacktestOrchestrator:
             else:  # SHORT
                 initial_stop_price = entry_price + (atr * atr_stop_mult)
 
+            # Calculate position size using risk formula
+            risk_amount = account_balance * (risk_per_trade_pct / 100.0)
+            stop_distance_pips = abs(entry_price - initial_stop_price) * 10000.0
+            if stop_distance_pips > 0:
+                raw_position_size = risk_amount / (stop_distance_pips * pip_value)
+                # Round down to nearest lot step
+                position_size = math.floor(raw_position_size / lot_step) * lot_step
+                # Apply maximum limit
+                if position_size > max_position_size:
+                    position_size = max_position_size
+                # Ensure minimum
+                if position_size < lot_step:
+                    position_size = lot_step
+            else:
+                position_size = lot_step
+
             # Generate deterministic signal ID
             signal_data = (
                 f"{timestamp_utc}|{pair}|{direction}|"
                 f"{entry_price}|{strategy.metadata.version}"
             )
             signal_id = hashlib.sha256(signal_data.encode()).hexdigest()[:16]
-
-            # Placeholder position size (calculated from account equity normally)
-            calc_position_size = 10000.0
 
             signal = TradeSignal(
                 id=signal_id,
