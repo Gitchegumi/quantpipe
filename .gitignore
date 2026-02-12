@@ -249,3 +249,4 @@ src/strategy/*/
 data/vault.duckdb
 data/vault.duckdb-wal
 
+test_config.yaml
