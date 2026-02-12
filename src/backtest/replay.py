@@ -692,10 +692,16 @@ def main() -> int:
                     "up" if c > o else "down" 
                     for c, o in zip(initial_df["close"], initial_df["open"])
                 ]
+            else:
+                new_source_data["direction"] = []
             if "center" in source.column_names and not initial_df.empty:
                 new_source_data["center"] = ((initial_df["open"] + initial_df["close"]) / 2).tolist()
+            else:
+                new_source_data["center"] = []
             if "height" in source.column_names and not initial_df.empty:
                 new_source_data["height"] = abs(initial_df["close"] - initial_df["open"]).tolist()
+            else:
+                new_source_data["height"] = []
             
             source.data = new_source_data
             progress = state["session"].get_progress()
