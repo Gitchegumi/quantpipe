@@ -497,7 +497,12 @@ def main() -> int:
                 pdf.index = pd.to_datetime(pdf.index)
                 pdf = pdf.sort_index()
 
-        # Create Bokeh ColumnDataSource
+        # Add derived columns for candlestick rendering BEFORE creating source
+        pdf["direction"] = ["up" if c > o else "down" for c, o in zip(pdf["close"], pdf["open"])]
+        pdf["center"] = (pdf["open"] + pdf["close"]) / 2
+        pdf["height"] = abs(pdf["close"] - pdf["open"])
+
+        # Create Bokeh ColumnDataSource with all columns including derived
         source = ColumnDataSource(pdf)
 
         # Determine price format
@@ -514,26 +519,28 @@ def main() -> int:
             active_scroll="wheel_zoom",
         )
 
-        # Add candlestick glyphs
-        inc = pdf["close"] > pdf["open"]
-        dec = ~inc
+        # Add candlestick glyphs - bound to ColumnDataSource for streaming updates
         up_color = "#00FF00"
         down_color = "#FF0000"
         body_width = 30 * 60 * 1000  # 30 minutes for 1m data
 
-        p.segment(pdf.index, pdf["high"], pdf.index, pdf["low"], color="#888888", line_width=1)
-        for cond, color in [(inc, up_color), (dec, down_color)]:
-            subset = pdf[cond]
-            if len(subset) > 0:
-                p.rect(
-                    subset.index,
-                    (subset["open"] + subset["close"]) / 2,
-                    body_width,
-                    abs(subset["close"] - subset["open"]),
-                    fill_color=color,
-                    line_color=color,
-                    line_width=1,
-                )
+        # Wicks (high-low lines) - use segment with source
+        p.segment(
+            x0="index", y0="high", x1="index", y1="low",
+            source=source, color="#888888", line_width=1
+        )
+
+        # Candle bodies - use rect with source, color-mapped by direction
+        from bokeh.core.properties import value
+        from bokeh.transform import factor_cmap
+        
+        p.rect(
+            x="index", y="center", width=value(body_width), height="height",
+            source=source,
+            fill_color=factor_cmap("direction", palette=[down_color, up_color], factors=["down", "up"]),
+            line_color=factor_cmap("direction", palette=[down_color, up_color], factors=["down", "up"]),
+            line_width=1,
+        )
 
         # HoverTool
         hover = HoverTool(
@@ -624,6 +631,16 @@ def main() -> int:
                 elif col == "index":
                     new_data["index"] = new_rows.index.tolist()
 
+            # Calculate derived columns for candlestick visualization
+            if "direction" in source.column_names:
+                directions = ["up" if new_rows["close"].iloc[i] > new_rows["open"].iloc[i] else "down" 
+                             for i in range(len(new_rows))]
+                new_data["direction"] = directions
+            if "center" in source.column_names:
+                new_data["center"] = ((new_rows["open"] + new_rows["close"]) / 2).tolist()
+            if "height" in source.column_names:
+                new_data["height"] = abs(new_rows["close"] - new_rows["open"]).tolist()
+
             # Stream with rollover
             source.stream(new_data, rollover=args.max_candles)
 
@@ -660,10 +677,27 @@ def main() -> int:
                 state["timer_id"] = None
             state["session"].reset()
             initial_df = state["session"].get_view_data()
-            source.data = {
-                col: initial_df[col].tolist() if col in initial_df.columns else []
-                for col in source.column_names
-            }
+            
+            # Rebuild full source data including derived columns
+            new_source_data = {}
+            for col in source.column_names:
+                if col in initial_df.columns:
+                    new_source_data[col] = initial_df[col].tolist()
+                elif col == "index":
+                    new_source_data["index"] = initial_df.index.tolist()
+            
+            # Recalculate derived columns
+            if "direction" in source.column_names and not initial_df.empty:
+                new_source_data["direction"] = [
+                    "up" if c > o else "down" 
+                    for c, o in zip(initial_df["close"], initial_df["open"])
+                ]
+            if "center" in source.column_names and not initial_df.empty:
+                new_source_data["center"] = ((initial_df["open"] + initial_df["close"]) / 2).tolist()
+            if "height" in source.column_names and not initial_df.empty:
+                new_source_data["height"] = abs(initial_df["close"] - initial_df["open"]).tolist()
+            
+            source.data = new_source_data
             progress = state["session"].get_progress()
             status_div.text = f"<b>Status:</b> Reset | Progress: {progress:.1f}% | View: {len(initial_df)}"
             play_button.disabled = False
