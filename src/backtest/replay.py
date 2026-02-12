@@ -347,7 +347,7 @@ def main() -> int:
         print("\nStarting dashboard at http://localhost:5006/")
         print("Press Ctrl+C to stop.\n")
 
-        pn.serve(dashboard, port=5006, show=True, title=f"{symbol} Replay - QuantPipe")
+        pn.serve(dashboard, port=5006, show=False, title=f"{symbol} Replay - QuantPipe")
 
     except ImportError as e:
         print(f"\nDashboard dependencies missing: {e}")
