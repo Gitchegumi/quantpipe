@@ -838,27 +838,96 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     yes_no_choices = ["y", "n"]
     session_choices = ["NY", "EU", "AS", "SY"]  # Common session abbreviations
 
-    # --- Interactive Prompts for Missing Flags (Feature 026) ---
+    # --- Load Config Early (Issue #88: Config-based prompt suppression) ---
+    config_data = {}
+    if args.config:
+        config_path = Path(args.config)
+        if config_path.exists():
+            try:
+                with open(config_path, encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+                logger.info("Loaded config from %s with %d keys", config_path, len(config_data))
+            except Exception as e:
+                logger.error("Failed to load config %s: %s", config_path, e)
+                return 1
+        else:
+            logger.warning("Config file %s not found. Proceeding without it.", config_path)
+
+    # Merge config values into args if arg not already set (Issue #88: suppress prompts)
+    # Mapping: config field name -> (arg dest, normalizer function)
+    def as_list(x):
+        return x if isinstance(x, list) else [x]
+
+    def as_float(x):
+        return float(x)
+
+    def as_int(x):
+        return int(x)
+
+    def as_bool(x):
+        if isinstance(x, bool):
+            return x
+        return str(x).lower() in ("true", "yes", "1", "y")
+
+    config_to_arg_mapping = {
+        "strategy": ("strategy", as_list),
+        "pair": ("pair", as_list),
+        "timeframe": ("timeframe", None),
+        "direction": ("direction", None),
+        "dataset": ("dataset", None),
+        "simulation_type": ("simulation_type", None),
+        "starting_balance": ("starting_balance", as_float),
+        "risk_percent": ("risk_percent", as_float),
+        "max_position_size": ("max_position_size", as_float),
+        "stop_policy": ("stop_policy", None),
+        "atr_multiplier": ("atr_multiplier", as_float),
+        "atr_period": ("atr_period", as_int),
+        "fixed_pips": ("fixed_pips", as_float),
+        "tp_policy": ("tp_policy", None),
+        "rr_ratio": ("rr_ratio", as_float),
+        "ma_type": ("ma_type", None),
+        "ma_period": ("ma_period", as_int),
+        "trail_trigger": ("trail_trigger", as_float),
+        "blackout_sessions": ("blackout_sessions", as_bool),
+        "blackout_news": ("blackout_news", as_bool),
+        "news_before": ("news_before", as_int),
+        "news_after": ("news_after", as_int),
+        "limit_sessions": ("limit_sessions", as_bool),
+        "sessions": ("sessions", as_list),
+        "sessions_force_close": ("sessions_force_close", as_bool),
+        "sessions_window": ("sessions_window", as_int),
+        "news_force_close": ("news_force_close", as_bool),
+        "dry_run": ("dry_run", as_bool),
+        "output": ("output", None),
+        "output_format": ("output_format", None),
+        "log_level": ("log_level", None),
+        "profile": ("profile", as_bool),
+        "max_workers": ("max_workers", as_int),
+        "visualize": ("visualize", as_bool),
+        "start": ("start", None),
+        "end": ("end", None),
+    }
+
+    for config_key, (arg_dest, normalizer) in config_to_arg_mapping.items():
+        if config_key in config_data and getattr(args, arg_dest, None) is None:
+            value = config_data[config_key]
+            if normalizer:
+                try:
+                    value = normalizer(value)
+                except Exception as e:
+                    logger.warning("Failed to normalize config %s=%r: %s. Using raw value.", config_key, config_data[config_key], e)
+            setattr(args, arg_dest, value)
+            logger.debug("Set %s from config: %s", arg_dest, value)
+
     is_interactive = _is_interactive() and not args.non_interactive
     run_param_sweep = False  # Initialize sweep flag
 
     # Only prompt if not in non-interactive mode and certain flags are missing
     if not args.list_strategies and not args.register_strategy:
-        # Check for missing required flags that need user input
-
-        # 0. Dataset Prompt (Test vs Validate)
-        if args.dataset is None:
-            if not is_interactive:
-                args.dataset = "test"
-            else:
-                args.dataset = _prompt(
-                    "? Dataset to use ",
-                    default="test",
-                    choices=["test", "validate"],
-                )
+        # After config merge, any remaining None values need prompts (or defaults)
 
         # 1. Strategy Prompt
-        if args.strategy is None:
+        if args.strategy is None and "strategy" not in config_data:
             if not is_interactive:
                 args.strategy = ["trend-pullback"]  # Default
             else:
