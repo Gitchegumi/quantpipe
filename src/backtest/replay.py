@@ -220,16 +220,21 @@ def main() -> int:
     start_dt = min_ts if not args.start else datetime.strptime(args.start, "%Y-%m-%d")
     end_dt = max_ts if not args.end else datetime.strptime(args.end, "%Y-%m-%d")
 
-    # Validate range
-    if start_dt > end_dt:
-        print("Error: start date must be before end date.")
-        return 1
+    # Clamp to available data bounds and ensure start <= end
+    adjusted = False
     if start_dt < min_ts:
         start_dt = min_ts
-        print(f"Start date adjusted to earliest available: {start_dt.strftime('%Y-%m-%d')}")
+        adjusted = True
     if end_dt > max_ts:
         end_dt = max_ts
-        print(f"End date adjusted to latest available: {end_dt.strftime('%Y-%m-%d')}")
+        adjusted = True
+    if start_dt > end_dt:
+        # If start is after end (e.g., default 90-day start beyond max_ts), set start to end
+        start_dt = end_dt
+        adjusted = True
+
+    if adjusted:
+        print(f"Date range adjusted to: {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}")
 
     print(f"Loading {symbol.upper()} {timeframe} from {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}...")
     print(f"Vault: {vault_path}")
