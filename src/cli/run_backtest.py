@@ -372,6 +372,14 @@ def configure_backtest_parser(
         help="Generate signals without execution (signal-only mode)",
     )
 
+    # Visualization control
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Launch replay dashboard after backtest (requires DuckDB vault). "
+        "Can also be set via config file. Overrides interactive prompt.",
+    )
+
     # Performance optimization flags (Phase 4: US2)
     parser.add_argument(
         "--profile",
@@ -1372,7 +1380,9 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             console.print("  3. This will build the vault (data/vault.duckdb) with 1-minute data.")
             args.visualize = False
     else:
-        args.visualize = False
+        # In non-interactive mode, don't override if --visualize was explicitly set (CLI or config)
+        if not getattr(args, "visualize", False):
+            args.visualize = False
 
     # Construct data paths
     try:
