@@ -502,7 +502,10 @@ def main() -> int:
         pdf["center"] = (pdf["open"] + pdf["close"]) / 2
         pdf["height"] = abs(pdf["close"] - pdf["open"])
 
-        # Create Bokeh ColumnDataSource with all columns including derived
+        # Ensure index is available as a column for Bokeh glyphs (fix BAD_COLUMN_NAME)
+        pdf["index"] = pdf.index
+
+        # Create Bokeh ColumnDataSource with all columns including derived and index
         source = ColumnDataSource(pdf)
 
         # Determine price format
