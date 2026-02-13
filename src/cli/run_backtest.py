@@ -118,11 +118,17 @@ def _launch_visualizer(result, args):
             # Use ReplaySession with vault; let qp-replay auto-detect full data range
             console.print(f"Loading replay from vault for {pair}...")
             import subprocess
+
             cmd = [
-                "poetry", "run", "qp-replay",
-                "--symbol", pair,
-                "--timeframe", args.timeframe if args.timeframe else "1m",
-                "--vault-path", str(vault_path),
+                "poetry",
+                "run",
+                "qp-replay",
+                "--symbol",
+                pair,
+                "--timeframe",
+                args.timeframe if args.timeframe else "1m",
+                "--vault-path",
+                str(vault_path),
             ]
             # Only pass explicit start/end if user provided them in backtest CLI
             if args.start:
@@ -132,7 +138,9 @@ def _launch_visualizer(result, args):
             subprocess.run(cmd)
         else:
             # Fallback to plotting directly from backtest data
-            console.print("[yellow]DuckDB vault not found. Visualization requires vault data.[/yellow]")
+            console.print(
+                "[yellow]DuckDB vault not found. Visualization requires vault data.[/yellow]"
+            )
             console.print("Please ensure the dataset has been ingested into the vault.")
     except Exception as e:
         console.print(f"[red]Visualization failed: {e}[/red]")
@@ -846,12 +854,16 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             try:
                 with open(config_path, encoding="utf-8") as f:
                     config_data = yaml.safe_load(f) or {}
-                logger.info("Loaded config from %s with %d keys", config_path, len(config_data))
+                logger.info(
+                    "Loaded config from %s with %d keys", config_path, len(config_data)
+                )
             except Exception as e:
                 logger.error("Failed to load config %s: %s", config_path, e)
                 return 1
         else:
-            logger.warning("Config file %s not found. Proceeding without it.", config_path)
+            logger.warning(
+                "Config file %s not found. Proceeding without it.", config_path
+            )
 
     # Merge config values into args if arg not already set (Issue #88: suppress prompts)
     # Mapping: config field name -> (arg dest, normalizer function)
@@ -888,8 +900,8 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         "atr_multiplier": ("atr_multiplier", as_float),
         "atr_period": ("atr_period", as_int),
         "fixed_pips": ("fixed_pips", as_float),
-        "tp_policy": ("tp_policy", None),
-        "rr_ratio": ("rr_ratio", as_float),
+        "take_profit_policy": ("take_profit_policy", None),
+        "reward_risk_ratio": ("reward_risk_ratio", as_float),
         # Trailing stop
         "ma_type": ("ma_type", None),
         "ma_period": ("ma_period", as_int),
@@ -897,13 +909,14 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         # Session blackouts
         "blackout_sessions": ("blackout_sessions", as_bool),
         "blackout_news": ("blackout_news", as_bool),
-        "news_before": ("news_before", as_int),
-        "news_after": ("news_after", as_int),
+        "force_news_close": ("force_news_close", as_bool),
+        "minutes_before_news": ("minutes_before_news", as_int),
+        "minutes_after_news": ("minutes_after_news", as_int),
         # Session limits
         "limit_sessions": ("limit_sessions", as_bool),
         "sessions": ("sessions", as_list),
         "sessions_force_close": ("force_session_close", as_bool),
-        "sessions_window": ("session_buffer", as_int),
+        "session_buffer": ("session_buffer", as_int),
         "news_force_close": ("news_force_close", as_bool),
         # Execution
         "dry_run": ("dry_run", as_bool),
@@ -913,12 +926,12 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         # Performance
         "profile": ("profile", as_bool),
         "max_workers": ("max_workers", as_int),
+        # Parameter sweep
+        "test_range": ("test_range", as_bool),
         # Visualization
         "visualize": ("visualize", as_bool),
         "start": ("start", None),
         "end": ("end", None),
-        # Parameter sweep
-        "test_range": ("test_range", as_bool),
     }
 
     for config_key, (arg_dest, normalizer) in config_to_arg_mapping.items():
@@ -943,7 +956,12 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             try:
                 value = normalizer(value)
             except Exception as e:
-                logger.warning("Failed to normalize config %s=%r: %s. Using raw value.", config_key, config_data[config_key], e)
+                logger.warning(
+                    "Failed to normalize config %s=%r: %s. Using raw value.",
+                    config_key,
+                    config_data[config_key],
+                    e,
+                )
         setattr(args, arg_dest, value)
         logger.debug("Set %s from config: %s", arg_dest, value)
 
@@ -1468,13 +1486,17 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 default="n",
                 choices=["y", "n"],
             )
-            args.visualize = (viz_yn == "y")
+            args.visualize = viz_yn == "y"
         else:
-            console.print("[yellow]DuckDB vault not found. Visualization unavailable.[/yellow]")
+            console.print(
+                "[yellow]DuckDB vault not found. Visualization unavailable.[/yellow]"
+            )
             console.print("[white]To enable visualization:[/white]")
             console.print("  1. Ensure raw price data exists in price_data/raw/")
             console.print("  2. Run: poetry run quantpipe ingest")
-            console.print("  3. This will build the vault (data/vault.duckdb) with 1-minute data.")
+            console.print(
+                "  3. This will build the vault (data/vault.duckdb) with 1-minute data."
+            )
             args.visualize = False
     else:
         # In non-interactive mode, don't override if --visualize was explicitly set (CLI or config)
@@ -1502,7 +1524,11 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                 for key in allowed_fields:
                     if key in config_data:
                         config_params[key] = config_data[key]
-                logger.info("Loaded config from %s with %d parameters", config_path, len(config_params))
+                logger.info(
+                    "Loaded config from %s with %d parameters",
+                    config_path,
+                    len(config_params),
+                )
             except Exception as e:
                 logger.error("Failed to load config %s: %s", config_path, e)
                 return 1
@@ -1640,7 +1666,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         total_trades = getattr(result, "total_trades", 0)
         win_rate = getattr(result, "win_rate", None)
         net_pnl = getattr(result, "net_pnl", None)
-        
+
         summary_parts = []
         if total_trades is not None:
             summary_parts.append(f"{total_trades} trades")
@@ -1648,7 +1674,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             summary_parts.append(f"{win_rate:.1f}% win rate")
         if net_pnl is not None:
             summary_parts.append(f"Net P&L: ${net_pnl:.2f}")
-        
+
         summary = " | ".join(summary_parts) if summary_parts else "Backtest completed"
         console.print(f"[green]✓ {summary}[/green]")
         console.print(f"   Full results: {output_path}")
@@ -1660,7 +1686,9 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             # Non-interactive already set to False; this branch just clarifies no action
             pass
         else:
-            console.print("[yellow]Visualization skipped (non-interactive mode).[/yellow]")
+            console.print(
+                "[yellow]Visualization skipped (non-interactive mode).[/yellow]"
+            )
 
     except Exception as e:
         logger.exception("Backtest execution failed: %s", e)
