@@ -922,15 +922,30 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     }
 
     for config_key, (arg_dest, normalizer) in config_to_arg_mapping.items():
-        if config_key in config_data and getattr(args, arg_dest, None) is None:
-            value = config_data[config_key]
-            if normalizer:
-                try:
-                    value = normalizer(value)
-                except Exception as e:
-                    logger.warning("Failed to normalize config %s=%r: %s. Using raw value.", config_key, config_data[config_key], e)
-            setattr(args, arg_dest, value)
-            logger.debug("Set %s from config: %s", arg_dest, value)
+        if config_key not in config_data:
+            continue
+        current_val = getattr(args, arg_dest, None)
+        # Determine if this is a boolean flag (normalizer is as_bool)
+        is_bool_flag = normalizer is as_bool
+        # Skip if current_val indicates explicit CLI set:
+        # - For non-bool: current_val is not None means CLI set (since default is None for most)
+        # - For bool: current_val is True means CLI set (store_true only sets True)
+        if is_bool_flag:
+            if current_val is True:
+                continue  # CLI explicitly enabled, skip
+            # else: allow config to set (including setting False if desired)
+        else:
+            if current_val is not None:
+                continue  # CLI set a value
+        # Apply config value
+        value = config_data[config_key]
+        if normalizer:
+            try:
+                value = normalizer(value)
+            except Exception as e:
+                logger.warning("Failed to normalize config %s=%r: %s. Using raw value.", config_key, config_data[config_key], e)
+        setattr(args, arg_dest, value)
+        logger.debug("Set %s from config: %s", arg_dest, value)
 
     is_interactive = _is_interactive() and not args.non_interactive
     run_param_sweep = False  # Initialize sweep flag
