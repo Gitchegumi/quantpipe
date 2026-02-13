@@ -870,12 +870,17 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         return str(x).lower() in ("true", "yes", "1", "y")
 
     config_to_arg_mapping = {
+        # Core
         "strategy": ("strategy", as_list),
         "pair": ("pair", as_list),
         "timeframe": ("timeframe", None),
         "direction": ("direction", None),
         "dataset": ("dataset", None),
         "simulation_type": ("simulation_type", None),
+        # CTI-specific
+        "cti_mode": ("cti_mode", None),
+        "buyback_strategy": ("buyback_strategy", None),
+        # Risk & stops
         "starting_balance": ("starting_balance", as_float),
         "risk_percent": ("risk_percent", as_float),
         "max_position_size": ("max_position_size", as_float),
@@ -885,27 +890,35 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         "fixed_pips": ("fixed_pips", as_float),
         "tp_policy": ("tp_policy", None),
         "rr_ratio": ("rr_ratio", as_float),
+        # Trailing stop
         "ma_type": ("ma_type", None),
         "ma_period": ("ma_period", as_int),
         "trail_trigger": ("trail_trigger", as_float),
+        # Session blackouts
         "blackout_sessions": ("blackout_sessions", as_bool),
         "blackout_news": ("blackout_news", as_bool),
         "news_before": ("news_before", as_int),
         "news_after": ("news_after", as_int),
+        # Session limits
         "limit_sessions": ("limit_sessions", as_bool),
         "sessions": ("sessions", as_list),
-        "sessions_force_close": ("sessions_force_close", as_bool),
-        "sessions_window": ("sessions_window", as_int),
+        "sessions_force_close": ("force_session_close", as_bool),
+        "sessions_window": ("session_buffer", as_int),
         "news_force_close": ("news_force_close", as_bool),
+        # Execution
         "dry_run": ("dry_run", as_bool),
         "output": ("output", None),
         "output_format": ("output_format", None),
         "log_level": ("log_level", None),
+        # Performance
         "profile": ("profile", as_bool),
         "max_workers": ("max_workers", as_int),
+        # Visualization
         "visualize": ("visualize", as_bool),
         "start": ("start", None),
         "end": ("end", None),
+        # Parameter sweep
+        "test_range": ("test_range", as_bool),
     }
 
     for config_key, (arg_dest, normalizer) in config_to_arg_mapping.items():
