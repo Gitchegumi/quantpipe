@@ -734,8 +734,7 @@ def main() -> int:
         # Layout
         controls = row(play_button, pause_button, reset_button, speed_div, status_div)
         layout = column(controls, p)
-        if vol_fig:
-            layout = column(layout, vol_fig)
+        # Volume panel intentionally removed; only indicators below price if present
         for ind_fig in indicator_figs:
             layout = column(layout, ind_fig)
 
