@@ -457,14 +457,19 @@ def main() -> int:
 
         # Prepare main DataFrame for plotting
         pdf = df.copy()
+        # Normalize timestamp column to datetime and set as index
         if "timestamp" in pdf.columns:
             pdf = pdf.rename(columns={"timestamp": "timestamp_utc"})
-            pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
-            pdf = pdf.set_index("timestamp_utc").sort_index()
-            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            pdf.index = pd.to_datetime(pdf.index)
-            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
+        elif "timestamp_utc" not in pdf.columns:
+            # If neither exists, assume index is timestamp
+            pdf = pdf.reset_index()
+            if "timestamp" not in pdf.columns:
+                pdf = pdf.rename(columns={pdf.columns[0]: "timestamp_utc"})
+        pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
+        pdf = pdf.set_index("timestamp_utc").sort_index()
+
+        # Human-readable time string for hover
+        pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
 
         # Load indicator overlay from test partition if requested (for static initial view)
         indicator_dfs = []
@@ -502,8 +507,10 @@ def main() -> int:
         pdf["center"] = (pdf["open"] + pdf["close"]) / 2
         pdf["height"] = abs(pdf["close"] - pdf["open"])
 
-        # Ensure index is available as a column for Bokeh glyphs (fix BAD_COLUMN_NAME)
-        # The index is timestamp_utc (datetime); materialize it as 'index' column for glyphs (milliseconds)
+        # Ensure timestamp_utc is available as a column for glyphs (datetime)
+        pdf["timestamp_utc"] = pdf.index
+
+        # Ensure index (milliseconds) is available for Bokeh datetime axis
         pdf["index"] = pdf.index.view('int64')
 
         # Ensure time_str is present for hover tool
