@@ -188,6 +188,7 @@ class StreamingReplaySession:
         """
         Streams the next batch of candles into the view.
         Returns the new rows that were added (for Bokeh streaming).
+        The returned DataFrame uses the original datetime index (timestamp_utc) for x-axis.
         """
         if self._buffer.empty:
             # Try to load more
@@ -198,19 +199,18 @@ class StreamingReplaySession:
         # Take next batch from buffer
         available = len(self._buffer) - self._buffer_idx
         n = min(batch_size, available)
-        new_rows = self._buffer.iloc[self._buffer_idx:self._buffer_idx + n]
+        new_rows = self._buffer.iloc[self._buffer_idx:self._buffer_idx + n].copy()
 
         # Append to view
         if self._view_df.empty:
-            self._view_df = new_rows.copy()
+            self._view_df = new_rows
         else:
-            self._view_df = pd.concat([self._view_df, new_rows], ignore_index=True)
+            self._view_df = pd.concat([self._view_df, new_rows])
 
-        # Maintain bounded window
+        # Maintain bounded window (by timestamp, not integer position)
         if len(self._view_df) > self.max_candles:
-            # Drop oldest
-            excess = len(self._view_df) - self.max_candles
-            self._view_df = self._view_df.iloc[excess:].reset_index(drop=True)
+            # Keep the most recent max_candles rows
+            self._view_df = self._view_df.iloc[-self.max_candles:]
 
         # Advance buffer pointer and current_time
         self._buffer_idx += n
@@ -220,7 +220,7 @@ class StreamingReplaySession:
         if self._buffer_idx >= len(self._buffer):
             self._load_next_buffer()
 
-        return new_rows.copy()
+        return new_rows
 
     def is_finished(self) -> bool:
         """Checks if replay has reached the end."""
@@ -503,7 +503,12 @@ def main() -> int:
         pdf["height"] = abs(pdf["close"] - pdf["open"])
 
         # Ensure index is available as a column for Bokeh glyphs (fix BAD_COLUMN_NAME)
-        pdf["index"] = pdf.index
+        # The index is timestamp_utc (datetime); materialize it as 'index' column for glyphs (milliseconds)
+        pdf["index"] = pdf.index.view('int64')
+
+        # Ensure time_str is present for hover tool
+        if "time_str" not in pdf.columns:
+            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
 
         # Create Bokeh ColumnDataSource with all columns including derived and index
         source = ColumnDataSource(pdf)
@@ -525,13 +530,33 @@ def main() -> int:
         # Add candlestick glyphs - bound to ColumnDataSource for streaming updates
         up_color = "#00FF00"
         down_color = "#FF0000"
-        body_width = 30 * 60 * 1000  # 30 minutes for 1m data
+        body_width = 60 * 1000  # 1 minute in milliseconds for 1m data
 
         # Wicks (high-low lines) - use segment with source
         p.segment(
             x0="index", y0="high", x1="index", y1="low",
             source=source, color="#888888", line_width=1
         )
+
+        # Compute candle width from timeframe (e.g., "15m" -> 15 minutes in milliseconds)
+        def _timeframe_to_ms(tf: str) -> int:
+            import re
+            m = re.match(r"(\d+)([mhdw])", tf.lower())
+            if not m:
+                return 60 * 1000  # default 1m
+            qty = int(m.group(1))
+            unit = m.group(2)
+            if unit == "m":
+                return qty * 60 * 1000
+            elif unit == "h":
+                return qty * 60 * 60 * 1000
+            elif unit == "d":
+                return qty * 24 * 60 * 60 * 1000
+            elif unit == "w":
+                return qty * 7 * 24 * 60 * 60 * 1000
+            return 60 * 1000
+
+        body_width = _timeframe_to_ms(args.timeframe)
 
         # Candle bodies - use rect with source, color-mapped by direction
         from bokeh.core.properties import value
@@ -558,19 +583,7 @@ def main() -> int:
         )
         p.add_tools(hover)
 
-        # Volume pane
-        vol_fig = None
-        if "volume" in pdf.columns and pdf["volume"].notna().any():
-            vol_fig = figure(
-                x_axis_type="datetime",
-                width=1200,
-                height=150,
-                x_range=p.x_range,
-                tools="",
-                toolbar_location=None,
-            )
-            vol_fig.vbar(x=pdf.index, top=pdf["volume"], width=body_width, fill_color="gray", alpha=0.3)
-            vol_fig.yaxis.axis_label = "Volume"
+        # Volume panel: REMOVED entirely per requirement (FX has no meaningful volume)
 
         # Indicator panes
         indicator_figs = []
@@ -630,18 +643,22 @@ def main() -> int:
             new_data = {}
             for col in source.column_names:
                 if col in new_rows.columns:
-                    new_data[col] = [new_rows[col].iloc[0]] if len(new_rows) == 1 else new_rows[col].tolist()
+                    val = new_rows[col]
+                    # Convert to list appropriately
+                    if hasattr(val, 'tolist'):
+                        new_data[col] = val.tolist()
+                    else:
+                        new_data[col] = [val]
                 elif col == "index":
-                    new_data["index"] = new_rows.index.tolist()
+                    # Convert datetime index to int64 milliseconds for Bokeh
+                    new_data["index"] = new_rows.index.view('int64').tolist()
 
-            # Calculate derived columns for candlestick visualization
-            if "direction" in source.column_names:
-                directions = ["up" if new_rows["close"].iloc[i] > new_rows["open"].iloc[i] else "down" 
-                             for i in range(len(new_rows))]
-                new_data["direction"] = directions
-            if "center" in source.column_names:
+            # Ensure derived columns exist (they should already be in source; stream them anyway)
+            if "direction" in source.column_names and "direction" not in new_data:
+                new_data["direction"] = ["up" if c > o else "down" for c, o in zip(new_rows["close"], new_rows["open"])]
+            if "center" in source.column_names and "center" not in new_data:
                 new_data["center"] = ((new_rows["open"] + new_rows["close"]) / 2).tolist()
-            if "height" in source.column_names:
+            if "height" in source.column_names and "height" not in new_data:
                 new_data["height"] = abs(new_rows["close"] - new_rows["open"]).tolist()
 
             # Stream with rollover
@@ -656,12 +673,12 @@ def main() -> int:
             state["running"] = True
             play_button.disabled = True
             pause_button.disabled = False
-            # Start periodic updates using pn.state.add_periodic_callback
-            from bokeh.document import without_document_lock
             if state["timer_id"] is None:
-                # Schedule every 60/replay_speed seconds
+                # Create periodic callback once and store the callback object
                 interval_ms = int(60000 / state["replay_speed"])
                 state["timer_id"] = pn.state.add_periodic_callback(update_chart, interval_ms)
+            else:
+                state["timer_id"].start()
 
         def on_pause():
             state = streaming_state
@@ -669,15 +686,13 @@ def main() -> int:
             play_button.disabled = False
             pause_button.disabled = True
             if state["timer_id"] is not None:
-                pn.state.remove_periodic_callback(state["timer_id"])
-                state["timer_id"] = None
+                state["timer_id"].stop()
 
         def on_reset():
             state = streaming_state
             state["running"] = False
             if state["timer_id"] is not None:
-                pn.state.remove_periodic_callback(state["timer_id"])
-                state["timer_id"] = None
+                state["timer_id"].stop()
             state["session"].reset()
             initial_df = state["session"].get_view_data()
             
@@ -687,7 +702,7 @@ def main() -> int:
                 if col in initial_df.columns:
                     new_source_data[col] = initial_df[col].tolist()
                 elif col == "index":
-                    new_source_data["index"] = initial_df.index.tolist()
+                    new_source_data["index"] = initial_df.index.view('int64').tolist()
             
             # Recalculate derived columns
             if "direction" in source.column_names and not initial_df.empty:

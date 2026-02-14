@@ -105,9 +105,21 @@ def _launch_visualizer(result, args):
     try:
         console.print("[cyan]Starting visualization...[/cyan]")
 
-        # Determine symbol: portfolio results have 'symbols' list; pick first
+        # Determine symbol: portfolio results have 'symbols' list; prompt user to pick one
         if hasattr(result, "symbols") and result.symbols:
-            pair = result.symbols[0]
+            available_symbols = sorted(result.symbols)
+            if not available_symbols:
+                console.print("[yellow]No symbols available for visualization.[/yellow]")
+                return
+            # In interactive mode, prompt; in non-interactive, pick first
+            if _is_interactive():
+                pair = _prompt(
+                    "? Select symbol to visualize",
+                    default=available_symbols[0],
+                    choices=available_symbols,
+                )
+            else:
+                pair = available_symbols[0]
         elif hasattr(result, "symbol"):
             pair = result.symbol
         else:
@@ -115,7 +127,7 @@ def _launch_visualizer(result, args):
         # Prefer DuckDB vault if exists
         vault_path = Path("data/vault.duckdb")
         if vault_path.exists():
-            # Use ReplaySession with vault; let qp-replay auto-detect full data range
+            # Use qp-replay; let it auto-detect full data range from vault
             console.print(f"Loading replay from vault for {pair}...")
             import subprocess
 
@@ -130,14 +142,13 @@ def _launch_visualizer(result, args):
                 "--vault-path",
                 str(vault_path),
             ]
-            # Only pass explicit start/end if user provided them in backtest CLI
+            # Only pass explicit start/end if user provided them
             if args.start:
                 cmd.extend(["--start", args.start])
             if args.end:
                 cmd.extend(["--end", args.end])
             subprocess.run(cmd)
         else:
-            # Fallback to plotting directly from backtest data
             console.print(
                 "[yellow]DuckDB vault not found. Visualization requires vault data.[/yellow]"
             )

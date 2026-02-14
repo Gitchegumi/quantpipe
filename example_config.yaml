@@ -1,0 +1,33 @@
+# QuantPipe Backtest Configuration
+# Use with: python -m src.cli.run_backtest --direction LONG --data data.csv --config this_file.yaml
+
+# Strategy & market
+strategy: trend-pullback
+pair: EURUSD
+timeframe: 1m
+
+# Account & risk
+starting_balance: 2500.0          # Starting account equity
+risk_percent: 0.25               # Risk per trade (% of balance)
+max_position_size: 10.0          # Max lots allowed
+
+# Stop & target policies
+stop_policy: ATR
+atr_multiplier: 2.0
+atr_period: 14
+tp_policy: RiskMultiple
+rr_ratio: 2.0
+
+# Backtest behavior
+direction: LONG
+dry_run: false
+output_format: text
+log_level: INFO
+
+# Optional: Blackout filters
+blackout_sessions: false
+blackout_news: false
+
+# Optional: Performance
+profile: false
+max_workers: 4
