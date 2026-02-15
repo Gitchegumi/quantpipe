@@ -109,7 +109,9 @@ def _launch_visualizer(result, args):
         if hasattr(result, "symbols") and result.symbols:
             available_symbols = sorted(result.symbols)
             if not available_symbols:
-                console.print("[yellow]No symbols available for visualization.[/yellow]")
+                console.print(
+                    "[yellow]No symbols available for visualization.[/yellow]"
+                )
                 return
             # In interactive mode, prompt; in non-interactive, pick first
             if _is_interactive():
@@ -1370,8 +1372,8 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     args.minutes_after_news = man if man else 30
 
             # 9. Parameter Sweep Mode Prompt
-            # Only prompt if --test-range wasn't explicitly set via CLI
-            if not args.test_range:
+            # Only prompt if --test-range wasn't explicitly set via CLI or config
+            if args.test_range is None:
                 if not is_interactive:
                     run_param_sweep = (
                         False  # Default to not running sweep if non-interactive
@@ -1385,7 +1387,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     if yn == "y":
                         run_param_sweep = True
                         args.test_range = True  # Set flag to trigger sweep logic
-            elif args.test_range:  # If --test-range was explicitly set on CLI
+            elif args.test_range:  # If --test-range was explicitly set on CLI or config
                 run_param_sweep = True
 
         # --- End of Interactive Prompts ---
@@ -1489,7 +1491,11 @@ def run_backtest_command(args: argparse.Namespace) -> int:
 
     # --- Visualization prompt (pre-backtest) ---
     # Check for DuckDB vault and ask if user wants to visualize after backtest completes
-    if is_interactive:
+    # Skip prompt if --visualize was already set via CLI flag or config file
+    if getattr(args, "visualize", None) is not None:
+        # Already set from CLI or config - use that value directly
+        pass
+    elif is_interactive:
         vault_path = Path("data/vault.duckdb")
         if vault_path.exists():
             viz_yn = _prompt(

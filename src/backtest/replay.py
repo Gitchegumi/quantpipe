@@ -98,9 +98,14 @@ class ReplaySession:
                 FROM ohlcv
                 WHERE symbol = ? AND timeframe = ?
             """
-            result = self.vault.conn.execute(query, [self.symbol, self.timeframe]).fetchone()
+            result = self.vault.conn.execute(
+                query, [self.symbol, self.timeframe]
+            ).fetchone()
             if result and result[0] and result[1]:
-                return pd.to_datetime(result[0]).to_pydatetime(), pd.to_datetime(result[1]).to_pydatetime()
+                return (
+                    pd.to_datetime(result[0]).to_pydatetime(),
+                    pd.to_datetime(result[1]).to_pydatetime(),
+                )
             return None, None
         except Exception as e:
             logger.warning("Failed to get data range: %s", e)
@@ -153,7 +158,11 @@ class StreamingReplaySession:
         self._load_next_buffer()
 
         # Build initial view (first max_candles or all if less)
-        self._view_df = self._buffer.head(self.max_candles).copy() if not self._buffer.empty else pd.DataFrame()
+        self._view_df = (
+            self._buffer.head(self.max_candles).copy()
+            if not self._buffer.empty
+            else pd.DataFrame()
+        )
         if not self._view_df.empty:
             self._advance_to_end_of_view()
 
@@ -177,7 +186,11 @@ class StreamingReplaySession:
     def _advance_to_end_of_view(self):
         """Advances current_time to the last candle currently in the view."""
         if not self._view_df.empty:
-            last_ts = self._view_df.index.max() if self._view_df.index.name == "timestamp_utc" else self._view_df["timestamp"].iloc[-1]
+            last_ts = (
+                self._view_df.index.max()
+                if self._view_df.index.name == "timestamp_utc"
+                else self._view_df["timestamp"].iloc[-1]
+            )
             self.current_time = pd.to_datetime(last_ts).to_pydatetime()
 
     def get_view_data(self) -> pd.DataFrame:
@@ -199,7 +212,7 @@ class StreamingReplaySession:
         # Take next batch from buffer
         available = len(self._buffer) - self._buffer_idx
         n = min(batch_size, available)
-        new_rows = self._buffer.iloc[self._buffer_idx:self._buffer_idx + n].copy()
+        new_rows = self._buffer.iloc[self._buffer_idx : self._buffer_idx + n].copy()
 
         # Append to view
         if self._view_df.empty:
@@ -210,7 +223,7 @@ class StreamingReplaySession:
         # Maintain bounded window (by timestamp, not integer position)
         if len(self._view_df) > self.max_candles:
             # Keep the most recent max_candles rows
-            self._view_df = self._view_df.iloc[-self.max_candles:]
+            self._view_df = self._view_df.iloc[-self.max_candles :]
 
         # Advance buffer pointer and current_time
         self._buffer_idx += n
@@ -224,7 +237,11 @@ class StreamingReplaySession:
 
     def is_finished(self) -> bool:
         """Checks if replay has reached the end."""
-        return self._buffer.empty and self._buffer_idx >= len(self._buffer) and self.current_time >= self.end_time
+        return (
+            self._buffer.empty
+            and self._buffer_idx >= len(self._buffer)
+            and self.current_time >= self.end_time
+        )
 
     def get_progress(self) -> float:
         """Returns progress percentage through the time range."""
@@ -239,7 +256,11 @@ class StreamingReplaySession:
         self.current_time = self.start_time
         self._buffer_idx = 0
         self._load_next_buffer()
-        self._view_df = self._buffer.head(self.max_candles).copy() if not self._buffer.empty else pd.DataFrame()
+        self._view_df = (
+            self._buffer.head(self.max_candles).copy()
+            if not self._buffer.empty
+            else pd.DataFrame()
+        )
         if not self._view_df.empty:
             self._advance_to_end_of_view()
 
@@ -352,7 +373,9 @@ def main() -> int:
         try:
             symbols = vault.list_symbols()
             if not symbols:
-                print("No symbols found in vault. Run 'poetry run quantpipe ingest' to build the vault first.")
+                print(
+                    "No symbols found in vault. Run 'poetry run quantpipe ingest' to build the vault first."
+                )
                 return 1
             print("\nAvailable symbols:")
             for sym in symbols:
@@ -362,7 +385,9 @@ def main() -> int:
         except Exception as e:
             print(f"Error connecting to vault: {e}")
             print(f"Vault path: {vault_path}")
-            print("Ensure vault exists. Run 'poetry run quantpipe ingest' to build the vault first.")
+            print(
+                "Ensure vault exists. Run 'poetry run quantpipe ingest' to build the vault first."
+            )
             return 1
 
     symbol = args.symbol.upper()
@@ -397,9 +422,13 @@ def main() -> int:
         adjusted = True
 
     if adjusted:
-        print(f"Date range adjusted to: {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}")
+        print(
+            f"Date range adjusted to: {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}"
+        )
 
-    print(f"Loading {symbol.upper()} {timeframe} from {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}...")
+    print(
+        f"Loading {symbol.upper()} {timeframe} from {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}..."
+    )
     print(f"Vault: {vault_path}")
 
     # Choose session type based on args
@@ -431,7 +460,9 @@ def main() -> int:
             max_candles=args.max_candles,
         )
         df = session.get_view_data()
-        print(f"Streaming mode: max {args.max_candles} candles visible. Buffering for smooth replay.")
+        print(
+            f"Streaming mode: max {args.max_candles} candles visible. Buffering for smooth replay."
+        )
 
     if df.empty:
         print(f"No data in selected range.")
@@ -442,7 +473,7 @@ def main() -> int:
         import holoviews as hv
         import hvplot.pandas  # noqa: F401
         import panel as pn
-        from bokeh.models import HoverTool, ColumnDataSource, Button, Div
+        from bokeh.models import HoverTool, ColumnDataSource, Button, Div, Range1d
         from bokeh.plotting import figure
         from bokeh.layouts import column, row
         from bokeh.palettes import Category10
@@ -482,25 +513,35 @@ def main() -> int:
         # Load indicator overlay from test partition if requested (for static initial view)
         indicator_dfs = []
         if args.overlay_indicators:
-            test_parquet = Path(f"price_data/processed/{symbol.lower()}/test/{symbol.lower()}_test.parquet")
+            test_parquet = Path(
+                f"price_data/processed/{symbol.lower()}/test/{symbol.lower()}_test.parquet"
+            )
             if test_parquet.exists():
                 try:
                     test_df = pd.read_parquet(test_parquet)
                     # Align index to pdf's index (timestamp)
                     if "timestamp" in test_df.columns:
                         test_df = test_df.rename(columns={"timestamp": "timestamp_utc"})
-                        test_df["timestamp_utc"] = pd.to_datetime(test_df["timestamp_utc"])
+                        test_df["timestamp_utc"] = pd.to_datetime(
+                            test_df["timestamp_utc"]
+                        )
                         test_df = test_df.set_index("timestamp_utc").sort_index()
                     # Intersection of indices with current view
                     common_idx = pdf.index.intersection(test_df.index)
                     if len(common_idx) > 0:
                         test_df = test_df.loc[common_idx]
                         indicator_dfs.append(test_df)
-                        print(f"Overlayed {len(test_df.columns)} indicator(s) from test partition.")
+                        print(
+                            f"Overlayed {len(test_df.columns)} indicator(s) from test partition."
+                        )
                 except Exception as e:
-                    print(f"Warning: failed to load indicators from {test_parquet}: {e}")
+                    print(
+                        f"Warning: failed to load indicators from {test_parquet}: {e}"
+                    )
             else:
-                print(f"Note: test parquet not found at {test_parquet}; indicators not overlaid.")
+                print(
+                    f"Note: test parquet not found at {test_parquet}; indicators not overlaid."
+                )
 
         # Prepare time-sorted data for streaming (with duplicate-safe guards)
         if pdf.index.name != "timestamp_utc":
@@ -512,19 +553,23 @@ def main() -> int:
 
         # Add derived columns for candlestick rendering BEFORE creating source (guard against duplicates)
         if "direction" not in pdf.columns:
-            pdf["direction"] = ["up" if c > o else "down" for c, o in zip(pdf["close"], pdf["open"])]
+            pdf["direction"] = [
+                "up" if c > o else "down" for c, o in zip(pdf["close"], pdf["open"])
+            ]
         if "center" not in pdf.columns:
             pdf["center"] = (pdf["open"] + pdf["close"]) / 2
         if "height" not in pdf.columns:
             pdf["height"] = abs(pdf["close"] - pdf["open"])
 
         # Ensure timestamp_utc is available as a column for glyphs (datetime) - safe fallback
-        if "timestamp_utc" not in pdf.columns:
+        # NOTE: ColumnDataSource automatically exposes the index by its name,
+        # so skip adding it as a column if the index is already named "timestamp_utc"
+        # to avoid "cannot insert timestamp_utc, already exists" errors.
+        if "timestamp_utc" not in pdf.columns and pdf.index.name != "timestamp_utc":
             pdf["timestamp_utc"] = pdf.index
 
-        # Ensure index (milliseconds) is available for Bokeh datetime axis - safe fallback
-        if "index" not in pdf.columns:
-            pdf["index"] = pdf.index.view('int64')
+        # NOTE: The int64 "index" column is no longer used.
+        # All glyphs now use "timestamp_utc" (datetime) directly for proper axis rendering.
 
         # Ensure time_str is present for hover tool - safe fallback (may have been added earlier)
         if "time_str" not in pdf.columns:
@@ -533,12 +578,24 @@ def main() -> int:
         # Create Bokeh ColumnDataSource with all columns including derived and index
         source = ColumnDataSource(pdf)
 
-        # Determine price format
-        price_fmt = ".2f" if pdf["close"].mean() > 1 else ".5f"
+        # Determine price format (numeral.js syntax for Bokeh HoverTool)
+        # Forex non-JPY pairs (EURUSD ~1.1) need 5 decimals; JPY pairs (USDJPY ~150) need 3;
+        # stocks/indices need 2. Threshold at 50 covers all non-JPY forex.
+        avg_price = pdf["close"].mean()
+        if avg_price < 50:
+            price_fmt = "0.00000"
+        elif avg_price < 500:
+            price_fmt = "0.000"
+        else:
+            price_fmt = "0.00"
 
         # Create main price chart (Bokeh figure)
+        # Use Range1d for x-axis so streaming can control the viewport
+        initial_x_start = pdf.index[0]
+        initial_x_end = pdf.index[-1]
         p = figure(
             x_axis_type="datetime",
+            x_range=Range1d(start=initial_x_start, end=initial_x_end),
             title=f"{symbol} {timeframe} Replay (Streaming: {args.max_candles} max candles)",
             width=1200,
             height=500,
@@ -550,17 +607,21 @@ def main() -> int:
         # Add candlestick glyphs - bound to ColumnDataSource for streaming updates
         up_color = "#00FF00"
         down_color = "#FF0000"
-        body_width = 60 * 1000  # 1 minute in milliseconds for 1m data
-
         # Wicks (high-low lines) - use segment with source
         p.segment(
-            x0="index", y0="high", x1="index", y1="low",
-            source=source, color="#888888", line_width=1
+            x0="timestamp_utc",
+            y0="high",
+            x1="timestamp_utc",
+            y1="low",
+            source=source,
+            color="#888888",
+            line_width=1,
         )
 
         # Compute candle width from timeframe (e.g., "15m" -> 15 minutes in milliseconds)
         def _timeframe_to_ms(tf: str) -> int:
             import re
+
             m = re.match(r"(\d+)([mhdw])", tf.lower())
             if not m:
                 return 60 * 1000  # default 1m
@@ -576,17 +637,26 @@ def main() -> int:
                 return qty * 7 * 24 * 60 * 60 * 1000
             return 60 * 1000
 
-        body_width = _timeframe_to_ms(args.timeframe)
+        body_width = int(
+            _timeframe_to_ms(args.timeframe) * 0.8
+        )  # 80% of interval for gap
 
         # Candle bodies - use rect with source, color-mapped by direction
         from bokeh.core.properties import value
         from bokeh.transform import factor_cmap
-        
+
         p.rect(
-            x="index", y="center", width=value(body_width), height="height",
+            x="timestamp_utc",
+            y="center",
+            width=value(body_width),
+            height="height",
             source=source,
-            fill_color=factor_cmap("direction", palette=[down_color, up_color], factors=["down", "up"]),
-            line_color=factor_cmap("direction", palette=[down_color, up_color], factors=["down", "up"]),
+            fill_color=factor_cmap(
+                "direction", palette=[down_color, up_color], factors=["down", "up"]
+            ),
+            line_color=factor_cmap(
+                "direction", palette=[down_color, up_color], factors=["down", "up"]
+            ),
             line_width=1,
         )
 
@@ -624,13 +694,22 @@ def main() -> int:
                     color = "orange"
                 elif "rsi" in col:
                     color = "cyan"
-                ind_fig.line(ind_df.index, ind_df[col], line_width=1, color=color, legend_label=col)
+                ind_fig.line(
+                    ind_df.index,
+                    ind_df[col],
+                    line_width=1,
+                    color=color,
+                    legend_label=col,
+                )
             ind_fig.legend.location = "top_left"
             ind_fig.legend.orientation = "horizontal"
             indicator_figs.append(ind_fig)
 
         # Control panel
-        status_div = Div(text=f"<b>Status:</b> Ready | Progress: 0% | View: {len(pdf)} candles", width=500)
+        status_div = Div(
+            text=f"<b>Status:</b> Ready | Progress: 0% | View: {len(pdf)} candles",
+            width=500,
+        )
         speed_div = Div(text=f"<b>Speed:</b> {args.replay_speed}x", width=150)
 
         play_button = Button(label="▶ Play", width=80, button_type="success")
@@ -667,29 +746,45 @@ def main() -> int:
                 if col in new_rows.columns:
                     val = new_rows[col]
                     # Convert to list appropriately
-                    if hasattr(val, 'tolist'):
+                    if hasattr(val, "tolist"):
                         new_data[col] = val.tolist()
                     else:
                         new_data[col] = [val]
-                elif col == "index":
-                    # Convert datetime index to int64 milliseconds for Bokeh
-                    new_data["index"] = new_rows.index.view('int64').tolist()
 
             # Calculate derived column values ONLY if they exist in source (for streaming)
             # These are required data values, not schema modifications
             if "direction" in source.column_names and "direction" not in new_data:
-                new_data["direction"] = ["up" if c > o else "down" for c, o in zip(new_rows["close"], new_rows["open"])]
+                new_data["direction"] = [
+                    "up" if c > o else "down"
+                    for c, o in zip(new_rows["close"], new_rows["open"])
+                ]
             if "center" in source.column_names and "center" not in new_data:
-                new_data["center"] = ((new_rows["open"] + new_rows["close"]) / 2).tolist()
+                new_data["center"] = (
+                    (new_rows["open"] + new_rows["close"]) / 2
+                ).tolist()
             if "height" in source.column_names and "height" not in new_data:
                 new_data["height"] = abs(new_rows["close"] - new_rows["open"]).tolist()
-            if "timestamp_utc" in source.column_names and "timestamp_utc" not in new_data:
-                new_data["timestamp_utc"] = [new_rows.index[0]] if not new_rows.empty else []
+            if (
+                "timestamp_utc" in source.column_names
+                and "timestamp_utc" not in new_data
+            ):
+                new_data["timestamp_utc"] = new_rows.index.tolist()
             if "time_str" in source.column_names and "time_str" not in new_data:
-                new_data["time_str"] = [new_rows.index[0].strftime("%Y-%m-%d %H:%M:%S")] if not new_rows.empty else []
+                new_data["time_str"] = new_rows.index.strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ).tolist()
 
             # Stream with rollover
             source.stream(new_data, rollover=args.max_candles)
+
+            # Enforce rolling x-range window so candles stay visible
+            if not new_rows.empty:
+                last_ts = new_rows.index[-1]
+                tf_ms = _timeframe_to_ms(args.timeframe)
+                window_ms = 500 * tf_ms  # Show ~500 candles
+                padding_ms = tf_ms * 2
+                p.x_range.start = int(last_ts.timestamp() * 1000) - window_ms
+                p.x_range.end = int(last_ts.timestamp() * 1000) + padding_ms
 
             # Update status
             progress = state["session"].get_progress()
@@ -703,7 +798,9 @@ def main() -> int:
             if state["timer_id"] is None:
                 # Create periodic callback once and store the callback object
                 interval_ms = int(60000 / state["replay_speed"])
-                state["timer_id"] = pn.state.add_periodic_callback(update_chart, interval_ms)
+                state["timer_id"] = pn.state.add_periodic_callback(
+                    update_chart, interval_ms
+                )
             else:
                 state["timer_id"].start()
 
@@ -717,7 +814,8 @@ def main() -> int:
 
         def on_reset():
             """Reset the replay session and rebuild the data source.
-            Uses existing source schema - only replaces data values, never adds columns."""
+            Uses existing source schema - only replaces data values, never adds columns.
+            """
             state = streaming_state
             state["running"] = False
             if state["timer_id"] is not None:
@@ -729,21 +827,38 @@ def main() -> int:
             # This ensures consistency without duplicating columns
             if not initial_df.empty:
                 # Add derived columns to initial_df ONLY if missing and needed by source
-                if "direction" in source.column_names and "direction" not in initial_df.columns:
+                if (
+                    "direction" in source.column_names
+                    and "direction" not in initial_df.columns
+                ):
                     initial_df["direction"] = [
                         "up" if c > o else "down"
                         for c, o in zip(initial_df["close"], initial_df["open"])
                     ]
-                if "center" in source.column_names and "center" not in initial_df.columns:
-                    initial_df["center"] = (initial_df["open"] + initial_df["close"]) / 2
-                if "height" in source.column_names and "height" not in initial_df.columns:
+                if (
+                    "center" in source.column_names
+                    and "center" not in initial_df.columns
+                ):
+                    initial_df["center"] = (
+                        initial_df["open"] + initial_df["close"]
+                    ) / 2
+                if (
+                    "height" in source.column_names
+                    and "height" not in initial_df.columns
+                ):
                     initial_df["height"] = abs(initial_df["close"] - initial_df["open"])
-                if "timestamp_utc" in source.column_names and "timestamp_utc" not in initial_df.columns:
+                if (
+                    "timestamp_utc" in source.column_names
+                    and "timestamp_utc" not in initial_df.columns
+                ):
                     initial_df["timestamp_utc"] = initial_df.index
-                if "index" in source.column_names and "index" not in initial_df.columns:
-                    initial_df["index"] = initial_df.index.view('int64')
-                if "time_str" in source.column_names and "time_str" not in initial_df.columns:
-                    initial_df["time_str"] = initial_df.index.strftime("%Y-%m-%d %H:%M:%S")
+                if (
+                    "time_str" in source.column_names
+                    and "time_str" not in initial_df.columns
+                ):
+                    initial_df["time_str"] = initial_df.index.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
 
             # Rebuild source data using ONLY existing columns from source.column_names
             # Never add new columns here - only populate existing schema with data
@@ -751,12 +866,10 @@ def main() -> int:
             for col in source.column_names:
                 if col in initial_df.columns and not initial_df.empty:
                     val = initial_df[col]
-                    if hasattr(val, 'tolist'):
+                    if hasattr(val, "tolist"):
                         new_source_data[col] = val.tolist()
                     else:
                         new_source_data[col] = [val]
-                elif col == "index" and not initial_df.empty:
-                    new_source_data["index"] = initial_df.index.view('int64').tolist()
                 else:
                     # Empty list for missing columns (schema preserved, data cleared)
                     new_source_data[col] = []
@@ -788,7 +901,9 @@ def main() -> int:
         pn.config.raw_css.append(dark_css)
 
         print("\nStarting dashboard at http://localhost:5006/")
-        print(f"Controls: Play/Pause/Reset. Replay speed: {args.replay_speed}x (1x = real-time)")
+        print(
+            f"Controls: Play/Pause/Reset. Replay speed: {args.replay_speed}x (1x = real-time)"
+        )
         print("Press Ctrl+C to stop.\n")
 
         pn.serve(layout, port=5006, show=False, title=f"{symbol} Replay - QuantPipe")
@@ -808,4 +923,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

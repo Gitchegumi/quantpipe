@@ -60,12 +60,12 @@ max_workers: 4                # Parallel workers (default: auto-detect)
 benchmark_out: ""             # Path to write benchmark JSON (optional)
 
 # --- Visualization ---
-visualize: "n"                # Launch replay dashboard after backtest
+visualize: "n"              # Launch replay dashboard after backtest
 start: ""                     # Visualization start date (YYYY-MM-DD)
 end: ""                       # Visualization end date (YYYY-MM-DD)
 
 # --- Parameter Sweep (Optional) ---
-test_range: "n"          # Test a range of parameter values
+test_range: "n"             # Test a range of parameter values
 
 # --- Notes ---
 # - All fields are optional; missing values will use CLI defaults or prompt in interactive mode
