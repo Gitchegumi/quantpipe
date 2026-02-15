@@ -457,19 +457,27 @@ def main() -> int:
 
         # Prepare main DataFrame for plotting
         pdf = df.copy()
-        # Normalize timestamp column to datetime and set as index
-        if "timestamp" in pdf.columns:
+
+        # Normalize timestamp column to datetime and set as index (with duplicate protection)
+        if "timestamp" in pdf.columns and "timestamp_utc" not in pdf.columns:
             pdf = pdf.rename(columns={"timestamp": "timestamp_utc"})
         elif "timestamp_utc" not in pdf.columns:
             # If neither exists, assume index is timestamp
             pdf = pdf.reset_index()
-            if "timestamp" not in pdf.columns:
+            if "timestamp" not in pdf.columns and pdf.columns[0] != "timestamp_utc":
                 pdf = pdf.rename(columns={pdf.columns[0]: "timestamp_utc"})
-        pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
-        pdf = pdf.set_index("timestamp_utc").sort_index()
 
-        # Human-readable time string for hover
-        pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
+        if "timestamp_utc" in pdf.columns:
+            pdf["timestamp_utc"] = pd.to_datetime(pdf["timestamp_utc"])
+            pdf = pdf.set_index("timestamp_utc").sort_index()
+        else:
+            # Fallback: ensure index is datetime
+            pdf.index = pd.to_datetime(pdf.index)
+            pdf = pdf.sort_index()
+
+        # Human-readable time string for hover (guard against duplicates)
+        if "time_str" not in pdf.columns:
+            pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
 
         # Load indicator overlay from test partition if requested (for static initial view)
         indicator_dfs = []
@@ -494,26 +502,31 @@ def main() -> int:
             else:
                 print(f"Note: test parquet not found at {test_parquet}; indicators not overlaid.")
 
-        # Prepare time-sorted data for streaming
-        if not pdf.index.name == "timestamp_utc":
+        # Prepare time-sorted data for streaming (with duplicate-safe guards)
+        if pdf.index.name != "timestamp_utc":
             if "timestamp_utc" in pdf.columns:
                 pdf = pdf.set_index("timestamp_utc").sort_index()
             else:
                 pdf.index = pd.to_datetime(pdf.index)
                 pdf = pdf.sort_index()
 
-        # Add derived columns for candlestick rendering BEFORE creating source
-        pdf["direction"] = ["up" if c > o else "down" for c, o in zip(pdf["close"], pdf["open"])]
-        pdf["center"] = (pdf["open"] + pdf["close"]) / 2
-        pdf["height"] = abs(pdf["close"] - pdf["open"])
+        # Add derived columns for candlestick rendering BEFORE creating source (guard against duplicates)
+        if "direction" not in pdf.columns:
+            pdf["direction"] = ["up" if c > o else "down" for c, o in zip(pdf["close"], pdf["open"])]
+        if "center" not in pdf.columns:
+            pdf["center"] = (pdf["open"] + pdf["close"]) / 2
+        if "height" not in pdf.columns:
+            pdf["height"] = abs(pdf["close"] - pdf["open"])
 
-        # Ensure timestamp_utc is available as a column for glyphs (datetime)
-        pdf["timestamp_utc"] = pdf.index
+        # Ensure timestamp_utc is available as a column for glyphs (datetime) - safe fallback
+        if "timestamp_utc" not in pdf.columns:
+            pdf["timestamp_utc"] = pdf.index
 
-        # Ensure index (milliseconds) is available for Bokeh datetime axis
-        pdf["index"] = pdf.index.view('int64')
+        # Ensure index (milliseconds) is available for Bokeh datetime axis - safe fallback
+        if "index" not in pdf.columns:
+            pdf["index"] = pdf.index.view('int64')
 
-        # Ensure time_str is present for hover tool
+        # Ensure time_str is present for hover tool - safe fallback (may have been added earlier)
         if "time_str" not in pdf.columns:
             pdf["time_str"] = pdf.index.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -633,7 +646,8 @@ def main() -> int:
         }
 
         def update_chart():
-            """Periodic callback that advances the replay by one candle and streams it."""
+            """Periodic callback that advances the replay by one candle and streams it.
+            Only streams data values - does not modify source schema/columns."""
             state = streaming_state
             if not state["running"]:
                 return
@@ -646,7 +660,8 @@ def main() -> int:
                 status_div.text = f"<b>Status:</b> Finished | Progress: 100% | View: {len(state['session']._view_df)}"
                 return
 
-            # Prepare data for streaming
+            # Prepare data for streaming - ONLY use columns that already exist in source
+            # Do NOT add new columns here; they were defined during initialization
             new_data = {}
             for col in source.column_names:
                 if col in new_rows.columns:
@@ -660,13 +675,18 @@ def main() -> int:
                     # Convert datetime index to int64 milliseconds for Bokeh
                     new_data["index"] = new_rows.index.view('int64').tolist()
 
-            # Ensure derived columns exist (they should already be in source; stream them anyway)
+            # Calculate derived column values ONLY if they exist in source (for streaming)
+            # These are required data values, not schema modifications
             if "direction" in source.column_names and "direction" not in new_data:
                 new_data["direction"] = ["up" if c > o else "down" for c, o in zip(new_rows["close"], new_rows["open"])]
             if "center" in source.column_names and "center" not in new_data:
                 new_data["center"] = ((new_rows["open"] + new_rows["close"]) / 2).tolist()
             if "height" in source.column_names and "height" not in new_data:
                 new_data["height"] = abs(new_rows["close"] - new_rows["open"]).tolist()
+            if "timestamp_utc" in source.column_names and "timestamp_utc" not in new_data:
+                new_data["timestamp_utc"] = [new_rows.index[0]] if not new_rows.empty else []
+            if "time_str" in source.column_names and "time_str" not in new_data:
+                new_data["time_str"] = [new_rows.index[0].strftime("%Y-%m-%d %H:%M:%S")] if not new_rows.empty else []
 
             # Stream with rollover
             source.stream(new_data, rollover=args.max_candles)
@@ -696,38 +716,52 @@ def main() -> int:
                 state["timer_id"].stop()
 
         def on_reset():
+            """Reset the replay session and rebuild the data source.
+            Uses existing source schema - only replaces data values, never adds columns."""
             state = streaming_state
             state["running"] = False
             if state["timer_id"] is not None:
                 state["timer_id"].stop()
             state["session"].reset()
             initial_df = state["session"].get_view_data()
-            
-            # Rebuild full source data including derived columns
+
+            # Prepare initial_df with all required columns that exist in source schema
+            # This ensures consistency without duplicating columns
+            if not initial_df.empty:
+                # Add derived columns to initial_df ONLY if missing and needed by source
+                if "direction" in source.column_names and "direction" not in initial_df.columns:
+                    initial_df["direction"] = [
+                        "up" if c > o else "down"
+                        for c, o in zip(initial_df["close"], initial_df["open"])
+                    ]
+                if "center" in source.column_names and "center" not in initial_df.columns:
+                    initial_df["center"] = (initial_df["open"] + initial_df["close"]) / 2
+                if "height" in source.column_names and "height" not in initial_df.columns:
+                    initial_df["height"] = abs(initial_df["close"] - initial_df["open"])
+                if "timestamp_utc" in source.column_names and "timestamp_utc" not in initial_df.columns:
+                    initial_df["timestamp_utc"] = initial_df.index
+                if "index" in source.column_names and "index" not in initial_df.columns:
+                    initial_df["index"] = initial_df.index.view('int64')
+                if "time_str" in source.column_names and "time_str" not in initial_df.columns:
+                    initial_df["time_str"] = initial_df.index.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Rebuild source data using ONLY existing columns from source.column_names
+            # Never add new columns here - only populate existing schema with data
             new_source_data = {}
             for col in source.column_names:
-                if col in initial_df.columns:
-                    new_source_data[col] = initial_df[col].tolist()
-                elif col == "index":
+                if col in initial_df.columns and not initial_df.empty:
+                    val = initial_df[col]
+                    if hasattr(val, 'tolist'):
+                        new_source_data[col] = val.tolist()
+                    else:
+                        new_source_data[col] = [val]
+                elif col == "index" and not initial_df.empty:
                     new_source_data["index"] = initial_df.index.view('int64').tolist()
-            
-            # Recalculate derived columns
-            if "direction" in source.column_names and not initial_df.empty:
-                new_source_data["direction"] = [
-                    "up" if c > o else "down" 
-                    for c, o in zip(initial_df["close"], initial_df["open"])
-                ]
-            else:
-                new_source_data["direction"] = []
-            if "center" in source.column_names and not initial_df.empty:
-                new_source_data["center"] = ((initial_df["open"] + initial_df["close"]) / 2).tolist()
-            else:
-                new_source_data["center"] = []
-            if "height" in source.column_names and not initial_df.empty:
-                new_source_data["height"] = abs(initial_df["close"] - initial_df["open"]).tolist()
-            else:
-                new_source_data["height"] = []
-            
+                else:
+                    # Empty list for missing columns (schema preserved, data cleared)
+                    new_source_data[col] = []
+
+            # Replace entire data dictionary atomically (no schema changes)
             source.data = new_source_data
             progress = state["session"].get_progress()
             status_div.text = f"<b>Status:</b> Reset | Progress: {progress:.1f}% | View: {len(initial_df)}"
