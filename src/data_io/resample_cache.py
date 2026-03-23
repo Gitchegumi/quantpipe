@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
+from src.data_io.sorted_write import write_parquet_sorted
 
 
 if TYPE_CHECKING:
@@ -116,7 +117,7 @@ def save_cached_resample(df: pl.DataFrame, cache_path: Path) -> None:
     """
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        df.write_parquet(cache_path)
+        write_parquet_sorted(df, str(cache_path))
         logger.info("Resample cache saved: %s", cache_path.name)
     except Exception as exc:
         logger.warning("Failed to save cache file %s: %s", cache_path, exc)

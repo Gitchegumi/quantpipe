@@ -10,6 +10,8 @@ from pathlib import Path
 
 import polars as pl
 
+from src.data_io.sorted_write import write_parquet_sorted
+
 
 logger = logging.getLogger(__name__)
 
@@ -74,16 +76,13 @@ def convert_csv_to_parquet(
     parquet_file = Path(parquet_path)
     parquet_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write to Parquet with compression
-    df.write_parquet(
+    # Write to Parquet with sorted order for zone map acceleration
+    write_parquet_sorted(
+        df,
         parquet_path,
         compression=compression,
         compression_level=compression_level,
-        statistics=True,
-        use_pyarrow=True,
     )
-
-    logger.info("Successfully wrote Parquet file: %s", parquet_path)
 
     # Compute schema fingerprint
     schema_fingerprint = compute_schema_fingerprint(df)
