@@ -88,15 +88,21 @@ class TestEnforceSortedWrite:
 
         assert validate_sort_order(sorted_df, SORT_COLUMNS)
 
-    def test_raises_on_validation_failure(self):
-        """Validation failure should raise SortOrderViolationError."""
+    def test_validation_is_superfluous_but_always_passes(self):
+        """Demonstrate that enforce_sorted_write always passes validation.
+
+        Since enforce_sorted_write ALWAYS re-sorts before validating,
+        the validation check is defensive-only (catches polars bugs).
+        This test documents that behavior.
+        """
         df = create_full_df()
-        # Manually break sort by mutating (can't actually break it after sort)
-        # This test verifies the validation path by using a custom sort_cols
-        # that doesn't include all breaking columns
-        df_broken = df.sort(["close"])  # sorted by close, not by sort columns
-        with pytest.raises(SortOrderViolationError):
-            enforce_sorted_write(df_broken)
+        df_broken = df.sort(["close"])  # sorted by close, not SORT_COLUMNS
+
+        # enforce_sorted_write re-sorts by SORT_COLUMNS before validating,
+        # so validation always passes - the check is just defensive
+        sorted_df = enforce_sorted_write(df_broken)
+        assert validate_sort_order(sorted_df, SORT_COLUMNS)
+        assert not validate_sort_order(df_broken, SORT_COLUMNS)  # original was unsorted
 
     def test_validates_true_by_default(self):
         """validate=True is the default."""
