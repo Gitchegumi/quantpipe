@@ -35,7 +35,7 @@ panel = "^1.4.0"
 bokeh = "^3.8.2"
 dask = "^2024.1.0"  # Pin to 2024.x for Datashader compatibility (2025.x has breaking changes)
 questionary = "^2.1.1"
-pillow = ">=12.1.1"
+pillow = "^12.1.1"
 tornado = ">=6.5.5"
 
 [tool.poetry.group.dev.dependencies]
@@ -43,7 +43,7 @@ pytest = "^8.3.4"
 pytest-benchmark = "^4.0.0"
 hypothesis = "^6.88.0"
 ruff = "^0.1.0"
-black = "^24.3.0"
+black = ">=26.3.1"
 pylint = "^3.0.0"
 mypy = "^1.7.0"
 ipykernel = "^7.1.0"
