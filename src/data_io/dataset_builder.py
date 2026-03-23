@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from ..models.metadata import BuildSummary, MetadataRecord, SkipReason, SkippedSymbol
+from ..infrastructure.duckdb.vault import DuckDBVault
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,45 @@ logger = logging.getLogger(__name__)
 REQUIRED_COLUMNS = {"timestamp", "open", "high", "low", "close", "volume"}
 MIN_ROWS_THRESHOLD = 500
 SPLIT_RATIO = 0.8
+
+
+def _infer_format(file_path: str) -> str:
+    """Infer raw file format by peeking at first data row.
+
+    Args:
+        file_path: Path to CSV file
+
+    Returns:
+        'standard' if has header with standard column names,
+        'metatrader' if headerless (or header matches MT format),
+        'unknown' if cannot determine.
+    """
+    try:
+        # Peek at first row to check for headers
+        first_row = pd.read_csv(file_path, nrows=1, header=None)
+        # If the first row contains any string that looks like a column name, then it's a header
+        first_values = first_row.iloc[0].astype(str).str.lower().tolist()
+        header_keywords = {"timestamp", "date", "time", "open", "high", "low", "close", "volume"}
+        has_header = any(any(keyword in val for keyword in header_keywords) for val in first_values)
+
+        if has_header:
+            # Read header to get column names
+            df_header = pd.read_csv(file_path, nrows=0)
+            cols = set(df_header.columns.str.lower())
+            if "timestamp" in cols:
+                return "standard"
+            elif {"date", "time"}.issubset(cols):
+                return "metatrader"
+            else:
+                return "unknown"
+        else:
+            # Headerless: assume MetaTrader 7-column format
+            if first_row.shape[1] == 7:
+                return "metatrader"
+            else:
+                return "unknown"
+    except Exception:
+        return "unknown"
 
 
 def discover_symbols(raw_data_path: str) -> list[str]:
@@ -52,7 +92,6 @@ def discover_symbols(raw_data_path: str) -> list[str]:
     symbols = []
     for item in raw_path.iterdir():
         if item.is_dir():
-            # Check if directory contains any CSV files
             csv_files = list(item.glob("*.csv"))
             if csv_files:
                 symbols.append(item.name)
@@ -67,6 +106,12 @@ def discover_symbols(raw_data_path: str) -> list[str]:
 def validate_schema(symbol: str, files: list[str]) -> bool:
     """Validate raw file schema consistency for a symbol.
 
+    Accepts two raw formats:
+      1. Standard: CSV with header containing 'timestamp', 'open', 'high', 'low', 'close', 'volume'
+      2. MetaTrader: headerless CSV with exactly 7 columns (date, time, open, high, low, close, volume)
+
+    All files for a symbol must share the same format.
+
     Args:
         symbol: Symbol identifier
         files: List of raw CSV file paths
@@ -80,35 +125,41 @@ def validate_schema(symbol: str, files: list[str]) -> bool:
         logger.warning("No files provided for schema validation of symbol %s", symbol)
         return False
 
-    reference_columns = None
+    reference_format = None  # Either "standard" or "metatrader"
 
     for file_path in files:
         try:
-            # Read only header to check schema
-            df_header = pd.read_csv(file_path, nrows=0)
-            current_columns = set(df_header.columns.str.lower())
-
-            # Check for required columns
-            missing_columns = REQUIRED_COLUMNS - current_columns
-            if missing_columns:
-                logger.error(
-                    "File %s for symbol %s missing required columns: %s",
-                    file_path,
-                    symbol,
-                    missing_columns,
-                )
+            fmt = _infer_format(file_path)
+            if fmt == "unknown":
+                logger.error("File %s for symbol %s: unrecognized format", file_path, symbol)
                 return False
 
+            # For metatrader, check that it's exactly 7 columns
+            if fmt == "metatrader":
+                peek = pd.read_csv(file_path, nrows=1, header=None)
+                if peek.shape[1] != 7:
+                    logger.error("File %s for symbol %s: MetaTrader file should have 7 columns", file_path, symbol)
+                    return False
+
+            # For standard format, verify required columns are present
+            if fmt == "standard":
+                df_header = pd.read_csv(file_path, nrows=0)
+                cols = set(df_header.columns.str.lower())
+                if not REQUIRED_COLUMNS.issubset(cols):
+                    missing = REQUIRED_COLUMNS - cols
+                    logger.error("File %s for symbol %s: missing required columns: %s", file_path, symbol, missing)
+                    return False
+
             # Check consistency across files
-            if reference_columns is None:
-                reference_columns = current_columns
-            elif current_columns != reference_columns:
+            if reference_format is None:
+                reference_format = fmt
+            elif fmt != reference_format:
                 logger.error(
-                    "Schema mismatch in symbol %s: %s has columns %s, expected %s",
+                    "Schema mismatch in symbol %s: %s is %s, expected %s",
                     symbol,
                     file_path,
-                    current_columns,
-                    reference_columns,
+                    fmt,
+                    reference_format,
                 )
                 return False
 
@@ -119,7 +170,10 @@ def validate_schema(symbol: str, files: list[str]) -> bool:
             return False
 
     logger.debug(
-        "Schema validation passed for symbol %s (%d files)", symbol, len(files)
+        "Schema validation passed for symbol %s (%d files, format=%s)",
+        symbol,
+        len(files),
+        reference_format,
     )
     return True
 
@@ -167,6 +221,10 @@ def detect_gaps_and_overlaps(df: pd.DataFrame, symbol: str) -> tuple[int, int]:
 def merge_and_sort(symbol: str, files: list[str]) -> tuple[pd.DataFrame, int, int]:
     """Merge raw files, sort chronologically, detect gaps/overlaps.
 
+    Handles two raw formats:
+    - Standard: CSV with header including 'timestamp' column
+    - MetaTrader: headerless CSV with 7 columns (date, time, open, high, low, close, volume)
+
     Args:
         symbol: Symbol identifier
         files: List of raw CSV file paths
@@ -181,13 +239,34 @@ def merge_and_sort(symbol: str, files: list[str]) -> tuple[pd.DataFrame, int, in
     dataframes = []
     for file_path in files:
         try:
-            df = pd.read_csv(file_path)
-            # Normalize column names to lowercase
-            df.columns = df.columns.str.lower()
-            # Parse timestamp
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+            # Determine format: infer if header exists
+            fmt = _infer_format(file_path)
+
+            if fmt == "standard":
+                df = pd.read_csv(file_path)
+                df.columns = df.columns.str.lower()
+                # Ensure timestamp column exists
+                if "timestamp" not in df.columns:
+                    raise ValueError(f"Standard format missing 'timestamp' column in {file_path}")
+                # Parse timestamp
+                df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+            elif fmt == "metatrader":
+                # Headerless: assign 7 column names
+                col_names = ["date", "time", "open", "high", "low", "close", "volume"]
+                df = pd.read_csv(file_path, header=None, names=col_names)
+                # Combine date and time into timestamp (MetaTrader format: 2000.05.30 17:27)
+                df["timestamp"] = pd.to_datetime(
+                    df["date"] + " " + df["time"],
+                    format="%Y.%m.%d %H:%M",
+                    utc=True
+                )
+                # Drop original date/time
+                df = df.drop(columns=["date", "time"])
+            else:
+                raise ValueError(f"Unrecognized format in {file_path}")
+
             dataframes.append(df)
-            logger.debug("Loaded %d rows from %s", len(df), file_path)
+            logger.debug("Loaded %d rows from %s (format=%s)", len(df), file_path, fmt)
         except Exception as e:
             logger.error(
                 "Error loading file %s for symbol %s: %s", file_path, symbol, e
@@ -320,7 +399,7 @@ def build_summary(
     build_end: datetime,
     symbols_processed: list[str],
     symbols_skipped: list[SkippedSymbol],
-    total_rows: int,
+    total_rows_processed: int,
     total_test_rows: int,
     total_validation_rows: int,
 ) -> BuildSummary:
@@ -347,7 +426,7 @@ def build_summary(
         build_completed_at=build_end,
         symbols_processed=symbols_processed,
         symbols_skipped=symbols_skipped,
-        total_rows_processed=total_rows,
+        total_rows_processed=total_rows_processed,
         total_test_rows=total_test_rows,
         total_validation_rows=total_validation_rows,
         duration_seconds=duration,
@@ -369,8 +448,10 @@ def write_outputs(
     validation_partition: pd.DataFrame,
     metadata: MetadataRecord,
     output_base: str,
+    save_to_vault: bool = True,
+    vault_path: str = "data/vault.duckdb",
 ) -> None:
-    """Write CSV partitions and metadata JSON files.
+    """Write CSV partitions, metadata JSON files, and optionally to DuckDB.
 
     Args:
         symbol: Symbol identifier
@@ -378,6 +459,8 @@ def write_outputs(
         validation_partition: Validation partition DataFrame
         metadata: MetadataRecord model instance
         output_base: Base output directory path
+        save_to_vault: If True, also ingest into DuckDB vault
+        vault_path: Path to DuckDB database file
 
     Implementation: T012
     """
@@ -388,6 +471,12 @@ def write_outputs(
     # Create directories
     test_path.mkdir(parents=True, exist_ok=True)
     validate_path.mkdir(parents=True, exist_ok=True)
+
+    # Write metadata.json first (so it exists even if later steps fail)
+    metadata_file = output_path / "metadata.json"
+    with open(metadata_file, "w", encoding="utf-8") as f:
+        f.write(metadata.model_dump_json(indent=2))
+    logger.debug("Wrote metadata: %s", metadata_file)
 
     # Write CSV partitions
     test_file = test_path / f"{symbol}_test.csv"
@@ -403,64 +492,79 @@ def write_outputs(
         len(validation_partition),
     )
 
-    # Write metadata JSON
-    metadata_file = output_path / "metadata.json"
-    with open(metadata_file, "w", encoding="utf-8") as f:
-        json.dump(metadata.model_dump(mode="json"), f, indent=2, default=str)
+    # Optional: Write to DuckDB Vault
+    if save_to_vault:
+        try:
+            vault = DuckDBVault(db_path=vault_path)
+            # Combine partitions for vault (or store separately if needed)
+            full_df = pd.concat([test_partition, validation_partition])
+            # Ensure timestamp column
+            if "timestamp" not in full_df.columns and "timestamp_utc" in full_df.columns:
+                full_df = full_df.rename(columns={"timestamp_utc": "timestamp"})
 
-    logger.info("Wrote outputs for symbol %s to %s", symbol, output_path)
+            vault.ingest_df(full_df, symbol, "1m")  # Base timeframe is 1m
+            vault.close()
+            logger.info("Ingested %s into DuckDB vault at %s", symbol, vault_path)
+        except Exception as e:
+            logger.error("Failed to save %s to DuckDB vault: %s", symbol, e)
 
 
 def build_symbol_dataset(
-    symbol: str, raw_path: str, output_path: str
+    symbol: str,
+    raw_path: str,
+    output_path: str,
+    save_to_vault: bool = True,
+    vault_path: str = "data/vault.duckdb",
 ) -> dict[str, Any]:
-    """Build complete dataset for a single symbol (US1 integration).
+    """Build dataset for a single symbol.
 
     Args:
         symbol: Symbol identifier
-        raw_path: Path to raw data directory
-        output_path: Path to processed output directory
+        raw_path: Path to raw data directory (e.g., price_data/raw)
+        output_path: Base output directory (e.g., price_data/processed)
+        save_to_vault: Whether to also save to DuckDB vault
+        vault_path: Path to DuckDB vault file
 
     Returns:
-        Build result summary for this symbol with keys:
-            - success: bool
-            - symbol: str
-            - metadata: MetadataRecord | None
-            - skip_reason: SkipReason | None
-            - error: str | None
-
-    Implementation: T015
+        Dictionary with keys: success (bool), metadata (MetadataRecord|None),
+        skip_reason (SkipReason|None), error (str|None)
     """
-    logger.info("Building dataset for symbol %s", symbol)
-
-    symbol_raw_path = Path(raw_path) / symbol
-    csv_files = list(symbol_raw_path.glob("*.csv"))
-
-    if not csv_files:
-        logger.warning("No CSV files found for symbol %s", symbol)
-        return {
-            "success": False,
-            "symbol": symbol,
-            "metadata": None,
-            "skip_reason": SkipReason.READ_ERROR,
-            "error": "No CSV files found",
-        }
-
-    file_paths = [str(f) for f in csv_files]
-
-    # Validate schema
-    if not validate_schema(symbol, file_paths):
-        return {
-            "success": False,
-            "symbol": symbol,
-            "metadata": None,
-            "skip_reason": SkipReason.SCHEMA_MISMATCH,
-            "error": "Schema validation failed",
-        }
-
     try:
+        # Find raw CSV files for this symbol
+        symbol_raw_dir = Path(raw_path) / symbol
+        if not symbol_raw_dir.exists():
+            return {
+                "success": False,
+                "symbol": symbol,
+                "metadata": None,
+                "skip_reason": SkipReason.INPUT_MISSING,
+                "error": f"Raw data directory not found: {symbol_raw_dir}",
+            }
+
+        file_paths = sorted(symbol_raw_dir.glob("*.csv"))
+        if not file_paths:
+            return {
+                "success": False,
+                "symbol": symbol,
+                "metadata": None,
+                "skip_reason": SkipReason.INPUT_MISSING,
+                "error": f"No CSV files found in {symbol_raw_dir}",
+            }
+
+        # Schema validation
+        if not validate_schema(symbol, [str(p) for p in file_paths]):
+            return {
+                "success": False,
+                "symbol": symbol,
+                "metadata": None,
+                "skip_reason": SkipReason.SCHEMA_MISMATCH,
+                "error": "Schema validation failed",
+            }
+
         # Merge and sort
-        merged_df, gap_count, overlap_count = merge_and_sort(symbol, file_paths)
+        merged_df, gap_count, overlap_count = merge_and_sort(
+            symbol, [str(p) for p in file_paths]
+        )
 
         # Check minimum rows threshold
         if len(merged_df) < MIN_ROWS_THRESHOLD:
@@ -494,12 +598,18 @@ def build_symbol_dataset(
             .to_pydatetime(),
             gap_count=gap_count,
             overlap_count=overlap_count,
-            source_files=file_paths,
+            source_files=[str(p) for p in file_paths],
         )
 
         # Write outputs
         write_outputs(
-            symbol, test_partition, validation_partition, metadata, output_path
+            symbol,
+            test_partition,
+            validation_partition,
+            metadata,
+            output_path,
+            save_to_vault=save_to_vault,
+            vault_path=vault_path,
         )
 
         logger.info("Successfully built dataset for symbol %s", symbol)
@@ -525,48 +635,57 @@ def build_symbol_dataset(
 
 
 def build_all_symbols(
-    raw_path: str, output_path: str, force: bool = False
+    raw_path: str,
+    output_path: str,
+    force: bool = False,
+    save_to_vault: bool = True,
+    vault_path: str = "data/vault.duckdb",
 ) -> BuildSummary:
-    """Build datasets for all discovered symbols (US2 orchestration).
+    """Build datasets for all discovered symbols.
 
     Args:
         raw_path: Path to raw data directory
-        output_path: Path to processed output directory
-        force: Force rebuild if True (currently ignored - future enhancement)
+        output_path: Base output directory
+        force: Force rebuild even if output exists (not yet implemented)
+        save_to_vault: Whether to save to DuckDB vault
+        vault_path: Path to DuckDB vault file
 
     Returns:
-        Consolidated BuildSummary model instance
+        BuildSummary instance
 
-    Implementation: T022
+    Implementation: T017
     """
     build_start = datetime.now(timezone.utc)
-    logger.info("Building datasets for all symbols (force=%s)", force)
 
     # Discover symbols
     symbols = discover_symbols(raw_path)
-
     if not symbols:
-        logger.warning("No symbols discovered from %s", raw_path)
-        build_end = datetime.now(timezone.utc)
+        logger.warning("No symbols discovered from raw path: %s", raw_path)
         return build_summary(
             build_start=build_start,
-            build_end=build_end,
+            build_end=datetime.now(timezone.utc),
             symbols_processed=[],
             symbols_skipped=[],
-            total_rows=0,
+            total_rows_processed=0,
             total_test_rows=0,
             total_validation_rows=0,
         )
 
+    # Process each symbol
     processed_symbols = []
     skipped_symbols = []
     total_rows = 0
     total_test_rows = 0
     total_validation_rows = 0
 
-    # Process each symbol
     for symbol in symbols:
-        result = build_symbol_dataset(symbol, raw_path, output_path)
+        result = build_symbol_dataset(
+            symbol,
+            raw_path,
+            output_path,
+            save_to_vault=save_to_vault,
+            vault_path=vault_path,
+        )
 
         if result["success"]:
             processed_symbols.append(symbol)
@@ -591,7 +710,7 @@ def build_all_symbols(
         build_end=build_end,
         symbols_processed=processed_symbols,
         symbols_skipped=skipped_symbols,
-        total_rows=total_rows,
+        total_rows_processed=total_rows,
         total_test_rows=total_test_rows,
         total_validation_rows=total_validation_rows,
     )

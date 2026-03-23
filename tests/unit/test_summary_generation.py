@@ -26,7 +26,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=["eurusd", "usdjpy"],
             symbols_skipped=[],
-            total_rows=1400,
+            total_rows_processed=1400,
             total_test_rows=1120,
             total_validation_rows=280,
         )
@@ -52,7 +52,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=["eurusd"],
             symbols_skipped=[],
-            total_rows=600,
+            total_rows_processed=600,
             total_test_rows=480,
             total_validation_rows=120,
         )
@@ -82,7 +82,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=["eurusd"],
             symbols_skipped=skipped,
-            total_rows=600,
+            total_rows_processed=600,
             total_test_rows=480,
             total_validation_rows=120,
         )
@@ -103,7 +103,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=["eurusd", "usdjpy"],
             symbols_skipped=[],
-            total_rows=1400,
+            total_rows_processed=1400,
             total_test_rows=1120,
             total_validation_rows=280,
         )
@@ -124,7 +124,7 @@ class TestSummaryGeneration:
                 build_end=end,
                 symbols_processed=["eurusd"],
                 symbols_skipped=[],
-                total_rows=1000,
+                total_rows_processed=1000,
                 total_test_rows=800,
                 total_validation_rows=300,  # 800 + 300 != 1000
             )
@@ -142,7 +142,7 @@ class TestSummaryGeneration:
                 build_end=end,
                 symbols_processed=["eurusd"],
                 symbols_skipped=[],
-                total_rows=600,
+                total_rows_processed=600,
                 total_test_rows=480,
                 total_validation_rows=120,
             )
@@ -157,7 +157,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=[],
             symbols_skipped=[],
-            total_rows=0,
+            total_rows_processed=0,
             total_test_rows=0,
             total_validation_rows=0,
         )
@@ -190,7 +190,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=[],
             symbols_skipped=skipped,
-            total_rows=0,
+            total_rows_processed=0,
             total_test_rows=0,
             total_validation_rows=0,
         )
@@ -217,7 +217,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=["eurusd"],
             symbols_skipped=skipped,
-            total_rows=600,
+            total_rows_processed=600,
             total_test_rows=480,
             total_validation_rows=120,
         )
@@ -237,7 +237,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=["eurusd", "usdjpy"],
             symbols_skipped=[],
-            total_rows=1400,
+            total_rows_processed=1400,
             total_test_rows=1120,
             total_validation_rows=280,
         )
@@ -262,7 +262,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=["eurusd"] * 10,
             symbols_skipped=[],
-            total_rows=10_000_000,
+            total_rows_processed=10_000_000,
             total_test_rows=8_000_000,
             total_validation_rows=2_000_000,
         )
@@ -295,7 +295,7 @@ class TestSummaryGeneration:
             build_end=end,
             symbols_processed=[],
             symbols_skipped=skipped,
-            total_rows=0,
+            total_rows_processed=0,
             total_test_rows=0,
             total_validation_rows=0,
         )

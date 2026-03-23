@@ -7,7 +7,7 @@ def dummy_strategy(_candles):  # placeholder returning minimal result
 
 
 def test_register_and_get_strategy():
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
     registry.register("alpha", dummy_strategy, tags=["trend"], version="0.0.1")
     strat = registry.get("alpha")
     assert strat.name == "alpha"
@@ -16,21 +16,21 @@ def test_register_and_get_strategy():
 
 
 def test_register_duplicate_without_overwrite():
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
     registry.register("alpha", dummy_strategy)
     with pytest.raises(ValueError):
         registry.register("alpha", dummy_strategy)
 
 
 def test_overwrite_strategy():
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
     registry.register("alpha", dummy_strategy, version="0.0.1")
     registry.register("alpha", dummy_strategy, version="0.0.2", overwrite=True)
     assert registry.get("alpha").version == "0.0.2"
 
 
 def test_filter_by_name_and_tags():
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
     registry.register("alpha", dummy_strategy, tags=["trend", "pullback"])
     registry.register("beta", dummy_strategy, tags=["range"])
     assert len(registry.filter(names=["alpha"])) == 1

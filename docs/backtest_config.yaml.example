@@ -1,20 +1,74 @@
-# Backtest Configuration File
-# 
-# This file allows setting default values for backtest parameters.
-# CLI arguments take precedence over config file values.
+# QuantPipe Backtest Configuration Example
+# ==========================================
+# Use with: python -m src.cli.run_backtest --config backtest_config.yaml
+# CLI arguments take precedence over config values.
 #
-# Location: Place in project root as 'backtest_config.yaml'
-#           or specify with --config flag
+# Place this file in your project root or anywhere and reference with --config.
 
-# Default timeframe for resampling (FR-002)
-# Supported formats: Xm, Xh, Xd where X is a positive integer
-# Examples: 1m, 5m, 15m, 1h, 4h, 1d, 7m, 90m
-timeframe: "1m"
+# --- Strategy & Market ---
+dataset: "test"               # Dataset name (e.g., "test", "validate")
+strategy: "trend-pullback"    # Strategy name from registry
+pair: "EURUSD"                # Currency pair (or multiple: [EURUSD, GBPUSD])
+timeframe: "1m"               # Resample target: 1m, 5m, 15m, 1h, 4h, 1d, etc.
 
-# Default trading direction
-# Options: LONG, SHORT, BOTH
-direction: "LONG"
+# --- Execution Mode ---
+direction: "LONG"             # LONG, SHORT, or BOTH
+simulation_type: "Personal Capital"  # "Personal Capital" or "City Traders Imperium (CTI)"
 
-# Default dataset to use
-# Options: test, validate
-dataset: "test"
+# --- Account & Risk ---
+starting_balance: 2500.0      # Starting account equity / challenge level
+risk_percent: 0.25            # Risk per trade (% of balance)
+max_position_size: 10.0       # Maximum position size in lots
+
+# --- Stop-Loss Policy ---
+stop_policy: "ATR"            # Options: ATR, FixedPips, MA_Trailing, None
+atr_multiplier: 2.0           # Stop distance = ATR * multiplier
+atr_period: 14                # ATR period
+fixed_pips: 20.0              # Required if stop_policy == FixedPips
+
+# --- Take-Profit Policy ---
+take_profit_policy: "RiskMultiple"     # Options: RiskMultiple, None
+reward_risk_ratio: 2.0                 # Target = entry ± (risk_distance * rr_ratio)
+
+# --- Trailing Stop (if using MA_Trailing) ---
+ma_type: "SMA"                # SMA or EMA
+ma_period: 50                 # Moving average period
+trail_trigger: 1.0            # R-multiple profit required to activate trailing
+
+# --- Session & News Blackouts ---
+blackout_sessions: "n"        # Block trades during low-liquidity session gaps
+blackout_news: "n"            # Block trades around high-impact news
+force_news_close: "y"         # Force close open trades during news events
+minutes_before_news: 10       # Minutes before news to block
+minutes_after_news: 30        # Minutes after news to block
+
+# --- Session Filtering (Optional) ---
+limit_sessions: "n"         # Only trade during specific sessions
+sessions: ["NY", "EU"]        # Sessions: NY, EU (London), AS (Asia), SY (Sydney)
+sessions_force_close: "n"   # Force close open trades at session end
+session_buffer: 15            # Buffer minutes before session end to stop new entries
+
+# --- Output & Logging ---
+output: "results"             # Output directory
+output_format: "text"         # text or json
+log_level: "INFO"             # DEBUG, INFO, WARNING, ERROR
+dry_run: "n"                  # Generate signals only (no execution)
+
+# --- Performance & Parallelism ---
+profile: "n"                  # Enable cProfile performance profiling
+max_workers: 4                # Parallel workers (default: auto-detect)
+benchmark_out: ""             # Path to write benchmark JSON (optional)
+
+# --- Visualization ---
+visualize: "n"              # Launch replay dashboard after backtest
+start: ""                     # Visualization start date (YYYY-MM-DD)
+end: ""                       # Visualization end date (YYYY-MM-DD)
+
+# --- Parameter Sweep (Optional) ---
+test_range: "n"             # Test a range of parameter values
+
+# --- Notes ---
+# - All fields are optional; missing values will use CLI defaults or prompt in interactive mode
+# - For CTI simulation, additional settings (mode, buyback, challenge level) will still prompt unless set via environment/CLI
+# - The --non-interactive flag can be used to fail if required values are missing instead of prompting
+# - If test_range is set to true, prompts will be displayed to enter the range of parameter values

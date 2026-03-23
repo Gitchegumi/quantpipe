@@ -61,7 +61,7 @@ def test_all_unknown_strategies():
     """
     Test error when all selected strategies are unknown.
     """
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     # Empty registry
     assert registry.count() == 0

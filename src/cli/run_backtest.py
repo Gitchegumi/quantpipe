@@ -49,6 +49,7 @@ from pathlib import Path
 
 import questionary
 import polars as pl
+import yaml
 from rich.console import Console
 
 from ..backtest.engine import (
@@ -94,6 +95,68 @@ DEFAULT_ACCOUNT_BALANCE: float = 2500.0
 def _is_interactive() -> bool:
     """Check if the current session is interactive (attached to a TTY)."""
     return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _launch_visualizer(result, args):
+    """
+    Launch the interactive replay dashboard using the backtest results.
+    Uses DuckDB vault if available; falls back to Parquet data.
+    """
+    try:
+        console.print("[cyan]Starting visualization...[/cyan]")
+
+        # Determine symbol: portfolio results have 'symbols' list; prompt user to pick one
+        if hasattr(result, "symbols") and result.symbols:
+            available_symbols = sorted(result.symbols)
+            if not available_symbols:
+                console.print(
+                    "[yellow]No symbols available for visualization.[/yellow]"
+                )
+                return
+            # In interactive mode, prompt; in non-interactive, pick first
+            if _is_interactive():
+                pair = _prompt(
+                    "? Select symbol to visualize",
+                    default=available_symbols[0],
+                    choices=available_symbols,
+                )
+            else:
+                pair = available_symbols[0]
+        elif hasattr(result, "symbol"):
+            pair = result.symbol
+        else:
+            pair = "portfolio"
+        # Prefer DuckDB vault if exists
+        vault_path = Path("data/vault.duckdb")
+        if vault_path.exists():
+            # Use qp-replay; let it auto-detect full data range from vault
+            console.print(f"Loading replay from vault for {pair}...")
+            import subprocess
+
+            cmd = [
+                "poetry",
+                "run",
+                "qp-replay",
+                "--symbol",
+                pair,
+                "--timeframe",
+                args.timeframe if args.timeframe else "1m",
+                "--vault-path",
+                str(vault_path),
+            ]
+            # Only pass explicit start/end if user provided them
+            if args.start:
+                cmd.extend(["--start", args.start])
+            if args.end:
+                cmd.extend(["--end", args.end])
+            subprocess.run(cmd)
+        else:
+            console.print(
+                "[yellow]DuckDB vault not found. Visualization requires vault data.[/yellow]"
+            )
+            console.print("Please ensure the dataset has been ingested into the vault.")
+    except Exception as e:
+        console.print(f"[red]Visualization failed: {e}[/red]")
 
 
 # --- Interactive Prompt Utilities using Questionary ---
@@ -330,6 +393,14 @@ def configure_backtest_parser(
         help="Generate signals without execution (signal-only mode)",
     )
 
+    # Visualization control
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Launch replay dashboard after backtest (requires DuckDB vault). "
+        "Can also be set via config file. Overrides interactive prompt.",
+    )
+
     # Performance optimization flags (Phase 4: US2)
     parser.add_argument(
         "--profile",
@@ -429,24 +500,6 @@ def configure_backtest_parser(
     )
 
     parser.add_argument(
-        "--visualize",
-        action="store_true",
-        help="Open interactive chart with results (requires GUI environment)",
-    )
-
-    parser.add_argument(
-        "--viz-start",
-        type=str,
-        help="Start date for visualization (YYYY-MM-DD). If omitted, defaults to last 3 months.",
-    )
-
-    parser.add_argument(
-        "--viz-end",
-        type=str,
-        help="End date for visualization (YYYY-MM-DD).",
-    )
-
-    parser.add_argument(
         "--disable-symbol",
         type=str,
         nargs="*",
@@ -500,6 +553,23 @@ def configure_backtest_parser(
         help="Path to YAML config file for default values. "
         "CLI arguments take precedence over config values. "
         "Example: --config backtest_config.yaml",
+    )
+
+    # Visualization replay range (qp-replay integration)
+    parser.add_argument(
+        "--start",
+        type=str,
+        default=None,
+        help="Start date for visualization replay (YYYY-MM-DD). "
+        "Default: earliest available date in vault.",
+    )
+
+    parser.add_argument(
+        "--end",
+        type=str,
+        default=None,
+        help="End date for visualization replay (YYYY-MM-DD). "
+        "Default: latest available date in vault.",
     )
 
     # GPU Acceleration flags (Feature 023-GPU)
@@ -789,27 +859,134 @@ def run_backtest_command(args: argparse.Namespace) -> int:
     yes_no_choices = ["y", "n"]
     session_choices = ["NY", "EU", "AS", "SY"]  # Common session abbreviations
 
-    # --- Interactive Prompts for Missing Flags (Feature 026) ---
+    # --- Load Config Early (Issue #88: Config-based prompt suppression) ---
+    config_data = {}
+    if args.config:
+        config_path = Path(args.config)
+        if config_path.exists():
+            try:
+                with open(config_path, encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+                logger.info(
+                    "Loaded config from %s with %d keys", config_path, len(config_data)
+                )
+            except Exception as e:
+                logger.error("Failed to load config %s: %s", config_path, e)
+                return 1
+        else:
+            logger.warning(
+                "Config file %s not found. Proceeding without it.", config_path
+            )
+
+    # Merge config values into args if arg not already set (Issue #88: suppress prompts)
+    # Mapping: config field name -> (arg dest, normalizer function)
+    def as_list(x):
+        return x if isinstance(x, list) else [x]
+
+    def as_float(x):
+        return float(x)
+
+    def as_int(x):
+        return int(x)
+
+    def as_bool(x):
+        if isinstance(x, bool):
+            return x
+        return str(x).lower() in ("true", "yes", "1", "y")
+
+    config_to_arg_mapping = {
+        # Core
+        "strategy": ("strategy", as_list),
+        "pair": ("pair", as_list),
+        "timeframe": ("timeframe", None),
+        "direction": ("direction", None),
+        "dataset": ("dataset", None),
+        "simulation_type": ("simulation_type", None),
+        # CTI-specific
+        "cti_mode": ("cti_mode", None),
+        "buyback_strategy": ("buyback_strategy", None),
+        # Risk & stops
+        "starting_balance": ("starting_balance", as_float),
+        "risk_percent": ("risk_percent", as_float),
+        "max_position_size": ("max_position_size", as_float),
+        "stop_policy": ("stop_policy", None),
+        "atr_multiplier": ("atr_multiplier", as_float),
+        "atr_period": ("atr_period", as_int),
+        "fixed_pips": ("fixed_pips", as_float),
+        "take_profit_policy": ("take_profit_policy", None),
+        "reward_risk_ratio": ("reward_risk_ratio", as_float),
+        # Trailing stop
+        "ma_type": ("ma_type", None),
+        "ma_period": ("ma_period", as_int),
+        "trail_trigger": ("trail_trigger", as_float),
+        # Session blackouts
+        "blackout_sessions": ("blackout_sessions", as_bool),
+        "blackout_news": ("blackout_news", as_bool),
+        "force_news_close": ("force_news_close", as_bool),
+        "minutes_before_news": ("minutes_before_news", as_int),
+        "minutes_after_news": ("minutes_after_news", as_int),
+        # Session limits
+        "limit_sessions": ("limit_sessions", as_bool),
+        "sessions": ("sessions", as_list),
+        "sessions_force_close": ("force_session_close", as_bool),
+        "session_buffer": ("session_buffer", as_int),
+        "news_force_close": ("news_force_close", as_bool),
+        # Execution
+        "dry_run": ("dry_run", as_bool),
+        "output": ("output", None),
+        "output_format": ("output_format", None),
+        "log_level": ("log_level", None),
+        # Performance
+        "profile": ("profile", as_bool),
+        "max_workers": ("max_workers", as_int),
+        # Parameter sweep
+        "test_range": ("test_range", as_bool),
+        # Visualization
+        "visualize": ("visualize", as_bool),
+        "start": ("start", None),
+        "end": ("end", None),
+    }
+
+    for config_key, (arg_dest, normalizer) in config_to_arg_mapping.items():
+        if config_key not in config_data:
+            continue
+        current_val = getattr(args, arg_dest, None)
+        # Determine if this is a boolean flag (normalizer is as_bool)
+        is_bool_flag = normalizer is as_bool
+        # Skip if current_val indicates explicit CLI set:
+        # - For non-bool: current_val is not None means CLI set (since default is None for most)
+        # - For bool: current_val is True means CLI set (store_true only sets True)
+        if is_bool_flag:
+            if current_val is True:
+                continue  # CLI explicitly enabled, skip
+            # else: allow config to set (including setting False if desired)
+        else:
+            if current_val is not None:
+                continue  # CLI set a value
+        # Apply config value
+        value = config_data[config_key]
+        if normalizer:
+            try:
+                value = normalizer(value)
+            except Exception as e:
+                logger.warning(
+                    "Failed to normalize config %s=%r: %s. Using raw value.",
+                    config_key,
+                    config_data[config_key],
+                    e,
+                )
+        setattr(args, arg_dest, value)
+        logger.debug("Set %s from config: %s", arg_dest, value)
+
     is_interactive = _is_interactive() and not args.non_interactive
     run_param_sweep = False  # Initialize sweep flag
 
     # Only prompt if not in non-interactive mode and certain flags are missing
     if not args.list_strategies and not args.register_strategy:
-        # Check for missing required flags that need user input
-
-        # 0. Dataset Prompt (Test vs Validate)
-        if args.dataset is None:
-            if not is_interactive:
-                args.dataset = "test"
-            else:
-                args.dataset = _prompt(
-                    "? Dataset to use ",
-                    default="test",
-                    choices=["test", "validate"],
-                )
+        # After config merge, any remaining None values need prompts (or defaults)
 
         # 1. Strategy Prompt
-        if args.strategy is None:
+        if args.strategy is None and "strategy" not in config_data:
             if not is_interactive:
                 args.strategy = ["trend-pullback"]  # Default
             else:
@@ -1195,8 +1372,8 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     args.minutes_after_news = man if man else 30
 
             # 9. Parameter Sweep Mode Prompt
-            # Only prompt if --test-range wasn't explicitly set via CLI
-            if not args.test_range:
+            # Only prompt if --test-range wasn't explicitly set via CLI or config
+            if args.test_range is None:
                 if not is_interactive:
                     run_param_sweep = (
                         False  # Default to not running sweep if non-interactive
@@ -1210,7 +1387,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     if yn == "y":
                         run_param_sweep = True
                         args.test_range = True  # Set flag to trigger sweep logic
-            elif args.test_range:  # If --test-range was explicitly set on CLI
+            elif args.test_range:  # If --test-range was explicitly set on CLI or config
                 run_param_sweep = True
 
         # --- End of Interactive Prompts ---
@@ -1312,6 +1489,37 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         logger.error("No strategy selected or found. Exiting.")
         sys.exit(1)
 
+    # --- Visualization prompt (pre-backtest) ---
+    # Check for DuckDB vault and ask if user wants to visualize after backtest completes
+    # Skip prompt if --visualize was already set via CLI flag or config file
+    if getattr(args, "visualize", None) is not None:
+        # Already set from CLI or config - use that value directly
+        pass
+    elif is_interactive:
+        vault_path = Path("data/vault.duckdb")
+        if vault_path.exists():
+            viz_yn = _prompt(
+                "? Would you like to run the visualizer after the backtest? ",
+                default="n",
+                choices=["y", "n"],
+            )
+            args.visualize = viz_yn == "y"
+        else:
+            console.print(
+                "[yellow]DuckDB vault not found. Visualization unavailable.[/yellow]"
+            )
+            console.print("[white]To enable visualization:[/white]")
+            console.print("  1. Ensure raw price data exists in price_data/raw/")
+            console.print("  2. Run: poetry run quantpipe ingest")
+            console.print(
+                "  3. This will build the vault (data/vault.duckdb) with 1-minute data."
+            )
+            args.visualize = False
+    else:
+        # In non-interactive mode, don't override if --visualize was explicitly set (CLI or config)
+        if not getattr(args, "visualize", False):
+            args.visualize = False
+
     # Construct data paths
     try:
         # construct_data_paths expects list of strings for pairs
@@ -1320,24 +1528,57 @@ def run_backtest_command(args: argparse.Namespace) -> int:
         return 1
 
     # Prepare Strategy Parameters
-    # Map args to StrategyParameters
+    # Load config file if provided
+    config_params = {}
+    if args.config:
+        config_path = Path(args.config)
+        if config_path.exists():
+            try:
+                with open(config_path, encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+                # Only include keys that match StrategyParameters fields
+                allowed_fields = StrategyParameters.__fields__.keys()
+                for key in allowed_fields:
+                    if key in config_data:
+                        config_params[key] = config_data[key]
+                logger.info(
+                    "Loaded config from %s with %d parameters",
+                    config_path,
+                    len(config_params),
+                )
+            except Exception as e:
+                logger.error("Failed to load config %s: %s", config_path, e)
+                return 1
+        else:
+            logger.warning("Config file %s not found. Using defaults.", config_path)
+
+    # Map args to StrategyParameters, with precedence: CLI > config > defaults
     try:
-        # Use args values if present, else defaults from model will apply
         # We need to map CLI arg names to model field names
         params_dict = {}
-        if args.risk_percent is not None:
-            params_dict["risk_per_trade_pct"] = args.risk_percent
-        if args.atr_multiplier is not None:
-            params_dict["atr_stop_mult"] = args.atr_multiplier
-        if args.atr_period is not None:
-            params_dict["atr_length"] = args.atr_period
-        if args.reward_risk_ratio is not None:
-            params_dict["target_r_mult"] = args.reward_risk_ratio
-        if args.starting_balance is not None:
-            params_dict["account_balance"] = args.starting_balance
+
+        # CLI args with dest names that may differ
+        cli_mapping = {
+            "risk_percent": "risk_per_trade_pct",
+            "atr_multiplier": "atr_stop_mult",
+            "atr_period": "atr_length",
+            "reward_risk_ratio": "target_r_mult",
+            "starting_balance": "account_balance",
+            "max_position_size": "max_position_size",
+        }
+
+        # Start with config params
+        params_dict.update(config_params)
+
+        # Override with CLI args where present
+        for cli_arg, model_field in cli_mapping.items():
+            cli_val = getattr(args, cli_arg, None)
+            if cli_val is not None:
+                params_dict[model_field] = cli_val
 
         # Set strategy name (taking first one for now as per current limitation)
-        params_dict["strategy_name"] = args.strategy[0]
+        if args.strategy:
+            params_dict["strategy_name"] = args.strategy[0]
 
         strategy_params = StrategyParameters(**params_dict)
     except Exception as e:
@@ -1390,7 +1631,7 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             use_gpu=args.gpu_accel,
         )
 
-        # Display Results
+        # Build full output content for file
         output_content = ""
         if args.output_format == "json":
             output_content = format_portfolio_json_output(result)
@@ -1422,16 +1663,12 @@ def run_backtest_command(args: argparse.Namespace) -> int:
                     logger.error("Failed to run CTI evaluation: %s", e)
                     output_content += f"\n\n[CTI Evaluation Failed: {e}]"
 
-        print(output_content)
-
-        # Save to file
+        # Save full output to file (non-intrusive)
         results_dir = Path("results")
         results_dir.mkdir(exist_ok=True)
 
-        # Determine file extension
         fmt = args.output_format if args.output_format else "text"
         ext = "txt" if fmt == "text" else fmt
-
         filename = f"backtest_{result.run_id}.{ext}"
         output_path = results_dir / filename
 
@@ -1440,6 +1677,35 @@ def run_backtest_command(args: argparse.Namespace) -> int:
             logger.info("Results saved to %s", output_path)
         except Exception as e:
             logger.error("Failed to save results to file: %s", e)
+
+        # Print minimal summary to terminal (concise)
+        # Extract key metrics from result (works for both single and portfolio)
+        total_trades = getattr(result, "total_trades", 0)
+        win_rate = getattr(result, "win_rate", None)
+        net_pnl = getattr(result, "net_pnl", None)
+
+        summary_parts = []
+        if total_trades is not None:
+            summary_parts.append(f"{total_trades} trades")
+        if win_rate is not None:
+            summary_parts.append(f"{win_rate:.1f}% win rate")
+        if net_pnl is not None:
+            summary_parts.append(f"Net P&L: ${net_pnl:.2f}")
+
+        summary = " | ".join(summary_parts) if summary_parts else "Backtest completed"
+        console.print(f"[green]✓ {summary}[/green]")
+        console.print(f"   Full results: {output_path}")
+
+        # Launch visualizer if user opted in (pre-backtest prompt)
+        if args.visualize:
+            _launch_visualizer(result, args)
+        elif is_interactive:
+            # Non-interactive already set to False; this branch just clarifies no action
+            pass
+        else:
+            console.print(
+                "[yellow]Visualization skipped (non-interactive mode).[/yellow]"
+            )
 
     except Exception as e:
         logger.exception("Backtest execution failed: %s", e)

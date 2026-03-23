@@ -15,7 +15,7 @@ from src.strategy.registry import StrategyRegistry, RegisteredStrategy
 
 def test_registry_list_empty():
     """Test listing when registry is empty."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
     strategies = registry.list()
 
     assert not strategies
@@ -23,7 +23,7 @@ def test_registry_list_empty():
 
 def test_registry_list_single_strategy():
     """Test listing with one registered strategy."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy_strategy(candles):
         return {"pnl": 100.0}
@@ -39,7 +39,7 @@ def test_registry_list_single_strategy():
 
 def test_registry_list_multiple_strategies():
     """Test listing with multiple strategies."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def strategy_a(candles):
         return {}
@@ -60,7 +60,7 @@ def test_registry_list_multiple_strategies():
 
 def test_registry_register_duplicate_raises_error():
     """Test that registering duplicate name raises ValueError."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -73,7 +73,7 @@ def test_registry_register_duplicate_raises_error():
 
 def test_registry_register_duplicate_with_overwrite():
     """Test that overwrite=True allows replacing strategies."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def old_version(candles):
         return {"version": "old"}
@@ -90,7 +90,7 @@ def test_registry_register_duplicate_with_overwrite():
 
 def test_registry_get_existing_strategy():
     """Test retrieving a registered strategy."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def my_strategy(candles):
         return {"pnl": 50.0}
@@ -104,7 +104,7 @@ def test_registry_get_existing_strategy():
 
 def test_registry_get_unknown_strategy_raises_error():
     """Test that retrieving unknown strategy raises KeyError."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     with pytest.raises(KeyError):
         registry.get("nonexistent")
@@ -112,7 +112,7 @@ def test_registry_get_unknown_strategy_raises_error():
 
 def test_registry_preserves_insertion_order():
     """Test that list() preserves registration order."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -143,7 +143,7 @@ def test_registered_strategy_immutability():
 
 def test_registry_tags_stored_as_list():
     """Test that tags are converted to list even if provided as tuple."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -157,7 +157,7 @@ def test_registry_tags_stored_as_list():
 
 def test_registry_no_tags_defaults_to_empty_list():
     """Test that omitting tags results in empty list."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
@@ -170,7 +170,7 @@ def test_registry_no_tags_defaults_to_empty_list():
 
 def test_registry_no_version_defaults_to_none():
     """Test that omitting version results in None."""
-    registry = StrategyRegistry()
+    registry = StrategyRegistry(load_private=False)
 
     def dummy(candles):
         return {}
