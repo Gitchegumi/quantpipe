@@ -248,5 +248,6 @@ src/strategy/*/
 # Ignore DuckDB vault
 data/vault.duckdb
 data/vault.duckdb-wal
+data/vault.duckdb.compaction.json
 
 test_config.yaml

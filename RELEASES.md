@@ -40,6 +40,8 @@ This document tracks all official releases of the trading-strategies project.
    - `ReplaySession` loads data slices efficiently for interactive exploration.
    - Standalone `qp-replay` CLI with HoloViews dashboard: candlesticks, indicators, trade markers, portfolio equity curve.
    - Backtest engine still runs from Parquet (fast); vault is exclusively for visualization (clean separation).
+   - **Sorted-write enforcement**: all inserts are ordered by `timestamp` before write, enabling zone-map acceleration on time-range queries (Issue #109).
+   - **Compaction manager**: tracks write activity; triggers VACUUM automatically when 7+ days have elapsed or write count exceeds 100 (Issue #109).
 
 2. **Backtest CLI Improvements**:
    - Terminal output reduced to essential summary: `✓ 30898 trades | 45.2% win rate | Net P&L: $502.96` plus results file path.
