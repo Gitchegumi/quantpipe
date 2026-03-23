@@ -35,6 +35,10 @@ bokeh = "^3.8.2"
 dask = "^2024.1.0"  # Pin to 2024.x for Datashader compatibility (2025.x has breaking changes)
 questionary = "^2.1.1"
 
+# Security fixes for transitive dependencies (pip-audit findings):
+pillow = ">=12.1.1"   # CVE-2026-25990: arbitrary code exec via PIL ImageMath
+tornado = ">=6.5.5"   # GHSA-78cv-mqj4-43f7, CVE-2026-31958: HTTP parsing flaws
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
 pytest-benchmark = "^4.0.0"
