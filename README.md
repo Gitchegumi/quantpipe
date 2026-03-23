@@ -2,6 +2,25 @@
 
 QuantPipe is an open-source platform for developing, testing, validating, and live trading your strategies using the Match-Trader API or MetaTrader (MT4/MT5). It allows traders and developers to research strategies offline and deploy the same logic into automated trading environments.
 
+## Data Requirements
+
+### Sorted Writes (Required)
+
+All parquet partitions **must** be written in sorted order: `(symbol, timestamp, strategy_id)`.
+
+This is enforced automatically by `data_io.sorted_write.write_parquet_sorted()` which all write paths use.
+Without sorted writes, DuckDB zone maps and bloom filters are ineffective, causing full scans
+(30s+ for single-symbol queries vs ≤3s target).
+
+**Sort key**: `symbol ASC, timestamp ASC, strategy_id ASC`  
+**Fallback** (when `strategy_id` not present): `symbol ASC, timestamp ASC`
+
+If you write parquet files directly, use:
+```python
+from src.data_io.sorted_write import write_parquet_sorted
+write_parquet_sorted(df, "path/to/output.parquet")
+```
+
 ## Overview
 
 QuantPipe provides a modular framework for developing, testing, validating, and trading algorithmic strategies in the FOREX market. It includes a general-purpose backtesting engine, dataset partitioning tools for test and validation workflows, and reusable risk management components.
