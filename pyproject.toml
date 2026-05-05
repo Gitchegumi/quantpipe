@@ -20,6 +20,9 @@ polars = "^1.17.0"
 pyarrow = "^18.0.0"
 psutil = "^6.1.0"
 
+[project.optional-dependencies]
+backend = ["fastapi>=0.115.0", "uvicorn[standard]>=0.32.0"]
+
 # Optional performance dependencies (install manually if needed):
 # numba = "^0.58.0"  # JIT compilation for trade simulation speedup (10-50x gains)
 tqdm = "^4.67.1"
