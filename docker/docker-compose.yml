@@ -1,0 +1,30 @@
+services:
+  quantpipe-api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../price_data:/app/price_data:ro
+      - ../results:/app/results
+    environment:
+      - QUANTPIPE_RESULTS_DIR=/app/results
+      - PYTHONPATH=/app/src
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  quantpipe-ui:
+    build:
+      context: ../quantpipe-ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - quantpipe-api
