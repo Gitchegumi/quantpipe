@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* shadcn/ui token mapping */
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+:root {
+  --background: 220 15% 6%;
+  --foreground: 213 27% 91%;
+  --card: 215 20% 10%;
+  --card-foreground: 213 27% 91%;
+  --popover: 215 20% 10%;
+  --popover-foreground: 213 27% 91%;
+  --primary: 213 92% 65%;
+  --primary-foreground: 215 20% 10%;
+  --secondary: 215 20% 14%;
+  --secondary-foreground: 213 27% 91%;
+  --muted: 215 20% 14%;
+  --muted-foreground: 215 15% 55%;
+  --accent: 263 70% 50%;
+  --accent-foreground: 213 27% 91%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 213 27% 91%;
+  --border: 215 20% 18%;
+  --input: 215 20% 14%;
+  --ring: 213 92% 65%;
+  --chart-1: 213 92% 65%;
+  --chart-2: 263 70% 55%;
+  --chart-3: 152 69% 50%;
+  --chart-4: 45 90% 60%;
+  --chart-5: 0 72% 51%;
+  --sidebar: 220 15% 6%;
+  --sidebar-foreground: 213 27% 91%;
+  --sidebar-primary: 213 92% 65%;
+  --sidebar-primary-foreground: 215 20% 10%;
+  --sidebar-accent: 215 20% 14%;
+  --sidebar-accent-foreground: 213 27% 91%;
+  --sidebar-border: 215 20% 18%;
+  --sidebar-ring: 213 92% 65%;
+  --radius: 0.75rem;
+}
+
+html {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+body {
+  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+}
+
+/* Scrollbar theming */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--card));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Selection */
+::selection {
+  background: hsl(var(--primary) / 0.3);
+  color: hsl(var(--foreground));
+}
+
+/* Code / monospace */
+pre, code {
+  font-family: var(--font-mono), ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+}
