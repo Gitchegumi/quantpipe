@@ -10,6 +10,38 @@ from pydantic import BaseModel, Field
 from src.models.portfolio import CurrencyPair
 
 
+class CandleEvent(BaseModel):
+    """Single candle data point for streaming replay."""
+
+    timestamp: datetime = Field(..., description="Candle open time")
+    open: float = Field(..., description="Open price")
+    high: float = Field(..., description="High price")
+    low: float = Field(..., description="Low price")
+    close: float = Field(..., description="Close price")
+    volume: float = Field(default=0.0, description="Volume")
+
+    class Config:
+        """Pydantic configuration."""
+
+        frozen = True
+
+
+class TradeEvent(BaseModel):
+    """Trade signal event emitted during replay."""
+
+    timestamp: datetime = Field(..., description="Signal time")
+    pair: CurrencyPair = Field(..., description="Currency pair")
+    signal: str = Field(..., description="Signal type (buy/sell/hold)")
+    price: float = Field(..., description="Entry/exit price")
+    size: float = Field(default=0.0, description="Position size")
+    reason: str = Field(default="", description="Signal rationale")
+
+    class Config:
+        """Pydantic configuration."""
+
+        frozen = True
+
+
 class RuntimeFailureEvent(BaseModel):
     """Records a runtime failure for a specific symbol.
 
