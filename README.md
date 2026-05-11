@@ -389,8 +389,48 @@ See `specs/009-optimize-ingestion/` for detailed architecture documentation.
 | Performance optimization       | `docs/performance.md`              |
 | Repository layout overview     | `docs/structure.md`                |
 | Contributing / dev setup       | `CONTRIBUTING.md`                  |
-| Full original specification    | `specs/001-trend-pullback/spec.md` |
-| Additional feature specs       | `specs/` directory                 |
+| Web GUI (Next.js + FastAPI)    | `frontend/` and `backend/` directories |
+
+## Web GUI
+
+QuantPipe includes a browser-based GUI built with **Next.js 16 (frontend)** and **FastAPI (backend)**.
+
+### Architecture
+
+The backend is a thin wrapper around the existing QuantPipe CLI — it exposes the core functionality via REST endpoints so the frontend can drive backtests, visualize results, and manage strategies without touching the CLI directly.
+
+```
+frontend (Next.js) → backend (FastAPI/uvicorn) → QuantPipe CLI / core libs
+```
+
+### Starting the Backend
+
+```powershell
+# Install backend dependencies first
+poetry install --with backend
+
+# Start the API server (default port 8000)
+poetry run uvicorn backend.api:app --reload --port 8000
+```
+
+### Starting the Frontend
+
+```powershell
+# From the repo root
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs on **port 3000** by default and proxies API requests to the backend at **port 8000**.
+
+### Ports Summary
+
+| Service    | URL                        |
+| ---------- | -------------------------- |
+| Frontend   | http://localhost:3000       |
+| Backend    | http://localhost:8000      |
+| API Docs   | http://localhost:8000/docs |
 
 ## Data Expectations (Summary)
 

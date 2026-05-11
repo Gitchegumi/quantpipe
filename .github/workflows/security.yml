@@ -13,10 +13,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Install Poetry
-        run: pip install poetry
-      - name: Install poetry-plugin-export
-        run: poetry self add poetry-plugin-export
+      - name: Install Poetry + export plugin
+        run: pip install poetry poetry-plugin-export
       - name: Export requirements
         run: poetry export --without-hashes -f requirements.txt -o requirements.txt
       - name: Install pip-audit
