@@ -155,6 +155,17 @@ class ResultSummary(BaseModel):
     timeframe: Optional[str] = None
     result_path: str
     created_at: Optional[datetime] = None
+    dataset: Optional[str] = "test"
+    pnl: float = 0.0
+    win_rate: float = 0.0
+    trades: int = 0
+    expectancy: float = 0.0
+    profit_factor: float = 0.0
+    max_drawdown: float = 0.0
+    sharpe_est: float = 0.0
+    average_r: float = 0.0
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 
 class ResultsResponse(BaseModel):

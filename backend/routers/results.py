@@ -56,6 +56,24 @@ def _build_summary(path: Path, data: dict[str, Any]) -> ResultSummary:
     direction = data.get("direction_mode") or data.get("direction")
     strategy = data.get("strategy")
     timeframe = data.get("timeframe")
+    dataset = data.get("dataset") or "test"
+
+    metrics = data.get("metrics") or {}
+    pnl = metrics.get("pnl") or metrics.get("total_pnl") or 0.0
+    win_rate = metrics.get("win_rate") or metrics.get("win_rate_pct") or 0.0
+    # Normalize win rate from standard percentage (e.g. 54.5) to a fraction (0.545) if necessary
+    if win_rate > 1.0:
+        win_rate = win_rate / 100.0
+    trades = metrics.get("trades") or metrics.get("total_trades") or 0
+    
+    expectancy = metrics.get("expectancy") or 0.0
+    profit_factor = metrics.get("profit_factor") or 0.0
+    max_drawdown = metrics.get("max_drawdown") or 0.0
+    sharpe_est = metrics.get("sharpe_est") or metrics.get("sharpe") or 0.0
+    average_r = metrics.get("average_r") or 0.0
+    
+    start_date = data.get("start_date") or metrics.get("start_date")
+    end_date = data.get("end_date") or metrics.get("end_date")
 
     created_at: Optional[datetime] = None
     try:
@@ -72,6 +90,17 @@ def _build_summary(path: Path, data: dict[str, Any]) -> ResultSummary:
         timeframe=timeframe,
         result_path=str(path.relative_to(REPO_ROOT)),
         created_at=created_at,
+        dataset=dataset,
+        pnl=pnl,
+        win_rate=win_rate,
+        trades=trades,
+        expectancy=expectancy,
+        profit_factor=profit_factor,
+        max_drawdown=max_drawdown,
+        sharpe_est=sharpe_est,
+        average_r=average_r,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 
