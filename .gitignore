@@ -244,3 +244,7 @@ src/strategy/*/
 # Also ignore any strategies created in root /strategy/ directory (scaffold default)
 /strategy/
 /runs/
+
+# next.js files
+.next/
+node_modules/
