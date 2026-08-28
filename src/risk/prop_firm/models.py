@@ -79,6 +79,7 @@ class ScalingReport:
     wallet_balance: float = 0.0
     net_payouts: float = 0.0
     total_costs: float = 0.0
+    payout_share: float = 0.8
 
     @property
     def tier_stats(self) -> dict[float, dict[str, int]]:

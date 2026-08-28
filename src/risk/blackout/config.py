@@ -82,6 +82,8 @@ class SessionOnlyConfig(BaseModel):
 
     enabled: bool = False
     allowed_sessions: list[str] = Field(default_factory=list)
+    force_close: bool = False
+    pre_close_minutes: int = Field(default=15, ge=0, le=60)
 
 
 class BlackoutConfig(BaseModel):
@@ -108,4 +110,5 @@ class BlackoutConfig(BaseModel):
     @property
     def any_enabled(self) -> bool:
         """Return True if any blackout type is enabled."""
+        # pylint: disable=no-member
         return self.news.enabled or self.sessions.enabled or self.session_only.enabled
